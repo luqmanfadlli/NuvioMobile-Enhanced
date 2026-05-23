@@ -30,7 +30,7 @@ enum class AppLanguage(
     PORTUGUESE("pt", Res.string.lang_portuguese_portugal),
     SPANISH("es", Res.string.lang_spanish),
     TURKISH("tr", Res.string.lang_turkish),
-    NORWEGIAN("no", Res.string.lang_norwegian),
+    NORWEGIAN("nb", Res.string.lang_norwegian),
     ;
 
     companion object {
