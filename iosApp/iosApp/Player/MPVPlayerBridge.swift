@@ -1,5 +1,7 @@
 import Foundation
 import UIKit
+import AVFoundation
+import AVKit
 import Libmpv
 import ComposeApp
 
