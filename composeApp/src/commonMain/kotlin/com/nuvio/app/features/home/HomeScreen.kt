@@ -48,7 +48,6 @@ import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.CachedInProgressItem
 import com.nuvio.app.features.watchprogress.CachedNextUpItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
-import com.nuvio.app.features.watchprogress.ContinueWatchingLimit
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
@@ -234,7 +233,7 @@ fun HomeScreen(
     }
 
     val visibleContinueWatchingEntries = remember(effectiveWatchProgressEntries) {
-        effectiveWatchProgressEntries.continueWatchingEntries()
+        effectiveWatchProgressEntries.continueWatchingEntries(limit = HomeContinueWatchingMaxRecentProgressItems)
     }
 
     LaunchedEffect(visibleContinueWatchingEntries) {
@@ -476,7 +475,7 @@ fun HomeScreen(
         val candidatesToResolve = completedSeriesCandidates.filter { candidate ->
             candidate.content.id !in cachedResolvedNextUpItems
         }
-        val resolutionCandidates = candidatesToResolve.take(NEXT_UP_INITIAL_RESOLUTION_LIMIT)
+        val resolutionCandidates = candidatesToResolve.take(HomeNextUpInitialResolutionLimit)
         val seedLastWatchedMap = completedSeriesCandidates.associate { it.content.id to it.markedAtEpochMs }
         if (candidatesToResolve.isEmpty()) {
             nextUpItemsBySeries = cachedResolvedNextUpItems
@@ -534,9 +533,6 @@ fun HomeScreen(
                     ).toSet()
             }
 
-            if (cachedResolvedNextUpItems.size + freshResults.size >= ContinueWatchingLimit) {
-                break
-            }
         }
 
         val results = cachedResolvedNextUpItems + freshResults
@@ -780,10 +776,11 @@ fun HomeScreen(
 }
 
 private const val HOME_CATALOG_PREVIEW_LIMIT = 18
+internal const val HomeContinueWatchingMaxRecentProgressItems = 300
+internal const val HomeNextUpInitialResolutionLimit = 32
 private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 private const val OPTIMISTIC_NEXT_UP_SEED_WINDOW_MS = 3L * 60L * 1000L
-private const val NEXT_UP_INITIAL_RESOLUTION_LIMIT = ContinueWatchingLimit * 2
-private const val NEXT_UP_RESOLUTION_CONCURRENCY = 8
+private const val NEXT_UP_RESOLUTION_CONCURRENCY = 4
 private const val NEXT_UP_RESOLUTION_BATCH_SIZE = NEXT_UP_RESOLUTION_CONCURRENCY
 
 internal fun filterEntriesForTraktContinueWatchingWindow(

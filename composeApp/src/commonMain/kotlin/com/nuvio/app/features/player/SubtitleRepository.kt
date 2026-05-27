@@ -86,6 +86,7 @@ object SubtitleRepository {
                                 url = url,
                                 language = normalizedLang,
                                 display = "${getLanguageLabelForCode(rawLang)} (${addon.displayTitle})",
+                                addonName = addon.displayTitle,
                             )
                         )
                     }

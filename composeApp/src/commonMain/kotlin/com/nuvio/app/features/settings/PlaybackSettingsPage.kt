@@ -42,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.player.AddonSubtitleStartupMode
 import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
 import com.nuvio.app.features.player.ExternalPlayerApp
@@ -61,9 +63,12 @@ import com.nuvio.app.features.player.IosTargetPrimaries
 import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
+import com.nuvio.app.features.player.SubtitleBackgroundColorSwatches
+import com.nuvio.app.features.player.SubtitleColorSwatches
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.formatPlaybackSpeedLabel
 import com.nuvio.app.features.player.languageLabelForCode
+import com.nuvio.app.features.player.toStorageHexString
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
@@ -121,6 +126,17 @@ private fun formatStep(value: Float): String {
     }
 }
 
+@Composable
+private fun addonSubtitleStartupModeLabel(mode: AddonSubtitleStartupMode): String =
+    when (mode) {
+        AddonSubtitleStartupMode.FAST_STARTUP ->
+            stringResource(Res.string.settings_playback_addon_subtitle_startup_fast)
+        AddonSubtitleStartupMode.PREFERRED_ONLY ->
+            stringResource(Res.string.settings_playback_addon_subtitle_startup_preferred)
+        AddonSubtitleStartupMode.ALL_SUBTITLES ->
+            stringResource(Res.string.settings_playback_addon_subtitle_startup_all)
+    }
+
 fun snapToStep(value: Float, step: Float): Float {
     return (value / step).roundToInt() * step
 }
@@ -155,6 +171,64 @@ fun ValueBox(
 }
 
 @Composable
+private fun SettingsSliderRow(
+    title: String,
+    value: Int,
+    valueText: String,
+    valueRange: IntRange,
+    step: Int,
+    isTablet: Boolean,
+    onValueChange: (Int) -> Unit,
+) {
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    var sliderValue by remember(value) { mutableFloatStateOf(value.toFloat()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+            ValueBox(text = valueText, modifier = Modifier.wrapContentWidth())
+        }
+        Slider(
+            value = sliderValue.coerceIn(valueRange.first.toFloat(), valueRange.last.toFloat()),
+            onValueChange = { sliderValue = snapToStep(it, step.toFloat()) },
+            onValueChangeFinished = {
+                onValueChange(sliderValue.roundToInt().coerceIn(valueRange.first, valueRange.last))
+            },
+            valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
+            steps = calculateSteps(valueRange.first.toFloat(), valueRange.last.toFloat(), step.toFloat()),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun subtitleColorLabel(color: Color): String {
+    return if (color.alpha == 0f) {
+        stringResource(Res.string.settings_playback_subtitle_color_transparent)
+    } else {
+        color.toStorageHexString()
+    }
+}
+
+@Composable
 private fun PlaybackSettingsSection(
     isTablet: Boolean,
     showLoadingOverlay: Boolean,
@@ -176,6 +250,10 @@ private fun PlaybackSettingsSection(
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
     var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
     var showSecondarySubtitleDialog by remember { mutableStateOf(false) }
+    var showAddonSubtitleStartupModeDialog by remember { mutableStateOf(false) }
+    var showSubtitleTextColorDialog by remember { mutableStateOf(false) }
+    var showSubtitleBackgroundColorDialog by remember { mutableStateOf(false) }
+    var showSubtitleOutlineColorDialog by remember { mutableStateOf(false) }
     var showExternalPlayerDialog by remember { mutableStateOf(false) }
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showDecoderPriorityDialog by remember { mutableStateOf(false) }
@@ -314,6 +392,131 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onClick = { showSecondarySubtitleDialog = true },
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_use_forced),
+                    description = stringResource(Res.string.settings_playback_subtitle_use_forced_description),
+                    checked = autoPlayPlayerSettings.subtitleStyle.useForcedSubtitles,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setSubtitleStyle(
+                            autoPlayPlayerSettings.subtitleStyle.copy(useForcedSubtitles = enabled),
+                        )
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_show_preferred_only),
+                    description = stringResource(Res.string.settings_playback_subtitle_show_preferred_only_description),
+                    checked = autoPlayPlayerSettings.subtitleStyle.showOnlyPreferredLanguages,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setSubtitleStyle(
+                            autoPlayPlayerSettings.subtitleStyle.copy(showOnlyPreferredLanguages = enabled),
+                        )
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_playback_addon_subtitle_startup_mode),
+                    description = addonSubtitleStartupModeLabel(autoPlayPlayerSettings.addonSubtitleStartupMode),
+                    isTablet = isTablet,
+                    onClick = { showAddonSubtitleStartupModeDialog = true },
+                )
+            }
+        }
+
+        SettingsSection(
+            title = stringResource(Res.string.settings_playback_section_subtitle_rendering),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                val subtitleStyle = autoPlayPlayerSettings.subtitleStyle
+                SettingsSliderRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_size),
+                    value = subtitleStyle.fontSizeSp,
+                    valueText = stringResource(Res.string.compose_player_font_size_value, subtitleStyle.fontSizeSp),
+                    valueRange = 12..40,
+                    step = 2,
+                    isTablet = isTablet,
+                    onValueChange = { value ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(fontSizeSp = value))
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSliderRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_vertical_offset),
+                    value = subtitleStyle.bottomOffset,
+                    valueText = subtitleStyle.bottomOffset.toString(),
+                    valueRange = 0..200,
+                    step = 5,
+                    isTablet = isTablet,
+                    onValueChange = { value ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(bottomOffset = value))
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_bold),
+                    description = stringResource(Res.string.settings_playback_subtitle_bold_description),
+                    checked = subtitleStyle.bold,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(bold = enabled))
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_text_color),
+                    description = subtitleColorLabel(subtitleStyle.textColor),
+                    isTablet = isTablet,
+                    onClick = { showSubtitleTextColorDialog = true },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_background_color),
+                    description = subtitleColorLabel(subtitleStyle.backgroundColor),
+                    isTablet = isTablet,
+                    onClick = { showSubtitleBackgroundColorDialog = true },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_outline),
+                    description = stringResource(Res.string.settings_playback_subtitle_outline_description),
+                    checked = subtitleStyle.outlineEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(outlineEnabled = enabled))
+                    },
+                )
+                if (subtitleStyle.outlineEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_subtitle_outline_color),
+                        description = subtitleColorLabel(subtitleStyle.outlineColor),
+                        isTablet = isTablet,
+                        onClick = { showSubtitleOutlineColorDialog = true },
+                    )
+                }
+                if (!isIos) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_enable_libass),
+                        description = stringResource(Res.string.settings_playback_enable_libass_description),
+                        checked = useLibass,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setUseLibass,
+                    )
+                    if (useLibass) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_render_type),
+                            description = libassRenderTypeLabel(libassRenderType),
+                            isTablet = isTablet,
+                            onClick = { showLibassRenderTypeDialog = true },
+                        )
+                    }
+                }
             }
         }
 
@@ -541,32 +744,6 @@ private fun PlaybackSettingsSection(
                         isTablet = isTablet,
                         onClick = { showIosTargetTransferDialog = true },
                     )
-                }
-            }
-        }
-
-        if (!isIos) {
-            SettingsSection(
-                title = stringResource(Res.string.settings_playback_section_subtitle_rendering),
-                isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_playback_enable_libass),
-                        description = stringResource(Res.string.settings_playback_enable_libass_description),
-                        checked = useLibass,
-                        isTablet = isTablet,
-                        onCheckedChange = PlayerSettingsRepository::setUseLibass,
-                    )
-                    if (useLibass) {
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsNavigationRow(
-                            title = stringResource(Res.string.settings_playback_render_type),
-                            description = libassRenderTypeLabel(libassRenderType),
-                            isTablet = isTablet,
-                            onClick = { showLibassRenderTypeDialog = true },
-                        )
-                    }
                 }
             }
         }
@@ -874,6 +1051,56 @@ private fun PlaybackSettingsSection(
                 showSecondarySubtitleDialog = false
             },
             onDismiss = { showSecondarySubtitleDialog = false },
+        )
+    }
+
+    if (showAddonSubtitleStartupModeDialog) {
+        AddonSubtitleStartupModeDialog(
+            selectedMode = autoPlayPlayerSettings.addonSubtitleStartupMode,
+            onModeSelected = {
+                PlayerSettingsRepository.setAddonSubtitleStartupMode(it)
+                showAddonSubtitleStartupModeDialog = false
+            },
+            onDismiss = { showAddonSubtitleStartupModeDialog = false },
+        )
+    }
+
+    if (showSubtitleTextColorDialog) {
+        SubtitleColorDialog(
+            title = stringResource(Res.string.settings_playback_subtitle_text_color),
+            colors = SubtitleColorSwatches,
+            selectedColor = autoPlayPlayerSettings.subtitleStyle.textColor,
+            onColorSelected = { color ->
+                PlayerSettingsRepository.setSubtitleStyle(autoPlayPlayerSettings.subtitleStyle.copy(textColor = color))
+                showSubtitleTextColorDialog = false
+            },
+            onDismiss = { showSubtitleTextColorDialog = false },
+        )
+    }
+
+    if (showSubtitleBackgroundColorDialog) {
+        SubtitleColorDialog(
+            title = stringResource(Res.string.settings_playback_subtitle_background_color),
+            colors = SubtitleBackgroundColorSwatches,
+            selectedColor = autoPlayPlayerSettings.subtitleStyle.backgroundColor,
+            onColorSelected = { color ->
+                PlayerSettingsRepository.setSubtitleStyle(autoPlayPlayerSettings.subtitleStyle.copy(backgroundColor = color))
+                showSubtitleBackgroundColorDialog = false
+            },
+            onDismiss = { showSubtitleBackgroundColorDialog = false },
+        )
+    }
+
+    if (showSubtitleOutlineColorDialog) {
+        SubtitleColorDialog(
+            title = stringResource(Res.string.settings_playback_subtitle_outline_color),
+            colors = SubtitleColorSwatches,
+            selectedColor = autoPlayPlayerSettings.subtitleStyle.outlineColor,
+            onColorSelected = { color ->
+                PlayerSettingsRepository.setSubtitleStyle(autoPlayPlayerSettings.subtitleStyle.copy(outlineColor = color))
+                showSubtitleOutlineColorDialog = false
+            },
+            onDismiss = { showSubtitleOutlineColorDialog = false },
         )
     }
 
@@ -1665,6 +1892,209 @@ private fun LibassRenderTypeDialog(
                             ) {
                                 Text(
                                     text = stringResource(labelRes),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Box(
+                                    modifier = Modifier.size(24.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_playback_dialog_close),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AddonSubtitleStartupModeDialog(
+    selectedMode: AddonSubtitleStartupMode,
+    onModeSelected: (AddonSubtitleStartupMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = listOf(
+        Triple(
+            AddonSubtitleStartupMode.FAST_STARTUP,
+            Res.string.settings_playback_addon_subtitle_startup_fast,
+            Res.string.settings_playback_addon_subtitle_startup_fast_description,
+        ),
+        Triple(
+            AddonSubtitleStartupMode.PREFERRED_ONLY,
+            Res.string.settings_playback_addon_subtitle_startup_preferred,
+            Res.string.settings_playback_addon_subtitle_startup_preferred_description,
+        ),
+        Triple(
+            AddonSubtitleStartupMode.ALL_SUBTITLES,
+            Res.string.settings_playback_addon_subtitle_startup_all,
+            Res.string.settings_playback_addon_subtitle_startup_all_description,
+        ),
+    )
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_addon_subtitle_startup_mode),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    options.forEach { (mode, titleRes, descriptionRes) ->
+                        val isSelected = mode == selectedMode
+                        val containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onModeSelected(mode) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = containerColor,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(titleRes),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = stringResource(descriptionRes),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier.size(24.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SubtitleColorDialog(
+    title: String,
+    colors: List<Color>,
+    selectedColor: Color,
+    onColorSelected: (Color) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    colors.forEach { color ->
+                        val isSelected = selectedColor.toStorageHexString() == color.toStorageHexString()
+                        val containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onColorSelected(color) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = containerColor,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (color.alpha == 0f) {
+                                        MaterialTheme.colorScheme.surface
+                                    } else {
+                                        color
+                                    },
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                                    ),
+                                ) {}
+                                Spacer(modifier = Modifier.size(12.dp))
+                                Text(
+                                    text = subtitleColorLabel(color),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f),

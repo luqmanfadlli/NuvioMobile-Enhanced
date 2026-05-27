@@ -28,6 +28,16 @@ private data class StoredWatchedPayload(
     val lastSuccessfulPushEpochMs: Long = 0L,
 )
 
+internal enum class WatchedTraktHistorySync {
+    Mirror,
+    Skip,
+}
+
+internal fun shouldMirrorWatchedMarkToTraktHistory(
+    sync: WatchedTraktHistorySync,
+    isTraktAuthenticated: Boolean,
+): Boolean = sync == WatchedTraktHistorySync.Mirror && isTraktAuthenticated
+
 object WatchedRepository {
     private const val watchedItemsPageSize = 900
 
@@ -134,6 +144,17 @@ object WatchedRepository {
     }
 
     fun markWatched(items: Collection<WatchedItem>) {
+        markWatched(items = items, traktHistorySync = WatchedTraktHistorySync.Mirror)
+    }
+
+    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem) {
+        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip)
+    }
+
+    private fun markWatched(
+        items: Collection<WatchedItem>,
+        traktHistorySync: WatchedTraktHistorySync,
+    ) {
         ensureLoaded()
         if (items.isEmpty()) return
         val markedAt = WatchedClock.nowEpochMs()
@@ -146,7 +167,7 @@ object WatchedRepository {
         }
         publish()
         persist()
-        pushMarksToServer(timestampedItems)
+        pushMarksToServer(timestampedItems, traktHistorySync)
     }
 
     fun unmarkWatched(item: WatchedItem) {
@@ -223,13 +244,22 @@ object WatchedRepository {
         }
     }
 
-    private fun pushMarksToServer(items: Collection<WatchedItem>) {
+    private fun pushMarksToServer(
+        items: Collection<WatchedItem>,
+        traktHistorySync: WatchedTraktHistorySync,
+    ) {
         syncScope.launch {
             runCatching {
                 if (items.isEmpty()) return@runCatching
                 val profileId = ProfileRepository.activeProfileId
-                pushToActiveTargets(profileId = profileId, items = items)
-                recordSuccessfulPush(profileId = profileId, items = items)
+                val pushed = pushToActiveTargets(
+                    profileId = profileId,
+                    items = items,
+                    traktHistorySync = traktHistorySync,
+                )
+                if (pushed) {
+                    recordSuccessfulPush(profileId = profileId, items = items)
+                }
             }.onFailure { e ->
                 log.e(e) { "Failed to push watched items" }
             }
@@ -296,16 +326,24 @@ object WatchedRepository {
     private suspend fun pushToActiveTargets(
         profileId: Int,
         items: Collection<WatchedItem>,
-    ) {
+        traktHistorySync: WatchedTraktHistorySync,
+    ): Boolean {
+        val shouldMirrorToTrakt = shouldMirrorWatchedMarkToTraktHistory(
+            sync = traktHistorySync,
+            isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
+        )
+
         if (shouldUseTraktWatchedSync()) {
+            if (!shouldMirrorToTrakt) return false
             TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
-            return
+            return true
         }
 
         syncAdapter.push(profileId = profileId, items = items)
-        if (TraktAuthRepository.isAuthenticated.value) {
+        if (shouldMirrorToTrakt) {
             TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
         }
+        return true
     }
 
     private suspend fun deleteFromActiveTargets(

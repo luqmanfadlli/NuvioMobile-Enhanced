@@ -129,7 +129,7 @@ object WatchingActions {
             episode = entry.episodeNumber,
             markedAtEpochMs = entry.lastUpdatedEpochMs,
         )
-        WatchedRepository.markWatched(watchedItem)
+        WatchedRepository.markWatchedFromPlaybackCompletion(watchedItem)
 
         if (!entry.isEpisode) return
         actionScope.launch {

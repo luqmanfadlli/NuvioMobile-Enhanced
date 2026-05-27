@@ -381,8 +381,25 @@ object WatchProgressRepository {
         if (videoIds.isEmpty()) return
 
         if (shouldUseTraktProgress()) {
+            val entriesToRemove = currentEntries().filter { entry -> entry.videoId in videoIds }
             videoIds.forEach(TraktProgressRepository::applyOptimisticRemoval)
             publish()
+            if (entriesToRemove.isNotEmpty()) {
+                syncScope.launch {
+                    entriesToRemove.forEach { entry ->
+                        runCatching {
+                            TraktProgressRepository.removeProgress(
+                                contentId = entry.parentMetaId,
+                                seasonNumber = entry.seasonNumber,
+                                episodeNumber = entry.episodeNumber,
+                            )
+                        }.onFailure { error ->
+                            if (error is CancellationException) throw error
+                            log.e(error) { "Failed to clear Trakt playback progress for ${entry.videoId}" }
+                        }
+                    }
+                }
+            }
             return
         }
 
@@ -462,6 +479,22 @@ object WatchProgressRepository {
     fun continueWatching(): List<WatchProgressEntry> {
         ensureLoaded()
         return currentEntries().continueWatchingEntries()
+    }
+
+    fun refreshEpisodeProgress(contentId: String, forceRefresh: Boolean = false) {
+        ensureLoaded()
+        if (!shouldUseTraktProgress()) return
+        syncScope.launch {
+            runCatching {
+                TraktProgressRepository.refreshEpisodeProgress(
+                    contentId = contentId,
+                    forceRefresh = forceRefresh,
+                )
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                log.w { "Failed to refresh Trakt episode progress for $contentId: ${error.message}" }
+            }
+        }
     }
 
     private fun upsert(
