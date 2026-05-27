@@ -288,7 +288,9 @@ actual fun PlatformPlayerSurface(
 
     // Cleanup
     DisposableEffect(bridge) {
+        IosPictureInPictureSession.registerBridge(bridge)
         onDispose {
+            IosPictureInPictureSession.unregisterBridge(bridge)
             bridge.destroy()
         }
     }
