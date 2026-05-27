@@ -1403,12 +1403,12 @@
     <string name="cw_airs_today">Tayang hari ini</string>
     <string name="cw_airs_tomorrow">Tayang besok</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="other">Tayang dalam %1$d hari</item>
+        <item quantity="other">Tayang dalam %d hari</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">Hari ini</string>
     <string name="cw_airs_tomorrow_short">Besok</string>
     <plurals name="cw_airs_in_days_short">
-        <item quantity="other">%1$d hari lagi</item>
+        <item quantity="other">Dalam %d hari</item>
     </plurals>
 </resources>
