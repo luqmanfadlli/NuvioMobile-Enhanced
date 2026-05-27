@@ -93,28 +93,11 @@ actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
 actual fun ManagePlayerPictureInPicture(
     isPlaying: Boolean,
     playerSize: IntSize,
-): PlayerPictureInPictureController {
-    var active by remember { mutableStateOf(IosPictureInPictureSession.isActive.value) }
 
-    LaunchedEffect(Unit) {
-        IosPictureInPictureSession.isActive.collect { value -> active = value }
-    }
-
-    // iOS apps cannot programmatically background themselves, so a manual PiP button
-    // can't deliver the Android-style "tap to minimize + float" UX. AVKit's inline
-    // auto-start (canStartPictureInPictureAutomaticallyFromInline = true) handles PiP
-    // when the user swipes home, which is the native iOS pattern. Report unsupported
-    // so the player header hides the button; isActive still tracks system PiP state
-    // so the rest of the UI reacts when the floating window appears.
-    return remember(active) {
-        object : PlayerPictureInPictureController {
-            override val isSupported: Boolean = false
-            override val isActive: Boolean = active
-            override fun enter() {
-                IosPictureInPictureSession.start()
-            }
-        }
-    }
+) {
+    // On iOS, Picture-in-Picture is activated automatically by the system
+    // when the user swipes to the Home screen (Auto-PiP), thanks to MPVPictureInPictureController.
+    // Therefore, we don't need to return a Controller or trigger PiP manually from Compose.
 }
 
 @Composable
