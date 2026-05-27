@@ -547,11 +547,12 @@ private fun ProgressControls(
                             onClick = onLiveChannelsClick,
                         )
                     } else {
-                    PlayerActionPillButton(
-                        label = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
-                        icon = Icons.Rounded.Speed,
-                        onClick = onSpeedClick,
-                    )
+                        PlayerActionPillButton(
+                            label = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
+                            icon = Icons.Rounded.Speed,
+                            onClick = onSpeedClick,
+                        )
+                    }
                     PlayerActionPillButton(
                         label = stringResource(Res.string.compose_player_subs),
                         painter = subtitlesPainter,
