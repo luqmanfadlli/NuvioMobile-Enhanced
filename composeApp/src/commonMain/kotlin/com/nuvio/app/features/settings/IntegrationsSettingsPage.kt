@@ -20,10 +20,10 @@ import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.integrationsContent(
     isTablet: Boolean,
+    onDebridClick: () -> Unit,
     onTraktClick: () -> Unit,
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
-    onDebridClick: () -> Unit,
     onLiveTvClick: () -> Unit,
 ) {
     item {
