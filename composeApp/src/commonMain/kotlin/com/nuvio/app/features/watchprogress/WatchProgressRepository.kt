@@ -3,7 +3,10 @@ package com.nuvio.app.features.watchprogress
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.AddonsUiState
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerPlaybackSnapshot
@@ -26,6 +29,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,14 +39,29 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 
-private const val NUVIO_SYNC_PERIODIC_INTERVAL_MS = 5L * 60L * 1000L
+private const val NUVIO_SYNC_PERIODIC_INTERVAL_MS = 30L * 60L * 1000L
 private const val WATCH_PROGRESS_METADATA_RESOLUTION_CONCURRENCY = 4
+private const val WATCH_PROGRESS_METADATA_RESOLUTION_LIMIT = 64
 
 private data class RemoteMetadataResolutionResult(
     val key: Pair<String, String>,
     val entries: List<WatchProgressEntry>,
     val meta: MetaDetails?,
 )
+
+private data class MetadataProviderReadiness(
+    val providers: List<AddonManifest>,
+    val isRefreshing: Boolean,
+) {
+    val fingerprint: String
+        get() = providers.map(AddonManifest::transportUrl).sorted().joinToString(separator = "|")
+
+    val isReady: Boolean
+        get() = providers.isNotEmpty() && !isRefreshing
+
+    val isSettledWithoutProviders: Boolean
+        get() = !isRefreshing && providers.isEmpty()
+}
 
 object WatchProgressRepository {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -57,6 +76,7 @@ object WatchProgressRepository {
     private var metadataResolutionJob: Job? = null
     private var isPullingNuvioSyncFromServer = false
     private var hasCompletedInitialNuvioSyncPull = false
+    private var lastAddonMetadataReadyFingerprint: String? = null
     internal var syncAdapter: ProgressSyncAdapter = SupabaseProgressSyncAdapter
 
     init {
@@ -103,11 +123,24 @@ object WatchProgressRepository {
         }
 
         syncScope.launch {
+            AddonRepository.uiState.collectLatest { state ->
+                retryMetadataResolutionWhenAddonMetaProvidersReady(state)
+            }
+        }
+
+        syncScope.launch {
             while (true) {
                 delay(NUVIO_SYNC_PERIODIC_INTERVAL_MS)
                 TraktAuthRepository.ensureLoaded()
                 TraktSettingsRepository.ensureLoaded()
-                if (shouldUseTraktProgress()) continue
+                if (shouldUseTraktProgress()) {
+                    runCatching { TraktProgressRepository.refreshNow() }
+                        .onFailure { error ->
+                            if (error is CancellationException) throw error
+                            log.w { "Periodic Trakt progress refresh failed: ${error.message}" }
+                        }
+                    continue
+                }
 
                 val authState = AuthRepository.state.value
                 if (authState !is AuthState.Authenticated || authState.isAnonymous) continue
@@ -147,6 +180,7 @@ object WatchProgressRepository {
         metadataResolutionJob?.cancel()
         hasLoaded = false
         currentProfileId = 1
+        lastAddonMetadataReadyFingerprint = null
         entriesByVideoId.clear()
         TraktProgressRepository.clearLocalState()
         TraktSettingsRepository.clearLocalState()
@@ -156,6 +190,7 @@ object WatchProgressRepository {
     private fun loadFromDisk(profileId: Int) {
         currentProfileId = profileId
         hasLoaded = true
+        lastAddonMetadataReadyFingerprint = null
         entriesByVideoId.clear()
 
         val payload = WatchProgressStorage.loadPayload(profileId).orEmpty().trim()
@@ -263,30 +298,48 @@ object WatchProgressRepository {
             isCompleted = isWatchProgressComplete(position, duration, false),
         )
 
+    private fun retryMetadataResolutionWhenAddonMetaProvidersReady(state: AddonsUiState) {
+        if (!hasLoaded || shouldUseTraktProgress()) return
+
+        val readiness = state.metadataProviderReadiness()
+        if (!readiness.isReady) return
+
+        val fingerprint = readiness.fingerprint
+        if (fingerprint == lastAddonMetadataReadyFingerprint) return
+        lastAddonMetadataReadyFingerprint = fingerprint
+
+        if (metadataResolutionJob?.isActive == true) return
+        resolveRemoteMetadata()
+    }
+
     private fun resolveRemoteMetadata() {
         val missingMetadataEntries = entriesByVideoId.values
             .filter { it.poster.isNullOrBlank() || it.background.isNullOrBlank() }
-        val entriesToResolve = missingMetadataEntries.continueWatchingEntries(limit = ContinueWatchingLimit)
+        val entriesToResolve = missingMetadataEntries.continueWatchingEntries(
+            limit = WATCH_PROGRESS_METADATA_RESOLUTION_LIMIT,
+        )
         val needsResolution = entriesToResolve
             .groupBy { it.parentMetaId to it.contentType }
 
-        if (needsResolution.isEmpty()) {
-            return
-        }
+        if (needsResolution.isEmpty()) return
 
         metadataResolutionJob?.cancel()
         metadataResolutionJob = syncScope.launch {
-            withTimeoutOrNull(30_000L) {
-                AddonRepository.awaitManifestsLoaded()
-            } ?: run {
-                log.w { "Timed out waiting for addon manifests" }
-                return@launch
+            val providerReadiness = awaitReadyMetadataProviders() ?: return@launch
+            lastAddonMetadataReadyFingerprint = providerReadiness.fingerprint
+
+            val supportedNeedsResolution = needsResolution.filter { (key, _) ->
+                val (metaId, metaType) = key
+                providerReadiness.providers.any { provider ->
+                    provider.supportsMetaRequest(type = metaType, id = metaId)
+                }
             }
+            if (supportedNeedsResolution.isEmpty()) return@launch
 
             var resolvedEntries = 0
             val semaphore = Semaphore(WATCH_PROGRESS_METADATA_RESOLUTION_CONCURRENCY)
             val resolutionResults = coroutineScope {
-                needsResolution.map { (key, entries) ->
+                supportedNeedsResolution.map { (key, entries) ->
                     async {
                         semaphore.withPermit {
                             fetchRemoteMetadataGroup(key = key, entries = entries)
@@ -356,20 +409,36 @@ object WatchProgressRepository {
         )
     }
 
+    private suspend fun awaitReadyMetadataProviders(): MetadataProviderReadiness? {
+        val current = AddonRepository.uiState.value.metadataProviderReadiness()
+        if (current.isReady) return current
+        if (current.isSettledWithoutProviders) return null
+
+        val settled = withTimeoutOrNull(30_000L) {
+            AddonRepository.uiState.first { state ->
+                val readiness = state.metadataProviderReadiness()
+                readiness.isReady || readiness.isSettledWithoutProviders
+            }.metadataProviderReadiness()
+        }
+        return settled?.takeIf { it.isReady }
+    }
+
     fun upsertPlaybackProgress(
         session: WatchProgressPlaybackSession,
         snapshot: PlayerPlaybackSnapshot,
+        syncRemote: Boolean = true,
     ) {
         ensureLoaded()
-        upsert(session = session, snapshot = snapshot, persist = true)
+        upsert(session = session, snapshot = snapshot, persist = true, syncRemote = syncRemote)
     }
 
     fun flushPlaybackProgress(
         session: WatchProgressPlaybackSession,
         snapshot: PlayerPlaybackSnapshot,
+        syncRemote: Boolean = true,
     ) {
         ensureLoaded()
-        upsert(session = session, snapshot = snapshot, persist = true)
+        upsert(session = session, snapshot = snapshot, persist = true, syncRemote = syncRemote)
     }
 
     fun clearProgress(videoId: String) {
@@ -501,6 +570,7 @@ object WatchProgressRepository {
         session: WatchProgressPlaybackSession,
         snapshot: PlayerPlaybackSnapshot,
         persist: Boolean,
+        syncRemote: Boolean,
     ) {
         val positionMs = snapshot.positionMs.coerceAtLeast(0L)
         val durationMs = snapshot.durationMs.coerceAtLeast(0L)
@@ -553,9 +623,11 @@ object WatchProgressRepository {
         if (entry.poster.isNullOrBlank() || entry.background.isNullOrBlank()) {
             resolveRemoteMetadata()
         }
-        pushScrobbleToServer(entry)
+        if (syncRemote) {
+            pushScrobbleToServer(entry)
+        }
         if (shouldCascadeCompletedProgressToWatchedHistory(entry, useTraktProgress)) {
-            WatchingActions.onProgressEntryUpdated(entry)
+            WatchingActions.onProgressEntryUpdated(entry, syncRemote = syncRemote)
         }
     }
 
@@ -622,4 +694,24 @@ object WatchProgressRepository {
         return shouldUseTraktProgress() && TraktProgressRepository.isShowHiddenFromProgress(contentId)
     }
 
+    private fun AddonsUiState.metadataProviderReadiness(): MetadataProviderReadiness {
+        val enabled = addons.enabledAddons()
+        val providers = enabled
+            .mapNotNull { addon -> addon.manifest }
+            .filter { manifest -> manifest.hasMetaResource() }
+        return MetadataProviderReadiness(
+            providers = providers,
+            isRefreshing = enabled.any { addon -> addon.isRefreshing },
+        )
+    }
+
+    private fun AddonManifest.hasMetaResource(): Boolean =
+        resources.any { resource -> resource.name == "meta" }
+
+    private fun AddonManifest.supportsMetaRequest(type: String, id: String): Boolean =
+        resources.any { resource ->
+            resource.name == "meta" &&
+                resource.types.contains(type) &&
+                (resource.idPrefixes.isEmpty() || resource.idPrefixes.any { prefix -> id.startsWith(prefix) })
+        }
 }

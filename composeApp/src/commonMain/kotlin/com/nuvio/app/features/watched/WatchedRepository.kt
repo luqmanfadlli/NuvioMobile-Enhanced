@@ -147,13 +147,14 @@ object WatchedRepository {
         markWatched(items = items, traktHistorySync = WatchedTraktHistorySync.Mirror)
     }
 
-    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem) {
-        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip)
+    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem, syncRemote: Boolean = true) {
+        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip, syncRemote = syncRemote)
     }
 
     private fun markWatched(
         items: Collection<WatchedItem>,
         traktHistorySync: WatchedTraktHistorySync,
+        syncRemote: Boolean = true,
     ) {
         ensureLoaded()
         if (items.isEmpty()) return
@@ -167,7 +168,9 @@ object WatchedRepository {
         }
         publish()
         persist()
-        pushMarksToServer(timestampedItems, traktHistorySync)
+        if (syncRemote) {
+            pushMarksToServer(timestampedItems, traktHistorySync)
+        }
     }
 
     fun unmarkWatched(item: WatchedItem) {

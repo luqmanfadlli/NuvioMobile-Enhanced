@@ -16,6 +16,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.player_error_mpv_unavailable
+import org.jetbrains.compose.resources.getString
 
 private const val TAG = "NuvioiOSPlayer"
 
@@ -49,7 +52,7 @@ actual fun PlatformPlayerSurface(
 
     if (bridge == null) {
         LaunchedEffect(Unit) {
-            latestOnError.value("MPV player engine not available. Please rebuild the app.")
+            latestOnError.value(getString(Res.string.player_error_mpv_unavailable))
         }
         return
     }
