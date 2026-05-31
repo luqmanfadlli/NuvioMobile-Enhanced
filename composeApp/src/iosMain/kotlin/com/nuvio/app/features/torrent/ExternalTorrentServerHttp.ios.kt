@@ -1,6 +1,9 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.nuvio.app.features.torrent
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSMutableURLRequest
 import platform.Foundation.NSOperationQueue
