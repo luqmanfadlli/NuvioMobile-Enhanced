@@ -68,6 +68,16 @@ interface NuvioPlayerBridge {
     fun getPlaybackSpeed(): Float
     fun getErrorMessage(): String
     fun destroy()
+
+    fun isPictureInPictureSupported(): Boolean
+    fun isPictureInPictureActive(): Boolean
+    fun startPictureInPicture()
+    fun stopPictureInPicture()
+    fun setPictureInPictureStateListener(listener: PictureInPictureStateListener?)
+}
+
+interface PictureInPictureStateListener {
+    fun onPictureInPictureActiveChanged(active: Boolean)
 }
 
 /**
