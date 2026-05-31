@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+
 package com.nuvio.app.features.trakt
 
 import platform.Foundation.NSDate
