@@ -507,7 +507,6 @@ private fun MobileSettingsScreen(
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
                             onContentDiscoveryClick = { onPageChange(SettingsPage.ContentDiscovery) },
                             onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
-                            onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
                             onSupportersContributorsClick = onSupportersContributorsClick,
                             onLicensesAttributionsClick = onLicensesAttributionsClick,
                             onCheckForUpdatesClick = onCheckForUpdatesClick,
@@ -603,10 +602,22 @@ private fun MobileSettingsScreen(
                 )
                 SettingsPage.Integrations -> integrationsContent(
                     isTablet = false,
+                    onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                    onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
                     onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                     onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
-                    onDebridClick = { onPageChange(SettingsPage.Debrid) },
                     onLiveTvClick = { onPageChange(SettingsPage.LiveTv) },
+                )
+                SettingsPage.Debrid -> debridSettingsContent(
+                    isTablet = false,
+                    settings = debridSettings,
+                )
+                SettingsPage.TraktAuthentication -> traktSettingsContent(
+                    isTablet = false,
+                    uiState = traktAuthUiState,
+                    settingsUiState = traktSettingsUiState,
+                    commentsEnabled = traktCommentsEnabled,
+                    onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                 )
                 SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                     isTablet = false,
@@ -616,20 +627,9 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     settings = mdbListSettings,
                 )
-                SettingsPage.Debrid -> debridSettingsContent(
-                    isTablet = false,
-                    settings = debridSettings,
-                )
                 SettingsPage.LiveTv -> liveTvSettingsContent(
                     isTablet = false,
                     uiState = liveTvUiState,
-                )
-                SettingsPage.TraktAuthentication -> traktSettingsContent(
-                    isTablet = false,
-                    uiState = traktAuthUiState,
-                    settingsUiState = traktSettingsUiState,
-                    commentsEnabled = traktCommentsEnabled,
-                    onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                 )
             }
         }
@@ -886,7 +886,6 @@ private fun TabletSettingsScreen(
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
                                 onContentDiscoveryClick = { openInlinePage(SettingsPage.ContentDiscovery) },
                                 onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
-                                onTraktClick = { openInlinePage(SettingsPage.TraktAuthentication) },
                                 onSupportersContributorsClick = { openInlinePage(SettingsPage.SupportersContributors) },
                                 onLicensesAttributionsClick = { openInlinePage(SettingsPage.LicensesAttributions) },
                                 onCheckForUpdatesClick = onCheckForUpdatesClick,
@@ -985,10 +984,22 @@ private fun TabletSettingsScreen(
                     )
                     SettingsPage.Integrations -> integrationsContent(
                         isTablet = true,
+                        onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                        onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
                         onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                         onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
-                        onDebridClick = { onPageChange(SettingsPage.Debrid) },
                         onLiveTvClick = { onPageChange(SettingsPage.LiveTv) },
+                    )
+                    SettingsPage.Debrid -> debridSettingsContent(
+                        isTablet = true,
+                        settings = debridSettings,
+                    )
+                    SettingsPage.TraktAuthentication -> traktSettingsContent(
+                        isTablet = true,
+                        uiState = traktAuthUiState,
+                        settingsUiState = traktSettingsUiState,
+                        commentsEnabled = traktCommentsEnabled,
+                        onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                     )
                     SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                         isTablet = true,
@@ -998,20 +1009,9 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         settings = mdbListSettings,
                     )
-                    SettingsPage.Debrid -> debridSettingsContent(
-                        isTablet = true,
-                        settings = debridSettings,
-                    )
                     SettingsPage.LiveTv -> liveTvSettingsContent(
                         isTablet = true,
                         uiState = liveTvUiState,
-                    )
-                    SettingsPage.TraktAuthentication -> traktSettingsContent(
-                        isTablet = true,
-                        uiState = traktAuthUiState,
-                        settingsUiState = traktSettingsUiState,
-                        commentsEnabled = traktCommentsEnabled,
-                        onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                     )
                 }
             }
