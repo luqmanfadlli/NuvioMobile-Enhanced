@@ -163,13 +163,29 @@ final class MPVPictureInPictureController: NSObject {
         enqueuePixelBuffer(pixelBuffer)
     }
 
-    private func syncControlTimebaseToPlayback() {
-        guard let timebase = displayLayer.controlTimebase,
-              let playbackController = playbackController else { return }
-        let positionMs = playbackController.positionMs
+    func invalidatePlaybackState(positionMs: Int64, isPlaying: Bool) {
+        if displayLayer.controlTimebase == nil {
+            var newTimebase: CMTimebase?
+            CMTimebaseCreateWithSourceClock(
+                allocator: kCFAllocatorDefault,
+                sourceClock: CMClockGetHostTimeClock(),
+                timebaseOut: &newTimebase
+            )
+            displayLayer.controlTimebase = newTimebase
+        }
+        
+        guard let timebase = displayLayer.controlTimebase else { return }
         let positionTime = CMTime(value: max(positionMs, 0), timescale: 1000)
         CMTimebaseSetTime(timebase, time: positionTime)
-        CMTimebaseSetRate(timebase, rate: playbackController.isPlaying ? 1.0 : 0.0)
+        CMTimebaseSetRate(timebase, rate: isPlaying ? 1.0 : 0.0)
+    }
+
+    private func syncControlTimebaseToPlayback() {
+        guard let playbackController = playbackController else { return }
+        invalidatePlaybackState(
+            positionMs: playbackController.positionMs, 
+            isPlaying: playbackController.isPlaying
+        )
     }
 
     private func configureTimebase() {
