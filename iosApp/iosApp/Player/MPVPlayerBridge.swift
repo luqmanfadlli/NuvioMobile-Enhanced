@@ -492,8 +492,15 @@ final class MPVPlayerViewController: UIViewController {
             // decoder continues to produce frames into its internal buffer.
             return
         }
-        pausePlayback()
-        setStringProperty("vid", "no")
+        // Give some time for the system  to engage Auto-PiP.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.mpv != nil else { return }
+            if #available(iOS 15.0, *) {
+                if self.isPictureInPictureActive { return }
+            }
+            self.pausePlayback()
+            self.setStringProperty("vid", "no")
+        }
     }
 
     @objc private func enterForeground() {

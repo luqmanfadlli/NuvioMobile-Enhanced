@@ -93,7 +93,7 @@ final class MPVPictureInPictureController: NSObject {
         // Prime the display layer with a single frame so iOS recognises it as ready
         // for PiP. Without this, `canStartPictureInPictureAutomaticallyFromInline`
         // does not trigger automatic PiP when the app moves to the background.
-        enqueueNextFrame()
+        ensureFramePumpRunning()
     }
 
     func detachFromHost() {
@@ -157,10 +157,17 @@ final class MPVPictureInPictureController: NSObject {
 
     private func enqueueNextFrame() {
         syncControlTimebaseToPlayback()
-        let pixelBuffer = frameSource?.capturePictureInPictureFrame()
-            ?? makePlaceholderPixelBuffer(size: CGSize(width: 320, height: 180), color: placeholderColor)
-        guard let pixelBuffer else { return }
-        enqueuePixelBuffer(pixelBuffer)
+        
+        let pixelBuffer: CVPixelBuffer?
+        if isActive {
+            pixelBuffer = frameSource?.capturePictureInPictureFrame()
+                ?? makePlaceholderPixelBuffer(size: CGSize(width: 320, height: 180), color: placeholderColor)
+        } else {
+            pixelBuffer = makePlaceholderPixelBuffer(size: CGSize(width: 16, height: 16), color: .black)
+        }
+        
+        guard let pb = pixelBuffer else { return }
+        enqueuePixelBuffer(pb)
     }
 
     func invalidatePlaybackState(positionMs: Int64, isPlaying: Bool) {
@@ -319,7 +326,6 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
     func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         print("[NuvioPiP] failed to start: \(error.localizedDescription)")
         isActive = false
-        stopFramePump()
     }
 
     func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
@@ -328,7 +334,6 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = false
-        stopFramePump()
     }
 
     func pictureInPictureController(
