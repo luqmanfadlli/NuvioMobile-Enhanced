@@ -59,7 +59,7 @@ final class MPVPictureInPictureController: NSObject {
     private let renderQueue = DispatchQueue(label: "nuvio.pip.render", qos: .userInteractive)
     private var lastEnqueuedPresentationSeconds: Double = 0
     private var hasInstalledTimebase: Bool = false
-    private let framePumpIntervalSeconds: Double = 1.0 / 10.0
+    private let framePumpIntervalSeconds: Double = 1.0 / 24.0
 
     override init() {
         let layer = AVSampleBufferDisplayLayer()
@@ -161,9 +161,9 @@ final class MPVPictureInPictureController: NSObject {
         let pixelBuffer: CVPixelBuffer?
         if isActive {
             pixelBuffer = frameSource?.capturePictureInPictureFrame()
-                ?? makePlaceholderPixelBuffer(size: CGSize(width: 320, height: 180), color: placeholderColor)
+                ?? makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: placeholderColor)
         } else {
-            pixelBuffer = makePlaceholderPixelBuffer(size: CGSize(width: 16, height: 16), color: .black)
+            pixelBuffer = makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: .black)
         }
         
         guard let pb = pixelBuffer else { return }
