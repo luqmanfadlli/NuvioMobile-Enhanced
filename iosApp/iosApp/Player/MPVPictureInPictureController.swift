@@ -18,20 +18,10 @@ protocol MPVPictureInPictureControllerDelegate: AnyObject {
     func pictureInPictureDidChangeActiveState(active: Bool)
 }
 
-/// Supplies decoded video frames to the PiP layer. Called on a background queue at the
-/// frame pump's cadence; the implementation must be safe to invoke off the main thread.
 protocol MPVPictureInPictureFrameSource: AnyObject {
     func capturePictureInPictureFrame() -> CVPixelBuffer?
 }
 
-/// Wraps an `AVPictureInPictureController` driven by an `AVSampleBufferDisplayLayer`.
-///
-/// Important context: this app uses mpv with a Metal layer for normal playback. iOS PiP
-/// requires an `AVPlayerLayer` or `AVSampleBufferDisplayLayer`. We can't pipe mpv's GPU
-/// frames into the display layer without rewriting the renderer, so PiP renders a static
-/// placeholder frame while audio continues. System transport controls (play/pause/seek)
-/// remain functional via the playback delegate.
-@available(iOS 15.0, *)
 final class MPVPictureInPictureController: NSObject {
 
     // MARK: - Public
@@ -70,9 +60,6 @@ final class MPVPictureInPictureController: NSObject {
         configureTimebase()
     }
 
-    /// Attach the display layer to a host view so the system PiP can pull frames from it.
-    /// The display layer sits behind the metal layer at full size; when PiP starts iOS
-    /// reparents it into its own window so on-screen visibility doesn't matter.
     func attach(toHostView host: UIView) {
         guard hostView !== host else { return }
         detachFromHost()
@@ -90,9 +77,6 @@ final class MPVPictureInPictureController: NSObject {
         controller.delegate = self
         pictureInPictureController = controller
 
-        // Prime the display layer with a single frame so iOS recognises it as ready
-        // for PiP. Without this, `canStartPictureInPictureAutomaticallyFromInline`
-        // does not trigger automatic PiP when the app moves to the background.
         ensureFramePumpRunning()
     }
 
@@ -118,8 +102,6 @@ final class MPVPictureInPictureController: NSObject {
         guard let controller = pictureInPictureController else { return }
         guard !controller.isPictureInPictureActive else { return }
         ensureFramePumpRunning()
-        // Allow at least one frame to be enqueued before starting PiP — the system requires
-        // the layer to have content already queued.
         DispatchQueue.main.async {
             controller.startPictureInPicture()
         }
@@ -131,13 +113,8 @@ final class MPVPictureInPictureController: NSObject {
 
     // MARK: - Frame pump
 
-    /// Pumps a placeholder solid-color frame at a slow cadence so the AVSampleBufferDisplayLayer
-    /// always has content. AVPictureInPictureController refuses to start (and may drop the
-    /// session mid-flight) if the layer is empty. Audio + system transport controls continue
-    /// regardless of what visual is being shown.
     private func ensureFramePumpRunning() {
         guard framePumpTimer == nil else { return }
-        // Push an initial frame immediately so the layer has content before PiP starts.
         enqueueNextFrame()
 
         let timer = DispatchSource.makeTimerSource(queue: renderQueue)
@@ -157,7 +134,7 @@ final class MPVPictureInPictureController: NSObject {
 
     private func enqueueNextFrame() {
         syncControlTimebaseToPlayback()
-        
+
         let pixelBuffer: CVPixelBuffer?
         if isActive {
             pixelBuffer = frameSource?.capturePictureInPictureFrame()
@@ -165,7 +142,7 @@ final class MPVPictureInPictureController: NSObject {
         } else {
             pixelBuffer = makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: .black)
         }
-        
+
         guard let pb = pixelBuffer else { return }
         enqueuePixelBuffer(pb)
     }
@@ -180,7 +157,7 @@ final class MPVPictureInPictureController: NSObject {
             )
             displayLayer.controlTimebase = newTimebase
         }
-        
+
         guard let timebase = displayLayer.controlTimebase else { return }
         let positionTime = CMTime(value: max(positionMs, 0), timescale: 1000)
         CMTimebaseSetTime(timebase, time: positionTime)
@@ -190,7 +167,7 @@ final class MPVPictureInPictureController: NSObject {
     private func syncControlTimebaseToPlayback() {
         guard let playbackController = playbackController else { return }
         invalidatePlaybackState(
-            positionMs: playbackController.positionMs, 
+            positionMs: playbackController.positionMs,
             isPlaying: playbackController.isPlaying
         )
     }
@@ -311,7 +288,8 @@ final class MPVPictureInPictureController: NSObject {
     }
 }
 
-@available(iOS 15.0, *)
+// MARK: - AVPictureInPictureControllerDelegate
+
 extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
@@ -328,9 +306,7 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
         isActive = false
     }
 
-    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        // no-op
-    }
+    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {}
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = false
@@ -344,7 +320,8 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
     }
 }
 
-@available(iOS 15.0, *)
+// MARK: - AVPictureInPictureSampleBufferPlaybackDelegate
+
 extension MPVPictureInPictureController: AVPictureInPictureSampleBufferPlaybackDelegate {
 
     func pictureInPictureController(_ controller: AVPictureInPictureController, setPlaying playing: Bool) {
@@ -373,9 +350,7 @@ extension MPVPictureInPictureController: AVPictureInPictureSampleBufferPlaybackD
     func pictureInPictureController(
         _ controller: AVPictureInPictureController,
         didTransitionToRenderSize newRenderSize: CMVideoDimensions
-    ) {
-        // no-op
-    }
+    ) {}
 
     func pictureInPictureController(
         _ controller: AVPictureInPictureController,
