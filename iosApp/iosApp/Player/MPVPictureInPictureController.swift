@@ -306,17 +306,24 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
         isActive = false
     }
 
-    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {}
+    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        stopFramePump()
+    }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = false
+        ensureFramePumpRunning()
     }
 
     func pictureInPictureController(
         _ controller: AVPictureInPictureController,
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
     ) {
-        completionHandler(true)
+        DispatchQueue.main.async {
+            self.hostView?.setNeedsLayout()
+            self.hostView?.layoutIfNeeded()
+            self.updateLayout()
+            completionHandler(true)
     }
 }
 

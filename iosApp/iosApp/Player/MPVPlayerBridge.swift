@@ -5,7 +5,7 @@ import AVKit
 import Libmpv
 import ComposeApp
 
-// MARK: - Player Bridge Implementation
+// MARK: - Player Bridge Implementation (Kotlin protocol conformance)
 
 final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
 
@@ -68,8 +68,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
 
-    // MARK: - Audio Tracks
-
+    // Audio tracks
     func getAudioTrackCount() -> Int32 { Int32(playerVC?.audioTracks.count ?? 0) }
     func getAudioTrackIndex(at: Int32) -> Int32 {
         guard let t = playerVC?.audioTracks, Int(at) < t.count else { return 0 }
@@ -92,8 +91,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         return t[Int(at)].selected
     }
 
-    // MARK: - Subtitle Tracks
-
+    // Subtitle tracks
     func getSubtitleTrackCount() -> Int32 { Int32(playerVC?.subtitleTracks.count ?? 0) }
     func getSubtitleTrackIndex(at: Int32) -> Int32 {
         guard let t = playerVC?.subtitleTracks, Int(at) < t.count else { return 0 }
@@ -142,8 +140,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         )
     }
 
-    // MARK: - State
-
+    // State - refreshes position from mpv on each call (polled from Kotlin every 250ms)
     func getIsLoading() -> Bool { playerVC?.refreshPlaybackState(); return playerVC?.isPlayerLoading ?? true }
     func getIsPlaying() -> Bool { return playerVC?.isPlayerPlaying ?? false }
     func getIsEnded() -> Bool { return playerVC?.isPlayerEnded ?? false }
@@ -169,17 +166,17 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     func startPictureInPicture() {
-        playerVC?.startPictureInPicture()
-    }
+            playerVC?.startPictureInPicture()
+        }
 
     func stopPictureInPicture() {
-        playerVC?.stopPictureInPicture()
-    }
+            playerVC?.stopPictureInPicture()
+        }
 
     func setPictureInPictureStateListener(listener: PictureInPictureStateListener?) {
-        pendingPictureInPictureListener = listener
-        playerVC?.pictureInPictureStateListener = listener
-    }
+            pendingPictureInPictureListener = listener
+            playerVC?.pictureInPictureStateListener = listener
+        }
 
     private func parseRequestHeaders(_ headersJson: String?) -> [String: String] {
         guard
@@ -249,9 +246,11 @@ final class MPVPlayerViewController: UIViewController {
         pipCoordinator?.isActive ?? false
     }
 
+    // Cached track lists
     var audioTracks: [TrackInfo] = []
     var subtitleTracks: [TrackInfo] = []
 
+    // State (polled from Kotlin every 250ms)
     var isPlayerLoading: Bool = true
     var isPlayerPlaying: Bool = false
     var isPlayerEnded: Bool = false
@@ -266,10 +265,21 @@ final class MPVPlayerViewController: UIViewController {
     }
     private var _currentErrorMessage: String?
 
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
-    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { [.bottom, .left, .right] }
-    override var prefersStatusBarHidden: Bool { true }
-    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        true
+    }
+
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        [.bottom, .left, .right]
+    }
+
+    override var prefersStatusBarHidden: Bool {
+        true
+    }
+
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        .fade
+    }
 
     // MARK: - Lifecycle
 
@@ -304,13 +314,13 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func setupPictureInPictureCoordinator() {
-        let coordinator = MPVPictureInPictureController()
-        coordinator.delegate = self
-        coordinator.playbackController = self
-        coordinator.frameSource = self
-        coordinator.attach(toHostView: view)
-        pictureInPictureCoordinator = coordinator
-    }
+            let coordinator = MPVPictureInPictureController()
+            coordinator.delegate = self
+            coordinator.playbackController = self
+            coordinator.frameSource = self
+            coordinator.attach(toHostView: view)
+            pictureInPictureCoordinator = coordinator
+        }
 
     func startPictureInPicture() {
         pipCoordinator?.startPictureInPicture()
@@ -423,6 +433,7 @@ final class MPVPlayerViewController: UIViewController {
 
         checkError(mpv_initialize(mpv))
 
+        // Observe properties
         mpv_observe_property(mpv, 0, "pause", MPV_FORMAT_FLAG)
         mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
         mpv_observe_property(mpv, 0, "core-idle", MPV_FORMAT_FLAG)
@@ -437,8 +448,8 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func setupNotifications() {
-        NotificationCenter.default.addObserver(self, selector: #selector(enterBackground),
-                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(),
+                                               name: UIApplication.didNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(enterForeground),
                                                name: UIApplication.willEnterForegroundNotification, object: nil)
     }
@@ -446,7 +457,7 @@ final class MPVPlayerViewController: UIViewController {
     @objc private func enterBackground() {
         guard mpv != nil else { return }
         if isPictureInPictureActive { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             guard let self = self, self.mpv != nil else { return }
             if self.isPictureInPictureActive { return }
             self.pausePlayback()
@@ -614,16 +625,19 @@ final class MPVPlayerViewController: UIViewController {
     func setResize(_ mode: Int) {
         guard mpv != nil else { return }
         switch mode {
-        case 1, 2:
+        case 1: // Fill
             setStringProperty("panscan", "1.0")
             setStringProperty("video-unscaled", "no")
-        default:
+        case 2: // Zoom
+            setStringProperty("panscan", "1.0")
+            setStringProperty("video-unscaled", "no")
+        default: // Fit
             setStringProperty("panscan", "0.0")
             setStringProperty("video-unscaled", "no")
         }
     }
 
-    // MARK: - Track Selection
+    // MARK: - Track selection
 
     func selectAudio(_ trackId: Int) {
         guard mpv != nil else { return }
@@ -723,12 +737,14 @@ final class MPVPlayerViewController: UIViewController {
         pipCoordinator?.detachFromHost()
         pictureInPictureCoordinator = nil
         guard let ctx = mpv else { return }
-        mpv = nil
+        mpv = nil  // nil first so event loop stops reading
         mpv_terminate_destroy(ctx)
     }
 
     // MARK: - State Update
 
+    /// Lightweight state refresh — called by Kotlin polling (every 250ms).
+    /// Only reads cheap scalar properties; does NOT re-enumerate tracks.
     func refreshPlaybackState() {
         guard mpv != nil else { return }
         let duration = getDouble("duration")
@@ -750,6 +766,7 @@ final class MPVPlayerViewController: UIViewController {
         currentSpeed = Float(speed > 0 ? speed : 1.0)
     }
 
+    /// Full state + track refresh — called from MPV event loop on property changes.
     func updateState() {
         refreshPlaybackState()
         refreshTracks()
@@ -840,12 +857,18 @@ final class MPVPlayerViewController: UIViewController {
             return normalized
         }
         switch channelCount {
-        case 1: return "Mono"
-        case 2: return "Stereo"
-        case 6: return "5.1"
-        case 8: return "7.1"
-        case let count where count > 0: return "\(count)ch"
-        default: return nil
+        case 1:
+            return "Mono"
+        case 2:
+            return "Stereo"
+        case 6:
+            return "5.1"
+        case 8:
+            return "7.1"
+        case let count where count > 0:
+            return "\(count)ch"
+        default:
+            return nil
         }
     }
 
@@ -1090,9 +1113,17 @@ extension MPVPlayerViewController: MPVPictureInPictureControllerDelegate {
 }
 
 extension MPVPlayerViewController: MPVPictureInPicturePlaybackController {
-    func play() { playPlayback() }
-    func pause() { pausePlayback() }
-    func seek(byMs offsetMs: Int64) { seekByMs(offsetMs) }
+    func play() {
+        playPlayback()
+    }
+
+    func pause() {
+        pausePlayback()
+    }
+
+    func seek(byMs offsetMs: Int64) {
+        seekByMs(offsetMs)
+    }
 
     var isPlaying: Bool {
         refreshPlaybackState()
@@ -1107,7 +1138,7 @@ extension MPVPlayerViewController: MPVPictureInPictureFrameSource {
     }
 }
 
-// MARK: - Bridge Creator
+// MARK: - Bridge Creator (implements Kotlin protocol)
 
 final class MPVPlayerBridgeCreator: NSObject, NuvioPlayerBridgeCreator {
     func createBridge() -> any NuvioPlayerBridge {
@@ -1115,7 +1146,7 @@ final class MPVPlayerBridgeCreator: NSObject, NuvioPlayerBridgeCreator {
     }
 }
 
-// MARK: - Registration
+// MARK: - Registration (called from Swift app startup)
 
 enum NuvioPlayerRegistration {
     static func register() {
