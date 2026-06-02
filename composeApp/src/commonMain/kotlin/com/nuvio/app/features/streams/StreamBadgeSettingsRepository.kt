@@ -12,9 +12,14 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+data class StreamBadgeSettingsUiState(
+    val rules: StreamBadgeRules = StreamBadgeRules(),
+    val showFileSizeBadges: Boolean = true,
+)
+
 object StreamBadgeSettingsRepository {
-    private val _uiState = MutableStateFlow(StreamBadgeRules())
-    val uiState: StateFlow<StreamBadgeRules> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(StreamBadgeSettingsUiState())
+    val uiState: StateFlow<StreamBadgeSettingsUiState> = _uiState.asStateFlow()
 
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
@@ -24,6 +29,7 @@ object StreamBadgeSettingsRepository {
 
     private var hasLoaded = false
     private var streamBadgeRules = StreamBadgeRules()
+    private var showFileSizeBadges = true
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -37,12 +43,18 @@ object StreamBadgeSettingsRepository {
     fun clearLocalState() {
         hasLoaded = false
         streamBadgeRules = StreamBadgeRules()
-        _uiState.value = streamBadgeRules
+        showFileSizeBadges = true
+        _uiState.value = StreamBadgeSettingsUiState()
     }
 
     fun snapshot(): StreamBadgeRules {
         ensureLoaded()
-        return _uiState.value
+        return _uiState.value.rules
+    }
+
+    fun showFileSizeBadgesSnapshot(): Boolean {
+        ensureLoaded()
+        return _uiState.value.showFileSizeBadges
     }
 
     suspend fun importStreamBadgeRulesFromUrl(url: String): StreamBadgeImportResult {
@@ -100,6 +112,14 @@ object StreamBadgeSettingsRepository {
         saveStreamBadgeRules()
     }
 
+    fun setShowFileSizeBadges(enabled: Boolean) {
+        ensureLoaded()
+        if (showFileSizeBadges == enabled) return
+        showFileSizeBadges = enabled
+        publish()
+        StreamBadgeSettingsStorage.saveShowFileSizeBadges(enabled)
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
         val storedRules = parseStreamBadgeRules(StreamBadgeSettingsStorage.loadStreamBadgeRules())
@@ -109,6 +129,7 @@ object StreamBadgeSettingsRepository {
             null
         }
         streamBadgeRules = storedRules ?: legacyRules ?: StreamBadgeRules()
+        showFileSizeBadges = StreamBadgeSettingsStorage.loadShowFileSizeBadges() ?: true
         if (legacyRules != null) {
             saveStreamBadgeRules()
             StreamBadgeSettingsStorage.clearLegacyDebridStreamBadgeRules()
@@ -117,7 +138,10 @@ object StreamBadgeSettingsRepository {
     }
 
     private fun publish() {
-        _uiState.value = streamBadgeRules
+        _uiState.value = StreamBadgeSettingsUiState(
+            rules = streamBadgeRules,
+            showFileSizeBadges = showFileSizeBadges,
+        )
     }
 
     private fun saveStreamBadgeRules() {

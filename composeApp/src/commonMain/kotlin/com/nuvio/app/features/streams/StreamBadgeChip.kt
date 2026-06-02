@@ -7,23 +7,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.i18n.localizedByteUnit
+import kotlin.math.round
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.streams_size
+import org.jetbrains.compose.resources.stringResource
 
 internal object StreamBadgeChipDefaults {
     val shape = RoundedCornerShape(6.dp)
     val fileSizeHorizontalPadding = 6.dp
-    val fileSizeFontSize: TextUnit = 10.sp
-    val fileSizeLineHeight: TextUnit = 12.sp
+    val fileSizeFontSize: TextUnit = 12.sp
+    val fileSizeLineHeight: TextUnit = 16.sp
     val fileSizeLetterSpacing: TextUnit = 0.sp
 }
 
@@ -91,6 +99,53 @@ internal fun StreamBadgeChip(
                 .widthIn(min = size.minImageWidth, max = size.maxImageWidth)
                 .clip(shape),
             contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@Composable
+internal fun StreamBadgeImage(badge: StreamBadge) {
+    StreamBadgeChip(
+        imageURL = badge.imageURL,
+        name = badge.name,
+        tagColor = badge.tagColor,
+        tagStyle = badge.tagStyle,
+        borderColor = badge.borderColor,
+        size = StreamBadgeChipSize.STREAM,
+    )
+}
+
+@Composable
+internal fun StreamFileSizeBadge(stream: StreamItem) {
+    val bytes = stream.behaviorHints.videoSize ?: return
+    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+    val sizeLabel = if (gib >= 1.0) {
+        val roundedGiB = round(gib * 10.0) / 10.0
+        "$roundedGiB ${localizedByteUnit("GB")}"
+    } else {
+        val mib = bytes.toDouble() / (1024.0 * 1024.0)
+        "${round(mib).toInt()} ${localizedByteUnit("MB")}"
+    }
+
+    val badgeShape = StreamBadgeChipDefaults.shape
+    Box(
+        modifier = Modifier
+            .height(StreamBadgeChipSize.STREAM.containerHeight)
+            .clip(badgeShape)
+            .background(Color(0xFF0A0C0C))
+            .border(1.dp, Color(0xFF0A0C0C), badgeShape)
+            .padding(horizontal = StreamBadgeChipDefaults.fileSizeHorizontalPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = stringResource(Res.string.streams_size, sizeLabel),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = StreamBadgeChipDefaults.fileSizeFontSize,
+                lineHeight = StreamBadgeChipDefaults.fileSizeLineHeight,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = StreamBadgeChipDefaults.fileSizeLetterSpacing,
+            ),
+            color = Color.White,
         )
     }
 }

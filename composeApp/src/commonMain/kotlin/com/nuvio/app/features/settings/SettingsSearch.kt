@@ -434,6 +434,15 @@ internal fun settingsSearchEntries(
     val playbackNextEpisode = stringResource(Res.string.settings_playback_section_next_episode)
     addRow(
         page = SettingsPage.Streams,
+        key = "stream-size-badges",
+        title = stringResource(Res.string.settings_stream_size_badges_title),
+        description = stringResource(Res.string.settings_stream_size_badges_description),
+        pageLabel = streamsPage,
+        section = stringResource(Res.string.settings_stream_badges_section),
+        icon = Icons.Rounded.Style,
+    )
+    addRow(
+        page = SettingsPage.Streams,
         key = "stream-badge-urls",
         title = stringResource(Res.string.settings_stream_badge_urls_title),
         description = stringResource(Res.string.settings_stream_badge_urls_search_description),
