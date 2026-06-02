@@ -318,7 +318,7 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
     func pictureInPictureController(
         _ controller: AVPictureInPictureController,
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.hostView?.setNeedsLayout()
             self.hostView?.layoutIfNeeded()
             self.updateLayout()
