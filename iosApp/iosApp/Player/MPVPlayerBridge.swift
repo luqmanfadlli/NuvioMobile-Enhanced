@@ -448,8 +448,8 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func setupNotifications() {
-        NotificationCenter.default.addObserver(self, selector: #selector(),
-                                               name: UIApplication.didNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(enterBackground),
+                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(enterForeground),
                                                name: UIApplication.willEnterForegroundNotification, object: nil)
     }

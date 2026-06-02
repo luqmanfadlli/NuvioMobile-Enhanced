@@ -317,13 +317,13 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureController(
         _ controller: AVPictureInPictureController,
-        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
-    ) {
+        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
         DispatchQueue.main.async {
             self.hostView?.setNeedsLayout()
             self.hostView?.layoutIfNeeded()
             self.updateLayout()
             completionHandler(true)
+        }
     }
 }
 
