@@ -10,11 +10,17 @@ import Libmpv
 /// background) or visually obscured (PiP overlay in-app).
 ///
 /// Caveats:
-///   • `screenshot-raw` blocks until the next decoded frame is available and allocates
-///     internally on every call. Drive it at sub-realtime cadence (≤ ~10 Hz).
+///   • `screenshot-raw` blocks until the next decoded frame is available. Keep it off
+///     the main thread and only drive it at high cadence while PiP is actually active.
 ///   • mpv must still be decoding video for the call to return a frame — never set
-///     `vid=no` while PiP is active.
+///     `vid=no` while PiP is starting or active.
 enum MPVScreenshotCapture {
+
+    private static let poolLock = NSLock()
+    private static var pixelBufferPool: CVPixelBufferPool?
+    private static var poolWidth: Int = 0
+    private static var poolHeight: Int = 0
+    private static var poolFormat: OSType = kCVPixelFormatType_32BGRA
 
     static func capture(mpv: OpaquePointer) -> CVPixelBuffer? {
         var result = mpv_node()
@@ -90,36 +96,58 @@ enum MPVScreenshotCapture {
             cvFormat = kCVPixelFormatType_32BGRA
         }
 
-        var pixelBuffer: CVPixelBuffer?
-        let attrs: [CFString: Any] = [
-            kCVPixelBufferIOSurfacePropertiesKey: [:],
-            kCVPixelBufferCGImageCompatibilityKey: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-        ]
-        let createStatus = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            width,
-            height,
-            cvFormat,
-            attrs as CFDictionary,
-            &pixelBuffer
-        )
+        let bytesPerPixel = 4
+        let expectedRowBytes = width * bytesPerPixel
+        guard stride >= expectedRowBytes else { return nil }
+        guard dataSize >= stride * height else { return nil }
 
-        guard createStatus == kCVReturnSuccess, let pb = pixelBuffer else { return nil }
+        guard let pb = makePixelBuffer(width: width, height: height, format: cvFormat) else { return nil }
 
         CVPixelBufferLockBaseAddress(pb, [])
         defer { CVPixelBufferUnlockBaseAddress(pb, []) }
 
         guard let dst = CVPixelBufferGetBaseAddress(pb) else { return nil }
         let dstStride = CVPixelBufferGetBytesPerRow(pb)
-        let rowBytes = min(stride, dstStride)
+        guard dstStride >= expectedRowBytes else { return nil }
 
         for row in 0..<height {
             let srcRow = data.advanced(by: row * stride)
             let dstRow = dst.advanced(by: row * dstStride)
-            memcpy(dstRow, srcRow, rowBytes)
+            memcpy(dstRow, srcRow, expectedRowBytes)
         }
 
         return pb
+    }
+
+    private static func makePixelBuffer(width: Int, height: Int, format: OSType) -> CVPixelBuffer? {
+        poolLock.lock()
+        defer { poolLock.unlock() }
+
+        if pixelBufferPool == nil || poolWidth != width || poolHeight != height || poolFormat != format {
+            poolWidth = width
+            poolHeight = height
+            poolFormat = format
+
+            let attrs: [CFString: Any] = [
+                kCVPixelBufferPixelFormatTypeKey: format,
+                kCVPixelBufferWidthKey: width,
+                kCVPixelBufferHeightKey: height,
+                kCVPixelBufferIOSurfacePropertiesKey: [:],
+                kCVPixelBufferCGImageCompatibilityKey: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+            ]
+            CVPixelBufferPoolCreate(
+                kCFAllocatorDefault,
+                nil,
+                attrs as CFDictionary,
+                &pixelBufferPool
+            )
+        }
+
+        guard let pixelBufferPool else { return nil }
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &pixelBuffer)
+        guard status == kCVReturnSuccess else { return nil }
+        return pixelBuffer
     }
 }

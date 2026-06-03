@@ -47,9 +47,17 @@ final class MPVPictureInPictureController: NSObject {
     private var hostView: UIView?
     private var placeholderColor: UIColor = .black
     private let renderQueue = DispatchQueue(label: "nuvio.pip.render", qos: .userInteractive)
+    private let renderQueueKey = DispatchSpecificKey<Void>()
     private var lastEnqueuedPresentationSeconds: Double = 0
+    private var lastPlaybackPositionSeconds: Double = 0
     private var hasInstalledTimebase: Bool = false
-    private let framePumpIntervalSeconds: Double = 1.0 / 24.0
+    private let activeFramePumpIntervalSeconds: Double = 1.0 / 24.0
+    private let idleFramePumpIntervalSeconds: Double = 1.0 / 2.0
+    private var currentFramePumpIntervalSeconds: Double = 1.0 / 2.0
+    private var isShuttingDown: Bool = false
+    private(set) var isStarting: Bool = false
+
+    var isStartingOrActive: Bool { isStarting || isActive }
 
     override init() {
         let layer = AVSampleBufferDisplayLayer()
@@ -57,6 +65,7 @@ final class MPVPictureInPictureController: NSObject {
         layer.backgroundColor = UIColor.black.cgColor
         self.displayLayer = layer
         super.init()
+        renderQueue.setSpecific(key: renderQueueKey, value: ())
         configureTimebase()
     }
 
@@ -86,7 +95,26 @@ final class MPVPictureInPictureController: NSObject {
         pictureInPictureController = nil
         displayLayer.removeFromSuperlayer()
         hostView = nil
+        isStarting = false
         isActive = false
+    }
+
+    func shutdownSynchronously() {
+        isShuttingDown = true
+        stopFramePump()
+
+        if DispatchQueue.getSpecific(key: renderQueueKey) == nil {
+            renderQueue.sync {}
+        }
+
+        pictureInPictureController?.delegate = nil
+        pictureInPictureController = nil
+        displayLayer.removeFromSuperlayer()
+        hostView = nil
+        isStarting = false
+        isActive = false
+        frameSource = nil
+        playbackController = nil
     }
 
     func updateLayout() {
@@ -114,12 +142,21 @@ final class MPVPictureInPictureController: NSObject {
     // MARK: - Frame pump
 
     private func ensureFramePumpRunning() {
-        guard framePumpTimer == nil else { return }
-        enqueueNextFrame()
+        let desiredInterval = desiredFramePumpIntervalSeconds
+        if let timer = framePumpTimer {
+            guard abs(desiredInterval - currentFramePumpIntervalSeconds) > 0.001 else { return }
+            timer.cancel()
+            framePumpTimer = nil
+        }
+
+        currentFramePumpIntervalSeconds = desiredInterval
+        renderQueue.async { [weak self] in
+            self?.enqueueNextFrame()
+        }
 
         let timer = DispatchSource.makeTimerSource(queue: renderQueue)
-        let interval = DispatchTimeInterval.milliseconds(Int(framePumpIntervalSeconds * 1000))
-        timer.schedule(deadline: .now() + interval, repeating: interval)
+        let interval = DispatchTimeInterval.milliseconds(max(1, Int(desiredInterval * 1000)))
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(4))
         timer.setEventHandler { [weak self] in
             self?.enqueueNextFrame()
         }
@@ -132,7 +169,13 @@ final class MPVPictureInPictureController: NSObject {
         framePumpTimer = nil
     }
 
+    private var desiredFramePumpIntervalSeconds: Double {
+        guard isActive else { return idleFramePumpIntervalSeconds }
+        return (playbackController?.isPlaying ?? false) ? activeFramePumpIntervalSeconds : idleFramePumpIntervalSeconds
+    }
+
     private func enqueueNextFrame() {
+        guard !isShuttingDown else { return }
         syncControlTimebaseToPlayback()
 
         let pixelBuffer: CVPixelBuffer?
@@ -197,16 +240,29 @@ final class MPVPictureInPictureController: NSObject {
 
         let presentationSeconds: Double
         if hasInstalledTimebase, let timebase = displayLayer.controlTimebase {
-            presentationSeconds = CMTimeGetSeconds(CMTimebaseGetTime(timebase))
+            let seconds = CMTimeGetSeconds(CMTimebaseGetTime(timebase))
+            presentationSeconds = seconds.isFinite ? seconds : lastEnqueuedPresentationSeconds + currentFramePumpIntervalSeconds
         } else {
-            presentationSeconds = lastEnqueuedPresentationSeconds + framePumpIntervalSeconds
+            presentationSeconds = lastEnqueuedPresentationSeconds + currentFramePumpIntervalSeconds
         }
-        let nextPts = max(presentationSeconds, lastEnqueuedPresentationSeconds + 0.01)
+
+        let jumpedBackward = presentationSeconds + 0.5 < lastPlaybackPositionSeconds
+        let jumpedForward = presentationSeconds - lastPlaybackPositionSeconds > 5.0
+        if jumpedBackward || jumpedForward {
+            lastEnqueuedPresentationSeconds = max(presentationSeconds - currentFramePumpIntervalSeconds, 0)
+            DispatchQueue.main.async { [weak self] in
+                self?.displayLayer.flush()
+            }
+        }
+        lastPlaybackPositionSeconds = presentationSeconds
+
+        let minimumStep = min(0.01, currentFramePumpIntervalSeconds)
+        let nextPts = max(presentationSeconds, lastEnqueuedPresentationSeconds + minimumStep)
         let pts = CMTime(seconds: nextPts, preferredTimescale: 600)
         lastEnqueuedPresentationSeconds = CMTimeGetSeconds(pts)
 
         var timing = CMSampleTimingInfo(
-            duration: CMTime(seconds: framePumpIntervalSeconds, preferredTimescale: 600),
+            duration: CMTime(seconds: currentFramePumpIntervalSeconds, preferredTimescale: 600),
             presentationTimeStamp: pts,
             decodeTimeStamp: .invalid
         )
@@ -293,24 +349,31 @@ final class MPVPictureInPictureController: NSObject {
 extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
+        isStarting = true
         isActive = true
         ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+        isStarting = false
         isActive = true
+        ensureFramePumpRunning()
     }
 
     func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         print("[NuvioPiP] failed to start: \(error.localizedDescription)")
+        isStarting = false
         isActive = false
+        ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        isStarting = false
         stopFramePump()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        isStarting = false
         isActive = false
         ensureFramePumpRunning()
     }
@@ -337,6 +400,7 @@ extension MPVPictureInPictureController: AVPictureInPictureSampleBufferPlaybackD
         } else {
             playbackController?.pause()
         }
+        ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerTimeRangeForPlayback(_ controller: AVPictureInPictureController) -> CMTimeRange {

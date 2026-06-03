@@ -227,6 +227,8 @@ final class MPVPlayerViewController: UIViewController {
     private var voNudgeWorkItem: DispatchWorkItem?
     private var pendingLoadRequest: PendingLoadRequest?
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
+    private var backgroundPauseWorkItem: DispatchWorkItem?
+    private var wasPlayingBeforeBackground: Bool = false
     private var mpv: OpaquePointer?
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
@@ -244,6 +246,10 @@ final class MPVPlayerViewController: UIViewController {
 
     var isPictureInPictureActive: Bool {
         pipCoordinator?.isActive ?? false
+    }
+
+    var isPictureInPictureStartingOrActive: Bool {
+        pipCoordinator?.isStartingOrActive ?? false
     }
 
     // Cached track lists
@@ -388,7 +394,7 @@ final class MPVPlayerViewController: UIViewController {
         lastBoundsForVoNudge = newSize
 
         guard UIApplication.shared.applicationState == .active else { return }
-        if isPictureInPictureActive { return }
+        if isPictureInPictureStartingOrActive { return }
 
         voNudgeWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
@@ -459,20 +465,32 @@ final class MPVPlayerViewController: UIViewController {
 
     @objc private func enterBackground() {
         guard mpv != nil else { return }
-        if isPictureInPictureActive { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let self = self, self.mpv != nil else { return }
-            if self.isPictureInPictureActive { return }
+        refreshPlaybackState()
+        wasPlayingBeforeBackground = isPlayerPlaying
+
+        backgroundPauseWorkItem?.cancel()
+        guard !isPictureInPictureStartingOrActive else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.mpv != nil else { return }
+            if self.isPictureInPictureStartingOrActive { return }
             self.pausePlayback()
             self.setStringProperty("vid", "no")
         }
+        backgroundPauseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     @objc private func enterForeground() {
         guard mpv != nil else { return }
-        if isPictureInPictureActive { return }
+        backgroundPauseWorkItem?.cancel()
+        backgroundPauseWorkItem = nil
+
+        if isPictureInPictureStartingOrActive { return }
         setStringProperty("vid", "auto")
-        playPlayback()
+        if wasPlayingBeforeBackground {
+            playPlayback()
+        }
     }
 
     // MARK: - Playback API
@@ -735,9 +753,11 @@ final class MPVPlayerViewController: UIViewController {
         pendingLoadRetryWorkItem = nil
         voNudgeWorkItem?.cancel()
         voNudgeWorkItem = nil
+        backgroundPauseWorkItem?.cancel()
+        backgroundPauseWorkItem = nil
         pendingLoadRequest = nil
         clearPlaybackError()
-        pipCoordinator?.detachFromHost()
+        pipCoordinator?.shutdownSynchronously()
         pictureInPictureCoordinator = nil
         guard let ctx = mpv else { return }
         mpv = nil  // nil first so event loop stops reading
