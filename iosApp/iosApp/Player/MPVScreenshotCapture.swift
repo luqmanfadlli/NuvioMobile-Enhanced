@@ -98,6 +98,7 @@ enum MPVScreenshotCapture {
 
         let bytesPerPixel = 4
         let expectedRowBytes = width * bytesPerPixel
+        let expectedSize = height * expectedRowBytes
         guard stride >= expectedRowBytes else { return nil }
         guard dataSize >= stride * height else { return nil }
 
@@ -110,10 +111,14 @@ enum MPVScreenshotCapture {
         let dstStride = CVPixelBufferGetBytesPerRow(pb)
         guard dstStride >= expectedRowBytes else { return nil }
 
-        for row in 0..<height {
-            let srcRow = data.advanced(by: row * stride)
-            let dstRow = dst.advanced(by: row * dstStride)
-            memcpy(dstRow, srcRow, expectedRowBytes)
+        if stride == dstStride && stride == expectedRowBytes {
+            memcpy(dst, data, expectedSize)
+        } else {
+            for row in 0..<height {
+                let srcRow = data.advanced(by: row * stride)
+                let dstRow = dst.advanced(by: row * dstStride)
+                memcpy(dstRow, srcRow, expectedRowBytes)
+            }
         }
 
         return pb

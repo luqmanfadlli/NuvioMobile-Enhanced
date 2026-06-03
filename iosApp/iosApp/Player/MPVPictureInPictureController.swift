@@ -294,6 +294,10 @@ final class MPVPictureInPictureController: NSObject {
             guard let self else { return }
             if self.displayLayer.status == .failed {
                 self.displayLayer.flush()
+                if self.displayLayer.error != nil {
+                    self.displayLayer.controlTimebase = nil
+                    self.configureTimebase()
+                }
             }
             if self.displayLayer.isReadyForMoreMediaData {
                 self.displayLayer.enqueue(sampleBuffer)
@@ -349,14 +353,18 @@ final class MPVPictureInPictureController: NSObject {
 extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        isStarting = true
-        isActive = true
+        renderQueue.async { [weak self] in
+            isStarting = true
+            isActive = true
+        }
         ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        isStarting = false
-        isActive = true
+        renderQueue.async { [weak self] in
+            isStarting = false
+            isActive = true
+        }
         ensureFramePumpRunning()
     }
 
@@ -368,13 +376,17 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
     }
 
     func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        isStarting = false
-        stopFramePump()
+        renderQueue.async { [weak self] in
+            isStarting = false
+            stopFramePump()
+        }
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        isStarting = false
-        isActive = false
+        renderQueue.async { [weak self] in
+            isStarting = false
+            isActive = false
+        }
         ensureFramePumpRunning()
     }
 
