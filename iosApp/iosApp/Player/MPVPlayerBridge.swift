@@ -387,6 +387,9 @@ final class MPVPlayerViewController: UIViewController {
         guard widthDelta > 1 || heightDelta > 1 else { return }
         lastBoundsForVoNudge = newSize
 
+        guard UIApplication.shared.applicationState == .active else { return }
+        if isPictureInPictureActive { return }
+
         voNudgeWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, let mpv = self.mpv else { return }
