@@ -97,9 +97,17 @@ enum MPVScreenshotCapture {
         }
 
         let bytesPerPixel = 4
+
+        guard width > 0, height > 0 else { return nil }
+        guard width <= Int.max / bytesPerPixel else { return nil }
+
         let expectedRowBytes = width * bytesPerPixel
+
+        guard height <= Int.max / expectedRowBytes else { return nil }
         let expectedSize = height * expectedRowBytes
+
         guard stride >= expectedRowBytes else { return nil }
+        guard height <= Int.max / stride else { return nil }
         guard dataSize >= stride * height else { return nil }
 
         guard let pb = makePixelBuffer(width: width, height: height, format: cvFormat) else { return nil }
@@ -108,6 +116,7 @@ enum MPVScreenshotCapture {
         defer { CVPixelBufferUnlockBaseAddress(pb, []) }
 
         guard let dst = CVPixelBufferGetBaseAddress(pb) else { return nil }
+
         let dstStride = CVPixelBufferGetBytesPerRow(pb)
         guard dstStride >= expectedRowBytes else { return nil }
 

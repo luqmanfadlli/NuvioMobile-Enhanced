@@ -31,6 +31,9 @@ final class MPVPictureInPictureController: NSObject {
     weak var frameSource: MPVPictureInPictureFrameSource?
 
     var isSupported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
+
+    private(set) var isStarting: Bool = false
+
     private(set) var isActive: Bool = false {
         didSet {
             guard oldValue != isActive else { return }
@@ -38,26 +41,34 @@ final class MPVPictureInPictureController: NSObject {
         }
     }
 
+    var isStartingOrActive: Bool {
+        isStarting || isActive
+    }
+
     let displayLayer: AVSampleBufferDisplayLayer
 
     // MARK: - Private
 
     private var pictureInPictureController: AVPictureInPictureController?
-    private var framePumpTimer: DispatchSourceTimer?
+    private var framePumpWorkItem: DispatchWorkItem?
+    private var isFramePumpEnabled = false
+    private var isCapturingFrame = false
+    private var isRecoveringDisplayLayer = false
     private var hostView: UIView?
     private var placeholderColor: UIColor = .black
     private let renderQueue = DispatchQueue(label: "nuvio.pip.render", qos: .userInteractive)
-    private let renderQueueKey = DispatchSpecificKey<Void>()
     private var lastEnqueuedPresentationSeconds: Double = 0
     private var lastPlaybackPositionSeconds: Double = 0
     private var hasInstalledTimebase: Bool = false
     private let activeFramePumpIntervalSeconds: Double = 1.0 / 24.0
     private let idleFramePumpIntervalSeconds: Double = 1.0 / 2.0
-    private var currentFramePumpIntervalSeconds: Double = 1.0 / 2.0
-    private var isShuttingDown: Bool = false
-    private(set) var isStarting: Bool = false
 
-    var isStartingOrActive: Bool { isStarting || isActive }
+    private var currentFramePumpIntervalSeconds: Double {
+        if isStartingOrActive, playbackController?.isPlaying == true {
+            return activeFramePumpIntervalSeconds
+        }
+        return idleFramePumpIntervalSeconds
+    }
 
     override init() {
         let layer = AVSampleBufferDisplayLayer()
@@ -65,7 +76,6 @@ final class MPVPictureInPictureController: NSObject {
         layer.backgroundColor = UIColor.black.cgColor
         self.displayLayer = layer
         super.init()
-        renderQueue.setSpecific(key: renderQueueKey, value: ())
         configureTimebase()
     }
 
@@ -100,21 +110,18 @@ final class MPVPictureInPictureController: NSObject {
     }
 
     func shutdownSynchronously() {
-        isShuttingDown = true
         stopFramePump()
-
-        if DispatchQueue.getSpecific(key: renderQueueKey) == nil {
-            renderQueue.sync {}
+        renderQueue.sync {
+            // Drain any in-flight capture before the MPV context is destroyed.
         }
-
         pictureInPictureController?.delegate = nil
         pictureInPictureController = nil
+        displayLayer.flush()
         displayLayer.removeFromSuperlayer()
         hostView = nil
+        isCapturingFrame = false
         isStarting = false
         isActive = false
-        frameSource = nil
-        playbackController = nil
     }
 
     func updateLayout() {
@@ -136,69 +143,119 @@ final class MPVPictureInPictureController: NSObject {
     }
 
     func stopPictureInPicture() {
-        pictureInPictureController?.stopPictureInPicture()
+        DispatchQueue.main.async { [weak self] in
+            self?.pictureInPictureController?.stopPictureInPicture()
+        }
     }
 
     // MARK: - Frame pump
 
     private func ensureFramePumpRunning() {
-        let desiredInterval = desiredFramePumpIntervalSeconds
-        if let timer = framePumpTimer {
-            guard abs(desiredInterval - currentFramePumpIntervalSeconds) > 0.001 else { return }
-            timer.cancel()
-            framePumpTimer = nil
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.ensureFramePumpRunning()
+            }
+            return
         }
 
-        currentFramePumpIntervalSeconds = desiredInterval
-        renderQueue.async { [weak self] in
-            self?.enqueueNextFrame()
-        }
-
-        let timer = DispatchSource.makeTimerSource(queue: renderQueue)
-        let interval = DispatchTimeInterval.milliseconds(max(1, Int(desiredInterval * 1000)))
-        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(4))
-        timer.setEventHandler { [weak self] in
-            self?.enqueueNextFrame()
-        }
-        timer.resume()
-        framePumpTimer = timer
+        guard !isFramePumpEnabled else { return }
+        isFramePumpEnabled = true
+        scheduleNextFramePump(after: 0)
     }
 
     private func stopFramePump() {
-        framePumpTimer?.cancel()
-        framePumpTimer = nil
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.stopFramePump()
+            }
+            return
+        }
+
+        isFramePumpEnabled = false
+        framePumpWorkItem?.cancel()
+        framePumpWorkItem = nil
     }
 
-    private var desiredFramePumpIntervalSeconds: Double {
-        guard isActive else { return idleFramePumpIntervalSeconds }
-        return (playbackController?.isPlaying ?? false) ? activeFramePumpIntervalSeconds : idleFramePumpIntervalSeconds
+    private func scheduleNextFramePumpIfNeeded() {
+        guard isFramePumpEnabled else { return }
+        scheduleNextFramePump(after: currentFramePumpIntervalSeconds)
+    }
+
+    private func scheduleNextFramePump(after interval: Double) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.scheduleNextFramePump(after: interval)
+            }
+            return
+        }
+
+        guard isFramePumpEnabled else { return }
+        guard framePumpWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.framePumpWorkItem = nil
+            self.enqueueNextFrame()
+        }
+        framePumpWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
     }
 
     private func enqueueNextFrame() {
-        guard !isShuttingDown else { return }
-        syncControlTimebaseToPlayback()
-
-        let pixelBuffer: CVPixelBuffer?
-        if isActive {
-            pixelBuffer = frameSource?.capturePictureInPictureFrame()
-                ?? makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: placeholderColor)
-        } else {
-            pixelBuffer = makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: .black)
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.enqueueNextFrame()
+            }
+            return
         }
 
-        guard let pb = pixelBuffer else { return }
-        enqueuePixelBuffer(pb)
+        guard isFramePumpEnabled else { return }
+
+        if isCapturingFrame {
+            scheduleNextFramePumpIfNeeded()
+            return
+        }
+
+        syncControlTimebaseToPlayback()
+        recoverDisplayLayerIfNeeded()
+
+        let shouldCaptureFrame = isStartingOrActive
+        let placeholder = shouldCaptureFrame ? placeholderColor : UIColor.black
+        let source = frameSource
+
+        isCapturingFrame = true
+        renderQueue.async { [weak self, weak source] in
+            let pixelBuffer: CVPixelBuffer?
+            if shouldCaptureFrame {
+                pixelBuffer = source?.capturePictureInPictureFrame()
+                    ?? self?.makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: placeholder)
+            } else {
+                pixelBuffer = self?.makePlaceholderPixelBuffer(size: CGSize(width: 640, height: 360), color: placeholder)
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isCapturingFrame = false
+
+                if let pixelBuffer, self.isFramePumpEnabled {
+                    self.enqueuePixelBuffer(pixelBuffer)
+                }
+
+                self.scheduleNextFramePumpIfNeeded()
+            }
+        }
     }
 
     func invalidatePlaybackState(positionMs: Int64, isPlaying: Bool) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.invalidatePlaybackState(positionMs: positionMs, isPlaying: isPlaying)
+            }
+            return
+        }
+
         if displayLayer.controlTimebase == nil {
-            var newTimebase: CMTimebase?
-            CMTimebaseCreateWithSourceClock(
-                allocator: kCFAllocatorDefault,
-                sourceClock: CMClockGetHostTimeClock(),
-                timebaseOut: &newTimebase
-            )
-            displayLayer.controlTimebase = newTimebase
+            configureTimebase()
         }
 
         guard let timebase = displayLayer.controlTimebase else { return }
@@ -229,7 +286,41 @@ final class MPVPictureInPictureController: NSObject {
         hasInstalledTimebase = true
     }
 
+    private func recoverDisplayLayerIfNeeded() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.recoverDisplayLayerIfNeeded()
+            }
+            return
+        }
+
+        guard displayLayer.status == .failed else { return }
+        guard !isRecoveringDisplayLayer else { return }
+
+        isRecoveringDisplayLayer = true
+        displayLayer.flush()
+        displayLayer.controlTimebase = nil
+        hasInstalledTimebase = false
+        configureTimebase()
+        lastEnqueuedPresentationSeconds = 0
+        lastPlaybackPositionSeconds = 0
+
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecoveringDisplayLayer = false
+        }
+    }
+
     private func enqueuePixelBuffer(_ pixelBuffer: CVPixelBuffer) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.enqueuePixelBuffer(pixelBuffer)
+            }
+            return
+        }
+
+        recoverDisplayLayerIfNeeded()
+        guard displayLayer.status != .failed else { return }
+
         var formatDescription: CMVideoFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(
             allocator: kCFAllocatorDefault,
@@ -240,24 +331,19 @@ final class MPVPictureInPictureController: NSObject {
 
         let presentationSeconds: Double
         if hasInstalledTimebase, let timebase = displayLayer.controlTimebase {
-            let seconds = CMTimeGetSeconds(CMTimebaseGetTime(timebase))
-            presentationSeconds = seconds.isFinite ? seconds : lastEnqueuedPresentationSeconds + currentFramePumpIntervalSeconds
+            presentationSeconds = CMTimeGetSeconds(CMTimebaseGetTime(timebase))
         } else {
             presentationSeconds = lastEnqueuedPresentationSeconds + currentFramePumpIntervalSeconds
         }
 
-        let jumpedBackward = presentationSeconds + 0.5 < lastPlaybackPositionSeconds
-        let jumpedForward = presentationSeconds - lastPlaybackPositionSeconds > 5.0
-        if jumpedBackward || jumpedForward {
-            lastEnqueuedPresentationSeconds = max(presentationSeconds - currentFramePumpIntervalSeconds, 0)
-            DispatchQueue.main.async { [weak self] in
-                self?.displayLayer.flush()
-            }
+        if presentationSeconds + 0.5 < lastPlaybackPositionSeconds
+            || presentationSeconds - lastPlaybackPositionSeconds > 5.0 {
+            displayLayer.flush()
+            lastEnqueuedPresentationSeconds = presentationSeconds
         }
         lastPlaybackPositionSeconds = presentationSeconds
 
-        let minimumStep = min(0.01, currentFramePumpIntervalSeconds)
-        let nextPts = max(presentationSeconds, lastEnqueuedPresentationSeconds + minimumStep)
+        let nextPts = max(presentationSeconds, lastEnqueuedPresentationSeconds + 0.01)
         let pts = CMTime(seconds: nextPts, preferredTimescale: 600)
         lastEnqueuedPresentationSeconds = CMTimeGetSeconds(pts)
 
@@ -290,24 +376,19 @@ final class MPVPictureInPictureController: NSObject {
             )
         }
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            if self.displayLayer.status == .failed {
-                self.displayLayer.flush()
-                if self.displayLayer.error != nil {
-                    self.displayLayer.controlTimebase = nil
-                    self.configureTimebase()
-                }
-            }
-            if self.displayLayer.isReadyForMoreMediaData {
-                self.displayLayer.enqueue(sampleBuffer)
-            }
+        guard displayLayer.isReadyForMoreMediaData else { return }
+        displayLayer.enqueue(sampleBuffer)
+
+        if displayLayer.status == .failed {
+            recoverDisplayLayerIfNeeded()
         }
     }
 
     private func makePlaceholderPixelBuffer(size: CGSize, color: UIColor) -> CVPixelBuffer? {
         let width = Int(size.width)
         let height = Int(size.height)
+        guard width > 0, height > 0 else { return nil }
+
         let attrs: [CFString: Any] = [
             kCVPixelBufferIOSurfacePropertiesKey: [:],
             kCVPixelBufferCGImageCompatibilityKey: true,
@@ -353,18 +434,14 @@ final class MPVPictureInPictureController: NSObject {
 extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        renderQueue.async { [weak self] in
-            isStarting = true
-            isActive = true
-        }
+        isStarting = true
+        isActive = true
         ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        renderQueue.async { [weak self] in
-            isStarting = false
-            isActive = true
-        }
+        isStarting = false
+        isActive = true
         ensureFramePumpRunning()
     }
 
@@ -376,17 +453,13 @@ extension MPVPictureInPictureController: AVPictureInPictureControllerDelegate {
     }
 
     func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        renderQueue.async { [weak self] in
-            isStarting = false
-            stopFramePump()
-        }
+        isStarting = false
+        stopFramePump()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        renderQueue.async { [weak self] in
-            isStarting = false
-            isActive = false
-        }
+        isStarting = false
+        isActive = false
         ensureFramePumpRunning()
     }
 
@@ -412,7 +485,6 @@ extension MPVPictureInPictureController: AVPictureInPictureSampleBufferPlaybackD
         } else {
             playbackController?.pause()
         }
-        ensureFramePumpRunning()
     }
 
     func pictureInPictureControllerTimeRangeForPlayback(_ controller: AVPictureInPictureController) -> CMTimeRange {
