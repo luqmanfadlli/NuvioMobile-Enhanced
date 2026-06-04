@@ -77,22 +77,38 @@ internal object TrailerExtractionPlatform {
         bestVideo: StreamCandidate?,
         bestAudio: StreamCandidate?,
     ): TrailerPlaybackSource? = withContext(Dispatchers.Default) {
-        val combinedUrl = bestManifest?.manifestUrl ?: bestProgressive?.url
-        if (!combinedUrl.isNullOrBlank()) {
+        val compatibleVideo = bestVideo
+            ?.takeIf { it.ext.equals("mp4", ignoreCase = true) }
+        val compatibleAudio = bestAudio
+            ?.takeIf {
+                it.ext.equals("m4a", ignoreCase = true) ||
+                    it.ext.equals("mp4", ignoreCase = true)
+            }
+
+        if (compatibleVideo != null) {
             return@withContext TrailerPlaybackSource(
-                videoUrl = resolveReachableUrl(combinedUrl),
+                videoUrl = resolveReachableUrl(compatibleVideo.url),
+                audioUrl = compatibleAudio?.url?.let { resolveReachableUrl(it) },
+            )
+        }
+
+        val compatibleProgressive = bestProgressive
+            ?.takeIf { it.ext.equals("mp4", ignoreCase = true) }
+        if (compatibleProgressive != null) {
+            return@withContext TrailerPlaybackSource(
+                videoUrl = resolveReachableUrl(compatibleProgressive.url),
                 audioUrl = null,
             )
         }
 
-        val compatibleVideo = bestVideo?.takeIf { it.ext.equals("mp4", ignoreCase = true) }
-            ?: return@withContext null
-        val compatibleAudio = bestAudio?.takeIf { it.ext.equals("m4a", ignoreCase = true) }
+        if (bestManifest != null) {
+            return@withContext TrailerPlaybackSource(
+                videoUrl = bestManifest.manifestUrl,
+                audioUrl = null,
+            )
+        }
 
-        TrailerPlaybackSource(
-            videoUrl = resolveReachableUrl(compatibleVideo.url),
-            audioUrl = compatibleAudio?.url?.let { resolveReachableUrl(it) },
-        )
+        null
     }
 
     private suspend fun resolveReachableUrl(url: String): String {
