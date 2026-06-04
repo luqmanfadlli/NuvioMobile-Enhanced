@@ -285,8 +285,16 @@ class InAppYouTubeExtractor {
         }
 
         val bestProgressive = sortCandidates(progressive).firstOrNull()
-        val bestVideo = pickBestForClient(adaptiveVideo, PREFERRED_SEPARATE_CLIENT)
-        val bestAudio = pickBestForClient(adaptiveAudio, PREFERRED_SEPARATE_CLIENT)
+        val bestVideo = pickBestForClient(
+            items = adaptiveVideo,
+            clientKey = PREFERRED_SEPARATE_CLIENT,
+            preferredExtensions = setOf("mp4"),
+        )
+        val bestAudio = pickBestForClient(
+            items = adaptiveAudio,
+            clientKey = PREFERRED_SEPARATE_CLIENT,
+            preferredExtensions = setOf("m4a", "mp4"),
+        )
 
         return TrailerExtractionPlatform.buildPlaybackSource(
             bestManifest = bestManifest,
@@ -513,12 +521,22 @@ class InAppYouTubeExtractor {
         )
     }
 
-    private fun pickBestForClient(items: List<StreamCandidate>, clientKey: String): StreamCandidate? {
+    private fun pickBestForClient(
+        items: List<StreamCandidate>,
+        clientKey: String,
+        preferredExtensions: Set<String> = emptySet(),
+    ): StreamCandidate? {
+        fun List<StreamCandidate>.preferredContainerFirst(): List<StreamCandidate> {
+            if (preferredExtensions.isEmpty()) return this
+            val preferred = filter { it.ext.lowercase() in preferredExtensions }
+            return if (preferred.isNotEmpty()) preferred else this
+        }
+
         val sameClient = items.filter { it.client == clientKey }
         if (sameClient.isNotEmpty()) {
-            return sortCandidates(sameClient).firstOrNull()
+            return sortCandidates(sameClient.preferredContainerFirst()).firstOrNull()
         }
-        return sortCandidates(items).firstOrNull()
+        return sortCandidates(items.preferredContainerFirst()).firstOrNull()
     }
 
     private fun containerPreference(ext: String): Int {
