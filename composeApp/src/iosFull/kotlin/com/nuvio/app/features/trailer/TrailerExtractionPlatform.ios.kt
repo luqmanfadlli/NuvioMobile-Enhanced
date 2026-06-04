@@ -77,22 +77,21 @@ internal object TrailerExtractionPlatform {
         bestVideo: StreamCandidate?,
         bestAudio: StreamCandidate?,
     ): TrailerPlaybackSource? = withContext(Dispatchers.Default) {
-        val bestManifestHeight = bestManifest?.height ?: -1
-        val bestCombinedIsManifest = bestManifest != null &&
-            (bestProgressive == null || bestManifestHeight > bestProgressive.height)
-
-        val combinedUrl = if (bestCombinedIsManifest) {
-            bestManifest.manifestUrl
-        } else {
-            bestProgressive?.url
+        val combinedUrl = bestManifest?.manifestUrl ?: bestProgressive?.url
+        if (!combinedUrl.isNullOrBlank()) {
+            return@withContext TrailerPlaybackSource(
+                videoUrl = resolveReachableUrl(combinedUrl),
+                audioUrl = null,
+            )
         }
 
-        val videoUrl = resolveReachableUrl(bestVideo?.url ?: combinedUrl ?: return@withContext null)
-        val audioUrl = bestAudio?.url?.let { resolveReachableUrl(it) }
+        val compatibleVideo = bestVideo?.takeIf { it.ext.equals("mp4", ignoreCase = true) }
+            ?: return@withContext null
+        val compatibleAudio = bestAudio?.takeIf { it.ext.equals("m4a", ignoreCase = true) }
 
         TrailerPlaybackSource(
-            videoUrl = videoUrl,
-            audioUrl = audioUrl,
+            videoUrl = resolveReachableUrl(compatibleVideo.url),
+            audioUrl = compatibleAudio?.url?.let { resolveReachableUrl(it) },
         )
     }
 
