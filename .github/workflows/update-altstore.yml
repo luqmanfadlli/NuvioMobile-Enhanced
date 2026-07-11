@@ -1,0 +1,200 @@
+name: Update AltStore source
+
+on:
+  workflow_dispatch: {}
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-altstore
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REPO: ${{ github.repository }}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update versions in apps.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          # Reads the existing apps.json and updates version.
+          
+          import hashlib, io, json, os, plistlib, re, sys, urllib.request, zipfile
+          from datetime import datetime, timezone
+
+          REPO = os.environ.get("UPSTREAM_REPO", "luqmanfadlli/NuvioMobile-iOS")
+          APPS = "apps.json"
+          DOWNLOAD_TIMEOUT = 300
+
+          def gh_get(url):
+              req = urllib.request.Request(url, headers={
+                  "User-Agent": "nuvio-altstore-updater",
+                  "Accept": "application/vnd.github+json",
+              })
+              tok = os.environ.get("GITHUB_TOKEN")
+              if tok:
+                  req.add_header("Authorization", f"Bearer {tok}")
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  return json.load(r)
+
+
+          def fetch_releases():
+              out, page = [], 1
+              while True:
+                  batch = gh_get(f"https://api.github.com/repos/{REPO}/releases?per_page=100&page={page}")
+                  if not batch:
+                      break
+                  out.extend(batch)
+                  if len(batch) < 100:
+                      break
+                  page += 1
+              return [r for r in out if not r.get("draft")]
+
+
+          def version_key(tag):
+              nums = re.findall(r"\d+", tag or "")
+              return tuple(int(n) for n in nums[:4]) or (0,)
+
+
+          def pick_asset(app_name, releases):
+              """Newest .ipa for this app. 'enhanced' apps get enhanced assets;
+              everything else gets the non-enhanced ones."""
+              want_enhanced = "enhanced" in (app_name or "").lower()
+              best = None
+              for rel in releases:
+                  for a in rel.get("assets", []):
+                      n = a.get("name", "").lower()
+                      if not n.endswith(".ipa"):
+                          continue
+                      if ("enhanced" in n) != want_enhanced:
+                          continue
+                      k = version_key(rel.get("tag_name"))
+                      if best is None or k > best[0]:
+                          best = (k, rel, a)
+              return (best[1], best[2]) if best else (None, None)
+
+
+          def download(url):
+              req = urllib.request.Request(url, headers={"User-Agent": "nuvio-altstore-updater"})
+              tok = os.environ.get("GITHUB_TOKEN")
+              if tok:
+                  req.add_header("Authorization", f"Bearer {tok}")
+              with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as r:
+                  return r.read()
+
+
+          def inspect_ipa(data):
+              info = {"version": None, "min_os": None}
+              with zipfile.ZipFile(io.BytesIO(data)) as z:
+                  names = [n for n in z.namelist()
+                           if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", n)]
+                  if names:
+                      pl = plistlib.loads(z.read(names[0]))
+                      info["version"] = pl.get("CFBundleShortVersionString") or pl.get("CFBundleVersion")
+                      info["min_os"] = pl.get("MinimumOSVersion")
+              return info
+
+
+          def latest(app):
+              vs = app.get("versions") or []
+              return vs[0] if vs else None
+
+
+          def main():
+              if not os.path.exists(APPS):
+                  sys.exit(f"{APPS} not found - commit a seed apps.json first.")
+              with open(APPS) as f:
+                  src = json.load(f)
+
+              releases = fetch_releases()
+              if not releases:
+                  sys.exit("No releases found upstream.")
+
+              changed = False
+              for app in src.get("apps", []):
+                  name = app.get("name", "")
+                  rel, asset = pick_asset(name, releases)
+                  if not asset:
+                      print(f"- {name}: no matching .ipa, left unchanged")
+                      continue
+
+                  url = asset["browser_download_url"]
+                  cur = latest(app)
+                  if cur and cur.get("downloadURL") == url and "PLACEHOLDER" not in str(cur.get("version", "")):
+                      print(f"- {name}: up to date ({cur.get('version')})")
+                      continue
+
+                  blob = download(url)
+                  meta = inspect_ipa(blob)
+                  version = meta["version"] or re.sub(r"[^0-9.].*$", "", rel["tag_name"]) or rel["tag_name"]
+                  date = (rel.get("published_at") or datetime.now(timezone.utc).isoformat())[:10]
+                  notes = (rel.get("body") or "").strip() or f"{name} {version}."
+
+                  entry = {
+                      "version": version,
+                      "date": date,
+                      "localizedDescription": notes[:800],
+                      "downloadURL": url,
+                      "size": asset.get("size", len(blob)),
+                      "sha256": hashlib.sha256(blob).hexdigest(),
+                  }
+                  min_os = meta["min_os"] or (cur.get("minOSVersion") if cur else None)
+                  if min_os:
+                      entry["minOSVersion"] = min_os
+
+                  # Keep prior versions as history; drop placeholders and any same-version dupe.
+                  history = [v for v in (app.get("versions") or [])
+                             if "PLACEHOLDER" not in str(v.get("version", ""))
+                             and v.get("version") != version]
+                  app["versions"] = [entry] + history
+
+                  # Keep other fields
+                  for k, val in (("version", entry["version"]), ("versionDate", entry["date"]),
+                                 ("versionDescription", entry["localizedDescription"]),
+                                 ("downloadURL", url), ("size", entry["size"])):
+                      if k in app:
+                          app[k] = val
+
+                  changed = True
+                  print(f"+ {name}: added {version}")
+
+              if changed:
+                  with open(APPS, "w") as f:
+                      json.dump(src, f, indent=2)
+                      f.write("\n")
+                  print("apps.json updated.")
+              else:
+                  print("No changes.")
+
+
+          if __name__ == "__main__":
+              main()
+          PY
+
+      - name: Validate JSON
+        run: python3 -c "import json; json.load(open('apps.json')); print('apps.json is valid JSON')"
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- apps.json; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          git commit -m "chore: update AltStore versions $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
