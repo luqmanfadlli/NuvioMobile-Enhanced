@@ -1,0 +1,32 @@
+{
+  "name": "Nuvio Enhanced (Unofficial)",
+  "subtitle": "Enhanced Nuvio builds for AltStore and SideStore.",
+  "description": "Update channel for the Nuvio Enhanced variant.",
+  "website": "https://github.com/luqmanfadlli/NuvioMobile-iOS",
+  "iconURL": "https://raw.githubusercontent.com/luqmanfadlli/NuvioMobile-iOS/cmp-rewrite/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+  "tintColor": "7B2FF7",
+  "news": [],
+  "apps": [
+    {
+      "name": "Nuvio Enhanced",
+      "bundleIdentifier": "com.nuvio.media",
+      "developerName": "Nuvio Unofficial",
+      "subtitle": "Watch your library, anywhere",
+      "localizedDescription": "Unofficial Enhanced build of Nuvio Mobile for iOS and iPadOS with experimental features, quality-of-life improvements, and additional fixes.",
+      "iconURL": "https://raw.githubusercontent.com/luqmanfadlli/NuvioMobile-iOS/cmp-rewrite/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+      "tintColor": "7B2FF7",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "0.2.21",
+          "date": "2026-07-09",
+          "localizedDescription": "# \ud83d\ude80 Release v0.2.21\r\n\r\nThis release is based on the upstream **Nuvio v0.2.21**, see official release details [here](https://github.com/NuvioMedia/NuvioMobile/releases/tag/0.2.21).\r\n\r\n---\r\n\r\n## Variants\r\n\r\n### Nuvio Full\r\nThis variant is similar to the official TestFlight version with unlocked Plugins and in-app Trailers.\r\n\r\n### Nuvio Enhanced\r\nThis custom variant includes experimental features, quality-of-life improvements, and specific bug fixes not yet available in the upstream repository.\r\n\r\n**Added Features:**\r\n* Added Now Playing Control in the Notification, Lockscreen, and Widget with media metadata and artwork.\r\n* Added a volume boost feature (up to 200%) for quieter streams.\r\n* Added support for Live TV integrations.\r\n* Added stream quality selection in Player Control.\r\n* Add artwo",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-iOS/releases/download/0.2.21/Nuvio-v0.2.21-Enhanced.ipa",
+          "size": 41599321,
+          "sha256": "0e7fb05e1229bf63e99c4d15fb91504a8c3519b0307e0de0aaad2fda8a8d1a2b",
+          "minOSVersion": "16.1"
+        }
+      ]
+    }
+  ]
+}
