@@ -733,7 +733,9 @@ struct DetailComposeView: UIViewControllerRepresentable {
         )
         return NuvioComposeHost.wrap(
             controller,
-            disablesInteractiveContentPopGesture: route is PlayerRoute
+            disablesInteractiveContentPopGesture:
+                route is PlayerRoute ||
+                route is StreamRoute
         )
     }
 
