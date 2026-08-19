@@ -18,8 +18,6 @@ import com.nuvio.app.features.watchprogress.parseReleaseDateToEpochMs
 import com.nuvio.app.features.watchprogress.resolvedProgressKey
 import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watched.WatchedItem
-import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
-import com.nuvio.app.features.trakt.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -29,18 +27,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HomeScreenTest {
-
-    @Test
-    fun `continue watching cache uses the effective progress source`() {
-        assertEquals(
-            WatchProgressSource.TRAKT,
-            effectiveContinueWatchingCacheSource(isTraktProgressActive = true),
-        )
-        assertEquals(
-            WatchProgressSource.NUVIO_SYNC,
-            effectiveContinueWatchingCacheSource(isTraktProgressActive = false),
-        )
-    }
 
     @Test
     fun `home trakt continue watching candidate limits match TV`() {
@@ -269,7 +255,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `build home continue watching items preserves cached in progress artwork fallback`() {
+    fun `build home continue watching items preserves cached in progress identity and metadata`() {
         val progress = progressEntry(
             videoId = "show:1:4",
             title = "Show",
@@ -285,9 +271,9 @@ class HomeScreenTest {
         val cached = ContinueWatchingItem(
             parentMetaId = "show",
             parentMetaType = "series",
-            videoId = "show:1:4",
+            videoId = "stable-show:1:4",
             title = "Cached Show",
-            subtitle = "S1E4",
+            subtitle = "Cached S1E4",
             imageUrl = "https://example.test/cached.jpg",
             logo = "https://example.test/logo.png",
             poster = "https://example.test/poster.jpg",
@@ -309,6 +295,8 @@ class HomeScreenTest {
             nextUpItemsBySeries = emptyMap(),
         )
 
+        assertEquals("stable-show:1:4", result.single().videoId)
+        assertEquals("Cached S1E4", result.single().subtitle)
         assertEquals("https://example.test/cached.jpg", result.single().imageUrl)
         assertEquals("https://example.test/logo.png", result.single().logo)
         assertEquals("https://example.test/poster.jpg", result.single().poster)
@@ -435,7 +423,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `Trakt continue watching window filters old progress only when Trakt source is active`() {
+    fun `provider continue watching cutoff filters old progress`() {
         val oldEntry = progressEntry(
             videoId = "old",
             title = "Old",
@@ -452,25 +440,21 @@ class HomeScreenTest {
         )
         val entries = listOf(oldEntry, recentEntry)
 
-        val filtered = filterEntriesForTraktContinueWatchingWindow(
+        val filtered = filterEntriesForContinueWatchingWindow(
             entries = entries,
-            isTraktProgressActive = true,
-            daysCap = 60,
-            nowEpochMs = 90L * MILLIS_PER_DAY,
+            cutoffEpochMs = 30L * MILLIS_PER_DAY,
         )
-        val nuvioSource = filterEntriesForTraktContinueWatchingWindow(
+        val sourceWithoutCutoff = filterEntriesForContinueWatchingWindow(
             entries = entries,
-            isTraktProgressActive = false,
-            daysCap = 60,
-            nowEpochMs = 90L * MILLIS_PER_DAY,
+            cutoffEpochMs = null,
         )
 
         assertEquals(listOf("recent"), filtered.map(WatchProgressEntry::videoId))
-        assertEquals(listOf("old", "recent"), nuvioSource.map(WatchProgressEntry::videoId))
+        assertEquals(listOf("old", "recent"), sourceWithoutCutoff.map(WatchProgressEntry::videoId))
     }
 
     @Test
-    fun `Trakt all history window keeps old progress`() {
+    fun `provider without a continue watching cutoff keeps old progress`() {
         val oldEntry = progressEntry(
             videoId = "old",
             title = "Old",
@@ -486,11 +470,9 @@ class HomeScreenTest {
             episodeNumber = null,
         )
 
-        val result = filterEntriesForTraktContinueWatchingWindow(
+        val result = filterEntriesForContinueWatchingWindow(
             entries = listOf(oldEntry, recentEntry),
-            isTraktProgressActive = true,
-            daysCap = TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL,
-            nowEpochMs = 90L * MILLIS_PER_DAY,
+            cutoffEpochMs = null,
         )
 
         assertEquals(listOf("old", "recent"), result.map(WatchProgressEntry::videoId))
@@ -516,7 +498,7 @@ class HomeScreenTest {
         val result = buildHomeNextUpSeedCandidates(
             progressEntries = listOf(completedProgress),
             watchedItems = listOf(olderWatchedItem),
-            isTraktProgressActive = false,
+            providerOwnsCompletedHistory = false,
             preferFurthestEpisode = true,
             nowEpochMs = 3_000L,
         )
@@ -547,7 +529,7 @@ class HomeScreenTest {
         val result = buildHomeNextUpSeedCandidates(
             progressEntries = listOf(olderCompletedProgress),
             watchedItems = listOf(newerWatchedItem),
-            isTraktProgressActive = false,
+            providerOwnsCompletedHistory = false,
             preferFurthestEpisode = true,
             nowEpochMs = 3_000L,
         )
@@ -557,7 +539,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `Trakt next up seeds ignore watched items from the separate watched sync`() {
+    fun `provider-owned completed history ignores the separate watched projection`() {
         val traktProgress = progressEntry(
             videoId = "show:1:2",
             title = "Show",
@@ -576,12 +558,41 @@ class HomeScreenTest {
         val result = buildHomeNextUpSeedCandidates(
             progressEntries = listOf(traktProgress),
             watchedItems = listOf(watchedItem),
-            isTraktProgressActive = true,
+            providerOwnsCompletedHistory = true,
             preferFurthestEpisode = true,
             nowEpochMs = 4_000L,
         )
 
         assertEquals(listOf("show"), result.map { it.content.id })
+    }
+
+    @Test
+    fun `hidden provider content cannot seed next up from progress or watched history`() {
+        val progress = progressEntry(
+            videoId = "dropped-show:1:2",
+            title = "Dropped Show",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastUpdatedEpochMs = 2_000L,
+            isCompleted = true,
+        )
+        val watched = watchedItem(
+            id = "dropped-show",
+            season = 1,
+            episode = 2,
+            markedAtEpochMs = 2_000L,
+        )
+
+        val result = buildHomeNextUpSeedCandidates(
+            progressEntries = listOf(progress),
+            watchedItems = listOf(watched),
+            providerOwnsCompletedHistory = false,
+            preferFurthestEpisode = true,
+            nowEpochMs = 3_000L,
+            isContentHidden = { contentId -> contentId == "dropped-show" },
+        )
+
+        assertTrue(result.isEmpty())
     }
 
     @Test
@@ -607,7 +618,7 @@ class HomeScreenTest {
     fun `home next up waits for the selected seed source before resolving or clearing cache`() {
         assertFalse(
             isHomeNextUpSeedSourceLoaded(
-                isTraktProgressActive = false,
+                providerOwnsCompletedHistory = false,
                 hasLoadedRemoteProgress = false,
                 hasLoadedWatchedItems = true,
                 hasLoadedRemoteWatchedItems = true,
@@ -615,7 +626,7 @@ class HomeScreenTest {
         )
         assertFalse(
             isHomeNextUpSeedSourceLoaded(
-                isTraktProgressActive = false,
+                providerOwnsCompletedHistory = false,
                 hasLoadedRemoteProgress = true,
                 hasLoadedWatchedItems = false,
                 hasLoadedRemoteWatchedItems = true,
@@ -623,7 +634,7 @@ class HomeScreenTest {
         )
         assertFalse(
             isHomeNextUpSeedSourceLoaded(
-                isTraktProgressActive = false,
+                providerOwnsCompletedHistory = false,
                 hasLoadedRemoteProgress = true,
                 hasLoadedWatchedItems = true,
                 hasLoadedRemoteWatchedItems = false,
@@ -631,7 +642,7 @@ class HomeScreenTest {
         )
         assertTrue(
             isHomeNextUpSeedSourceLoaded(
-                isTraktProgressActive = false,
+                providerOwnsCompletedHistory = false,
                 hasLoadedRemoteProgress = true,
                 hasLoadedWatchedItems = true,
                 hasLoadedRemoteWatchedItems = true,
@@ -639,7 +650,7 @@ class HomeScreenTest {
         )
         assertTrue(
             isHomeNextUpSeedSourceLoaded(
-                isTraktProgressActive = true,
+                providerOwnsCompletedHistory = true,
                 hasLoadedRemoteProgress = true,
                 hasLoadedWatchedItems = false,
                 hasLoadedRemoteWatchedItems = false,

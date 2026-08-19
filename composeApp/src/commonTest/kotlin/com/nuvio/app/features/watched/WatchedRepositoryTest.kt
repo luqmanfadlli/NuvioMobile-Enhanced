@@ -2,13 +2,69 @@ package com.nuvio.app.features.watched
 
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.WatchProgressSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
+    @Test
+    fun oversizedLegacyPayload_isNotRestored() {
+        assertTrue(shouldRestoreWatchedPayload(4 * 1024 * 1024))
+        assertFalse(shouldRestoreWatchedPayload(4 * 1024 * 1024 + 1))
+    }
+
+    @Test
+    fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
+        assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
+    }
+
+    @Test
+    fun populatedProviderExtraKeys_triggerRefreshFromEmptyState() {
+        assertTrue(extraWatchedKeysChanged(previous = null, current = setOf("series:tt1:-1:-1")))
+    }
+
+    @Test
+    fun changedProviderExtraKeys_triggerRefresh() {
+        assertTrue(
+            extraWatchedKeysChanged(
+                previous = setOf("series:tt1:-1:-1"),
+                current = setOf("series:tt2:-1:-1"),
+            ),
+        )
+    }
+
+    @Test
+    fun providerRefreshFailure_isContainedWithoutReplacingState() = runBlocking {
+        val failure = IllegalStateException("rate limited")
+        var observedFailure: Throwable? = null
+
+        val result = watchedProviderRefreshOrNull(
+            refresh = { throw failure },
+            onFailure = { observedFailure = it },
+        )
+
+        assertNull(result)
+        assertEquals(failure, observedFailure)
+    }
+
+    @Test
+    fun providerRefreshCancellation_isNotContained() = runBlocking {
+        assertFailsWith<CancellationException> {
+            watchedProviderRefreshOrNull(
+                refresh = { throw CancellationException("cancelled") },
+                onFailure = {},
+            )
+        }
+        Unit
+    }
+
     @Test
     fun watchedItemKey_isTypeAware() {
         assertEquals("movie:tt1:-1:-1", watchedItemKey(type = "movie", id = "tt1"))
@@ -136,38 +192,69 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun playbackCompletionWatchedMarks_doNotMirrorToTraktHistory() {
-        assertFalse(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Skip,
-                isTraktAuthenticated = true,
-            ),
+    fun successfulTrackerPush_doesNotAcknowledgeFailedNuvioPush() {
+        val outcome = WatchedPushOutcome(
+            nuvioSyncSucceeded = false,
+            succeededTrackerProviderIds = setOf(TrackingProviderId.TRAKT),
         )
-        assertTrue(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Mirror,
-                isTraktAuthenticated = true,
-            ),
-        )
+
         assertFalse(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Mirror,
-                isTraktAuthenticated = false,
+            shouldAcknowledgeNuvioWatchedPush(
+                source = WatchProgressSource.NUVIO_SYNC,
+                outcome = outcome,
             ),
         )
     }
 
     @Test
-    fun watchedItemsForSource_keepsNuvioAndTraktSnapshotsIsolated() {
+    fun successfulNuvioPush_acknowledgesNuvioDirtyState() {
+        val outcome = WatchedPushOutcome(nuvioSyncSucceeded = true)
+
+        assertTrue(
+            shouldAcknowledgeNuvioWatchedPush(
+                source = WatchProgressSource.NUVIO_SYNC,
+                outcome = outcome,
+            ),
+        )
+    }
+
+    @Test
+    fun playbackCompletionWatchedMarks_doNotMirrorToTrackerHistory() {
+        assertFalse(
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Skip,
+                hasConnectedTracker = true,
+            ),
+        )
+        assertTrue(
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Mirror,
+                hasConnectedTracker = true,
+            ),
+        )
+        assertFalse(
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Mirror,
+                hasConnectedTracker = false,
+            ),
+        )
+    }
+
+    @Test
+    fun watchedItemsForSource_keepsProviderSnapshotsIsolated() {
         val nuvioItem = watchedItem(id = "nuvio", markedAtEpochMs = 1_000L)
         val traktItem = watchedItem(id = "trakt", markedAtEpochMs = 2_000L)
+        val simklItem = watchedItem(id = "simkl", markedAtEpochMs = 3_000L)
 
         assertEquals(
             listOf(nuvioItem),
             watchedItemsForSource(
                 source = WatchProgressSource.NUVIO_SYNC,
                 nuvioItems = listOf(nuvioItem),
-                traktItems = listOf(traktItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
             ),
         )
         assertEquals(
@@ -175,15 +262,49 @@ class WatchedRepositoryTest {
             watchedItemsForSource(
                 source = WatchProgressSource.TRAKT,
                 nuvioItems = listOf(nuvioItem),
-                traktItems = listOf(traktItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(simklItem),
+            watchedItemsForSource(
+                source = WatchProgressSource.SIMKL,
+                nuvioItems = listOf(nuvioItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
             ),
         )
     }
 
     @Test
-    fun onlyNuvioWatchedStateIsPersisted() {
-        assertTrue(shouldPersistWatchedSource(WatchProgressSource.NUVIO_SYNC))
-        assertFalse(shouldPersistWatchedSource(WatchProgressSource.TRAKT))
+    fun successfulTrackerPush_waitsForRemoteSnapshotAcknowledgement() {
+        val outcome = WatchedPushOutcome(
+            succeededTrackerProviderIds = setOf(TrackingProviderId.TRAKT),
+        )
+
+        assertFalse(shouldAcknowledgeNuvioWatchedPush(WatchProgressSource.TRAKT, outcome))
+    }
+
+    @Test
+    fun providerSnapshot_acknowledgesPendingMarkByPresence() {
+        val localItem = watchedItem(id = "pending", markedAtEpochMs = 1_999L)
+        val remoteItem = localItem.copy(markedAtEpochMs = 1_000L)
+        val key = watchedItemKey(localItem.type, localItem.id)
+
+        val merged = mergeWatchedSnapshot(
+            serverItems = listOf(remoteItem),
+            localItems = listOf(localItem),
+            dirtyKeys = setOf(key),
+            acknowledgeDirtyByPresence = true,
+        )
+
+        assertEquals(mapOf(key to remoteItem), merged.items)
+        assertTrue(merged.dirtyKeys.isEmpty())
     }
 
     @Test
@@ -192,17 +313,22 @@ class WatchedRepositoryTest {
         val previousTraktItem = watchedItem(id = "old-trakt", markedAtEpochMs = 2_000L)
         val refreshedTraktItem = watchedItem(id = "new-trakt", markedAtEpochMs = 3_000L)
         val nuvioItems = mutableMapOf("nuvio" to nuvioItem)
-        val traktItems = mutableMapOf("old-trakt" to previousTraktItem)
+        val providerItems = mutableMapOf(
+            TrackingProviderId.TRAKT to mutableMapOf("old-trakt" to previousTraktItem),
+        )
 
         replaceWatchedItemsForSource(
             source = WatchProgressSource.TRAKT,
             nuvioItems = nuvioItems,
-            traktItems = traktItems,
+            providerItems = providerItems,
             replacement = mapOf("new-trakt" to refreshedTraktItem),
         )
 
         assertEquals(mapOf("nuvio" to nuvioItem), nuvioItems)
-        assertEquals(mapOf("new-trakt" to refreshedTraktItem), traktItems)
+        assertEquals(
+            mapOf("new-trakt" to refreshedTraktItem),
+            providerItems[TrackingProviderId.TRAKT].orEmpty(),
+        )
     }
 
     @Test
@@ -211,14 +337,32 @@ class WatchedRepositoryTest {
             WatchProgressSource.NUVIO_SYNC,
             effectiveWatchedSource(
                 requestedSource = WatchProgressSource.TRAKT,
-                isTraktAuthenticated = false,
+                connectedProviderIds = emptySet(),
             ),
         )
         assertEquals(
             WatchProgressSource.TRAKT,
             effectiveWatchedSource(
                 requestedSource = WatchProgressSource.TRAKT,
-                isTraktAuthenticated = true,
+                connectedProviderIds = setOf(TrackingProviderId.TRAKT),
+            ),
+        )
+    }
+
+    @Test
+    fun effectiveWatchedSource_selectsConnectedSimkl() {
+        assertEquals(
+            WatchProgressSource.SIMKL,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.SIMKL,
+                connectedProviderIds = setOf(TrackingProviderId.SIMKL),
+            ),
+        )
+        assertEquals(
+            WatchProgressSource.NUVIO_SYNC,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.SIMKL,
+                connectedProviderIds = emptySet(),
             ),
         )
     }

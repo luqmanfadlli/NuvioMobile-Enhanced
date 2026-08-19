@@ -4,7 +4,7 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
-import com.nuvio.app.features.watched.watchedItemKey
+import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.continueWatchingEntries
 import com.nuvio.app.features.watchprogress.shouldUseAsCompletedSeedForContinueWatching
@@ -20,9 +20,9 @@ object WatchingState {
         item: MetaPreview,
         fullyWatchedSeriesKeys: Set<String> = emptySet(),
     ): Boolean {
-        val posterKey = watchedItemKey(item.type, item.id)
-        if (watchedKeys.contains(posterKey)) return true
-        return item.type.isSeriesLikePosterType() && fullyWatchedSeriesKeys.contains(posterKey)
+        val posterKeys = watchedItemKeys(type = item.type, id = item.id)
+        if (posterKeys.any(watchedKeys::contains)) return true
+        return item.type.isSeriesLikePosterType() && posterKeys.any(fullyWatchedSeriesKeys::contains)
     }
 
     fun isEpisodeWatched(
@@ -30,14 +30,25 @@ object WatchingState {
         metaType: String,
         metaId: String,
         episode: MetaVideo,
-    ): Boolean = watchedKeys.contains(
-        watchedItemKey(
+    ): Boolean {
+        val keys = watchedItemKeys(
             type = metaType,
             id = metaId,
             season = episode.season,
             episode = episode.episode,
-        ),
-    )
+        )
+        if (keys.any(watchedKeys::contains)) return true
+
+        // Fallback for franchise-parent anime: meta.id (e.g. "mal:49233") may differ
+        // from the actual entry ID in Simkl. Check via video ID resolution in snapshot.
+        // Only for anime-style video IDs (mal:, kitsu:, etc.) — not IMDB/TVDB content.
+        val videoId = episode.id
+        val episodeNumber = episode.episode
+        if (episodeNumber != null) {
+            return com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(videoId, episodeNumber)
+        }
+        return false
+    }
 
     fun areEpisodesWatched(
         watchedKeys: Set<String>,
@@ -88,7 +99,7 @@ object WatchingState {
 }
 
 private fun String.isSeriesLikePosterType(): Boolean =
-    trim().lowercase() in setOf("series", "show", "tv", "tvshow")
+    trim().lowercase() in setOf("series", "show", "tv", "tvshow", "anime")
 
 private fun WatchProgressEntry.toDomainProgressRecord(): WatchingProgressRecord =
     normalizedCompletion().let { entry ->

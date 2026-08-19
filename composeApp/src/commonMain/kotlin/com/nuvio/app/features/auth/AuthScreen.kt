@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,7 +66,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -84,13 +83,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.features.settings.AppBrandWordmark
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.app_logo_wordmark
 import nuvio.composeapp.generated.resources.compose_auth_already_have_account
 import nuvio.composeapp.generated.resources.compose_auth_continue_without_account
 import nuvio.composeapp.generated.resources.compose_auth_create_account
@@ -107,7 +107,6 @@ import nuvio.composeapp.generated.resources.compose_auth_tagline
 import nuvio.composeapp.generated.resources.compose_auth_terms_link
 import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val AuthTextPrimary = Color(0xFFF5F7F8)
@@ -187,6 +186,7 @@ fun AuthScreen(
     modifier: Modifier = Modifier,
 ) {
     val authError by AuthRepository.error.collectAsStateWithLifecycle()
+    val serverConnectionState by ServerConnectionController.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     var isSignUp by rememberSaveable { mutableStateOf(false) }
@@ -196,6 +196,8 @@ fun AuthScreen(
     var isLoading by rememberSaveable { mutableStateOf(false) }
     var emailFieldBounds by remember { mutableStateOf<Rect?>(null) }
     var passwordFieldBounds by remember { mutableStateOf<Rect?>(null) }
+    var showServerSheet by rememberSaveable { mutableStateOf(false) }
+    var showOfficialServerDialog by rememberSaveable { mutableStateOf(false) }
 
     fun submitAuth() {
         if (email.isBlank() || password.length < 6 || isLoading) return
@@ -214,6 +216,12 @@ fun AuthScreen(
     }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    LaunchedEffect(serverConnectionState.activeServer.isCustom) {
+        if (!serverConnectionState.activeServer.isCustom) {
+            showOfficialServerDialog = false
+        }
+    }
 
     Box(
         modifier = modifier
@@ -313,6 +321,65 @@ fun AuthScreen(
                 }
             }
         }
+
+        if (AppFeaturePolicy.customServerConnectionsEnabled) {
+            ServerConnectionMenu(
+                activeServer = serverConnectionState.activeServer,
+                onUseOfficial = {
+                    ServerConnectionController.resetDiscovery()
+                    showOfficialServerDialog = true
+                },
+                onConnectCustom = {
+                    ServerConnectionController.resetDiscovery()
+                    showServerSheet = true
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 8.dp, top = statusBarTop + 4.dp),
+            )
+        }
+    }
+
+    if (
+        AppFeaturePolicy.customServerConnectionsEnabled &&
+        showServerSheet &&
+        serverConnectionState.discoveredServer == null
+    ) {
+        ServerConnectionSheet(
+            state = serverConnectionState,
+            onDiscover = ServerConnectionController::discover,
+            onDismiss = {
+                showServerSheet = false
+                ServerConnectionController.resetDiscovery()
+            },
+        )
+    }
+
+    serverConnectionState.discoveredServer?.let { server ->
+        if (AppFeaturePolicy.customServerConnectionsEnabled) {
+            ServerTrustDialog(
+                server = server,
+                isSwitching = serverConnectionState.isSwitching,
+                switchFailure = serverConnectionState.switchFailure,
+                onConfirm = ServerConnectionController::connectDiscovered,
+                onDismiss = {
+                    showServerSheet = false
+                    ServerConnectionController.resetDiscovery()
+                },
+            )
+        }
+    }
+
+    if (AppFeaturePolicy.customServerConnectionsEnabled && showOfficialServerDialog) {
+        OfficialServerDialog(
+            isSwitching = serverConnectionState.isSwitching,
+            switchFailure = serverConnectionState.switchFailure,
+            onConfirm = ServerConnectionController::useOfficial,
+            onDismiss = {
+                showOfficialServerDialog = false
+                ServerConnectionController.resetDiscovery()
+            },
+        )
     }
 }
 
@@ -429,11 +496,9 @@ private fun AuthLargeLayout(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start,
         ) {
-            Image(
-                painter = painterResource(Res.drawable.app_logo_wordmark),
+            AppBrandWordmark(
                 contentDescription = null,
                 modifier = Modifier.height(60.dp * scale),
-                contentScale = ContentScale.Fit,
             )
             Spacer(modifier = Modifier.height(32.dp * scale))
             Text(
@@ -527,11 +592,9 @@ private fun AuthBrandLockup(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(
-            painter = painterResource(Res.drawable.app_logo_wordmark),
+        AppBrandWordmark(
             contentDescription = null,
             modifier = Modifier.height(logoHeight),
-            contentScale = ContentScale.Fit,
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(

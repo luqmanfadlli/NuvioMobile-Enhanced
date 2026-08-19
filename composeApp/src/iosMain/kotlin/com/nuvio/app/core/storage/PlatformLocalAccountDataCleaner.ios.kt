@@ -1,6 +1,11 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.nuvio.app.core.storage
 
 import platform.Foundation.NSUserDefaults
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSHomeDirectory
+import com.nuvio.app.features.profiles.MAX_PROFILES
 
 internal actual object PlatformLocalAccountDataCleaner {
     private val plainKeys = listOf(
@@ -51,7 +56,10 @@ internal actual object PlatformLocalAccountDataCleaner {
         "mdblist_use_trakt",
         "mdblist_use_letterboxd",
         "mdblist_use_audience",
+        "mdblist_use_mal",
         "trakt_auth_payload",
+        "simkl_auth_metadata",
+        "simkl_sync_snapshot",
         "trakt_library_payload",
         "trakt_settings_payload",
         "library_display_settings_payload",
@@ -65,7 +73,7 @@ internal actual object PlatformLocalAccountDataCleaner {
 
         plainKeys.forEach(defaults::removeObjectForKey)
 
-        (1..4).forEach { profileId ->
+        (1..MAX_PROFILES).forEach { profileId ->
             profileIndexedPrefixes.forEach { prefix ->
                 defaults.removeObjectForKey("$prefix$profileId")
             }
@@ -85,6 +93,11 @@ internal actual object PlatformLocalAccountDataCleaner {
             ) {
                 defaults.removeObjectForKey(keyString)
             }
+        }
+
+        val scraperCodePath = "${NSHomeDirectory()}/Library/Application Support/nuvio_plugin_scrapers"
+        if (NSFileManager.defaultManager.fileExistsAtPath(scraperCodePath)) {
+            NSFileManager.defaultManager.removeItemAtPath(scraperCodePath, null)
         }
     }
 }

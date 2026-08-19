@@ -19,6 +19,8 @@ internal actual object PlatformLocalAccountDataCleaner {
         "nuvio_mdblist_settings",
         "nuvio_auth",
         "nuvio_trakt_auth",
+        "nuvio_simkl_auth",
+        "nuvio_simkl_sync",
         "nuvio_trakt_library",
         "nuvio_trakt_settings",
         "nuvio_watched",
@@ -48,5 +50,6 @@ internal actual object PlatformLocalAccountDataCleaner {
                 .clear()
                 .apply()
         }
+        context.filesDir.resolve("nuvio_plugin_scrapers").deleteRecursively()
     }
 }
