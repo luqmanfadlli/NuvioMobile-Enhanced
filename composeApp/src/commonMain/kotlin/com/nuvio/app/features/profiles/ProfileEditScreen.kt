@@ -45,9 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioScreen
@@ -457,19 +457,24 @@ private fun ProfileIdentityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (customAvatarUrl != null) {
-                        AsyncImage(
-                            model = customAvatarUrl,
+                        NuvioAsyncImage(
+                            imageUrl = customAvatarUrl,
                             contentDescription = name,
                             modifier = Modifier.size(88.dp).clip(CircleShape),
                             contentScale = ContentScale.Crop,
+                            animateIfPossible = true,
                         )
                     } else if (selectedAvatar != null) {
-                        AsyncImage(
-                            model = avatarImageUrl(selectedAvatar),
-                            contentDescription = selectedAvatar.displayName,
-                            modifier = Modifier.size(88.dp).clip(CircleShape),
-                            contentScale = ContentScale.Crop,
-                        )
+                        val selectedAvatarImageUrl = avatarImageUrl(selectedAvatar)
+                        if (selectedAvatarImageUrl != null) {
+                            NuvioAsyncImage(
+                                imageUrl = selectedAvatarImageUrl,
+                                contentDescription = selectedAvatar.displayName,
+                                modifier = Modifier.size(88.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                                animateIfPossible = true,
+                            )
+                        }
                     } else if (name.isNotBlank()) {
                         Text(
                             text = name.take(1).uppercase(),
@@ -573,12 +578,16 @@ private fun AvatarChoiceItem(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = avatarImageUrl(avatar),
-            contentDescription = avatar.displayName,
-            modifier = Modifier.fillMaxSize().clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        val avatarImageUrl = avatarImageUrl(avatar)
+        if (avatarImageUrl != null) {
+            NuvioAsyncImage(
+                imageUrl = avatarImageUrl,
+                contentDescription = avatar.displayName,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                animateIfPossible = true,
+            )
+        }
 
         if (isSelected) {
             Box(

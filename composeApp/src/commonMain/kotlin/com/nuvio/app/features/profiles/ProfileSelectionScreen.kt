@@ -59,6 +59,7 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.ui.ProfileMeshBackground
+import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.ProfileBackgroundRepository
@@ -421,11 +422,12 @@ private fun ProfileAvatarCard(
                 contentAlignment = Alignment.Center,
             ) {
                 if (avatarImageUrl != null) {
-                    AsyncImage(
-                        model = avatarImageUrl,
+                    NuvioAsyncImage(
+                        imageUrl = avatarImageUrl,
                         contentDescription = avatarItem?.displayName ?: profile.name,
                         modifier = Modifier.size(100.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop,
+                        animateIfPossible = true,
                     )
                 } else if (profile.name.isNotBlank()) {
                     Text(
