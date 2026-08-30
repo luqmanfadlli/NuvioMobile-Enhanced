@@ -342,6 +342,21 @@ actual fun PlatformPlayerSurface(
                     stripSdh = style.stripSdh,
                 )
             }
+
+            override fun setKeyboardShortcutsEnabled(enabled: Boolean) {
+                bridge.setKeyboardShortcutsEnabled(enabled)
+            }
+
+            override fun setKeyboardShortcutHandler(handler: ((PlayerKeyboardShortcut) -> Unit)?) {
+                if (handler == null) {
+                    bridge.setKeyboardShortcutHandler(null)
+                    return
+                }
+                // The bridge speaks plain strings so the Swift side stays free of Kotlin enums.
+                bridge.setKeyboardShortcutHandler { code ->
+                    PlayerKeyboardShortcut.fromWireCode(code)?.let(handler)
+                }
+            }
         }
     }
 

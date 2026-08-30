@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.p2p.P2pStreamingState
@@ -171,10 +175,28 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         }
     }
 
+    // Compose only delivers key events to the focused subtree, and overlays take focus while they
+    // are open, so focus is re-requested whenever the last one closes.
+    val keyboardFocusRequester = remember { FocusRequester() }
+    val keyboardShortcutsEnabled = remember {
+        derivedStateOf { !isAnyOverlayVisible && !playerControlsLocked }
+    }
+    val onKeyboardShortcut = rememberUpdatedState(::handleKeyboardShortcut)
+    LaunchedEffect(keyboardShortcutsEnabled.value) {
+        if (keyboardShortcutsEnabled.value) {
+            runCatching { keyboardFocusRequester.requestFocus() }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { layoutSize = it }
+            .playerKeyboardShortcuts(
+                focusRequester = keyboardFocusRequester,
+                enabledState = keyboardShortcutsEnabled,
+                onShortcutState = onKeyboardShortcut,
+            )
             .playerSurfaceTapGestures(
                 layoutSize = layoutSize,
                 playerControlsLockedState = gestureCallbacks.playerControlsLocked,

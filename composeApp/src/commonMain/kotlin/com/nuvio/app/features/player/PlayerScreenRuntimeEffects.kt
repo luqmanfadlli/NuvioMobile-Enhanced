@@ -181,6 +181,19 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         playerController?.applySubtitleStyle(subtitleStyle)
     }
 
+    // iOS recognises hardware keys in the mpv view controller, because its UIKit view can hold
+    // first responder at moments when the Compose surface does not. It only reports which
+    // shortcut was pressed — the action itself still runs through the shared runtime dispatcher.
+    DisposableEffect(playerController) {
+        playerController?.setKeyboardShortcutHandler(::handleKeyboardShortcut)
+        onDispose { playerController?.setKeyboardShortcutHandler(null) }
+    }
+
+    val platformKeyboardShortcutsEnabled = !isAnyOverlayVisible && !playerControlsLocked
+    LaunchedEffect(playerController, platformKeyboardShortcutsEnabled) {
+        playerController?.setKeyboardShortcutsEnabled(platformKeyboardShortcutsEnabled)
+    }
+
     val subtitlePreferenceKey = listOf(
         playerSettingsUiState.preferredSubtitleLanguage,
         playerSettingsUiState.secondaryPreferredSubtitleLanguage.orEmpty(),

@@ -91,6 +91,8 @@ interface NuvioPlayerBridge {
     fun getVideoHeight(): Int
     fun getErrorMessage(): String
     fun getMediaInfoJson(): String
+    fun setKeyboardShortcutsEnabled(enabled: Boolean)
+    fun setKeyboardShortcutHandler(handler: ((String) -> Unit)?)
     fun destroy()
 }
 

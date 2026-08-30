@@ -177,6 +177,24 @@ internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
     }
 }
 
+/**
+ * Single entry point for hardware-keyboard shortcuts, whichever layer recognised the key. Routing
+ * through the ordinary runtime actions is what keeps a key press equivalent to the same action
+ * from a tap: seek feedback, control reveal and the debounced watch-progress sync all still run.
+ */
+internal fun PlayerScreenRuntime.handleKeyboardShortcut(shortcut: PlayerKeyboardShortcut) {
+    if (playerControlsLocked || isAnyOverlayVisible) return
+    when (shortcut) {
+        PlayerKeyboardShortcut.TogglePlayback -> togglePlayback()
+        PlayerKeyboardShortcut.SeekBackward -> seekBy(-PlayerDoubleTapSeekStepMs)
+        PlayerKeyboardShortcut.SeekForward -> seekBy(PlayerDoubleTapSeekStepMs)
+        PlayerKeyboardShortcut.Exit -> {
+            flushWatchProgress()
+            args.onBack()
+        }
+    }
+}
+
 internal fun PlayerScreenRuntime.handleDoubleTapSeek(direction: PlayerSeekDirection) {
     val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     val currentSeekState = accumulatedSeekState

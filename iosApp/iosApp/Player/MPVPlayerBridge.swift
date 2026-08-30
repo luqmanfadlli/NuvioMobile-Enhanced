@@ -11,6 +11,10 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
 
     private var playerVC: MPVPlayerViewController?
     private var experimentalSinglePrimaryPictureInPictureEnabled = false
+    // Kotlin can set these before the view controller exists, so they are held here and replayed
+    // in ensurePlayerViewController().
+    private var keyboardShortcutsEnabled = true
+    private var keyboardShortcutHandler: ((String) -> Void)?
 
     func createPlayerViewController() -> UIViewController {
         return ensurePlayerViewController()
@@ -21,6 +25,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         let vc = MPVPlayerViewController(
             experimentalSinglePrimaryPictureInPictureEnabled: experimentalSinglePrimaryPictureInPictureEnabled
         )
+        vc.setKeyboardShortcutsEnabled(keyboardShortcutsEnabled)
+        vc.setKeyboardShortcutHandler(keyboardShortcutHandler)
         self.playerVC = vc
         return vc
     }
@@ -77,6 +83,14 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         )
     }
     func clearNowPlayingInfo() { playerVC?.clearNowPlayingInfo() }
+    func setKeyboardShortcutsEnabled(enabled: Bool) {
+        keyboardShortcutsEnabled = enabled
+        playerVC?.setKeyboardShortcutsEnabled(enabled)
+    }
+    func setKeyboardShortcutHandler(handler: ((String) -> Void)?) {
+        keyboardShortcutHandler = handler
+        playerVC?.setKeyboardShortcutHandler(handler)
+    }
     func configureVideoOutput(
         hardwareDecoder: String,
         targetColorspaceHint: Bool,
@@ -341,6 +355,8 @@ final class MPVPlayerViewController: UIViewController {
     private var mediaInfoGeneration: UInt64 = 0
     private var recentPlaybackLogs: [String] = []
     private var activeRequestHeaders: [String: String] = [:]
+    private var keyboardShortcutsEnabled: Bool = true
+    private var keyboardShortcutHandler: ((String) -> Void)?
 
     struct VideoOutputSettings {
         let hardwareDecoder: String
@@ -2391,6 +2407,59 @@ final class MPVPlayerViewController: UIViewController {
             object: self,
             userInfo: [nuvioPlayerImmersiveSystemUIVisibleKey: isVisible]
         )
+    }
+
+    // MARK: - Hardware keyboard shortcuts
+
+    // mpv's view controller sees hardware key presses that never reach Compose, so it recognises
+    // them here — but it deliberately does NOT act on the player itself. It reports the shortcut
+    // to Kotlin, which runs the same action a tap or gesture would, so seek feedback, control
+    // reveal and watch-progress syncing behave identically whichever layer caught the key.
+    private enum KeyboardShortcut: String {
+        case togglePlayback = "toggle_playback"
+        case seekBackward = "seek_backward"
+        case seekForward = "seek_forward"
+        case exit
+
+        init?(key: UIKey) {
+            switch key.charactersIgnoringModifiers {
+            case UIKeyCommand.inputEscape: self = .exit
+            case UIKeyCommand.inputLeftArrow: self = .seekBackward
+            case UIKeyCommand.inputRightArrow: self = .seekForward
+            case " ": self = .togglePlayback
+            default: return nil
+            }
+        }
+    }
+
+    func setKeyboardShortcutsEnabled(_ enabled: Bool) {
+        keyboardShortcutsEnabled = enabled
+    }
+
+    func setKeyboardShortcutHandler(_ handler: ((String) -> Void)?) {
+        keyboardShortcutHandler = handler
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        guard keyboardShortcutsEnabled, let handler = keyboardShortcutHandler else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+
+        var unhandled: Set<UIPress> = []
+        for press in presses {
+            guard let key = press.key, let shortcut = KeyboardShortcut(key: key) else {
+                unhandled.insert(press)
+                continue
+            }
+            handler(shortcut.rawValue)
+        }
+
+        // Forward only what we did not consume, so an unrecognised key still reaches the next
+        // responder even when it arrived in the same batch as one we handled.
+        if !unhandled.isEmpty {
+            super.pressesBegan(unhandled, with: event)
+        }
     }
 }
 

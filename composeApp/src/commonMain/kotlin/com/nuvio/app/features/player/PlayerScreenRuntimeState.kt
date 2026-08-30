@@ -218,6 +218,25 @@ internal class PlayerScreenRuntime(
     var subtitleDelayMs by mutableStateOf(0)
     var subtitleAutoSyncState by mutableStateOf(SubtitleAutoSyncUiState())
 
+    /**
+     * True while anything above the player surface owns the screen. Keyboard shortcuts are
+     * suppressed then, so an overlay's own keys (a subtitle search field, list navigation) keep
+     * working. Kept here rather than rebuilt at each call site so the modal set only has to be
+     * maintained in one place.
+     */
+    val isAnyOverlayVisible: Boolean
+        get() = showAudioModal ||
+            showSubtitleModal ||
+            showVideoSettingsModal ||
+            showStreamInfoModal ||
+            showSourcesPanel ||
+            showQualityPanel ||
+            showEpisodesPanel ||
+            showLiveChannelsPanel ||
+            showSubmitIntroModal ||
+            showParentalGuide ||
+            episodeStreamsPanelState.showStreams
+
     var lastSyncedSettingsResizeMode: PlayerResizeMode? = null
     var lastResetPlaybackIdentity: String? = null
     var lastResetVideoIdentity: String? = null
