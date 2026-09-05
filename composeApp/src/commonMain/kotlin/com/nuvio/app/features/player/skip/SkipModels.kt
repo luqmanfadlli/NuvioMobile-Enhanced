@@ -28,6 +28,14 @@ enum class NextEpisodeThresholdMode {
     MINUTES_BEFORE_END,
 }
 
+@Serializable
+data class ArmEntry(
+    @SerialName("myanimelist") val myanimelist: Int? = null,
+    @SerialName("anilist") val anilist: Int? = null,
+    @SerialName("kitsu") val kitsu: Int? = null,
+    @SerialName("imdb") val imdb: String? = null,
+)
+
 // --- IntroDb API response models ---
 
 @Serializable

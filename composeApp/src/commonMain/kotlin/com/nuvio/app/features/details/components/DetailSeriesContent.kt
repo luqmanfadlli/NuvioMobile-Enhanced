@@ -357,7 +357,8 @@ internal fun DetailSeriesListEpisode(
             video = episode,
             fallbackImage = meta.background ?: meta.poster,
             progressEntry = progressByVideoId[episodeVideoId],
-            imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
+            tmdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
+            ratingIsImdb = episode.ratingIsImdb,
             isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
                 WatchingState.isEpisodeWatched(
                     watchedKeys = watchedKeys,
