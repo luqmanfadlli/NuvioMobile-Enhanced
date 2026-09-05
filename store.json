@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.4.14",
+          "buildVersion": "118",
+          "date": "2026-09-05T11:51:54Z",
+          "localizedDescription": "## Upstream changelog:\r\n- fix(player): original audio language preference @tapframe\r\n- fix(player): allow minimum device brightness @tapframe\r\n- use Android User-Agent so IPTV DASH streams do not 403 (#1863) @halibiram\r\n- feat: updated Spanish string resource file for application localization (#1861) @IberianSoldierPC\r\n- fix(player): align mobile control icons with tv @tapframe\r\n- i18n(el): translate delayed addon content state strings (#1851) @nosvasedis\r\n- fix(streams): honor autoplay source loading scope @tapframe\r\n- Updated BG translation and fixes with later versiond (#1838) @viiktr\r\n- fix(player): persist next episode dismissal @tapframe\r\n- Use Simkl for anime ID resolution in skip-intro (replaces ARM) (#1836) @skoruppa\r\n- fix(details): map addon specials season posters @tapframe\r\n- fix(details): optimize large vertical episode lists (#1835) @ThePunpun\r\n- fix(updater): apply theme gradient to download progress @tapframe\r\n- fix(player): keep subtitle picker stable for duplicate tracks (#1800) @halibiram\r\n\r\n## Enhanced changelog:\r\n- All changes from the upstream\r\n- fix(profile): smooth tap-to-center transition, kill flicker + spinner @albertovinaroz\r\n- feat(library): show release calendar in a responsive overlay panel @luqmanfadlli\r\n- perf(library): warm nearby release dates for calendar @luqmanfadlli\r\n- fix(library): stabilize calendar overlay sizing and tap handling @luqmanfadlli\r\n- feat(details): add random episode action @luqmanfadlli\r\n- feat(playback): add random next episode preferences @luqmanfadlli\r\n- fix(details): fall back to TMDB when Trakt has no related titles @albertovinaroz\r\n- perf(app): reduce hot-path overhead in date labels, cold-start guard, and episode lists @albertovinaroz\r\n- feat(downloads): allow changing the downloads folder (Android + iOS) @albertovinaroz\r\n- feat(auth): cold-start intro, wordmark theme crossfade, and 3 auth-flow fixes @albertovinaroz\r\n- feat(downloads): keep iOS downloads running when the app is backgrounded @albertovinaroz\r\n- fix(ui): fit profile and library cards @Arad00ak\r\n- fix(ui): prevent profile text truncation @Arad00ak\r\n- fix(ui): equalize profile stat cards @Arad00ak\r\n- fix(profile): hide custom background option for non-supporters @luqmanfadlli\r\n- build(android): change release application ID to `com.nuvio.media` @luqmanfadlli\r\n- fix(trailer): resolve hero trailer while start delay is running @luqmanfadlli\r\n- fix(about): fetch contributors from GitHub API @luqmanfadlli\r\n- feat(details): add personal OMDb API key + IMDB episode ratings @albertovinaroz\r\n- fix(merge): reconcile upstream API refactors with enhanced features @luqmanfadlli ",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.4.14/Nuvio-v0.4.14-Enhanced.ipa",
+          "size": 66761280,
+          "sha256": "4a6acaca25c7f9afd1c49a133a7e0644ed015cea1cafa671dd4d451f056b78c8",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.4.13",
           "buildVersion": "117",
           "date": "2026-08-30T20:46:36Z",
