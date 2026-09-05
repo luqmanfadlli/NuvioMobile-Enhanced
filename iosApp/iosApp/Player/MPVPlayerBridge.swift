@@ -125,6 +125,10 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func configureAudioOutput(audioOutput: String) {
         playerVC?.configureAudioOutput(audioOutput: audioOutput)
     }
+
+    func applyAudioLanguagePreferences(languages: [String]) {
+        ensurePlayerViewController().applyAudioLanguagePreferences(languages)
+    }
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func getVolume() -> Float { playerVC?.getVolume() ?? 1.0 }
     func setVolume(volume: Float) { playerVC?.setVolume(volume) }
@@ -1370,6 +1374,14 @@ final class MPVPlayerViewController: UIViewController {
         lastSelectedAudioTrackId = trackId
         guard mpv != nil else { return }
         setIntProperty("aid", Int64(trackId))
+    }
+
+    func applyAudioLanguagePreferences(_ languages: [String]) {
+        let normalized = languages
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        setStringProperty("alang", normalized.joined(separator: ","))
+        setStringProperty("aid", "auto")
     }
 
     func selectSubtitle(_ trackId: Int) {
