@@ -74,6 +74,8 @@ fun HomescreenSettingsScreen(
         homescreenSettingsContent(
             isTablet = false,
             heroEnabled = homescreenSettingsUiState.heroEnabled,
+            heroTrailerPlaybackEnabled = homescreenSettingsUiState.heroTrailerPlaybackEnabled,
+            heroTrailerStartDelaySeconds = homescreenSettingsUiState.heroTrailerStartDelaySeconds,
             showCatalogType = homescreenSettingsUiState.showCatalogType,
             hideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
             items = homescreenSettingsUiState.items,

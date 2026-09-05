@@ -215,7 +215,7 @@ fun DetailActionButtons(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DetailIconAction(
+internal fun DetailIconAction(
     label: String,
     icon: ImageVector,
     active: Boolean,

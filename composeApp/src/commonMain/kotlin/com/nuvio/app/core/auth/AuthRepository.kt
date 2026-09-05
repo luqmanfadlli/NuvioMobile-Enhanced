@@ -36,6 +36,7 @@ object AuthRepository {
     private var initialized = false
     private var sessionStatusJob: Job? = null
     private var validatedRemoteUserId: String? = null
+    private var trustNextSessionWithoutValidation = false
 
     fun initialize() {
         if (initialized) return
@@ -82,6 +83,11 @@ object AuthRepository {
 
     private suspend fun validateRemoteSession(userId: String): Boolean {
         if (userId.isBlank() || validatedRemoteUserId == userId) return true
+        if (trustNextSessionWithoutValidation) {
+            trustNextSessionWithoutValidation = false
+            validatedRemoteUserId = userId
+            return true
+        }
 
         return runCatching {
             SupabaseProvider.client.auth.retrieveUserForCurrentSession(false)
@@ -117,6 +123,7 @@ object AuthRepository {
             this.email = email
             this.password = password
         }
+        trustNextSessionWithoutValidation = true
         Unit
     }.onFailure { e ->
         log.e(e) { "Email sign-up failed" }
@@ -130,6 +137,7 @@ object AuthRepository {
             this.email = email
             this.password = password
         }
+        trustNextSessionWithoutValidation = true
     }.onFailure { e ->
         log.e(e) { "Email sign-in failed" }
         _error.value = e.safeAuthErrorDescription()

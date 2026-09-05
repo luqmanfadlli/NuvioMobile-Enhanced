@@ -107,8 +107,19 @@ fun localizedUpNextLabel(seasonNumber: Int?, episodeNumber: Int?): String =
         resourceString("Next Up") { getString(Res.string.continue_watching_up_next) }
     }
 
-fun localizedMonthName(month: Int): String =
-    when (month) {
+// Month names are resolved via a blocking resource lookup (see resourceString below), but every
+// caller sits on a hot path (one call per poster/episode/calendar-day rendered). Memoize by month
+// so the blocking lookup runs at most once per month per process instead of once per item per
+// composition. Safe to leave unsynchronized: worst case under a race is resolving the same
+// (deterministic, immutable) value twice, never a wrong one. Language changes go through an
+// app-language switch that recreates the process, which naturally clears these arrays too.
+private val monthNameCache = arrayOfNulls<String>(13)
+private val shortMonthNameCache = arrayOfNulls<String>(13)
+
+fun localizedMonthName(month: Int): String {
+    if (month !in 1..12) return month.toString()
+    monthNameCache[month]?.let { return it }
+    val resolved = when (month) {
         1 -> resourceString("January") { getString(Res.string.date_month_january) }
         2 -> resourceString("February") { getString(Res.string.date_month_february) }
         3 -> resourceString("March") { getString(Res.string.date_month_march) }
@@ -120,12 +131,16 @@ fun localizedMonthName(month: Int): String =
         9 -> resourceString("September") { getString(Res.string.date_month_september) }
         10 -> resourceString("October") { getString(Res.string.date_month_october) }
         11 -> resourceString("November") { getString(Res.string.date_month_november) }
-        12 -> resourceString("December") { getString(Res.string.date_month_december) }
-        else -> month.toString()
+        else -> resourceString("December") { getString(Res.string.date_month_december) }
     }
+    monthNameCache[month] = resolved
+    return resolved
+}
 
-fun localizedShortMonthName(month: Int): String =
-    when (month) {
+fun localizedShortMonthName(month: Int): String {
+    if (month !in 1..12) return month.toString()
+    shortMonthNameCache[month]?.let { return it }
+    val resolved = when (month) {
         1 -> resourceString("Jan") { getString(Res.string.date_month_short_jan) }
         2 -> resourceString("Feb") { getString(Res.string.date_month_short_feb) }
         3 -> resourceString("Mar") { getString(Res.string.date_month_short_mar) }
@@ -137,9 +152,11 @@ fun localizedShortMonthName(month: Int): String =
         9 -> resourceString("Sep") { getString(Res.string.date_month_short_sep) }
         10 -> resourceString("Oct") { getString(Res.string.date_month_short_oct) }
         11 -> resourceString("Nov") { getString(Res.string.date_month_short_nov) }
-        12 -> resourceString("Dec") { getString(Res.string.date_month_short_dec) }
-        else -> month.toString()
+        else -> resourceString("Dec") { getString(Res.string.date_month_short_dec) }
     }
+    shortMonthNameCache[month] = resolved
+    return resolved
+}
 
 fun localizedNoSubtitleLinesFound(): String =
     resourceString("No subtitle lines found") { getString(Res.string.compose_player_no_subtitle_lines_found) }

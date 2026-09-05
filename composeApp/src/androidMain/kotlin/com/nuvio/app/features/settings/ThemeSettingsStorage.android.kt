@@ -19,6 +19,9 @@ actual object ThemeSettingsStorage {
     private const val customThemeColorsKey = "custom_theme_colors"
     private const val amoledEnabledKey = "amoled_enabled"
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
+    private const val dynamicArtworkBackgroundEnabledKey = "dynamic_artwork_background_enabled"
+    private const val showCatalogAccentEnabledKey = "show_catalog_accent_enabled"
+    private const val tabBarBehaviorKey = "tab_bar_behavior"
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val NAV_BAR_STYLE_KEY = "nav_bar_style"
     private val profileScopedSyncKeys = listOf(
@@ -26,6 +29,9 @@ actual object ThemeSettingsStorage {
         customThemeColorsKey,
         amoledEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
+        tabBarBehaviorKey,
+        dynamicArtworkBackgroundEnabledKey,
+        showCatalogAccentEnabledKey,
         NAV_BAR_STYLE_KEY,
     )
 
@@ -82,6 +88,42 @@ actual object ThemeSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadTabBarBehavior(): String? =
+        preferences?.getString(ProfileScopedKey.of(tabBarBehaviorKey), null)
+
+    actual fun saveTabBarBehavior(behaviorKey: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(tabBarBehaviorKey), behaviorKey)
+            ?.apply()
+    }
+
+    actual fun loadDynamicArtworkBackgroundEnabled(): Boolean? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(dynamicArtworkBackgroundEnabledKey)
+            if (prefs.contains(key)) prefs.getBoolean(key, false) else null
+        }
+
+    actual fun saveDynamicArtworkBackgroundEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(dynamicArtworkBackgroundEnabledKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadShowCatalogAccentEnabled(): Boolean? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(showCatalogAccentEnabledKey)
+            if (prefs.contains(key)) prefs.getBoolean(key, false) else null
+        }
+
+    actual fun saveShowCatalogAccentEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(showCatalogAccentEnabledKey), enabled)
+            ?.apply()
+    }
+
     actual fun loadSelectedAppLanguage(): String? {
         val value = preferences?.getString(selectedAppLanguageKey, null)
         if (value != null) return value
@@ -122,6 +164,9 @@ actual object ThemeSettingsStorage {
         loadCustomThemeColors()?.let { put(customThemeColorsKey, encodeSyncString(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
+        loadTabBarBehavior()?.let { put(tabBarBehaviorKey, encodeSyncString(it)) }
+        loadDynamicArtworkBackgroundEnabled()?.let { put(dynamicArtworkBackgroundEnabledKey, encodeSyncBoolean(it)) }
+        loadShowCatalogAccentEnabled()?.let { put(showCatalogAccentEnabledKey, encodeSyncBoolean(it)) }
         loadNavBarStyle()?.let { put(NAV_BAR_STYLE_KEY, encodeSyncString(it)) }
     }
 
@@ -134,6 +179,9 @@ actual object ThemeSettingsStorage {
         payload.decodeSyncString(customThemeColorsKey)?.let(::saveCustomThemeColors)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)
+        payload.decodeSyncString(tabBarBehaviorKey)?.let(::saveTabBarBehavior)
+        payload.decodeSyncBoolean(dynamicArtworkBackgroundEnabledKey)?.let(::saveDynamicArtworkBackgroundEnabled)
+        payload.decodeSyncBoolean(showCatalogAccentEnabledKey)?.let(::saveShowCatalogAccentEnabled)
         payload.decodeSyncString(NAV_BAR_STYLE_KEY)?.let(::saveNavBarStyle)
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.DEVICE.code)
     }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,13 +34,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
@@ -49,6 +54,19 @@ import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
 import nuvio.composeapp.generated.resources.layout_catalog_type
 import nuvio.composeapp.generated.resources.layout_catalog_type_sub
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card_description
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_description
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed_description
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_description
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_instant
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_value
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_trailer_playback
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_trailer_playback_description
+import nuvio.composeapp.generated.resources.settings_homescreen_catalogs_source
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
 import nuvio.composeapp.generated.resources.settings_homescreen_keep_home_focused
 import nuvio.composeapp.generated.resources.settings_homescreen_limit_reached
@@ -65,6 +83,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -73,6 +92,8 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
+    heroTrailerPlaybackEnabled: Boolean,
+    heroTrailerStartDelaySeconds: Int,
     showCatalogType: Boolean,
     hideUnreleasedContent: Boolean,
     items: List<HomeCatalogSettingsItem>,
@@ -81,6 +102,8 @@ internal fun LazyListScope.homescreenSettingsContent(
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
     val enabledCatalogCount = items.count { it.enabled }
+    val showHeroTrailerPlaybackSetting = AppFeaturePolicy.heroTrailerPlaybackSupported &&
+        AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
     item {
         HomescreenSummaryCard(
             isTablet = isTablet,
@@ -102,6 +125,37 @@ internal fun LazyListScope.homescreenSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHeroEnabled,
                 )
+                if (heroEnabled && showHeroTrailerPlaybackSetting) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_homescreen_hero_trailer_playback),
+                        description = stringResource(Res.string.settings_homescreen_hero_trailer_playback_description),
+                        checked = heroTrailerPlaybackEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = HomeCatalogSettingsRepository::setHeroTrailerPlaybackEnabled,
+                    )
+                    if (heroTrailerPlaybackEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSliderRow(
+                            title = stringResource(Res.string.settings_hero_trailer_start_delay),
+                            description = stringResource(Res.string.settings_hero_trailer_start_delay_description),
+                            value = heroTrailerStartDelaySeconds,
+                            valueText = if (heroTrailerStartDelaySeconds <= 0) {
+                                stringResource(Res.string.settings_hero_trailer_start_delay_instant)
+                            } else {
+                                stringResource(
+                                    Res.string.settings_hero_trailer_start_delay_value,
+                                    heroTrailerStartDelaySeconds,
+                                )
+                            },
+                            valueRange = HomeCatalogSettingsRepository.MIN_HERO_TRAILER_START_DELAY_SECONDS..
+                                HomeCatalogSettingsRepository.MAX_HERO_TRAILER_START_DELAY_SECONDS,
+                            step = 1,
+                            isTablet = isTablet,
+                            onValueChange = HomeCatalogSettingsRepository::setHeroTrailerStartDelaySeconds,
+                        )
+                    }
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.layout_catalog_type),
@@ -124,18 +178,27 @@ internal fun LazyListScope.homescreenSettingsContent(
     item {
         val catalogOnlyItems = items.filter { !it.isCollection }
         if (heroEnabled && catalogOnlyItems.isNotEmpty()) {
+            val settingsUiState by remember {
+                HomeCatalogSettingsRepository.uiState
+            }.collectAsStateWithLifecycle()
             var heroSourcesExpanded by remember { mutableStateOf(false) }
             SettingsSection(
                 title = stringResource(Res.string.settings_homescreen_section_hero_sources),
                 isTablet = isTablet,
             ) {
-                HeroSourcesDropdown(
-                    isTablet = isTablet,
-                    items = catalogOnlyItems,
-                    selectedHeroSourceCount = selectedHeroSourceCount,
-                    expanded = heroSourcesExpanded,
-                    onExpandedChange = { heroSourcesExpanded = it },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroStyleOptions(
+                        isTablet = isTablet,
+                        selectedStyle = settingsUiState.heroStyle,
+                    )
+                    HeroSourcesDropdown(
+                        isTablet = isTablet,
+                        items = catalogOnlyItems,
+                        selectedHeroSourceCount = selectedHeroSourceCount,
+                        expanded = heroSourcesExpanded,
+                        onExpandedChange = { heroSourcesExpanded = it },
+                    )
+                }
             }
         }
     }
@@ -199,6 +262,102 @@ internal fun LazyListScope.homescreenSettingsContent(
 }
 
 @Composable
+private fun HeroStyleOptions(
+    isTablet: Boolean,
+    selectedStyle: HomeHeroStyle,
+) {
+    SettingsGroup(isTablet = isTablet) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(Res.string.settings_homescreen_hero_style),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_homescreen_hero_style_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HeroStyleOption(
+                    modifier = Modifier.weight(1f),
+                    style = HomeHeroStyle.FULL_BLEED,
+                    selectedStyle = selectedStyle,
+                    title = stringResource(Res.string.settings_homescreen_hero_style_full_bleed),
+                    description = stringResource(
+                        Res.string.settings_homescreen_hero_style_full_bleed_description,
+                    ),
+                )
+                HeroStyleOption(
+                    modifier = Modifier.weight(1f),
+                    style = HomeHeroStyle.CARD,
+                    selectedStyle = selectedStyle,
+                    title = stringResource(Res.string.settings_homescreen_hero_style_card),
+                    description = stringResource(
+                        Res.string.settings_homescreen_hero_style_card_description,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroStyleOption(
+    modifier: Modifier,
+    style: HomeHeroStyle,
+    selectedStyle: HomeHeroStyle,
+    title: String,
+    description: String,
+) {
+    val selected = selectedStyle == style
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+
+    Surface(
+        modifier = modifier
+            .heightIn(min = if (selected) 92.dp else 88.dp)
+            .clickable { HomeCatalogSettingsRepository.setHeroStyle(style) },
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 private fun HeroSourcesDropdown(
     isTablet: Boolean,
     items: List<HomeCatalogSettingsItem>,
@@ -220,14 +379,19 @@ private fun HeroSourcesDropdown(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
+                    text = stringResource(Res.string.settings_homescreen_catalogs_source),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
                     text = stringResource(
                         Res.string.settings_homescreen_selected_count,
                         selectedHeroSourceCount,
                         HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = items.filter { it.heroSourceEnabled }

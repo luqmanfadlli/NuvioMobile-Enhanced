@@ -23,7 +23,7 @@ jobs:
   build:
     name: Build unsigned full ${{ inputs.configuration }} IPA
     runs-on: macos-26
-    timeout-minutes: ${{ inputs.configuration == 'Release' && 75 || 30 }}
+    timeout-minutes: ${{ inputs.configuration == 'Release' && 120 || 30 }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
@@ -32,6 +32,7 @@ jobs:
       NUVIO_GRADLE_JVMARGS: -Xmx4608M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx4608M
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
 
     steps:
       - name: Check out source
@@ -64,6 +65,9 @@ jobs:
         run: |
           printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
           sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          if [[ -n "${CONTRIBUTIONS_URL}" ]]; then
+            printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}" >> local.properties
+          fi
 
       - name: Prepare iOS dependencies
         run: ./scripts/prepare-ios-dependencies.sh

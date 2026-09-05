@@ -1,5 +1,6 @@
 package com.nuvio.app.features.catalog
 
+import com.nuvio.app.features.details.MoreLikeThisSource
 import com.nuvio.app.features.library.LibrarySortOption
 import kotlinx.serialization.Serializable
 
@@ -21,6 +22,15 @@ sealed interface CatalogTarget {
         val sortOption: LibrarySortOption = LibrarySortOption.DEFAULT,
     ) : CatalogTarget {
         override val supportsPagination: Boolean = false
+    }
+
+    data class MoreLikeThis(
+        val itemId: String,
+        val itemType: String,
+        val source: MoreLikeThisSource,
+    ) : CatalogTarget {
+        override val contentType: String get() = itemType
+        override val supportsPagination: Boolean = true
     }
 
     data class CollectionSource(

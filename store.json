@@ -1,18 +1,18 @@
 {
-  "name": "Nuvio",
+  "name": "Nuvio Enhanced (Unofficial)",
   "subtitle": "A free, open-source media app for your phone, your desktop, and the TV you already own.",
   "description": "A free, open-source media app for your phone, your desktop, and the TV you already own.\n\nBring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.",
   "website": "https://nuvio.tv",
-  "iconURL": "https://raw.githubusercontent.com/NuvioMedia/NuvioMobile/0.4.11/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+  "iconURL": "https://raw.githubusercontent.com/luqmanfadlli/NuvioMobile-Enhanced/enhanced/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
   "tintColor": "#1E88E5",
   "featuredApps": [
     "com.nuvio.media"
   ],
   "apps": [
     {
-      "name": "Nuvio",
+      "name": "Nuvio Enhanced",
       "bundleIdentifier": "com.nuvio.media",
-      "developerName": "NuvioMedia",
+      "developerName": "Unofficial Nuvio",
       "subtitle": "A free, open-source media app for your phone, your desktop, and the TV you already own.",
       "localizedDescription": "A free, open-source media app for your phone, your desktop, and the TV you already own.\n\nBring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.",
       "iconURL": "https://raw.githubusercontent.com/NuvioMedia/NuvioMobile/0.4.11/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
@@ -22,31 +22,31 @@
         {
           "version": "0.4.14",
           "buildVersion": "118",
-          "date": "2026-09-05T10:55:58Z",
-          "localizedDescription": "- 4f79bfe0 fix(player): original audio language preference @tapframe  \r\n- 9b09045f fix(player): allow minimum device brightness @tapframe  \r\n- [use Android User-Agent so IPTV DASH streams do not 403 (#1863)](https://github.com/NuvioMedia/NuvioMobile/pull/1863) @halibiram  \r\n- [feat: updated Spanish string resource file for application localization (#1861)](https://github.com/NuvioMedia/NuvioMobile/pull/1861) @IberianSoldierPC  \r\n- 92466c4e fix(player): align mobile control icons with tv @tapframe  \r\n- [i18n(el): translate delayed addon content state strings (#1851)](https://github.com/NuvioMedia/NuvioMobile/pull/1851) @nosvasedis  \r\n- 58864ec1 fix(streams): honor autoplay source loading scope @tapframe  \r\n- [Updated BG translation and fixes with later versiond (#1838)](https://github.com/NuvioMedia/NuvioMobile/pull/1838) @viiktr  \r\n- 4026ec92 fix(player): persist next episode dismissal @tapframe  \r\n- [Use Simkl for anime ID resolution in skip-intro (replaces ARM) (#1836)](https://github.com/NuvioMedia/NuvioMobile/pull/1836) @skoruppa  \r\n- 22096a1e fix(details): map addon specials season posters @tapframe  \r\n- [fix(details): optimize large vertical episode lists (#1835)](https://github.com/NuvioMedia/NuvioMobile/pull/1835) @ThePunpun  \r\n- 802db48d fix(updater): apply theme gradient to download progress @tapframe  \r\n- [fix(player): keep subtitle picker stable for duplicate tracks (#1800)](https://github.com/NuvioMedia/NuvioMobile/pull/1800) @halibiram  \r\n",
-          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.14/nuvio-0.4.14-full-release.ipa",
-          "size": 51787331,
-          "sha256": "969974f82a0a2ebe84354bccda98b364701d4651c97cbccbb737e86c5280cea9",
+          "date": "2026-09-05T11:51:54Z",
+          "localizedDescription": "## Upstream changelog:\r\n- fix(player): original audio language preference @tapframe\r\n- fix(player): allow minimum device brightness @tapframe\r\n- use Android User-Agent so IPTV DASH streams do not 403 (#1863) @halibiram\r\n- feat: updated Spanish string resource file for application localization (#1861) @IberianSoldierPC\r\n- fix(player): align mobile control icons with tv @tapframe\r\n- i18n(el): translate delayed addon content state strings (#1851) @nosvasedis\r\n- fix(streams): honor autoplay source loading scope @tapframe\r\n- Updated BG translation and fixes with later versiond (#1838) @viiktr\r\n- fix(player): persist next episode dismissal @tapframe\r\n- Use Simkl for anime ID resolution in skip-intro (replaces ARM) (#1836) @skoruppa\r\n- fix(details): map addon specials season posters @tapframe\r\n- fix(details): optimize large vertical episode lists (#1835) @ThePunpun\r\n- fix(updater): apply theme gradient to download progress @tapframe\r\n- fix(player): keep subtitle picker stable for duplicate tracks (#1800) @halibiram\r\n\r\n## Enhanced changelog:\r\n- All changes from the upstream\r\n- fix(profile): smooth tap-to-center transition, kill flicker + spinner @albertovinaroz\r\n- feat(library): show release calendar in a responsive overlay panel @luqmanfadlli\r\n- perf(library): warm nearby release dates for calendar @luqmanfadlli\r\n- fix(library): stabilize calendar overlay sizing and tap handling @luqmanfadlli\r\n- feat(details): add random episode action @luqmanfadlli\r\n- feat(playback): add random next episode preferences @luqmanfadlli\r\n- fix(details): fall back to TMDB when Trakt has no related titles @albertovinaroz\r\n- perf(app): reduce hot-path overhead in date labels, cold-start guard, and episode lists @albertovinaroz\r\n- feat(downloads): allow changing the downloads folder (Android + iOS) @albertovinaroz\r\n- feat(auth): cold-start intro, wordmark theme crossfade, and 3 auth-flow fixes @albertovinaroz\r\n- feat(downloads): keep iOS downloads running when the app is backgrounded @albertovinaroz\r\n- fix(ui): fit profile and library cards @Arad00ak\r\n- fix(ui): prevent profile text truncation @Arad00ak\r\n- fix(ui): equalize profile stat cards @Arad00ak\r\n- fix(profile): hide custom background option for non-supporters @luqmanfadlli\r\n- build(android): change release application ID to `com.nuvio.media` @luqmanfadlli\r\n- fix(trailer): resolve hero trailer while start delay is running @luqmanfadlli\r\n- fix(about): fetch contributors from GitHub API @luqmanfadlli\r\n- feat(details): add personal OMDb API key + IMDB episode ratings @albertovinaroz\r\n- fix(merge): reconcile upstream API refactors with enhanced features @luqmanfadlli ",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.4.14/Nuvio-v0.4.14-Enhanced.ipa",
+          "size": 66761280,
+          "sha256": "4a6acaca25c7f9afd1c49a133a7e0644ed015cea1cafa671dd4d451f056b78c8",
           "minOSVersion": "16.1"
         },
         {
           "version": "0.4.13",
           "buildVersion": "117",
-          "date": "2026-08-30T19:02:51Z",
-          "localizedDescription": "- 0504af98 feat(details): parse addon certifications @tapframe  \r\n- f5726012 fix(details): parse addon season posters @tapframe   \r\n- 085e8dc6 fix(ui): handle delayed addon content states @tapframe  \r\n- e68cbb08 fix(android): adjust launcher icon scale @tapframe  \r\n- b86932b9 feat(player): apply member gradients to player accents @tapframe  \r\n- [fix(player): reset subtitle selection on source change (#1812)](https://github.com/NuvioMedia/NuvioMobile/pull/1812) @guuilp  \r\n",
-          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.13/nuvio-0.4.13-full-release.ipa",
-          "size": 51726937,
-          "sha256": "1e4458b0613c6e827459f02b6922d2c06e0e246624a097dac0a80bfc1dfb7c5a",
+          "date": "2026-08-30T20:46:36Z",
+          "localizedDescription": "## AltStore/SideStore source:\r\n```\r\nhttps://github.com/luqmanfadlli/NuvioMobile-Enhanced/raw/refs/heads/enhanced/store.json\r\n```\r\n\r\n## Upstream changelog:\r\n- feat(details): parse addon certifications @tapframe\r\n- fix(details): parse addon season posters @tapframe\r\n- fix(ui): handle delayed addon content states @tapframe\r\n- fix(android): adjust launcher icon scale @tapframe\r\n- feat(player): apply member gradients to player accents @tapframe\r\n- fix(player): reset subtitle selection on source change (#1812) @guuilp\r\n\r\n## Enhanced changelog:\r\n- All changes from the upstream\r\n- fix(ios): restore native drag overlay on the morphed tab bar @luqmanfadlli\r\n- feat(profiles): push Edit Profile as a native navigation destination @albertovinaroz\r\n- feat(trailer): add configurable hero trailer start delay @luqmanfadlli\r\n- feat(player): hardware keyboard shortcut @luqmanfadlli\r\n- fix(player): stop accidental seek swipes on the player surface @luqmanfadlli\r\n- feat(player): add a Swipe to Seek toggle to playback settings @luqmanfadlli\r\n- feat(details): open the full More Like This list in a paged grid @luqmanfadlli\r\n- fix(profiles): return to Profile Insights after editing a profile",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.4.13/Nuvio-v0.4.13-Enhanced.ipa",
+          "size": 66579308,
+          "sha256": "351db1054f1b4f7701d631459001fc68dcd03888d0ee4eb8df9efcce1f4c1209",
           "minOSVersion": "16.1"
         },
         {
           "version": "0.4.12",
           "buildVersion": "116",
-          "date": "2026-08-29T13:17:20Z",
-          "localizedDescription": "- 501c61d9 fix(tmdb): use multiplatform map insertion @tapframe  \r\n- 793c665c feat(store): automate sideload source updates @tapframe  \r\n- [i18n(el): translate sign-in with link strings (#1813)](https://github.com/NuvioMedia/NuvioMobile/pull/1813) @nosvasedis  \r\n- 388e613c feat(auth): add six-character login codes @tapframe  \r\n- [Port NuvioTV fixes: YouTube extractor, trailer language, scrobble guard, aggregate credits (#1795)](https://github.com/NuvioMedia/NuvioMobile/pull/1795) @skoruppa  \r\n- [fallback CJK cast names and filmography titles to English/Romaji (#1785)](https://github.com/NuvioMedia/NuvioMobile/pull/1785) @halibiram  \r\n- 582ae863 fix(player): keep controls hidden on playback start @tapframe  \r\n- 1c92795c fix(release): group notes by pull request @tapframe  \r\n- 4e838e47 fix(release): target repository explicitly @tapframe  \r\n",
-          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.12/nuvio-0.4.12-full-release.ipa",
-          "size": 51718448,
-          "sha256": "eefce854675c29c86c381c0ecc34082dc57ef24bfeec78309661a2e082b9de2b",
+          "date": "2026-08-29T16:32:02Z",
+          "localizedDescription": "# 🚀 Release v0.4.12\r\n\r\nAltStore/SideStore source:\r\n```\r\nhttps://github.com/luqmanfadlli/NuvioMobile-Enhanced/raw/refs/heads/enhanced/store.json\r\n```\r\n\r\n## Upstream changelog:\r\n- fix(tmdb): use multiplatform map insertion @tapframe\r\n- feat(store): automate sideload source updates @tapframe\r\n- i18n(el): translate sign-in with link strings (#1813) @nosvasedis\r\n- feat(auth): add six-character login codes @tapframe\r\n- Port NuvioTV fixes: YouTube extractor, trailer language, scrobble guard, aggregate credits (#1795) @skoruppa\r\n- fallback CJK cast names and filmography titles to English/Romaji (#1785) @halibiram\r\n- fix(player): keep controls hidden on playback start @tapframe\r\n- fix(release): group notes by pull request @tapframe\r\n- fix(release): target repository explicitly @tapframe\r\n\r\n## Enhanced changelog:\r\n- All changes from the upstream\r\n- feat(profile): let any profile use a custom background image URL @albertovinaroz\r\n- feat(livetv): add Xtream and Stalker providers @asrma7\r\n- fix(ios): restore native morphed tab interaction @Arad00ak\r\n- fix(profile-insights): correct watch time and clarify title-based stats @luqmanfadlli \r\n- feat(home): add catalog accent underline toggle @albertovinaroz\r\n- fix(player): let Next Episode reuse the auto-selected source @albertovinaroz\r\n- fix(ios): reduce morphed tab bar transition glitches @albertovinaroz\r\n- feat(downloads): require Wi-Fi for downloads unless mobile data is allowed @albertovinaroz\r\n- feat(home): autoplay trailers in the hero carousel @albertovinaroz\r\n- fix(ios): stop hero trailer when switching native tabs @albertovinaroz\r\n- fix(ios): native drag-across-tabs handoff + animated profile switch transition @albertovinaroz",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.4.12/Nuvio-v0.4.12-Enhanced.ipa",
+          "size": 66526080,
+          "sha256": "466464b5fc4c31d269a310fa0f531b8aefc013786ea843898652d2a8649e1449",
           "minOSVersion": "16.1"
         },
         {

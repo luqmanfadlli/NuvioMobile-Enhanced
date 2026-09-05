@@ -7,18 +7,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.details.MetaDetailsScreen
 import com.nuvio.app.features.details.PersonDetailScreen
 import com.nuvio.app.features.details.TmdbEntityBrowseScreen
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.tmdb.TmdbEntityKind
 import com.nuvio.app.features.tmdb.TmdbService
+import com.nuvio.app.navigation.CatalogRoute
 import com.nuvio.app.navigation.DetailRoute
 import com.nuvio.app.navigation.EntityBrowseRoute
 import com.nuvio.app.navigation.NuvioNavigator
 import com.nuvio.app.navigation.PersonDetailRoute
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.details_more_like_this
 import nuvio.composeapp.generated.resources.person_role_creator
 import nuvio.composeapp.generated.resources.person_role_director
 import nuvio.composeapp.generated.resources.person_role_writer
@@ -80,6 +83,7 @@ internal fun DetailsDestination(
 ) {
     val onBack = rememberGuardedPopBackStack(navController, route)
     val onOpenMeta = rememberOpenMeta(navController)
+    val moreLikeThisTitle = stringResource(Res.string.details_more_like_this)
     val directorRole = stringResource(Res.string.person_role_director)
     val writerRole = stringResource(Res.string.person_role_writer)
     val creatorRole = stringResource(Res.string.person_role_creator)
@@ -90,6 +94,29 @@ internal fun DetailsDestination(
         onPlay = onPlay,
         onPlayManually = onPlayManually,
         onOpenMeta = onOpenMeta,
+        onOpenMoreLikeThis = { meta ->
+            val source = meta.moreLikeThisSource
+            if (source != null) {
+                val launchId = CatalogLaunchStore.put(
+                    CatalogLaunch(
+                        title = moreLikeThisTitle,
+                        subtitle = meta.name,
+                        target = CatalogTarget.MoreLikeThis(
+                            itemId = meta.id,
+                            itemType = meta.type,
+                            source = source,
+                        ),
+                    ),
+                )
+                navController.navigate(
+                    CatalogRoute(
+                        launchId = launchId,
+                        title = moreLikeThisTitle,
+                        subtitle = meta.name,
+                    ),
+                )
+            }
+        },
         onCastClick = { person, avatarTransitionKey ->
             val tmdbId = person.tmdbId
             if (tmdbId != null && tmdbId > 0) {

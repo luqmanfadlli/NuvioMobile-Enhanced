@@ -230,6 +230,7 @@ fun SearchScreen(
         NuvioScreen(
             horizontalPadding = 0.dp,
             listState = listState,
+            autoHidesNativeTabBar = true,
             modifier = Modifier.fillMaxSize(),
         ) {
         stickyHeader {

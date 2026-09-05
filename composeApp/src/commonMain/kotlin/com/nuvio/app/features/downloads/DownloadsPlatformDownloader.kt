@@ -1,12 +1,11 @@
 package com.nuvio.app.features.downloads
 
 internal data class DownloadPlatformRequest(
-    val item: DownloadItem,
-) {
-    val sourceUrl: String get() = item.sourceUrl
-    val sourceHeaders: Map<String, String> get() = item.sourceHeaders
-    val destinationFileName: String get() = item.fileName
-}
+    val downloadId: String,
+    val sourceUrl: String,
+    val sourceHeaders: Map<String, String>,
+    val destinationFileName: String,
+)
 
 internal interface DownloadsTaskHandle {
     fun cancel()
@@ -18,10 +17,7 @@ internal expect object DownloadsPlatformDownloader {
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
         onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
         onFailure: (message: String) -> Unit,
-        onPaused: () -> Unit,
     ): DownloadsTaskHandle
-
-    fun restoreItem(item: DownloadItem): DownloadItem
 
     fun removeFile(localFileUri: String?): Boolean
 

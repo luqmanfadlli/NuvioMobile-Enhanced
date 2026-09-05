@@ -1,6 +1,10 @@
 package com.nuvio.app.features.catalog
 
 import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.details.MoreLikeThisSource
+import com.nuvio.app.features.tmdb.TmdbMetadataService
+import com.nuvio.app.features.tmdb.TmdbSettingsRepository
+import com.nuvio.app.features.trakt.TraktRelatedRepository
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
 import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.library.LibraryRepository
@@ -165,6 +169,11 @@ object CatalogRepository {
                         page = requestedSkip.takeIf { it > 0 } ?: 1,
                     )
 
+                    is CatalogTarget.MoreLikeThis -> fetchMoreLikeThisCatalogPage(
+                        target = target,
+                        page = requestedSkip.takeIf { it > 0 } ?: 1,
+                    )
+
                     is CatalogTarget.Library -> error(getString(Res.string.catalog_load_failed))
                 }.withUnreleasedFilter(request.hideUnreleasedContent)
             }.fold(
@@ -237,6 +246,34 @@ private suspend fun fetchCollectionSourcePage(
         source.isTrakt -> TraktPublicListSourceResolver.resolve(source = source, page = page)
         else -> error(getString(Res.string.catalog_load_failed))
     }
+}
+
+private suspend fun fetchMoreLikeThisCatalogPage(
+    target: CatalogTarget.MoreLikeThis,
+    page: Int,
+): CatalogPage {
+    val result = when (target.source) {
+        MoreLikeThisSource.TRAKT -> TraktRelatedRepository.getRelated(
+            itemId = target.itemId,
+            itemType = target.itemType,
+            page = page,
+        )
+
+        MoreLikeThisSource.TMDB -> {
+            TmdbSettingsRepository.ensureLoaded()
+            TmdbMetadataService.fetchMoreLikeThisPage(
+                itemId = target.itemId,
+                itemType = target.itemType,
+                page = page,
+                settings = TmdbSettingsRepository.snapshot(),
+            )
+        }
+    }
+    return CatalogPage(
+        items = result.items,
+        rawItemCount = result.items.size,
+        nextSkip = if (result.hasMore && result.items.isNotEmpty()) page + 1 else null,
+    )
 }
 
 private data class CatalogRequest(

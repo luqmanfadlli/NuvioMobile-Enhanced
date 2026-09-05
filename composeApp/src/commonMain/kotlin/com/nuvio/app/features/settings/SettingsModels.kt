@@ -3,7 +3,6 @@ package com.nuvio.app.features.settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -15,23 +14,28 @@ import nuvio.composeapp.generated.resources.compose_settings_page_addons
 import nuvio.composeapp.generated.resources.compose_settings_page_advanced
 import nuvio.composeapp.generated.resources.compose_settings_page_appearance
 import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
+import nuvio.composeapp.generated.resources.compose_settings_page_debug_logs
 import nuvio.composeapp.generated.resources.compose_settings_page_debrid
 import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
 import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
+import nuvio.composeapp.generated.resources.compose_settings_page_live_tv
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
 import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
+import nuvio.composeapp.generated.resources.compose_settings_page_omdb
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
 import nuvio.composeapp.generated.resources.compose_settings_page_plugins
 import nuvio.composeapp.generated.resources.compose_settings_page_poster_customization
+import nuvio.composeapp.generated.resources.compose_settings_page_profile
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import nuvio.composeapp.generated.resources.compose_settings_page_streams
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
 import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
 import nuvio.composeapp.generated.resources.compose_settings_page_trakt
 import nuvio.composeapp.generated.resources.compose_settings_page_tracking
+import nuvio.composeapp.generated.resources.compose_settings_root_downloads_title
 import nuvio.composeapp.generated.resources.settings_account
 import org.jetbrains.compose.resources.StringResource
 
@@ -57,6 +61,11 @@ internal enum class SettingsPage(
     ),
     Account(
         titleRes = Res.string.compose_settings_page_account,
+        category = SettingsCategory.Account,
+        parentPage = Root,
+    ),
+    Profile(
+        titleRes = Res.string.compose_settings_page_profile,
         category = SettingsCategory.Account,
         parentPage = Root,
     ),
@@ -90,8 +99,18 @@ internal enum class SettingsPage(
         category = SettingsCategory.Advanced,
         parentPage = Root,
     ),
+    DebugLogs(
+        titleRes = Res.string.compose_settings_page_debug_logs,
+        category = SettingsCategory.Advanced,
+        parentPage = Advanced,
+    ),
     Notifications(
         titleRes = Res.string.compose_settings_page_notifications,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
+    Downloads(
+        titleRes = Res.string.compose_settings_root_downloads_title,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
@@ -145,8 +164,18 @@ internal enum class SettingsPage(
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),
+    Omdb(
+        titleRes = Res.string.compose_settings_page_omdb,
+        category = SettingsCategory.General,
+        parentPage = Integrations,
+    ),
     Debrid(
         titleRes = Res.string.compose_settings_page_debrid,
+        category = SettingsCategory.General,
+        parentPage = Integrations,
+    ),
+    LiveTv(
+        titleRes = Res.string.compose_settings_page_live_tv,
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),

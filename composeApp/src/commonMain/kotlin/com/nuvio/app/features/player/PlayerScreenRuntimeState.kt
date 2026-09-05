@@ -12,6 +12,7 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsUiState
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.livetv.LiveTvUiState
 import com.nuvio.app.features.p2p.P2pSettingsUiState
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
@@ -27,6 +28,7 @@ internal class PlayerScreenRuntime(
     args: PlayerScreenArgs,
 ) {
     var args by mutableStateOf(args)
+    var randomEpisodePlayback by mutableStateOf(false)
 
     val title: String get() = args.title
     val profileId: Int get() = args.profileId
@@ -60,6 +62,7 @@ internal class PlayerScreenRuntime(
     val initialProgressFraction: Float? get() = args.initialProgressFraction
     val externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> get() = args.externalSubtitles
     val isSeries: Boolean get() = parentMetaType == "series"
+    val isLiveTvPlayback: Boolean get() = contentType == "live"
 
     lateinit var scope: CoroutineScope
     lateinit var hapticFeedback: HapticFeedback
@@ -70,6 +73,7 @@ internal class PlayerScreenRuntime(
     var metaScreenSettingsUiState: MetaScreenSettingsUiState = MetaScreenSettingsUiState()
     var watchedUiState: WatchedUiState = WatchedUiState()
     var watchProgressUiState: WatchProgressUiState = WatchProgressUiState()
+    var liveTvUiState: LiveTvUiState = LiveTvUiState()
     var sourceStreamsState by mutableStateOf(StreamsUiState())
     var episodeStreamsRepoState by mutableStateOf(StreamsUiState())
     var metaUiState: MetaDetailsUiState = MetaDetailsUiState()
@@ -95,8 +99,22 @@ internal class PlayerScreenRuntime(
 
     var controlsVisible by mutableStateOf(false)
     var playerControlsLocked by mutableStateOf(false)
+    private val shouldResolveInitialPlayerQuality: Boolean
+        get() = torrentInfoHash == null &&
+            sourceAudioUrl == null &&
+            sourceUrl.contains(".m3u8", ignoreCase = true)
+
     var activeSourceUrl by mutableStateOf(sourceUrl)
+    var selectedPlayerQualityId by mutableStateOf<String?>(null)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
+
+    var activePlaybackSourceUrl by mutableStateOf<String?>(
+        if (shouldResolveInitialPlayerQuality) null else sourceUrl,
+    )
+    var playerQualityState by mutableStateOf(
+        PlayerQualitySelectionState(isLoading = shouldResolveInitialPlayerQuality, sourceUrl = sourceUrl),
+    )
+
     var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
     var activeSourceResponseHeaders by mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
     var activeStreamType by mutableStateOf(streamType)
@@ -114,6 +132,7 @@ internal class PlayerScreenRuntime(
     var activeStreamSubtitle by mutableStateOf(streamSubtitle)
     var activeProviderName by mutableStateOf(providerName)
     var activeProviderAddonId by mutableStateOf(providerAddonId)
+    var activeLogo by mutableStateOf(logo)
     var currentStreamBingeGroup by mutableStateOf(initialBingeGroup)
     var activeSeasonNumber by mutableStateOf(seasonNumber)
     var activeEpisodeNumber by mutableStateOf(episodeNumber)
@@ -156,7 +175,9 @@ internal class PlayerScreenRuntime(
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
 
     var showSourcesPanel by mutableStateOf(false)
+    var showQualityPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
+    var showLiveChannelsPanel by mutableStateOf(false)
     var showSubmitIntroModal by mutableStateOf(false)
     var submitIntroSegmentType by mutableStateOf("intro")
     var submitIntroStartTimeStr by mutableStateOf("00:00")
@@ -185,6 +206,7 @@ internal class PlayerScreenRuntime(
     var showAudioModal by mutableStateOf(false)
     var showSubtitleModal by mutableStateOf(false)
     var showVideoSettingsModal by mutableStateOf(false)
+    var showStreamInfoModal by mutableStateOf(false)
     var audioTracks by mutableStateOf<List<AudioTrack>>(emptyList())
     var subtitleTracks by mutableStateOf<List<SubtitleTrack>>(emptyList())
     var selectedAudioIndex by mutableStateOf(-1)
@@ -201,6 +223,25 @@ internal class PlayerScreenRuntime(
     var trackPreferenceRestoreApplied by mutableStateOf(false)
     var subtitleDelayMs by mutableStateOf(0)
     var subtitleAutoSyncState by mutableStateOf(SubtitleAutoSyncUiState())
+
+    /**
+     * True while anything above the player surface owns the screen. Keyboard shortcuts are
+     * suppressed then, so an overlay's own keys (a subtitle search field, list navigation) keep
+     * working. Kept here rather than rebuilt at each call site so the modal set only has to be
+     * maintained in one place.
+     */
+    val isAnyOverlayVisible: Boolean
+        get() = showAudioModal ||
+            showSubtitleModal ||
+            showVideoSettingsModal ||
+            showStreamInfoModal ||
+            showSourcesPanel ||
+            showQualityPanel ||
+            showEpisodesPanel ||
+            showLiveChannelsPanel ||
+            showSubmitIntroModal ||
+            showParentalGuide ||
+            episodeStreamsPanelState.showStreams
 
     var lastSyncedSettingsResizeMode: PlayerResizeMode? = null
     var lastResetPlaybackIdentity: String? = null

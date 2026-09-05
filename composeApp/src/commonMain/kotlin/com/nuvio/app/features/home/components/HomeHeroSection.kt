@@ -1,21 +1,27 @@
 package com.nuvio.app.features.home.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
@@ -24,21 +30,31 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -50,12 +66,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.ui.dynamicScrimAlpha
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
+import com.nuvio.app.features.details.HeroTrailerAudioState
+import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.details.components.DetailIconAction
+import com.nuvio.app.features.details.components.HeroTrailerPlayerSurface
+import com.nuvio.app.features.details.selectHeroTrailer
+import com.nuvio.app.features.details.youtubePlaybackUrl
+import com.nuvio.app.features.home.HomeHeroArtworkSource
+import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.library.toLibraryItem
+import com.nuvio.app.features.trailer.TrailerPlaybackResolver
+import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -73,8 +106,91 @@ private const val HERO_SWIPE_THRESHOLD_FRACTION = 0.16f
 private const val HERO_SWIPE_VELOCITY_THRESHOLD = 300f
 private const val HERO_AUTO_SCROLL_INTERVAL_MS = 8_000L
 private const val MOBILE_HERO_VIEWPORT_RATIO = 0.82f
+private const val MOBILE_PORTRAIT_HERO_WIDTH_RATIO = 1.5f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 760f
+private const val TABLET_LANDSCAPE_HERO_HEIGHT_MULTIPLIER = 1.5f
+
+/**
+ * Home can stay composed underneath other screens/tabs (state preservation, fast tab switching),
+ * so a change in hero trailer settings alone isn't a reliable signal that playback should stop —
+ * Home might not even be recomposing while it's not the visible destination. The app shell (which
+ * is always alive) calls [forceStop] imperatively the moment the user navigates away from Home,
+ * regardless of whether Home's own composition reacts to it.
+ */
+internal object HomeHeroTrailerPlaybackController {
+    private var stopCallback: (() -> Unit)? = null
+
+    fun register(stop: () -> Unit) {
+        stopCallback = stop
+    }
+
+    fun unregister(stop: () -> Unit) {
+        if (stopCallback === stop) stopCallback = null
+    }
+
+    fun forceStop() {
+        stopCallback?.invoke()
+    }
+}
+
+/**
+ * Home's hero item is disposed by the LazyColumn when scrolled far enough out of view, which would
+ * otherwise reset trailer playback to the start. Positions are kept here, outside composition, so
+ * scrolling the hero back into view can resume a trailer where it left off instead of restarting it.
+ */
+private object HomeHeroTrailerPlaybackPositionStore {
+    private val positions = mutableMapOf<String, Long>()
+
+    fun get(key: String): Long = positions[key] ?: 0L
+
+    fun set(key: String, positionMs: Long) {
+        if (positionMs > 0L) positions[key] = positionMs
+    }
+
+    fun clear(key: String) {
+        positions.remove(key)
+    }
+}
+
+/** TMDB posters are 2:3, so height is width * 1.5. Shared with the skeleton/reserved placeholders. */
+internal const val TMDB_POSTER_HEIGHT_RATIO = 1.5f
+
+/** Backdrops are 16:9, so height is width * 0.5625. */
+internal const val BACKDROP_HEIGHT_RATIO = 9f / 16f
+
+/** Stops a 16:9 card from swallowing the whole viewport on a landscape phone. */
+private const val CARD_WIDE_MAX_VIEWPORT_FRACTION = 0.72f
+internal val HERO_CARD_CORNER_RADIUS = 28.dp
+internal val HERO_CARD_HORIZONTAL_PADDING = 12.dp
+internal val HERO_CARD_TOP_PADDING = 8.dp
+
+/**
+ * Card mode follows the shape of the screen: a 2:3 poster in portrait, a 16:9 backdrop in landscape
+ * or on tablets. A portrait poster in landscape would be taller than the viewport itself, which is
+ * why the source is switched along with the ratio. Full-bleed is unaffected and always uses the
+ * backdrop.
+ */
+internal fun heroUsesWideArtwork(
+    maxWidth: Dp,
+    viewportHeight: Dp?,
+    isTablet: Boolean,
+): Boolean = isTablet || (viewportHeight != null && maxWidth > viewportHeight)
+
+internal fun cardHeroHeight(
+    maxWidth: Dp,
+    viewportHeight: Dp?,
+    isTablet: Boolean,
+): Dp = if (heroUsesWideArtwork(maxWidth, viewportHeight, isTablet)) {
+    val wideHeight = maxWidth * BACKDROP_HEIGHT_RATIO
+    if (viewportHeight != null) {
+        minOf(wideHeight, viewportHeight * CARD_WIDE_MAX_VIEWPORT_FRACTION)
+    } else {
+        wideHeight
+    }
+} else {
+    maxWidth * TMDB_POSTER_HEIGHT_RATIO
+}
 
 internal data class HomeHeroLayout(
     val isTablet: Boolean,
@@ -88,23 +204,32 @@ internal data class HomeHeroLayout(
 )
 
 @Composable
-fun HomeHeroSection(
+internal fun HomeHeroSection(
     items: List<MetaPreview>,
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
     listState: LazyListState? = null,
     stretchPx: () -> Float = { 0f },
+    trailerPlaybackEnabled: Boolean = false,
+    trailerStartDelaySeconds: Int = 0,
     onItemClick: ((MetaPreview) -> Unit)? = null,
+    onActiveArtworkChange: ((String?) -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
 
     val pagerState = rememberPagerState(pageCount = { items.size })
     val coroutineScope = rememberCoroutineScope()
     val autoScrollPage = pagerState.currentPage
+    val effectiveTrailerPlaybackEnabled = trailerPlaybackEnabled &&
+        AppFeaturePolicy.heroTrailerPlaybackSupported &&
+        AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
 
-    LaunchedEffect(autoScrollPage, items.size) {
-        if (items.size <= 1) return@LaunchedEffect
+    LaunchedEffect(autoScrollPage, items.size, effectiveTrailerPlaybackEnabled) {
+        // The carousel only advances by itself when trailer playback is off; with it on, the
+        // current item's trailer plays and only a swipe should move to the next one.
+        if (items.size <= 1 || effectiveTrailerPlaybackEnabled) return@LaunchedEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
             delay(100L)
@@ -116,213 +241,475 @@ fun HomeHeroSection(
         }
     }
 
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .homeHeroPagerGesture(
-                pagerState = pagerState,
-                itemCount = items.size,
-                coroutineScope = coroutineScope,
-            )
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
-    ) {
-        val layout = homeHeroLayout(
-            maxWidthDp = maxWidth.value,
-            viewportHeightDp = viewportHeight?.value,
-            mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+    val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val cardInsetModifier = if (isCardStyle) {
+        Modifier.padding(
+            top = statusBarTopPadding + HERO_CARD_TOP_PADDING,
+            start = HERO_CARD_HORIZONTAL_PADDING,
+            end = HERO_CARD_HORIZONTAL_PADDING,
         )
-        val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
-        val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
-        val scrollOffsetPx by remember(listState, heroHeightPx) {
-            derivedStateOf {
-                when {
-                    listState == null -> 0f
-                    listState.firstVisibleItemIndex > 0 -> heroHeightPx
-                    else -> listState.firstVisibleItemScrollOffset.toFloat()
-                }
-            }
-        }
-        val currentPage = pagerState.currentPage.coerceIn(items.indices)
-        val visiblePages = listOf(
-            currentPage,
-            (currentPage - 1).coerceIn(items.indices),
-            (currentPage + 1).coerceIn(items.indices),
-        ).distinct()
-            .mapNotNull { index ->
-                val pageOffset = heroPageOffset(pagerState, index)
-                val visibility = (1f - abs(pageOffset)).coerceIn(0f, 1f)
-                if (visibility <= 0f) {
-                    null
-                } else {
-                    HeroPageLayer(
-                        page = index,
-                        visibility = visibility,
-                        offset = pageOffset,
-                    )
-                }
-            }
-            .sortedBy(HeroPageLayer::visibility)
-        val currentItem = visiblePages
-            .lastOrNull()
-            ?.page
-            ?.let(items::get)
-            ?: items[currentPage]
+    } else {
+        Modifier
+    }
+    val heroShape = if (isCardStyle) {
+        RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+    } else {
+        RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    }
 
-        Box(
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .heroStretchHeight(layout.heroHeight, stretchPx),
+                .then(cardInsetModifier)
+                .homeHeroPagerGesture(
+                    pagerState = pagerState,
+                    itemCount = items.size,
+                    coroutineScope = coroutineScope,
+                )
+                .clip(heroShape),
         ) {
-            HorizontalPager(
-                state = pagerState,
-                userScrollEnabled = false,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = 0.01f },
-            ) {
-                Box(modifier = Modifier.fillMaxSize())
+            val baseLayout = homeHeroLayout(
+                maxWidthDp = maxWidth.value,
+                viewportHeightDp = viewportHeight?.value,
+                mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+            )
+            // In card mode the height is dictated by the artwork ratio, not the viewport.
+            val layout = if (isCardStyle) {
+                baseLayout.copy(
+                    heroHeight = cardHeroHeight(
+                        maxWidth = maxWidth,
+                        viewportHeight = viewportHeight,
+                        isTablet = baseLayout.isTablet,
+                    ),
+                )
+            } else {
+                baseLayout
             }
-
-            Box(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.heroHeight)
-                        .heroStretchZoom(stretchPx),
-                ) {
-                    visiblePages.forEach { layer ->
-                        AsyncImage(
-                            model = items[layer.page].banner ?: items[layer.page].poster,
-                            contentDescription = items[layer.page].name,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    val offset = scrollOffsetPx
-                                    val scrollScale = heroBackgroundScrollScale(offset)
-                                    alpha = layer.visibility
-                                    translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                    translationY = heroBackgroundScrollTranslationY(offset)
-                                    scaleX = HERO_BACKGROUND_SCALE * scrollScale
-                                    scaleY = HERO_BACKGROUND_SCALE * scrollScale
-                                },
-                            alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                            contentScale = ContentScale.Crop,
+            val effectiveArtworkSource = when {
+                !isCardStyle -> HomeHeroArtworkSource.BACKDROP
+                heroUsesWideArtwork(maxWidth, viewportHeight, baseLayout.isTablet) ->
+                    HomeHeroArtworkSource.BACKDROP
+                else -> HomeHeroArtworkSource.POSTER
+            }
+            // The card is sized to the artwork's own ratio, so the zoom and parallax that exist to hide
+            // the edges of a cropped full-bleed backdrop would only crop the artwork for no reason.
+            val artworkParallax = if (isCardStyle) 0f else HERO_BACKGROUND_PARALLAX
+            val artworkBaseScale = if (isCardStyle) 1f else HERO_BACKGROUND_SCALE
+            val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
+            val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
+            val scrollOffsetPx by remember(listState, heroHeightPx) {
+                derivedStateOf {
+                    when {
+                        listState == null -> 0f
+                        listState.firstVisibleItemIndex > 0 -> heroHeightPx
+                        else -> listState.firstVisibleItemScrollOffset.toFloat()
+                    }
+                }
+            }
+            val heroScrollScale = heroBackgroundScrollScale(scrollOffsetPx)
+            val heroScrollTranslationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
+            val currentPage = pagerState.currentPage.coerceIn(items.indices)
+            val visiblePages = listOf(
+                currentPage,
+                (currentPage - 1).coerceIn(items.indices),
+                (currentPage + 1).coerceIn(items.indices),
+            ).distinct()
+                .mapNotNull { index ->
+                    val pageOffset = heroPageOffset(pagerState, index)
+                    val visibility = (1f - abs(pageOffset)).coerceIn(0f, 1f)
+                    if (visibility <= 0f) {
+                        null
+                    } else {
+                        HeroPageLayer(
+                            page = index,
+                            visibility = visibility,
+                            offset = pageOffset,
                         )
                     }
                 }
+                .sortedBy(HeroPageLayer::visibility)
+            val currentItem = visiblePages
+                .lastOrNull()
+                ?.page
+                ?.let(items::get)
+                ?: items[currentPage]
 
-                Box(
+            val activeArtworkUrl = when (effectiveArtworkSource) {
+                HomeHeroArtworkSource.POSTER -> currentItem.poster ?: currentItem.banner
+                HomeHeroArtworkSource.BACKDROP -> currentItem.banner ?: currentItem.poster
+            }
+            LaunchedEffect(onActiveArtworkChange, activeArtworkUrl) {
+                onActiveArtworkChange?.invoke(activeArtworkUrl)
+            }
+
+            val libraryUiState by remember {
+                LibraryRepository.ensureLoaded()
+                LibraryRepository.uiState
+            }.collectAsStateWithLifecycle()
+            val isSavedToLibrary = remember(libraryUiState, currentItem.id, currentItem.type) {
+                LibraryRepository.isSaved(currentItem.id, currentItem.type)
+            }
+            val toggleLibrarySaved: () -> Unit = {
+                val item = currentItem.toLibraryItem(savedAtEpochMs = 0L)
+                coroutineScope.launch {
+                    runCatching { LibraryRepository.toggleSaved(item) }
+                }
+            }
+
+            val heroTrailerItemKey = "${currentItem.type}:${currentItem.id}"
+            var heroTrailerPlaybackSource by remember(currentItem.type, currentItem.id) {
+                mutableStateOf<TrailerPlaybackSource?>(null)
+            }
+            var heroTrailerReady by remember(currentItem.type, currentItem.id) { mutableStateOf(false) }
+            var heroTrailerFinished by remember(currentItem.type, currentItem.id) { mutableStateOf(false) }
+            val heroTrailerMuted by HeroTrailerAudioState.muted.collectAsStateWithLifecycle()
+
+            val latestForceStopTrailer = rememberUpdatedState {
+                if (heroTrailerPlaybackSource != null || !heroTrailerFinished) {
+                    heroTrailerPlaybackSource = null
+                    heroTrailerReady = false
+                    heroTrailerFinished = true
+                }
+            }
+            DisposableEffect(Unit) {
+                val callback: () -> Unit = { latestForceStopTrailer.value.invoke() }
+                HomeHeroTrailerPlaybackController.register(callback)
+                onDispose { HomeHeroTrailerPlaybackController.unregister(callback) }
+            }
+
+            LaunchedEffect(
+                effectiveTrailerPlaybackEnabled,
+                currentItem.type,
+                currentItem.id,
+                trailerStartDelaySeconds,
+            ) {
+                heroTrailerPlaybackSource = null
+                heroTrailerReady = false
+                heroTrailerFinished = false
+                if (!effectiveTrailerPlaybackEnabled) return@LaunchedEffect
+                // Fetch metadata and resolve the playable source while the configured delay is
+                // running. Playback still waits for both conditions, avoiding delay + fetch +
+                // resolver latency being added serially.
+                val resolvedSource = async {
+                    val meta = runCatching {
+                        MetaDetailsRepository.fetch(currentItem.type, currentItem.id)
+                    }.getOrNull()
+                    val trailer = meta?.trailers?.let(::selectHeroTrailer) ?: return@async null
+                    runCatching {
+                        TrailerPlaybackResolver.resolveFromYouTubeUrl(trailer.youtubePlaybackUrl())
+                    }.getOrNull()
+                }
+                if (trailerStartDelaySeconds > 0) {
+                    delay(trailerStartDelaySeconds.toLong() * 1000L)
+                }
+                val source = resolvedSource.await()
+                if (source == null) {
+                    heroTrailerFinished = true
+                } else {
+                    heroTrailerPlaybackSource = source
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heroStretchHeight(layout.heroHeight, stretchPx),
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    userScrollEnabled = false,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
-                                ),
-                            ),
-                        ),
-                )
+                        .graphicsLayer { alpha = 0.01f },
+                ) {
+                    Box(modifier = Modifier.fillMaxSize())
+                }
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.bottomFadeHeight)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                                    MaterialTheme.colorScheme.background,
-                                ),
-                            ),
-                        ),
-                )
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = layout.contentHorizontalPadding,
-                            vertical = layout.contentVerticalPadding,
-                        ),
-                    horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(layout.contentWidthFraction)
-                            .widthIn(max = layout.contentMaxWidth),
-                        contentAlignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
+                            .fillMaxWidth()
+                            .height(layout.heroHeight)
+                            .heroStretchZoom(stretchPx),
                     ) {
                         visiblePages.forEach { layer ->
-                            Box(
-                                modifier = Modifier.graphicsLayer {
-                                    alpha = layer.visibility
-                                    translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
-                                },
-                            ) {
-                                HeroContentBlock(
-                                    item = items[layer.page],
-                                    layout = layout,
-                                    onItemClick = onItemClick,
+                            val item = items[layer.page]
+                            val artworkUrl = when (effectiveArtworkSource) {
+                                HomeHeroArtworkSource.POSTER -> item.poster ?: item.banner
+                                HomeHeroArtworkSource.BACKDROP -> item.banner ?: item.poster
+                            }
+                            key(effectiveArtworkSource, item.type, item.id, artworkUrl) {
+                                AsyncImage(
+                                    model = artworkUrl,
+                                    contentDescription = item.name,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            alpha = layer.visibility
+                                            translationX = -layer.offset * heroWidthPx * artworkParallax
+                                            translationY = if (isCardStyle) 0f else heroScrollTranslationY
+                                            scaleX = artworkBaseScale *
+                                                if (isCardStyle) 1f else heroScrollScale
+                                            scaleY = artworkBaseScale *
+                                                if (isCardStyle) 1f else heroScrollScale
+                                        },
+                                    alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
+                                    contentScale = ContentScale.Crop,
                                 )
                             }
                         }
-                    }
 
-                    if (!layout.isTablet) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Surface(
-                            modifier = Modifier
-                                .clickable(enabled = onItemClick != null) {
-                                    onItemClick?.invoke(currentItem)
+                        val heroTrailerSourceUrl = heroTrailerPlaybackSource
+                            ?.videoUrl
+                            ?.takeIf { it.isNotBlank() && effectiveTrailerPlaybackEnabled && !heroTrailerFinished }
+                        if (heroTrailerSourceUrl != null) {
+                            val trailerReadyAlpha by animateFloatAsState(
+                                targetValue = if (heroTrailerReady) 1f else 0f,
+                                animationSpec = tween(durationMillis = 300),
+                                label = "home_hero_trailer_alpha",
+                            )
+                            val currentPageOffset = pagerState.currentPageOffsetFraction
+                            val currentPageVisibility = (1f - abs(currentPageOffset)).coerceIn(0f, 1f)
+                            val isHeroScrolledAway = scrollOffsetPx >= heroHeightPx * 0.6f
+                            HeroTrailerPlayerSurface(
+                                sourceUrl = heroTrailerSourceUrl,
+                                sourceAudioUrl = heroTrailerPlaybackSource?.audioUrl,
+                                playWhenReady = !heroTrailerFinished && !isHeroScrolledAway,
+                                muted = heroTrailerMuted,
+                                startPositionMs = remember(heroTrailerItemKey) {
+                                    HomeHeroTrailerPlaybackPositionStore.get(heroTrailerItemKey)
                                 },
-                            color = MaterialTheme.colorScheme.onBackground,
-                            contentColor = MaterialTheme.colorScheme.background,
-                            shape = RoundedCornerShape(40.dp),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.home_view_details),
-                                modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        alpha = trailerReadyAlpha * currentPageVisibility
+                                        translationX = -currentPageOffset * heroWidthPx * artworkParallax
+                                        translationY = if (isCardStyle) 0f else heroScrollTranslationY
+                                        scaleX = artworkBaseScale * if (isCardStyle) 1f else heroScrollScale
+                                        scaleY = artworkBaseScale * if (isCardStyle) 1f else heroScrollScale
+                                    },
+                                onReady = {
+                                    if (!heroTrailerFinished) heroTrailerReady = true
+                                },
+                                onEnded = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                    HomeHeroTrailerPlaybackPositionStore.clear(heroTrailerItemKey)
+                                },
+                                onError = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                    HomeHeroTrailerPlaybackPositionStore.clear(heroTrailerItemKey)
+                                },
+                                onPositionUpdate = { positionMs ->
+                                    HomeHeroTrailerPlaybackPositionStore.set(heroTrailerItemKey, positionMs)
+                                },
                             )
                         }
                     }
 
-                    if (items.size > 1) {
-                        Spacer(modifier = Modifier.height(if (layout.isTablet) 14.dp else 12.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                    if (!isCardStyle) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.02f)),
+                                            MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.12f)),
+                                            MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.34f)),
+                                            MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.78f)),
+                                        ),
+                                    ),
+                                ),
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(layout.bottomFadeHeight)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                                            MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(1f)),
+                                        ),
+                                    ),
+                                ),
+                        )
+                    }
+
+                    if (isCardStyle) {
+                        // Clean artwork: the whole card is the touch target instead of a details button.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(enabled = onItemClick != null) {
+                                    onItemClick?.invoke(currentItem)
+                                },
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = layout.contentHorizontalPadding,
+                                    vertical = layout.contentVerticalPadding,
+                                ),
+                            horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
                         ) {
-                            items.forEachIndexed { index, _ ->
-                                val activeFraction = heroPageVisibility(pagerState, index)
-                                Box(
-                                    modifier = Modifier
-                                        .clickable {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(index)
-                                            }
-                                        }
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.onBackground)
-                                        .graphicsLayer {
-                                            alpha = 0.35f + (0.57f * activeFraction)
-                                        }
-                                        .width(8.dp + (24.dp * activeFraction))
-                                        .height(8.dp),
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(layout.contentWidthFraction)
+                                    .widthIn(max = layout.contentMaxWidth),
+                                contentAlignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
+                            ) {
+                                visiblePages.forEach { layer ->
+                                    Box(
+                                        modifier = Modifier.graphicsLayer {
+                                            alpha = layer.visibility
+                                            translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
+                                        },
+                                    ) {
+                                        HeroContentBlock(
+                                            item = items[layer.page],
+                                            layout = layout,
+                                            onItemClick = onItemClick,
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (!layout.isTablet) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .clickable(enabled = onItemClick != null) {
+                                                onItemClick?.invoke(currentItem)
+                                            },
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        contentColor = MaterialTheme.colorScheme.background,
+                                        shape = RoundedCornerShape(40.dp),
+                                    ) {
+                                        Text(
+                                            text = stringResource(Res.string.home_view_details),
+                                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
+
+                                    DetailIconAction(
+                                        label = stringResource(
+                                            if (isSavedToLibrary) {
+                                                Res.string.hero_remove_from_library
+                                            } else {
+                                                Res.string.hero_add_to_library
+                                            },
+                                        ),
+                                        icon = if (isSavedToLibrary) Icons.Default.Check else Icons.Default.Add,
+                                        active = isSavedToLibrary,
+                                        progress = 1f,
+                                        size = 52.dp,
+                                        onClick = toggleLibrarySaved,
+                                    )
+                                }
+                            }
+
+                            if (items.size > 1) {
+                                Spacer(modifier = Modifier.height(if (layout.isTablet) 14.dp else 12.dp))
+                                HeroPageIndicator(
+                                    itemCount = items.size,
+                                    pagerState = pagerState,
+                                    coroutineScope = coroutineScope,
                                 )
                             }
                         }
                     }
+
+                    if (heroTrailerReady && heroTrailerPlaybackSource != null) {
+                        val muteIconSize = 20.dp
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(
+                                    top = statusBarTopPadding + 12.dp,
+                                    end = if (layout.isTablet) 32.dp else 18.dp,
+                                )
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.35f))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    HeroTrailerAudioState.toggleMuted()
+                                }
+                                .padding(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (heroTrailerMuted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(muteIconSize),
+                            )
+                        }
+                    }
                 }
             }
+        }
+
+        // In card mode the indicator sits below the card rather than on top of the artwork.
+        if (isCardStyle && items.size > 1) {
+            Spacer(modifier = Modifier.height(12.dp))
+            HeroPageIndicator(
+                itemCount = items.size,
+                pagerState = pagerState,
+                coroutineScope = coroutineScope,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroPageIndicator(
+    itemCount: Int,
+    pagerState: PagerState,
+    coroutineScope: CoroutineScope,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(itemCount) { index ->
+            val activeFraction = heroPageVisibility(pagerState, index)
+            Box(
+                modifier = Modifier
+                    .clickable {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onBackground)
+                    .graphicsLayer {
+                        alpha = 0.35f + (0.57f * activeFraction)
+                    }
+                    .width(8.dp + (24.dp * activeFraction))
+                    .height(8.dp),
+            )
         }
     }
 }
@@ -346,26 +733,56 @@ private fun heroPageVisibility(
 }
 
 @Composable
-fun HomeHeroReservedSpace(
+internal fun HomeHeroReservedSpace(
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
 ) {
+    val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
+            .then(
+                if (isCardStyle) {
+                    Modifier.padding(
+                        top = statusBarTopPadding + HERO_CARD_TOP_PADDING,
+                        start = HERO_CARD_HORIZONTAL_PADDING,
+                        end = HERO_CARD_HORIZONTAL_PADDING,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .clip(
+                if (isCardStyle) {
+                    RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+                } else {
+                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                },
+            ),
     ) {
-        val layout = homeHeroLayout(
+        val baseLayout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
+        val heroHeight = if (isCardStyle) {
+            cardHeroHeight(
+                maxWidth = maxWidth,
+                viewportHeight = viewportHeight,
+                isTablet = baseLayout.isTablet,
+            )
+        } else {
+            baseLayout.heroHeight
+        }
 
         Spacer(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(layout.heroHeight),
+                .height(heroHeight),
         )
     }
 }
@@ -459,11 +876,18 @@ internal fun homeHeroLayout(
     maxWidthDp: Float,
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
-): HomeHeroLayout =
-    when {
+): HomeHeroLayout {
+    val isLandscapeViewport = viewportHeightDp?.let { maxWidthDp > it } == true
+    val shortestViewportSideDp = viewportHeightDp?.let { minOf(maxWidthDp, it) } ?: maxWidthDp
+    val shouldBoostTabletLandscapeHero = isLandscapeViewport && shortestViewportSideDp >= 600f
+
+    return when {
         maxWidthDp >= 1200f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.42f).dp.coerceIn(360.dp, 440.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.42f).dp.coerceIn(360.dp, 440.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 640.dp,
             contentWidthFraction = 0.56f,
             contentHorizontalPadding = 56.dp,
@@ -473,7 +897,10 @@ internal fun homeHeroLayout(
         )
         maxWidthDp >= 840f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.46f).dp.coerceIn(340.dp, 420.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.46f).dp.coerceIn(340.dp, 420.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 560.dp,
             contentWidthFraction = 0.62f,
             contentHorizontalPadding = 40.dp,
@@ -483,7 +910,10 @@ internal fun homeHeroLayout(
         )
         maxWidthDp >= 600f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.58f).dp.coerceIn(320.dp, 380.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.58f).dp.coerceIn(320.dp, 380.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 520.dp,
             contentWidthFraction = 0.72f,
             contentHorizontalPadding = 32.dp,
@@ -506,19 +936,31 @@ internal fun homeHeroLayout(
             logoWidthFraction = 0.62f,
         )
     }
+}
+
+private fun tabletHeroHeight(
+    baseHeight: Dp,
+    boostForLandscape: Boolean,
+): Dp {
+    if (!boostForLandscape) return baseHeight
+
+    return (baseHeight.value * TABLET_LANDSCAPE_HERO_HEIGHT_MULTIPLIER).dp
+}
 
 private fun mobileHeroHeight(
     maxWidthDp: Float,
     viewportHeightDp: Float?,
     mobileBelowSectionHeightHintDp: Float?,
 ): Dp {
+    val isPortraitViewport = viewportHeightDp?.let { it >= maxWidthDp } != false
+
+    if (isPortraitViewport) {
+        return (maxWidthDp * MOBILE_PORTRAIT_HERO_WIDTH_RATIO).dp
+    }
+
     val viewportDrivenHeight = viewportHeightDp?.let { (it * MOBILE_HERO_VIEWPORT_RATIO).dp }
     val widthFallbackHeight = (maxWidthDp * 1.16f).dp
-    val baseHeight = if (mobileBelowSectionHeightHintDp == null) {
-        viewportDrivenHeight?.coerceAtMost(widthFallbackHeight) ?: widthFallbackHeight
-    } else {
-        viewportDrivenHeight ?: widthFallbackHeight
-    }
+    val baseHeight = viewportDrivenHeight ?: widthFallbackHeight
 
     val maxAllowedFromViewportDp = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
         viewportHeightDp - mobileBelowSectionHeightHintDp

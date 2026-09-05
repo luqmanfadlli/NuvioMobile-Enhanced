@@ -14,7 +14,14 @@ internal const val TRAILER_EXTRACTOR_TAG = "InAppYouTubeExtractor"
 internal const val TRAILER_REQUEST_TIMEOUT_MS = 20_000L
 
 private const val EXTRACTOR_TIMEOUT_MS = 30_000L
-private const val PREFERRED_SEPARATE_CLIENT = "visionos"
+
+private val TOKEN_FREE_CLIENTS = listOf("visionos", "android_vr")
+
+private const val TOKEN_FREE_PROGRESSIVE_ITAG = 18
+
+private const val MAX_VIDEO_HEIGHT = 1080
+private const val MAX_ADAPTIVE_PROBES = 2
+private const val MAX_PROBES_PER_TIER = 4
 
 private val VIDEO_ID_REGEX = Regex("^[a-zA-Z0-9_-]{11}$")
 private val API_KEY_REGEX = Regex("\"INNERTUBE_API_KEY\":\"([^\"]+)\"")
@@ -38,6 +45,7 @@ private data class WatchConfig(
 internal data class StreamCandidate(
     val client: String,
     val priority: Int,
+    val itag: Int,
     val url: String,
     val score: Double,
     val hasN: Boolean,
@@ -53,15 +61,6 @@ internal data class StreamCandidate(
 private data class ManifestBestVariant(
     val url: String,
     val width: Int,
-    val height: Int,
-    val bandwidth: Long,
-)
-
-internal data class ManifestCandidate(
-    val client: String,
-    val priority: Int,
-    val manifestUrl: String,
-    val selectedVariantUrl: String,
     val height: Int,
     val bandwidth: Long,
 )
@@ -96,6 +95,26 @@ private val CLIENTS = listOf(
         priority = 0,
     ),
     YouTubeClient(
+        key = "android_vr",
+        id = "28",
+        version = "1.65.10",
+        userAgent = "com.google.android.apps.youtube.vr.oculus/1.65.10 " +
+            "(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+        context = jsonObjectOf(
+            "clientName" to "ANDROID_VR",
+            "clientVersion" to "1.65.10",
+            "deviceMake" to "Oculus",
+            "deviceModel" to "Quest 3",
+            "osName" to "Android",
+            "osVersion" to "12L",
+            "platform" to "MOBILE",
+            "androidSdkVersion" to 32,
+            "hl" to "en",
+            "gl" to "US",
+        ),
+        priority = 1,
+    ),
+    YouTubeClient(
         key = "android",
         id = "3",
         version = "20.10.35",
@@ -110,7 +129,7 @@ private val CLIENTS = listOf(
             "hl" to "en",
             "gl" to "US",
         ),
-        priority = 1,
+        priority = 2,
     ),
     YouTubeClient(
         key = "ios",
@@ -127,7 +146,7 @@ private val CLIENTS = listOf(
             "hl" to "en",
             "gl" to "US",
         ),
-        priority = 2,
+        priority = 3,
     ),
 )
 
@@ -179,7 +198,19 @@ class InAppYouTubeExtractor {
                     visitorData = watchConfig.visitorData,
                 )
 
-                val streamingData = playerResponse.objectValue("streamingData") ?: return@runCatching
+                val playability = playerResponse.objectValue("playabilityStatus")
+                val playabilityStatus = playability?.stringValue("status") ?: "unknown"
+                val playabilityReason = playability?.stringValue("reason").orEmpty()
+                log.i {
+                    "client=" + client.key + " playability=" + playabilityStatus +
+                        (if (playabilityReason.isBlank()) "" else " reason=" + playabilityReason)
+                }
+
+                val streamingData = playerResponse.objectValue("streamingData")
+                if (streamingData == null) {
+                    log.w { "client=" + client.key + " returned no streamingData" }
+                    return@runCatching
+                }
                 val hlsManifestUrl = streamingData.stringValue("hlsManifestUrl")
                 if (!hlsManifestUrl.isNullOrBlank()) {
                     manifestUrls += Triple(client.key, client.priority, hlsManifestUrl)
@@ -203,6 +234,7 @@ class InAppYouTubeExtractor {
                     progressive += StreamCandidate(
                         client = client.key,
                         priority = client.priority,
+                        itag = (format.numberValue("itag") ?: 0.0).toInt(),
                         url = url,
                         score = videoScore(height, fps, bitrate),
                         hasN = hasNParam(url),
@@ -232,6 +264,7 @@ class InAppYouTubeExtractor {
                         adaptiveVideo += StreamCandidate(
                             client = client.key,
                             priority = client.priority,
+                            itag = (format.numberValue("itag") ?: 0.0).toInt(),
                             url = url,
                             score = videoScore(height, fps, bitrate),
                             hasN = hasNParam(url),
@@ -254,6 +287,7 @@ class InAppYouTubeExtractor {
                         adaptiveAudio += StreamCandidate(
                             client = client.key,
                             priority = client.priority,
+                            itag = (format.numberValue("itag") ?: 0.0).toInt(),
                             url = url,
                             score = audioScore(bitrate, audioSampleRate),
                             hasN = hasNParam(url),
@@ -264,45 +298,139 @@ class InAppYouTubeExtractor {
                         )
                     }
                 }
+            }.onFailure { error ->
+                log.w { "client=" + client.key + " failed: " + (error.message ?: "unknown") }
             }
         }
 
         if (manifestUrls.isEmpty() && progressive.isEmpty() && adaptiveVideo.isEmpty() && adaptiveAudio.isEmpty()) {
+            log.w { "No playable formats returned by any client" }
             return null
         }
 
-        var bestManifest: ManifestCandidate? = null
-        for ((clientKey, priority, manifestUrl) in manifestUrls) {
-            runCatching {
-                val variant = parseHlsManifest(manifestUrl) ?: return@runCatching
-                val candidate = ManifestCandidate(
-                    client = clientKey,
-                    priority = priority,
-                    manifestUrl = manifestUrl,
-                    selectedVariantUrl = variant.url,
-                    height = variant.height,
-                    bandwidth = variant.bandwidth,
-                )
-                if (
-                    bestManifest == null ||
-                    candidate.height > bestManifest.height ||
-                    (candidate.height == bestManifest.height && candidate.bandwidth > bestManifest.bandwidth)
-                ) {
-                    bestManifest = candidate
+        val rejectedClients = mutableSetOf<String>()
+        resolveAdaptive(adaptiveVideo, adaptiveAudio, rejectedClients)?.let { return it }
+        resolveProgressive(progressive, rejectedClients)?.let { return it }
+        resolveHls(manifestUrls, rejectedClients)?.let { return it }
+
+        log.w { "All candidates rejected - googlevideo likely requires a GVS PO token for every client" }
+        return null
+    }
+
+    private suspend fun resolveAdaptive(
+        video: List<StreamCandidate>,
+        audio: List<StreamCandidate>,
+        rejectedClients: MutableSet<String>,
+    ): TrailerPlaybackSource? {
+        var probes = 0
+        for (clientKey in clientOrder(video.map { it.client })) {
+            if (probes >= MAX_ADAPTIVE_PROBES) break
+            if (clientKey !in TOKEN_FREE_CLIENTS) continue
+            val bestVideo = sortCandidates(video.filter { it.client == clientKey }).firstOrNull() ?: continue
+
+            probes++
+            val videoUrl = TrailerExtractionPlatform.resolvePlayableUrl(bestVideo.url)
+            if (videoUrl == null) {
+                rejectedClients += clientKey
+                log.i {
+                    "adaptive rejected client=" + clientKey + " itag=" + bestVideo.itag +
+                        " height=" + bestVideo.height
                 }
+                continue
             }
+
+            val bestAudio = sortCandidates(audio.filter { it.client == clientKey }).firstOrNull()
+            if (bestAudio == null) {
+                log.w { "adaptive video ok but client=" + clientKey + " has no audio track" }
+                continue
+            }
+
+            val audioUrl = TrailerExtractionPlatform.resolvePlayableUrl(bestAudio.url)
+            if (audioUrl == null) {
+                rejectedClients += clientKey
+                log.i { "adaptive audio rejected client=" + clientKey + " itag=" + bestAudio.itag }
+                continue
+            }
+
+            log.i {
+                "using adaptive client=" + clientKey + " video=" + bestVideo.itag +
+                    " height=" + bestVideo.height + " audio=" + bestAudio.itag
+            }
+            return TrailerPlaybackSource(videoUrl = videoUrl, audioUrl = audioUrl)
         }
+        return null
+    }
 
-        val bestProgressive = sortCandidates(progressive).firstOrNull()
-        val bestVideo = pickBestForClient(adaptiveVideo, PREFERRED_SEPARATE_CLIENT)
-        val bestAudio = pickBestForClient(adaptiveAudio, PREFERRED_SEPARATE_CLIENT)
-
-        return TrailerExtractionPlatform.buildPlaybackSource(
-            bestManifest = bestManifest,
-            bestProgressive = bestProgressive,
-            bestVideo = bestVideo,
-            bestAudio = bestAudio,
+    private suspend fun resolveProgressive(
+        progressive: List<StreamCandidate>,
+        rejectedClients: MutableSet<String>,
+    ): TrailerPlaybackSource? {
+        val ordered = progressive.sortedWith(
+            compareBy<StreamCandidate> { clientRank(it.client) }
+                .thenBy { if (it.itag == TOKEN_FREE_PROGRESSIVE_ITAG) 0 else 1 }
+                .thenByDescending { it.score },
         )
+
+        var probes = 0
+        var lastClient: String? = null
+        for (candidate in ordered) {
+            if (probes >= MAX_PROBES_PER_TIER) break
+            if (candidate.client in rejectedClients && candidate.itag != TOKEN_FREE_PROGRESSIVE_ITAG) continue
+            if (candidate.client == lastClient && candidate.itag != TOKEN_FREE_PROGRESSIVE_ITAG) continue
+            lastClient = candidate.client
+
+            probes++
+            val url = TrailerExtractionPlatform.resolvePlayableUrl(candidate.url)
+            if (url == null) {
+                rejectedClients += candidate.client
+                log.i { "progressive rejected client=" + candidate.client + " itag=" + candidate.itag }
+                continue
+            }
+
+            log.i {
+                "using progressive muxed client=" + candidate.client + " itag=" + candidate.itag +
+                    " height=" + candidate.height
+            }
+            return TrailerPlaybackSource(videoUrl = url, audioUrl = null)
+        }
+        return null
+    }
+
+    private suspend fun resolveHls(
+        manifestUrls: List<Triple<String, Int, String>>,
+        rejectedClients: Set<String>,
+    ): TrailerPlaybackSource? {
+        val ordered = manifestUrls
+            .filterNot { it.first in rejectedClients }
+            .sortedBy { clientRank(it.first) }
+        for ((clientKey, _, manifestUrl) in ordered) {
+            val variant = runCatching { parseHlsManifest(manifestUrl) }
+                .onFailure { error ->
+                    log.i { "HLS manifest unreadable client=" + clientKey + ": " + (error.message ?: "unknown") }
+                }
+                .getOrNull() ?: continue
+
+            if (TrailerExtractionPlatform.resolvePlayableUrl(variant.url) == null) {
+                log.i { "HLS variant rejected client=" + clientKey + " height=" + variant.height }
+                continue
+            }
+
+            log.i { "using HLS client=" + clientKey + " height=" + variant.height }
+            return TrailerPlaybackSource(videoUrl = manifestUrl, audioUrl = null)
+        }
+        return null
+    }
+
+    private fun clientRank(client: String): Int {
+        val tokenFreeIndex = TOKEN_FREE_CLIENTS.indexOf(client)
+        if (tokenFreeIndex >= 0) return tokenFreeIndex
+
+        val declaredIndex = CLIENTS.indexOfFirst { it.key == client }
+        return TOKEN_FREE_CLIENTS.size + (if (declaredIndex >= 0) declaredIndex else CLIENTS.size)
+    }
+
+    private fun clientOrder(present: Collection<String>): List<String> {
+        return present.distinct().sortedBy { clientRank(it) }
     }
 
     private suspend fun fetchPlayerResponse(
@@ -388,21 +516,25 @@ class InAppYouTubeExtractor {
                 bandwidth = bandwidth,
             )
 
-            if (
-                bestVariant == null ||
-                candidate.height > bestVariant.height ||
-                (candidate.height == bestVariant.height && candidate.bandwidth > bestVariant.bandwidth) ||
-                (
-                    candidate.height == bestVariant.height &&
-                        candidate.bandwidth == bestVariant.bandwidth &&
-                        candidate.width > bestVariant.width
-                    )
-            ) {
+            if (isBetterVariant(candidate, bestVariant)) {
                 bestVariant = candidate
             }
         }
 
         return bestVariant
+    }
+
+    private fun isBetterVariant(candidate: ManifestBestVariant, best: ManifestBestVariant?): Boolean {
+        if (best == null) return true
+
+        val candidateOverCap = candidate.height > MAX_VIDEO_HEIGHT
+        val bestOverCap = best.height > MAX_VIDEO_HEIGHT
+        if (candidateOverCap != bestOverCap) return bestOverCap
+        if (candidateOverCap) return candidate.height < best.height
+
+        if (candidate.height != best.height) return candidate.height > best.height
+        if (candidate.bandwidth != best.bandwidth) return candidate.bandwidth > best.bandwidth
+        return candidate.width > best.width
     }
 
     private fun extractVideoId(input: String): String? {
@@ -516,19 +648,13 @@ class InAppYouTubeExtractor {
     internal fun sortCandidates(items: List<StreamCandidate>): List<StreamCandidate> {
         return items.sortedWith(
             compareBy<StreamCandidate> { if (it.isDefaultAudioTrack) 0 else 1 }
+                .thenBy { if (it.height > MAX_VIDEO_HEIGHT) 1 else 0 }
+                .thenBy { if (it.height > MAX_VIDEO_HEIGHT) it.height else 0 }
                 .thenByDescending { it.score }
                 .thenBy { if (it.hasN) 1 else 0 }
                 .thenBy { containerPreference(it.ext) }
                 .thenBy { it.priority },
         )
-    }
-
-    private fun pickBestForClient(items: List<StreamCandidate>, clientKey: String): StreamCandidate? {
-        val sameClient = items.filter { it.client == clientKey }
-        if (sameClient.isNotEmpty()) {
-            return sortCandidates(sameClient).firstOrNull()
-        }
-        return sortCandidates(items).firstOrNull()
     }
 
     private fun containerPreference(ext: String): Int {

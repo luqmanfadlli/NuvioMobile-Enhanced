@@ -71,6 +71,10 @@ import nuvio.composeapp.generated.resources.settings_meta_comments
 import nuvio.composeapp.generated.resources.settings_meta_comments_description
 import nuvio.composeapp.generated.resources.settings_meta_details
 import nuvio.composeapp.generated.resources.settings_meta_details_description
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_description
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_instant
+import nuvio.composeapp.generated.resources.settings_hero_trailer_start_delay_value
 import nuvio.composeapp.generated.resources.settings_meta_hero_trailer_playback
 import nuvio.composeapp.generated.resources.settings_meta_hero_trailer_playback_description
 import nuvio.composeapp.generated.resources.settings_meta_episode_cards
@@ -138,6 +142,27 @@ internal fun LazyListScope.metaScreenSettingsContent(
                         isTablet = isTablet,
                         onCheckedChange = { MetaScreenSettingsRepository.setHeroTrailerPlayback(it) },
                     )
+                    if (uiState.heroTrailerPlayback) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSliderRow(
+                            title = stringResource(Res.string.settings_hero_trailer_start_delay),
+                            description = stringResource(Res.string.settings_hero_trailer_start_delay_description),
+                            value = uiState.heroTrailerStartDelaySeconds,
+                            valueText = if (uiState.heroTrailerStartDelaySeconds <= 0) {
+                                stringResource(Res.string.settings_hero_trailer_start_delay_instant)
+                            } else {
+                                stringResource(
+                                    Res.string.settings_hero_trailer_start_delay_value,
+                                    uiState.heroTrailerStartDelaySeconds,
+                                )
+                            },
+                            valueRange = MetaScreenSettingsRepository.MIN_HERO_TRAILER_START_DELAY_SECONDS..
+                                MetaScreenSettingsRepository.MAX_HERO_TRAILER_START_DELAY_SECONDS,
+                            step = 1,
+                            isTablet = isTablet,
+                            onValueChange = { MetaScreenSettingsRepository.setHeroTrailerStartDelaySeconds(it) },
+                        )
+                    }
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(

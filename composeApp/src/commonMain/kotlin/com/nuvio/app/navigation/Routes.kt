@@ -104,6 +104,9 @@ data class SupportersContributorsSettingsRoute(override val title: String = "") 
 data class LicensesAttributionsSettingsRoute(override val title: String = "") : SettingsDestinationRoute
 
 @Serializable
+data class ProfileEditRoute(override val title: String = "") : SettingsDestinationRoute
+
+@Serializable
 data class CollectionsRoute(override val title: String = "") : SettingsDestinationRoute
 
 @Serializable

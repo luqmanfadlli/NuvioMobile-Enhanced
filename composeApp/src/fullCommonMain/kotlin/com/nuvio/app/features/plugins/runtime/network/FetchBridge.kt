@@ -3,6 +3,7 @@ package com.nuvio.app.features.plugins.runtime.network
 import co.touchlab.kermit.Logger
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.function
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.plugins.runtime.host.HostModule
 import kotlinx.coroutines.runBlocking
@@ -30,6 +31,10 @@ internal class FetchBridge : HostModule {
                 performNativeFetch(url, method, headersJson, body, followRedirects)
             } catch (t: Throwable) {
                 log.e(t) { "Fetch bridge error for $method $url" }
+                InAppLogger.error(
+                    "PluginRuntime/Fetch",
+                    "$method ${InAppLogger.redactUrl(url)} failed: ${InAppLogger.throwableSummary(t)}",
+                )
                 JsonObject(
                     mapOf(
                         "ok" to JsonPrimitive(false),
@@ -56,6 +61,12 @@ internal class FetchBridge : HostModule {
             headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
 
+        InAppLogger.info(
+            "PluginRuntime/Fetch",
+            "$method ${InAppLogger.redactUrl(url)} headers=${InAppLogger.headerKeys(headers)} " +
+                "bodyChars=${body.length} followRedirects=$followRedirects",
+        )
+
         val response = runBlocking {
             httpRequestRaw(
                 method = method,
@@ -64,6 +75,15 @@ internal class FetchBridge : HostModule {
                 body = body,
                 followRedirects = followRedirects,
             )
+        }
+
+        val responseLogMessage = "$method ${InAppLogger.redactUrl(url)} -> ${response.status} ${response.statusText} " +
+            "responseUrl=${InAppLogger.redactUrl(response.url)} bodyChars=${response.body.length} " +
+            "responseHeaders=${responseHeaderKeys(response.headers)}"
+        if (response.status in 200..299) {
+            InAppLogger.info("PluginRuntime/Fetch", responseLogMessage)
+        } else {
+            InAppLogger.warn("PluginRuntime/Fetch", responseLogMessage)
         }
 
         val responseHeaders = response.headers.mapKeys { (key, _) -> key.lowercase() }
@@ -98,4 +118,12 @@ internal class FetchBridge : HostModule {
         if (end <= 0) return FETCH_TRUNCATION_SUFFIX.take(maxChars)
         return value.substring(0, end) + FETCH_TRUNCATION_SUFFIX
     }
+
+    private fun responseHeaderKeys(headers: Map<String, String>): String =
+        headers.keys
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .sortedBy { it.lowercase() }
+            .joinToString(separator = ",")
+            .ifBlank { "none" }
 }

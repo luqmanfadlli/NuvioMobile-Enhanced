@@ -11,9 +11,13 @@ internal const val PlayerLockedOverlayDurationMs = 2_000L
 internal const val PlayerLeftGestureBoundary = 0.4f
 internal const val PlayerRightGestureBoundary = 0.6f
 internal const val PlayerVerticalGestureSensitivity = 0.65f
+internal const val PlayerNormalVolumeCeiling = 1f
+internal const val PlayerMaxVolumeBoost = 2f
 internal const val PlayerVerticalGestureTouchSlopMultiplier = 3f
 internal const val PlayerVerticalGestureMinHeightFraction = 0.06f
 internal const val PlayerVerticalGestureDominanceRatio = 1.2f
+internal const val PlayerHorizontalGestureTouchSlopMultiplier = 3f
+internal const val PlayerHorizontalGestureDominanceRatio = 1.2f
 internal const val PlayerSeekProgressSyncDebounceMs = 700L
 internal const val P2pInitialByteProgressMidpoint = 5_242_880L
 internal const val P2pInitialBufferTargetMs = 10_000L
@@ -87,3 +91,45 @@ internal data class PendingPlayerP2pSwitch(
     val episode: MetaVideo?,
     val isAutoPlay: Boolean,
 )
+
+
+internal fun currentCombinedVolumeLevel(
+    systemVolume: PlayerAudioLevel?,
+    softwareVolume: PlayerAudioLevel?,
+): PlayerAudioLevel? {
+    if (systemVolume == null && softwareVolume == null) return null
+    if (systemVolume == null) return softwareVolume
+    if (systemVolume.fraction < PlayerNormalVolumeCeiling || softwareVolume == null) {
+        return systemVolume
+    }
+    val boostFraction = softwareVolume.fraction.coerceIn(PlayerNormalVolumeCeiling, PlayerMaxVolumeBoost)
+    return PlayerAudioLevel(
+        fraction = boostFraction,
+        isMuted = boostFraction <= 0.001f,
+    )
+}
+
+internal fun setCombinedVolumeLevel(
+    target: Float,
+    systemController: PlayerGestureController?,
+    engineController: PlayerEngineController?,
+): PlayerAudioLevel? {
+    val normalized = target.coerceIn(0f, PlayerMaxVolumeBoost)
+    return if (normalized <= PlayerNormalVolumeCeiling) {
+        // Normal range: change device/media volume and keep software gain neutral.
+        engineController?.setPlayerVolume(PlayerNormalVolumeCeiling)
+        systemController?.setVolume(normalized)
+            ?: PlayerAudioLevel(
+                fraction = normalized,
+                isMuted = normalized <= 0.001f,
+            )
+    } else {
+        // Boost range: keep device/media volume at maximum and apply software gain above 100%.
+        val systemLevel = systemController?.setVolume(PlayerNormalVolumeCeiling)
+        val boostedLevel = engineController?.setPlayerVolume(normalized)
+        boostedLevel?.copy(
+            fraction = normalized,
+            isMuted = false,
+        ) ?: systemLevel
+    }
+}

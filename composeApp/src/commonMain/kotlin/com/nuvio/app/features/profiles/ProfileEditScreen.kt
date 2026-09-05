@@ -45,15 +45,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
-import com.nuvio.app.core.ui.themePalette
+import com.nuvio.app.core.ui.NuvioAsyncImage
+import com.nuvio.app.core.ui.ThemeColors
 import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.appTheme
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.ProfileBackgroundRepository
@@ -84,6 +85,7 @@ fun ProfileEditScreen(
     var avatarUrl by rememberSaveable { mutableStateOf(currentProfile?.avatarUrl.orEmpty()) }
     var selectedBackgroundId by rememberSaveable { mutableStateOf(currentProfile?.profileBackgroundId) }
     var selectedBackgroundUrl by rememberSaveable { mutableStateOf(currentProfile?.profileBackgroundUrl) }
+    var customBackgroundUrlInput by rememberSaveable { mutableStateOf(currentProfile?.profileBackgroundUrl.orEmpty()) }
     var usesPrimaryAddons by rememberSaveable { mutableStateOf(currentProfile?.usesPrimaryAddons ?: false) }
     var isSaving by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -111,6 +113,11 @@ fun ProfileEditScreen(
 
     val customAvatarUrl = remember(avatarUrl) { normalizedAvatarUrl(avatarUrl) }
     val avatarUrlIsInvalid = avatarUrl.isNotBlank() && customAvatarUrl == null
+    val customBackgroundUrl = remember(canChooseBackground, customBackgroundUrlInput) {
+        if (canChooseBackground) normalizedAvatarUrl(customBackgroundUrlInput) else null
+    }
+    val customBackgroundUrlIsInvalid =
+        canChooseBackground && customBackgroundUrlInput.isNotBlank() && customBackgroundUrl == null
     val selectedAvatarItem = remember(selectedAvatarId, avatars) {
         selectedAvatarId?.let { id -> avatars.find { it.id == id } }
     }
@@ -203,8 +210,50 @@ fun ProfileEditScreen(
                             onSelectionChange = { id, url ->
                                 selectedBackgroundId = id
                                 selectedBackgroundUrl = url
+                                customBackgroundUrlInput = ""
                             },
                         )
+                    }
+                }
+            }
+        }
+
+        if (canChooseBackground) {
+            item {
+                NuvioSurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = stringResource(Res.string.profile_custom_background_url),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = stringResource(Res.string.profile_custom_background_url_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        NuvioInputField(
+                            value = customBackgroundUrlInput,
+                            onValueChange = { value ->
+                                customBackgroundUrlInput = value
+                                val normalized = normalizedAvatarUrl(value)
+                                if (normalized != null) {
+                                    selectedBackgroundId = null
+                                    selectedBackgroundUrl = normalized
+                                } else if (value.isBlank()) {
+                                    selectedBackgroundId = null
+                                    selectedBackgroundUrl = null
+                                }
+                            },
+                            placeholder = stringResource(Res.string.profile_custom_background_url_placeholder),
+                        )
+                        if (customBackgroundUrlIsInvalid) {
+                            Text(
+                                text = stringResource(Res.string.profile_background_url_invalid),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
@@ -304,33 +353,36 @@ fun ProfileEditScreen(
                 } else {
                     stringResource(Res.string.collections_editor_save_changes)
                 },
-                enabled = name.isNotBlank() && !avatarUrlIsInvalid && !isSaving,
+                enabled = name.isNotBlank() && !avatarUrlIsInvalid && !customBackgroundUrlIsInvalid && !isSaving,
                 onClick = {
                     isSaving = true
                     scope.launch {
-                        val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
-                        if (isNew) {
-                            ProfileRepository.createProfile(
-                                name = name,
-                                avatarColorHex = avatarColorHex,
-                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
-                                avatarUrl = customAvatarUrl,
-                                usesPrimaryAddons = usesPrimaryAddons,
-                            )
-                        } else {
-                            ProfileRepository.updateProfile(
-                                profileIndex = currentProfile!!.profileIndex,
-                                name = name,
-                                avatarColorHex = avatarColorHex,
-                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
-                                avatarUrl = customAvatarUrl,
-                                profileBackgroundId = selectedBackgroundId,
-                                profileBackgroundUrl = selectedBackgroundUrl,
-                                usesPrimaryAddons = usesPrimaryAddons,
-                            )
+                        try {
+                            val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
+                            if (isNew) {
+                                ProfileRepository.createProfile(
+                                    name = name,
+                                    avatarColorHex = avatarColorHex,
+                                    avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                    avatarUrl = customAvatarUrl,
+                                    usesPrimaryAddons = usesPrimaryAddons,
+                                )
+                            } else {
+                                ProfileRepository.updateProfile(
+                                    profileIndex = currentProfile!!.profileIndex,
+                                    name = name,
+                                    avatarColorHex = avatarColorHex,
+                                    avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                    avatarUrl = customAvatarUrl,
+                                    profileBackgroundId = selectedBackgroundId,
+                                    profileBackgroundUrl = selectedBackgroundUrl,
+                                    usesPrimaryAddons = usesPrimaryAddons,
+                                )
+                            }
+                            onSaved()
+                        } finally {
+                            isSaving = false
                         }
-                        isSaving = false
-                        onSaved()
                     }
                 },
             )
@@ -447,19 +499,24 @@ private fun ProfileIdentityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (customAvatarUrl != null) {
-                        AsyncImage(
-                            model = customAvatarUrl,
+                        NuvioAsyncImage(
+                            imageUrl = customAvatarUrl,
                             contentDescription = name,
-                            modifier = Modifier.size(88.dp).clip(CircleShape),
+                            modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
+                            animateIfPossible = true,
                         )
                     } else if (selectedAvatar != null) {
-                        AsyncImage(
-                            model = avatarImageUrl(selectedAvatar),
-                            contentDescription = selectedAvatar.displayName,
-                            modifier = Modifier.size(88.dp).clip(CircleShape),
-                            contentScale = ContentScale.Crop,
-                        )
+                        val selectedAvatarImageUrl = avatarImageUrl(selectedAvatar)
+                        if (selectedAvatarImageUrl != null) {
+                            NuvioAsyncImage(
+                                imageUrl = selectedAvatarImageUrl,
+                                contentDescription = selectedAvatar.displayName,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                animateIfPossible = true,
+                            )
+                        }
                     } else if (name.isNotBlank()) {
                         Text(
                             text = name.take(1).uppercase(),
@@ -546,7 +603,7 @@ private fun AvatarChoiceItem(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val palette = MaterialTheme.themePalette
+    val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
     Box(
         modifier = Modifier
             .size(size)
@@ -563,12 +620,16 @@ private fun AvatarChoiceItem(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = avatarImageUrl(avatar),
-            contentDescription = avatar.displayName,
-            modifier = Modifier.fillMaxSize().clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        val avatarImageUrl = avatarImageUrl(avatar)
+        if (avatarImageUrl != null) {
+            NuvioAsyncImage(
+                imageUrl = avatarImageUrl,
+                contentDescription = avatar.displayName,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                animateIfPossible = true,
+            )
+        }
 
         if (isSelected) {
             Box(

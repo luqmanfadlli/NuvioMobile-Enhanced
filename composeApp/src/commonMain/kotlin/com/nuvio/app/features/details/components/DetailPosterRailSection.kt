@@ -30,6 +30,7 @@ fun DetailPosterRailSection(
     headerHorizontalPadding: Dp = 0.dp,
     horizontalScrollPadding: Dp = 0.dp,
     sourceLabel: String? = null,
+    onViewAllClick: (() -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
@@ -44,6 +45,7 @@ fun DetailPosterRailSection(
                 horizontal = headerHorizontalPadding + horizontalScrollPadding,
             ),
             rowModifier = Modifier.nuvioHorizontalScrollBleed(horizontalScrollPadding),
+            onViewAllClick = onViewAllClick.takeIf { showHeader },
             key = { item -> item.stableKey() },
         ) { item ->
             HomePosterCard(

@@ -31,8 +31,11 @@ data class HomeCatalogSettingsItem(
         get() = customTitle.ifBlank { defaultTitle }
 }
 
-data class HomeCatalogSettingsUiState(
+internal data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
+    val heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
+    val heroTrailerPlaybackEnabled: Boolean = false,
+    val heroTrailerStartDelaySeconds: Int = HomeCatalogSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
@@ -40,6 +43,12 @@ data class HomeCatalogSettingsUiState(
     val signature: String
         get() = buildString {
             append(heroEnabled)
+            append('|')
+            append(heroStyle.storageValue)
+            append('|')
+            append(heroTrailerPlaybackEnabled)
+            append('|')
+            append(heroTrailerStartDelaySeconds)
             append('|')
             append(showCatalogType)
             append('|')
@@ -53,6 +62,40 @@ data class HomeCatalogSettingsUiState(
         }
 }
 
+/**
+ * Not a user setting: the hero derives this from the layout (portrait -> poster,
+ * landscape/tablet -> backdrop). See heroUsesWideArtwork in HomeHeroSection.
+ */
+internal enum class HomeHeroArtworkSource(
+    val storageValue: String,
+) {
+    BACKDROP("backdrop"),
+    POSTER("poster"),
+    ;
+
+    companion object {
+        fun fromStorageValue(value: String?): HomeHeroArtworkSource =
+            entries.firstOrNull { it.storageValue == value } ?: BACKDROP
+    }
+}
+
+/**
+ * Full-bleed keeps the original edge-to-edge hero. Card renders the artwork inside a rounded
+ * TMDB-poster-ratio card inset from the screen edges, below the status bar.
+ */
+internal enum class HomeHeroStyle(
+    val storageValue: String,
+) {
+    FULL_BLEED("full_bleed"),
+    CARD("card"),
+    ;
+
+    companion object {
+        fun fromStorageValue(value: String?): HomeHeroStyle =
+            entries.firstOrNull { it.storageValue == value } ?: FULL_BLEED
+    }
+}
+
 internal data class HomeCatalogPreference(
     val customTitle: String,
     val enabled: Boolean,
@@ -62,6 +105,7 @@ internal data class HomeCatalogPreference(
 
 internal data class HomeCatalogSettingsSnapshot(
     val heroEnabled: Boolean,
+    val heroStyle: HomeHeroStyle,
     val showCatalogType: Boolean,
     val hideUnreleasedContent: Boolean,
     val preferences: Map<String, HomeCatalogPreference>,
@@ -79,6 +123,9 @@ private data class StoredHomeCatalogPreference(
 @Serializable
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
+    val heroStyle: String = HomeHeroStyle.FULL_BLEED.storageValue,
+    val heroTrailerPlaybackEnabled: Boolean = false,
+    val heroTrailerStartDelaySeconds: Int = HomeCatalogSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
@@ -87,13 +134,18 @@ private data class StoredHomeCatalogSettingsPayload(
 object HomeCatalogSettingsRepository {
     const val HERO_SOURCE_SELECTION_LIMIT = 2
 
+    /** Bounds for the "start hero trailer after N seconds" preference. */
+    const val MIN_HERO_TRAILER_START_DELAY_SECONDS = 0
+    const val MAX_HERO_TRAILER_START_DELAY_SECONDS = 10
+    const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 0
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
     private val _uiState = MutableStateFlow(HomeCatalogSettingsUiState())
-    val uiState: StateFlow<HomeCatalogSettingsUiState> = _uiState.asStateFlow()
+    internal val uiState: StateFlow<HomeCatalogSettingsUiState> = _uiState.asStateFlow()
 
     private var hasLoaded = false
     private var definitions: List<HomeCatalogDefinition> = emptyList()
@@ -105,6 +157,9 @@ object HomeCatalogSettingsRepository {
             preferencesRef.value = value
         }
     private var heroEnabled = true
+    private var heroStyle = HomeHeroStyle.FULL_BLEED
+    private var heroTrailerPlaybackEnabled = false
+    private var heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
     private var showCatalogType = true
     private var hideUnreleasedContent = false
 
@@ -112,6 +167,9 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         preferences = emptyMap()
         heroEnabled = true
+        heroStyle = HomeHeroStyle.FULL_BLEED
+        heroTrailerPlaybackEnabled = false
+        heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         showCatalogType = true
         hideUnreleasedContent = false
         definitions = emptyList()
@@ -125,6 +183,9 @@ object HomeCatalogSettingsRepository {
         collectionDefinitions = emptyList()
         preferences = emptyMap()
         heroEnabled = true
+        heroStyle = HomeHeroStyle.FULL_BLEED
+        heroTrailerPlaybackEnabled = false
+        heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         showCatalogType = true
         hideUnreleasedContent = false
         _uiState.value = HomeCatalogSettingsUiState()
@@ -158,6 +219,7 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(
             heroEnabled = heroEnabled,
+            heroStyle = heroStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             preferences = preferences.mapValues { (_, value) ->
@@ -177,6 +239,40 @@ object HomeCatalogSettingsRepository {
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
+    }
+
+    internal fun setHeroStyle(style: HomeHeroStyle) {
+        ensureLoaded()
+        if (heroStyle == style) return
+        heroStyle = style
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    fun setHeroTrailerPlaybackEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (heroTrailerPlaybackEnabled == enabled) return
+        heroTrailerPlaybackEnabled = enabled
+        publish()
+        persist()
+    }
+
+    /**
+     * How long the hero waits, after an item becomes the active page, before its trailer starts.
+     * Clamped to [MIN_HERO_TRAILER_START_DELAY_SECONDS]..[MAX_HERO_TRAILER_START_DELAY_SECONDS].
+     */
+    fun setHeroTrailerStartDelaySeconds(seconds: Int) {
+        ensureLoaded()
+        val clamped = seconds.coerceIn(
+            MIN_HERO_TRAILER_START_DELAY_SECONDS,
+            MAX_HERO_TRAILER_START_DELAY_SECONDS,
+        )
+        if (heroTrailerStartDelaySeconds == clamped) return
+        heroTrailerStartDelaySeconds = clamped
+        publish()
+        persist()
     }
 
     fun setShowCatalogType(enabled: Boolean) {
@@ -226,6 +322,9 @@ object HomeCatalogSettingsRepository {
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
+        heroStyle = HomeHeroStyle.FULL_BLEED
+        heroTrailerPlaybackEnabled = false
+        heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         showCatalogType = true
         hideUnreleasedContent = false
         preferences = emptyMap()
@@ -277,6 +376,12 @@ object HomeCatalogSettingsRepository {
 
         if (parsedPayload != null) {
             heroEnabled = parsedPayload.heroEnabled
+            heroStyle = HomeHeroStyle.fromStorageValue(parsedPayload.heroStyle)
+            heroTrailerPlaybackEnabled = parsedPayload.heroTrailerPlaybackEnabled
+            heroTrailerStartDelaySeconds = parsedPayload.heroTrailerStartDelaySeconds.coerceIn(
+                MIN_HERO_TRAILER_START_DELAY_SECONDS,
+                MAX_HERO_TRAILER_START_DELAY_SECONDS,
+            )
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             preferences = parsedPayload.items.associateBy { it.key }
@@ -377,6 +482,9 @@ object HomeCatalogSettingsRepository {
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
+            heroStyle = heroStyle,
+            heroTrailerPlaybackEnabled = heroTrailerPlaybackEnabled,
+            heroTrailerStartDelaySeconds = heroTrailerStartDelaySeconds,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
@@ -388,6 +496,9 @@ object HomeCatalogSettingsRepository {
             json.encodeToString(
                 StoredHomeCatalogSettingsPayload(
                     heroEnabled = heroEnabled,
+                    heroStyle = heroStyle.storageValue,
+                    heroTrailerPlaybackEnabled = heroTrailerPlaybackEnabled,
+                    heroTrailerStartDelaySeconds = heroTrailerStartDelaySeconds,
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
                     items = preferences.values.sortedBy { it.order },

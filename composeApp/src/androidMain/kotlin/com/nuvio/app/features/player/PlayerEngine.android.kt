@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -44,16 +43,23 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TransferListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.ForwardingRenderer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -65,6 +71,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.CaptionStyleCompat
 import com.nuvio.app.R
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.streams.normalizeStreamType
 import `is`.xyz.mpv.BaseMPVView
 import `is`.xyz.mpv.MPV
@@ -81,8 +88,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -132,6 +144,15 @@ actual fun PlatformPlayerSurface(
         mutableStateOf(playerSettings.androidPlaybackEngine.initialAndroidEngine())
     }
 
+    LaunchedEffect(activeEngine, playerSourceKey, playerSettings.androidPlaybackEngine) {
+        InAppLogger.info(
+            "Player/Android",
+            "engine=$activeEngine configured=${playerSettings.androidPlaybackEngine} url=${InAppLogger.redactUrl(sourceUrl)} " +
+                "audio=${!sourceAudioUrl.isNullOrBlank()} subtitles=${externalSubtitles.size} " +
+                "streamType=${normalizeStreamType(streamType) ?: "unknown"}",
+        )
+    }
+
     when (activeEngine) {
         ResolvedAndroidPlaybackEngine.ExoPlayer -> ExoPlayerSurface(
             sourceUrl = sourceUrl,
@@ -153,6 +174,7 @@ actual fun PlatformPlayerSurface(
             onError = { message ->
                 if (message != null && playerSettings.androidPlaybackEngine == AndroidPlaybackEngine.Auto) {
                     Log.w(TAG, "ExoPlayer failed; falling back to libmpv: $message")
+                    InAppLogger.warn("Player/Android", "ExoPlayer failed; falling back to libmpv: $message")
                     initialPositionRequestKey?.let { key ->
                         onInitialPositionHandled(key, false)
                     }
@@ -267,12 +289,13 @@ private fun ExoPlayerSurface(
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
+    var initializedVideoDecoderName by remember(playerSourceKey) { mutableStateOf<String?>(null) }
+    var initializedAudioDecoderName by remember(playerSourceKey) { mutableStateOf<String?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
+    val volumeBoostAudioProcessor = remember(playerSourceKey) { VolumeBoostAudioProcessor() }
 
-    var resolvedMediaItem by remember(playerSourceKey, externalSubtitles) { mutableStateOf<MediaItem?>(null) }
-
-    LaunchedEffect(playerSourceKey, externalSubtitles) {
-        val subtitleConfigs = externalSubtitles.map { subtitle ->
+    val initialMediaItem = remember(playerSourceKey, externalSubtitles) {
+        val subtitleConfigs = externalSubtitles.mapNotNull { subtitle ->
             val mimeType = resolveSubtitleMimeType(subtitle.url, subtitle.headers)
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
                 .setMimeType(mimeType)
@@ -281,7 +304,7 @@ private fun ExoPlayerSurface(
                 .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
                 .build()
         }
-        resolvedMediaItem = playbackMediaItemFromUrl(
+        playbackMediaItemFromUrl(
             url = sourceUrl,
             responseHeaders = sanitizedSourceResponseHeaders,
             streamType = normalizedStreamType,
@@ -294,6 +317,8 @@ private fun ExoPlayerSurface(
             }
             .build()
     }
+
+    var resolvedMediaItem by remember(playerSourceKey) { mutableStateOf(initialMediaItem) }
     var probeAttempted by remember(playerSourceKey) { mutableStateOf(false) }
 
     val extractorsFactory = remember {
@@ -316,6 +341,16 @@ private fun ExoPlayerSurface(
             useYoutubeChunkedPlayback = useYoutubeChunkedPlayback,
             useLongReadTimeout = isLoopbackPlaybackSource(sourceUrl),
             externalSubtitles = externalSubtitles,
+        )
+    }
+
+    LaunchedEffect(playerSourceKey) {
+        InAppLogger.info(
+            "ExoPlayer/Android",
+            "prepare source url=${InAppLogger.redactUrl(sourceUrl)} audio=${!sourceAudioUrl.isNullOrBlank()} " +
+                "subtitles=${externalSubtitles.size} requestHeaders=${InAppLogger.headerKeys(sanitizedSourceHeaders)} " +
+                "responseHeaderOverrides=${InAppLogger.headerKeys(sanitizedSourceResponseHeaders)} " +
+                "streamType=${normalizedStreamType ?: "unknown"} youtubeChunked=$useYoutubeChunkedPlayback",
         )
     }
 
@@ -354,6 +389,7 @@ private fun ExoPlayerSurface(
                 latestExternalSubtitleMimeType.value == MimeTypes.TEXT_VTT
             },
             shouldStripSdhProvider = { currentSubtitleStyle.stripSdh },
+            volumeBoostAudioProcessor = volumeBoostAudioProcessor,
             videoBoundsFractionProvider = {
                 playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
             },
@@ -399,6 +435,13 @@ private fun ExoPlayerSurface(
                 5_000
             )
             .build()
+
+        InAppLogger.info(
+            "ExoPlayer/Android",
+            "Initializing ExoPlayer decoderPriority=${effectiveDecoderPriority.decoderPriorityName()} " +
+                "decoderFallback=true tunneling=${playerSettings.tunnelingEnabled} libass=$useLibass " +
+                "libassRenderType=$libassRenderType mapDV7ToHevc=${playerSettings.mapDV7ToHevc}",
+        )
 
         val player = if (useLibass) {
             ExoPlayer.Builder(context)
@@ -453,7 +496,7 @@ private fun ExoPlayerSurface(
     }
 
     fun dispatchExoPlayerSnapshot() {
-        val snapshot = exoPlayer.snapshot()
+        val snapshot = exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName)
         latestOnSnapshot.value(snapshot)
         nowPlayingController.syncPlayback(snapshot)
     }
@@ -464,6 +507,11 @@ private fun ExoPlayerSurface(
 
     LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey) {
         val mediaItem = resolvedMediaItem ?: return@LaunchedEffect
+        InAppLogger.info(
+            "ExoPlayer/Android",
+            "load mediaItem uri=${InAppLogger.redactUrl(mediaItem.localConfiguration?.uri?.toString() ?: sourceUrl)} " +
+                "mime=${mediaItem.localConfiguration?.mimeType ?: "unknown"} startPositionMs=${fallbackStartPositionMs ?: 0L}",
+        )
         val requestedStartPositionMs = fallbackStartPositionMs
             ?: initialPositionMs?.takeIf { it > 0L }
         playbackDiagnostics.attempt += 1
@@ -476,6 +524,7 @@ private fun ExoPlayerSurface(
                 "startPositionMs=${requestedStartPositionMs ?: 0L}",
         )
         exoPlayer.setPlaybackMediaItem(mediaItem, requestedStartPositionMs)
+        exoPlayer.prepare()
         if (fallbackStartPositionMs == null) {
             initialPositionRequestKey?.let { key ->
                 latestOnInitialPositionHandled.value(
@@ -484,7 +533,6 @@ private fun ExoPlayerSurface(
                 )
             }
         }
-        exoPlayer.prepare()
     }
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
@@ -516,16 +564,6 @@ private fun ExoPlayerSurface(
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             exoPlayer.pause()
         }
-        PlayerPictureInPictureManager.registerTogglePlaybackCallback {
-            if (exoPlayer.isPlaying) {
-                exoPlayer.pause()
-            } else {
-                if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_ENDED) {
-                    exoPlayer.seekTo(0L)
-                }
-                exoPlayer.play()
-            }
-        }
 
         fun reportPlayerError(error: PlaybackException) {
             if (
@@ -538,17 +576,32 @@ private fun ExoPlayerSurface(
                     "Decoder failure (${error.errorCodeName}); retrying with app decoders",
                     error,
                 )
+                InAppLogger.warn(
+                    "ExoPlayer/Android",
+                    "Decoder failure ${error.errorCodeName}; retrying with preferred app decoders. " +
+                        "cause=${error.cause?.let(InAppLogger::throwableSummary) ?: InAppLogger.throwableSummary(error)}",
+                )
                 fallbackStartPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
                 decoderPriorityOverride = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                 latestOnError.value(null)
                 return
             }
+            InAppLogger.error(
+                "ExoPlayer/Android",
+                "Playback error code=${error.errorCodeName} message=${error.localizedMessage ?: error.message ?: "unknown"} " +
+                    "cause=${error.cause?.let(InAppLogger::throwableSummary) ?: "none"}",
+            )
             latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
         }
 
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
+                InAppLogger.error(
+                    "ExoPlayer/Android",
+                    "onPlayerError code=${error.errorCodeName} recoverableProbe=${!probeAttempted} " +
+                        "message=${error.localizedMessage ?: error.message ?: "unknown"}",
+                )
                 Log.e(
                     PLAYER_DIAGNOSTIC_TAG,
                     "error attempt=${playbackDiagnostics.attempt} " +
@@ -574,9 +627,29 @@ private fun ExoPlayerSurface(
                         }
                         if (probedMime != null) {
                             Log.d(TAG, "Playback failed with source error. Probed MIME type: $probedMime. Retrying...")
-                            resolvedMediaItem = resolvedMediaItem?.buildUpon()
-                                ?.setMimeType(probedMime)
-                                ?.build()
+                            InAppLogger.warn(
+                                "ExoPlayer/Android",
+                                "Source error recovered by MIME probe mime=$probedMime url=${InAppLogger.redactUrl(sourceUrl)}",
+                            )
+                            resolvedMediaItem = MediaItem.Builder()
+                                .setUri(sourceUrl)
+                                .setMimeType(probedMime)
+                                .setMediaId(sourceUrl)
+                                .apply {
+                                    val subtitleConfigs = externalSubtitles.mapNotNull { subtitle ->
+                                        val mimeType = resolveSubtitleMimeType(subtitle.url, subtitle.headers)
+                                        MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
+                                            .setMimeType(mimeType)
+                                            .setLanguage(subtitle.language)
+                                            .setLabel(subtitle.name ?: subtitle.language)
+                                            .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
+                                            .build()
+                                    }
+                                    if (subtitleConfigs.isNotEmpty()) {
+                                        setSubtitleConfigurations(subtitleConfigs)
+                                    }
+                                }
+                                .build()
                             latestOnError.value(null)
                             return@launch
                         }
@@ -597,6 +670,7 @@ private fun ExoPlayerSurface(
                     else -> "UNKNOWN($playbackState)"
                 }
                 Log.d(TAG, "onPlaybackStateChanged: $stateName")
+                InAppLogger.debug("ExoPlayer/Android", "state=$stateName playWhenReady=${exoPlayer.playWhenReady}")
                 Log.i(
                     PLAYER_DIAGNOSTIC_TAG,
                     "state=$stateName attempt=${playbackDiagnostics.attempt} " +
@@ -611,12 +685,14 @@ private fun ExoPlayerSurface(
                     fallbackStartPositionMs = null
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
+                    exoPlayer.logSelectedPlaybackDetails("STATE_READY")
                 }
                 syncPlayerViewKeepScreenOn()
                 dispatchExoPlayerSnapshot()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                InAppLogger.debug("ExoPlayer/Android", "isPlaying=$isPlaying")
                 Log.i(
                     PLAYER_DIAGNOSTIC_TAG,
                     "isPlaying=$isPlaying attempt=${playbackDiagnostics.attempt} " +
@@ -628,6 +704,12 @@ private fun ExoPlayerSurface(
             }
 
             override fun onRenderedFirstFrame() {
+                InAppLogger.info(
+                    "ExoPlayer/Android",
+                    "firstFrame attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                )
                 Log.i(
                     PLAYER_DIAGNOSTIC_TAG,
                     "firstFrame attempt=${playbackDiagnostics.attempt} " +
@@ -637,19 +719,26 @@ private fun ExoPlayerSurface(
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                InAppLogger.debug(
+                    "ExoPlayer/Android",
+                    "playbackSpeed=${playbackParameters.speed} pitch=${playbackParameters.pitch}",
+                )
                 dispatchExoPlayerSnapshot()
             }
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {
-                latestOnSnapshot.value(exoPlayer.snapshot())
+                InAppLogger.info("ExoPlayer/Android", "videoSize=${videoSize.toLogSummary()}")
                 if (videoSize.width > 0 && videoSize.height > 0) {
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
+                dispatchExoPlayerSnapshot()
             }
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 Log.d(TAG, "onTracksChanged: ${tracks.groups.size} groups total")
+                InAppLogger.info("ExoPlayer/Android", "tracksChanged groups=${tracks.groups.size}")
                 exoPlayer.logCurrentTracks("onTracksChanged")
+                exoPlayer.logSelectedPlaybackDetails("onTracksChanged")
                 pendingAudioTrackSelection.firstOrNull()?.let { selection ->
                     if (tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
                         pendingAudioTrackSelection.clear()
@@ -670,13 +759,77 @@ private fun ExoPlayerSurface(
                 }
                 dispatchExoPlayerSnapshot()
             }
-
         }
+
+        val analyticsListener = object : AnalyticsListener {
+            private var lastBandwidthLogUptimeMs = 0L
+
+            override fun onVideoDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                initializedVideoDecoderName = decoderName
+                InAppLogger.info(
+                    "ExoPlayer/Android",
+                    "videoDecoder=$decoderName acceleration=${decoderName.decoderAccelerationHint()} initMs=$initializationDurationMs",
+                )
+                dispatchExoPlayerSnapshot()
+            }
+
+            override fun onAudioDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                initializedAudioDecoderName = decoderName
+                InAppLogger.info(
+                    "ExoPlayer/Android",
+                    "audioDecoder=$decoderName acceleration=${decoderName.decoderAccelerationHint()} initMs=$initializationDurationMs",
+                )
+                dispatchExoPlayerSnapshot()
+            }
+
+            override fun onLoadError(
+                eventTime: AnalyticsListener.EventTime,
+                loadEventInfo: LoadEventInfo,
+                mediaLoadData: MediaLoadData,
+                error: IOException,
+                wasCanceled: Boolean,
+            ) {
+                InAppLogger.warn(
+                    "Network/Playback",
+                    "loadError url=${InAppLogger.redactUrl(loadEventInfo.uri.toString())} " +
+                        "type=${mediaLoadData.dataType} trackType=${mediaLoadData.trackType} canceled=$wasCanceled " +
+                        "error=${InAppLogger.throwableSummary(error)}",
+                )
+            }
+
+            override fun onBandwidthEstimate(
+                eventTime: AnalyticsListener.EventTime,
+                totalLoadTimeMs: Int,
+                totalBytesLoaded: Long,
+                bitrateEstimate: Long,
+            ) {
+                val now = SystemClock.uptimeMillis()
+                if (now - lastBandwidthLogUptimeMs < 5_000L) return
+                lastBandwidthLogUptimeMs = now
+                InAppLogger.debug(
+                    "Network/Playback",
+                    "bandwidth bitrate=${bitrateEstimate.formatBitrate()} " +
+                        "totalBytes=${totalBytesLoaded.formatBytes()} loadTimeMs=$totalLoadTimeMs",
+                )
+            }
+        }
+
         exoPlayer.addListener(listener)
+        exoPlayer.addAnalyticsListener(analyticsListener)
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
-            PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             exoPlayer.removeListener(listener)
+            exoPlayer.removeAnalyticsListener(analyticsListener)
             playerViewRef?.keepScreenOn = false
             subtitleSelectionJob?.cancel()
             sidecarController.stopSidecarAddonSubtitle(clearView = true)
@@ -687,13 +840,22 @@ private fun ExoPlayerSurface(
         val activity = context.findActivity()
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> exoPlayer.playWhenReady = latestPlayWhenReady.value
+                Lifecycle.Event.ON_START -> {
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "lifecycle ON_START restorePlayWhenReady=${latestPlayWhenReady.value}",
+                    )
+                    exoPlayer.playWhenReady = latestPlayWhenReady.value
+                }
                 Lifecycle.Event.ON_STOP -> {
                     val isInPictureInPicture =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
                     val isFinishing = activity?.isFinishing == true
-                    val hasActiveNowPlayingSession = nowPlayingController.isActive
-                    if ((!isInPictureInPicture && !hasActiveNowPlayingSession) || isFinishing) {
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "lifecycle ON_STOP pip=$isInPictureInPicture finishing=$isFinishing positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                    )
+                    if (!isInPictureInPicture || isFinishing) {
                         exoPlayer.pause()
                     }
                 }
@@ -703,8 +865,12 @@ private fun ExoPlayerSurface(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            InAppLogger.info(
+                "ExoPlayer/Android",
+                "release positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} durationMs=${exoPlayer.duration.coerceAtLeast(0L)}",
+            )
             playerViewRef?.releaseLibassOverlay()
-            exoPlayer.releaseWithAssSupportCompat()
+            exoPlayer.release()
         }
     }
 
@@ -718,28 +884,40 @@ private fun ExoPlayerSurface(
         onControllerReady(
             object : PlayerEngineController {
                 override fun play() {
+                    InAppLogger.debug("ExoPlayer/Android", "control play positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.playWhenReady = true
                     exoPlayer.play()
                 }
 
                 override fun pause() {
+                    InAppLogger.debug("ExoPlayer/Android", "control pause positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.pause()
                 }
 
                 override fun seekTo(positionMs: Long) {
-                    exoPlayer.seekTo(positionMs.coerceAtLeast(0L))
+                    val targetMs = positionMs.coerceAtLeast(0L)
+                    InAppLogger.info(
+                        "ExoPlayer/Android",
+                        "control seekTo fromMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} targetMs=$targetMs",
+                    )
+                    exoPlayer.seekTo(targetMs)
                 }
 
                 override fun seekBy(offsetMs: Long) {
-                    exoPlayer.seekTo((exoPlayer.currentPosition + offsetMs).coerceAtLeast(0L))
+                    val currentMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    val targetMs = (currentMs + offsetMs).coerceAtLeast(0L)
+                    InAppLogger.info("ExoPlayer/Android", "control seekBy offsetMs=$offsetMs fromMs=$currentMs targetMs=$targetMs")
+                    exoPlayer.seekTo(targetMs)
                 }
 
                 override fun retry() {
+                    InAppLogger.info("ExoPlayer/Android", "control retry positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
                 }
 
                 override fun setPlaybackSpeed(speed: Float) {
+                    InAppLogger.info("ExoPlayer/Android", "control speed=$speed")
                     exoPlayer.setPlaybackSpeed(speed)
                 }
 
@@ -751,11 +929,43 @@ private fun ExoPlayerSurface(
                     nowPlayingController.clear()
                 }
 
-                override fun getAudioTracks(): List<AudioTrack> =
-                    exoPlayer.extractAudioTracks(context)
+                override fun currentPlayerVolume(): PlayerAudioLevel {
+                    val current = volumeBoostAudioProcessor.gain.coerceIn(0f, 2f)
+                    return PlayerAudioLevel(
+                        fraction = current,
+                        isMuted = current <= 0.001f,
+                    )
+                }
+
+                override fun setPlayerVolume(level: Float): PlayerAudioLevel {
+                    val target = level.coerceIn(0f, 2f)
+                    InAppLogger.debug("ExoPlayer/Android", "control volume target=$target muted=${target <= 0.001f}")
+                    // Keep ExoPlayer's own volume at unity and apply gain in the PCM audio processor.
+                    // ExoPlayer#setVolume is effectively a normal 0..1 output volume control on many devices,
+                    // so values above 1 may not create audible amplification.
+                    exoPlayer.volume = 1f
+                    volumeBoostAudioProcessor.gain = target
+                    return PlayerAudioLevel(
+                        fraction = target,
+                        isMuted = target <= 0.001f,
+                    )
+                }
+
+                override fun getAudioTracks(): List<AudioTrack> {
+                    val tracks = exoPlayer.extractAudioTracks(context)
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "getAudioTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                    )
+                    return tracks
+                }
 
                 override fun getSubtitleTracks(): List<SubtitleTrack> {
                     val tracks = exoPlayer.extractSubtitleTracks(context)
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "getSubtitleTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                    )
                     Log.d(TAG, "getSubtitleTracks: found ${tracks.size} tracks")
                     tracks.forEach { t ->
                         Log.d(TAG, "  track idx=${t.index} id=${t.id} label='${t.label}' lang=${t.language} selected=${t.isSelected}")
@@ -764,6 +974,7 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun selectAudioTrack(index: Int) {
+                    InAppLogger.info("ExoPlayer/Android", "select audio track index=$index")
                     exoPlayer.selectTrackByIndex(C.TRACK_TYPE_AUDIO, index)
                 }
 
@@ -776,6 +987,7 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun selectSubtitleTrack(index: Int) {
+                    InAppLogger.info("ExoPlayer/Android", "select subtitle track index=$index")
                     Log.d(TAG, "selectSubtitleTrack: index=$index")
                     sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     if (index < 0) {
@@ -797,6 +1009,7 @@ private fun ExoPlayerSurface(
 
                 override fun setSubtitleUri(url: String) {
                     Log.d(TAG, "setSubtitleUri: url=$url")
+                    InAppLogger.info("ExoPlayer/Android", "set external subtitle url=${InAppLogger.redactUrl(url)}")
                     subtitleSelectionJob?.cancel()
                     if (sidecarController.canAttachAddonSubtitleViaSidecar(url, useLibass)) {
                         Log.d(TAG, "setSubtitleUri: using buffer-preserving sidecar for url=$url")
@@ -819,11 +1032,18 @@ private fun ExoPlayerSurface(
                         val wasPlaying = exoPlayer.isPlaying
                         val currentMediaItem = exoPlayer.currentMediaItem ?: run {
                             Log.e(TAG, "setSubtitleUri: currentMediaItem is null, aborting")
+                            InAppLogger.warn("ExoPlayer/Android", "set external subtitle aborted: currentMediaItem is null")
                             return@launch
                         }
                         preserveAudioSelectionForReload("setSubtitleUri")
-                        val resolvedMime = resolveSubtitleMimeType(url)
+                        val resolvedMime = withContext(Dispatchers.IO) {
+                            resolveSubtitleMimeType(url)
+                        }
                         selectedExternalSubtitleMimeType = resolvedMime
+                        InAppLogger.info(
+                            "ExoPlayer/Android",
+                            "external subtitle resolved mime=$resolvedMime positionMs=$currentPosition wasPlaying=$wasPlaying",
+                        )
                         Log.d(TAG, "setSubtitleUri: currentPosition=$currentPosition, wasPlaying=$wasPlaying")
                         val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(url))
                             .setMimeType(resolvedMime)
@@ -854,12 +1074,16 @@ private fun ExoPlayerSurface(
 
                 override fun clearExternalSubtitle() {
                     Log.d(TAG, "clearExternalSubtitle called")
+                    InAppLogger.info("ExoPlayer/Android", "clear external subtitle")
                     subtitleSelectionJob?.cancel()
                     sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     selectedExternalSubtitleMimeType = null
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
-                    val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    val currentMediaItem = exoPlayer.currentMediaItem ?: run {
+                        InAppLogger.warn("ExoPlayer/Android", "clear external subtitle aborted: currentMediaItem is null")
+                        return
+                    }
                     if (currentMediaItem.localConfiguration?.subtitleConfigurations?.isNotEmpty() == true) {
                         preserveAudioSelectionForReload("clearExternalSubtitle")
                         val newMediaItem = currentMediaItem.buildUpon()
@@ -876,12 +1100,16 @@ private fun ExoPlayerSurface(
 
                 override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
                     Log.d(TAG, "clearExternalSubtitleAndSelect: trackIndex=$trackIndex")
+                    InAppLogger.info("ExoPlayer/Android", "clear external subtitle and select builtInIndex=$trackIndex")
                     subtitleSelectionJob?.cancel()
                     sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     selectedExternalSubtitleMimeType = null
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
-                    val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    val currentMediaItem = exoPlayer.currentMediaItem ?: run {
+                        InAppLogger.warn("ExoPlayer/Android", "clear external subtitle/select aborted: currentMediaItem is null")
+                        return
+                    }
                     if (currentMediaItem.localConfiguration?.subtitleConfigurations?.isNotEmpty() == true) {
                         pendingSubtitleTrackIndex.clear()
                         pendingSubtitleTrackIndex.add(trackIndex)
@@ -900,6 +1128,10 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "apply subtitle style font=${style.fontSizeSp} bold=${style.bold} outline=${style.outlineEnabled}:${style.outlineWidth} bottom=${style.bottomOffset}",
+                    )
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style, pipSubtitleScale)
                 }
@@ -922,7 +1154,9 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
-                    subtitleDelayMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                    val targetMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                    InAppLogger.info("ExoPlayer/Android", "set subtitle delay ms=$targetMs")
+                    subtitleDelayMs = targetMs
                 }
             }
         )
@@ -1028,8 +1262,7 @@ private fun LibmpvPlayerSurface(
                     val isInPictureInPicture =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
                     val isFinishing = activity?.isFinishing == true
-                    val hasActiveNowPlayingSession = nowPlayingController?.isActive == true
-                    if ((!isInPictureInPicture && !hasActiveNowPlayingSession) || isFinishing) {
+                    if (!isInPictureInPicture || isFinishing) {
                         view.setPaused(true)
                     }
                 }
@@ -1073,16 +1306,25 @@ private fun LibmpvPlayerSurface(
                     dispatchSnapshot(updateKeepScreenOn = true)
                 }
             }
-            override fun eventProperty(property: String, value: String) = Unit
+            override fun eventProperty(property: String, value: String) {
+                if (property == "video-codec" || property == "audio-codec" || property == "hwdec-current") {
+                    InAppLogger.info("MPV/Android", "$property=$value")
+                }
+            }
             override fun eventProperty(property: String, value: Double) {
                 if (property == "duration" || property == "time-pos" || property == "speed") {
                     dispatchSnapshot()
                 }
             }
             override fun eventProperty(property: String, value: MPVNode) {
-                if (property == "track-list") {
-                    view.refreshTracks(context)
-                    dispatchSnapshot()
+                when (property) {
+                    "track-list" -> {
+                        InAppLogger.info("MPV/Android", "track-list updated")
+                        view.refreshTracks(context)
+                        dispatchSnapshot()
+                    }
+                    "video-params" -> InAppLogger.info("MPV/Android", "videoParams=${value.toMpvNodeSummary()}")
+                    "audio-params" -> InAppLogger.info("MPV/Android", "audioParams=${value.toMpvNodeSummary()}")
                 }
             }
             override fun event(eventId: Int, data: MPVNode) {
@@ -1103,6 +1345,10 @@ private fun LibmpvPlayerSurface(
                     MPV.mpvEvent.MPV_EVENT_FILE_LOADED,
                     MPV.mpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
                         coroutineScope.launch(Dispatchers.Main.immediate) {
+                            InAppLogger.info(
+                                "MPV/Android",
+                                "event=$eventId playback ready ${view.playbackDiagnosticsForLogs()}",
+                            )
                             latestOnError.value(null)
                             val snapshot = view.snapshot()
                             Log.i(
@@ -1128,6 +1374,7 @@ private fun LibmpvPlayerSurface(
                                     "durationMs=${snapshot.durationMs} eof=${snapshot.isEnded} " +
                                     "data=${diagnosticPlayerMessage(data.toJson())}",
                             )
+                            InAppLogger.info("MPV/Android", "event=end-file")
                             latestOnSnapshot.value(snapshot)
                             nowPlayingController?.syncPlayback(snapshot)
                             view.keepScreenOn = snapshot.isPlaying || snapshot.isLoading
@@ -1158,22 +1405,8 @@ private fun LibmpvPlayerSurface(
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             view.setPaused(true)
         }
-        PlayerPictureInPictureManager.registerTogglePlaybackCallback {
-            coroutineScope.launch {
-                val snapshot = view.snapshot()
-                if (snapshot.isPlaying) {
-                    view.setPaused(true)
-                } else {
-                    if (snapshot.isEnded) {
-                        view.seekToMs(0L)
-                    }
-                    view.setPaused(false)
-                }
-            }
-        }
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
-            PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             view.keepScreenOn = false
         }
     }
@@ -1244,6 +1477,7 @@ private fun LibmpvPlayerSurface(
                     initialize(viewContext.filesDir.path, viewContext.cacheDir.path)
                 }.onFailure { error ->
                     Log.e(TAG, "Failed to initialize libmpv", error)
+                    InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
                     latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
                 }
                 playerViewRef = this
@@ -1291,6 +1525,10 @@ private class NuvioLibmpvView(
     private var latestSubtitleTracks: List<LibmpvTrack> = emptyList()
 
     override fun initOptions() {
+        InAppLogger.info(
+            "MPV/Android",
+            "Initializing libmpv vo=${videoOutput.mpvValue} hwdec=${if (hardwareDecodingEnabled) "auto" else "no"} yuv420p=$yuv420pEnabled",
+        )
         setVo(videoOutput.mpvValue)
         mpv.setOptionString("profile", "fast")
         mpv.setOptionString("hwdec", if (hardwareDecodingEnabled) "auto" else "no")
@@ -1300,6 +1538,7 @@ private class NuvioLibmpvView(
         mpv.setOptionString("msg-level", "all=warn")
         mpv.setOptionString("tls-verify", "yes")
         mpv.setOptionString("tls-ca-file", "${context.filesDir.path}/cacert.pem")
+        mpv.setOptionString("demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]").logIfMpvError("demuxer-lavf-o")
         mpv.setOptionString("demuxer-max-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-bytes")
         mpv.setOptionString("demuxer-max-back-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-back-bytes")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
@@ -1322,7 +1561,16 @@ private class NuvioLibmpvView(
             "time-pos" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
             "demuxer-cache-time" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
             "speed" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
+            "video-params/w" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-params/h" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-out-params/w" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-out-params/h" to MPV.mpvFormat.MPV_FORMAT_INT64,
             "track-list" to MPV.mpvFormat.MPV_FORMAT_NODE,
+            "video-codec" to MPV.mpvFormat.MPV_FORMAT_STRING,
+            "audio-codec" to MPV.mpvFormat.MPV_FORMAT_STRING,
+            "hwdec-current" to MPV.mpvFormat.MPV_FORMAT_STRING,
+            "video-params" to MPV.mpvFormat.MPV_FORMAT_NODE,
+            "audio-params" to MPV.mpvFormat.MPV_FORMAT_NODE,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
@@ -1345,6 +1593,10 @@ private class NuvioLibmpvView(
             currentRequestHeaders = requestHeaders
             currentExternalSubtitles = externalSubtitles
             if (!sameSource) {
+                InAppLogger.info(
+                    "MPV/Android",
+                    "loadfile url=${sourceUrl.redactedPlaybackUrlForLogs()} audio=${!sourceAudioUrl.isNullOrBlank()} subtitles=${externalSubtitles.size} playWhenReady=$playWhenReady",
+                )
                 loadCurrentSourceNow(playWhenReady = playWhenReady)
             } else {
                 applyRequestHeadersNow(requestHeaders)
@@ -1428,7 +1680,162 @@ private class NuvioLibmpvView(
             playbackSpeed = (mpv.getPropertyDouble("speed") ?: 1.0).toFloat(),
             videoWidth = videoWidth,
             videoHeight = videoHeight,
+            mediaInfoJson = buildLibmpvMediaInfoJson(),
         )
+    }
+
+
+    private fun buildLibmpvMediaInfoJson(): String {
+        return try {
+            val nodes = mpv.getPropertyNode("track-list")?.asArray()?.toList().orEmpty()
+            var videoCodec = mpv.getPropertyString("video-codec").orEmpty()
+            var videoDecoder = ""
+            var dvProfile = ""
+            var codecProfile = ""
+            val filename = currentSourceUrl?.substringBefore('?')?.substringAfterLast('/').orEmpty()
+            val gamma = mpv.getPropertyString("video-params/gamma").orEmpty()
+            val primaries = mpv.getPropertyString("video-params/primaries").orEmpty()
+            val colorLevels = mpv.getPropertyString("video-params/colorlevels").orEmpty()
+            val pixelFormat = mpv.getPropertyString("video-out-params/pixelformat").orEmpty()
+            val videoWidth = mpv.getPropertyInt("video-params/w") ?: 0
+            val videoHeight = mpv.getPropertyInt("video-params/h") ?: 0
+            val fps = mpv.getPropertyDouble("container-fps") ?: 0.0
+            val hwdecCurrent = mpv.getPropertyString("hwdec-current").orEmpty()
+            var hdrFormat = ""
+
+            for (node in nodes) {
+                if (node.nodeString("type") == "video" && node.nodeBoolean("selected") != false) {
+                    videoCodec = node.nodeString("codec") ?: videoCodec
+                    videoDecoder = node.nodeString("decoder-desc").orEmpty()
+                    dvProfile = node.nodeString("dolby-vision-profile")
+                        ?: node.nodeString("dv_profile")
+                        ?: ""
+                    codecProfile = node.nodeString("codec-profile").orEmpty()
+                    val dvLower = dvProfile.lowercase()
+                    val isDolbyVision = dvProfile.isNotBlank() &&
+                        dvLower != "none" &&
+                        dvLower != "unknown" &&
+                        dvLower != "0" &&
+                        dvLower != "false"
+                    if (
+                        isDolbyVision ||
+                        videoCodec.contains("dovi", ignoreCase = true) ||
+                        videoCodec.contains("dvhe", ignoreCase = true) ||
+                        videoCodec.contains("dvh1", ignoreCase = true) ||
+                        videoDecoder.contains("dovi", ignoreCase = true) ||
+                        codecProfile.contains("dovi", ignoreCase = true)
+                    ) {
+                        hdrFormat = "dolby_vision"
+                    }
+                    break
+                }
+            }
+
+            if (hdrFormat.isEmpty()) {
+                hdrFormat = when {
+                    gamma.equals("hlg", ignoreCase = true) -> "hlg"
+                    gamma.equals("pq", ignoreCase = true) -> "hdr"
+                    primaries.equals("bt.2020", ignoreCase = true) ||
+                        primaries.equals("bt.2020nc", ignoreCase = true) -> "hdr"
+                    gamma.equals("sdr", ignoreCase = true) -> "sdr"
+                    else -> ""
+                }
+            }
+
+            var audioCodec = mpv.getPropertyString("audio-codec").orEmpty()
+            var audioDecoder = ""
+            var audioChannels = ""
+            var audioSampleRate = ""
+            var audioLang = ""
+            for (node in nodes) {
+                if (node.nodeString("type") == "audio" && node.nodeBoolean("selected") == true) {
+                    audioCodec = node.nodeString("codec") ?: audioCodec
+                    audioDecoder = node.nodeString("decoder-desc").orEmpty()
+                    val channelCount = node.nodeInt("demux-channel-count") ?: 0
+                    audioChannels = if (channelCount > 0) channelCount.toString() else ""
+                    val sampleRate = node.nodeInt("demux-samplerate") ?: 0
+                    audioSampleRate = if (sampleRate > 0) sampleRate.toString() else ""
+                    audioLang = node.nodeString("lang").orEmpty()
+                    break
+                }
+            }
+
+            val videoBitrate = mpv.getPropertyDouble("video-bitrate") ?: 0.0
+            val audioBitrate = mpv.getPropertyDouble("audio-bitrate") ?: 0.0
+            val videoBitrateKbps = if (videoBitrate.isFinite() && videoBitrate > 0) (videoBitrate / 1000.0).toInt() else 0
+            val audioBitrateKbps = if (audioBitrate.isFinite() && audioBitrate > 0) (audioBitrate / 1000.0).toInt() else 0
+
+            buildString {
+                append('{')
+                appendJsonString("engine", "libmpv")
+                append(',')
+                appendJsonString("filename", filename)
+                append(',')
+                appendJsonString("videoCodec", videoCodec)
+                append(',')
+                appendJsonString("videoDecoder", videoDecoder)
+                append(',')
+                appendJsonString("dvProfile", dvProfile)
+                append(',')
+                appendJsonString("codecProfile", codecProfile)
+                append(',')
+                appendJsonString("hdrFormat", hdrFormat)
+                append(',')
+                appendJsonString("gamma", gamma)
+                append(',')
+                appendJsonString("primaries", primaries)
+                append(',')
+                appendJsonString("colorLevels", colorLevels)
+                append(',')
+                appendJsonString("pixelFormat", pixelFormat)
+                append(',')
+                append("\"videoWidth\":").append(videoWidth).append(',')
+                append("\"videoHeight\":").append(videoHeight).append(',')
+                append("\"fps\":").append(if (fps.isFinite()) fps else 0.0).append(',')
+                appendJsonString("hwdecCurrent", hwdecCurrent)
+                append(',')
+                appendJsonString("audioCodec", audioCodec)
+                append(',')
+                appendJsonString("audioDecoder", audioDecoder)
+                append(',')
+                appendJsonString("audioChannels", audioChannels)
+                append(',')
+                appendJsonString("audioSampleRate", audioSampleRate)
+                append(',')
+                appendJsonString("audioLang", audioLang)
+                append(',')
+                append("\"videoBitrateKbps\":").append(videoBitrateKbps).append(',')
+                append("\"audioBitrateKbps\":").append(audioBitrateKbps)
+                append('}')
+            }
+        } catch (error: Throwable) {
+            InAppLogger.warn("MPV/Android", "Failed to build playback info: ${InAppLogger.throwableSummary(error)}")
+            "{}"
+        }
+    }
+
+    suspend fun playbackDiagnosticsForLogs(): String {
+        if (released.get()) return "released"
+        return withContext(mpvDispatcher) {
+            if (released.get()) {
+                "released"
+            } else {
+                runCatching {
+                    buildString {
+                        append("videoCodec=")
+                        append(mpv.getPropertyString("video-codec") ?: "unknown")
+                        append(" audioCodec=")
+                        append(mpv.getPropertyString("audio-codec") ?: "unknown")
+                        append(" hwdec=")
+                        append(mpv.getPropertyString("hwdec-current") ?: "unknown")
+                        append(" videoParams=")
+                        append(mpv.getPropertyNode("video-params")?.toMpvNodeSummary() ?: "unknown")
+                        append(" audioParams=")
+                        append(mpv.getPropertyNode("audio-params")?.toMpvNodeSummary() ?: "unknown")
+                    }
+                }.getOrDefault("unavailable")
+            }
+        }
     }
 
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
@@ -1461,22 +1868,36 @@ private class NuvioLibmpvView(
         nowPlayingController: AndroidPlayerNowPlayingController?,
     ): PlayerEngineController =
         object : PlayerEngineController {
-            override fun play() = setPaused(false)
+            override fun play() {
+                InAppLogger.debug("MPV/Android", "control play positionMs=${latestSnapshot.positionMs}")
+                setPaused(false)
+            }
 
-            override fun pause() = setPaused(true)
+            override fun pause() {
+                InAppLogger.debug("MPV/Android", "control pause positionMs=${latestSnapshot.positionMs}")
+                setPaused(true)
+            }
 
-            override fun seekTo(positionMs: Long) = this@NuvioLibmpvView.seekToMs(positionMs)
+            override fun seekTo(positionMs: Long) {
+                val targetMs = positionMs.coerceAtLeast(0L)
+                InAppLogger.info("MPV/Android", "control seekTo targetMs=$targetMs")
+                this@NuvioLibmpvView.seekToMs(targetMs)
+            }
 
-            override fun seekBy(offsetMs: Long) = this@NuvioLibmpvView.seekByMs(offsetMs)
+            override fun seekBy(offsetMs: Long) {
+                InAppLogger.info("MPV/Android", "control seekBy offsetMs=$offsetMs")
+                this@NuvioLibmpvView.seekByMs(offsetMs)
+            }
 
             override fun retry() {
+                InAppLogger.info("MPV/Android", "control retry url=${InAppLogger.redactUrl(currentSourceUrl)}")
                 executeMpv { loadCurrentSourceNow(playWhenReady = true) }
             }
 
             override fun setPlaybackSpeed(speed: Float) {
-                executeMpv {
-                    mpv.setPropertyDouble("speed", speed.coerceIn(0.25f, 4f).toDouble())
-                }
+                val target = speed.coerceIn(0.25f, 4f)
+                InAppLogger.info("MPV/Android", "control speed=$target")
+                executeMpv { mpv.setPropertyDouble("speed", target.toDouble()) }
             }
 
             override fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {
@@ -1488,11 +1909,12 @@ private class NuvioLibmpvView(
             }
 
             override fun setMuted(muted: Boolean) {
+                InAppLogger.debug("MPV/Android", "control muted=$muted")
                 executeMpv { mpv.setPropertyBoolean("mute", muted) }
             }
 
-            override fun getAudioTracks(): List<AudioTrack> =
-                latestAudioTracks.mapIndexed { index, track ->
+            override fun getAudioTracks(): List<AudioTrack> {
+                val tracks = latestAudioTracks.mapIndexed { index, track ->
                     AudioTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1501,9 +1923,15 @@ private class NuvioLibmpvView(
                         isSelected = track.isSelected,
                     )
                 }
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "getAudioTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                )
+                return tracks
+            }
 
-            override fun getSubtitleTracks(): List<SubtitleTrack> =
-                latestSubtitleTracks.mapIndexed { index, track ->
+            override fun getSubtitleTracks(): List<SubtitleTrack> {
+                val tracks = latestSubtitleTracks.mapIndexed { index, track ->
                     SubtitleTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1513,12 +1941,20 @@ private class NuvioLibmpvView(
                         isForced = track.isForced,
                     )
                 }
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "getSubtitleTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                )
+                return tracks
+            }
 
             override fun selectAudioTrack(index: Int) {
+                InAppLogger.info("MPV/Android", "select audio track index=$index")
                 if (index < 0) {
                     executeMpv { mpv.setPropertyString("aid", "no") }
                 } else {
                     latestAudioTracks.getOrNull(index)?.let { track ->
+                        InAppLogger.debug("MPV/Android", "select audio track mpvId=${track.id} label=${track.label}")
                         executeMpv { mpv.setPropertyInt("aid", track.id) }
                     }
                 }
@@ -1535,24 +1971,29 @@ private class NuvioLibmpvView(
             }
 
             override fun selectSubtitleTrack(index: Int) {
+                InAppLogger.info("MPV/Android", "select subtitle track index=$index")
                 if (index < 0) {
                     executeMpv { mpv.setPropertyString("sid", "no") }
                 } else {
                     latestSubtitleTracks.getOrNull(index)?.let { track ->
+                        InAppLogger.debug("MPV/Android", "select subtitle track mpvId=${track.id} label=${track.label}")
                         executeMpv { mpv.setPropertyInt("sid", track.id) }
                     }
                 }
             }
 
             override fun setSubtitleUri(url: String) {
+                InAppLogger.info("MPV/Android", "set external subtitle url=${InAppLogger.redactUrl(url)}")
                 executeMpv { mpv.command("sub-add", url, "select") }
             }
 
             override fun clearExternalSubtitle() {
+                InAppLogger.info("MPV/Android", "clear external subtitle")
                 executeMpv { mpv.setPropertyString("sid", "no") }
             }
 
             override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
+                InAppLogger.info("MPV/Android", "clear external subtitle and select builtInIndex=$trackIndex")
                 selectSubtitleTrack(trackIndex)
             }
 
@@ -1589,6 +2030,10 @@ private class NuvioLibmpvView(
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "apply subtitle style font=${style.fontSizeSp} bold=${style.bold} outline=${style.outlineEnabled}:${style.outlineWidth} bottom=${style.bottomOffset}",
+                )
                 executeMpv {
                     mpv.setPropertyString("sub-ass-override", "no")
                     mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
@@ -1607,11 +2052,10 @@ private class NuvioLibmpvView(
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
+                val targetMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                InAppLogger.info("MPV/Android", "set subtitle delay ms=$targetMs")
                 executeMpv {
-                    mpv.setPropertyDouble(
-                        "sub-delay",
-                        delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS) / 1000.0,
-                    )
+                    mpv.setPropertyDouble("sub-delay", targetMs / 1000.0)
                 }
             }
         }
@@ -1649,12 +2093,19 @@ private class NuvioLibmpvView(
     private fun applyRequestHeadersNow(headers: Map<String, String>) {
         val userAgent = headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
         if (!userAgent.isNullOrBlank()) {
+            InAppLogger.debug("MPV/Android", "Applying User-Agent header")
             mpv.setPropertyString("user-agent", userAgent)
         }
         val serialized = headers
             .filterKeys { !it.equals("User-Agent", ignoreCase = true) }
             .map { (key, value) -> "${key}: ${value.replace(",", "\\,")}" }
             .joinToString(",")
+        if (headers.isNotEmpty()) {
+            InAppLogger.debug(
+                "MPV/Android",
+                "Applying request header keys=${InAppLogger.headerKeys(headers)}",
+            )
+        }
         mpv.setPropertyString("http-header-fields", serialized)
     }
 
@@ -1694,11 +2145,136 @@ private data class LibmpvTrack(
     val isForced: Boolean,
 )
 
+
+private fun ExoPlayer.logSelectedPlaybackDetails(context: String) {
+    val selectedVideo = selectedFormatFor(C.TRACK_TYPE_VIDEO)
+    val selectedAudio = selectedFormatFor(C.TRACK_TYPE_AUDIO)
+    val selectedText = selectedFormatFor(C.TRACK_TYPE_TEXT)
+
+    InAppLogger.info(
+        "ExoPlayer/Android",
+        "selectedTracks context=$context " +
+            "video=${selectedVideo?.toTrackLogSummary(C.TRACK_TYPE_VIDEO) ?: "none"} " +
+            "audio=${selectedAudio?.toTrackLogSummary(C.TRACK_TYPE_AUDIO) ?: "none"} " +
+            "subtitle=${selectedText?.toTrackLogSummary(C.TRACK_TYPE_TEXT) ?: "none"}",
+    )
+}
+
+private fun ExoPlayer.selectedFormatFor(trackType: Int): Format? =
+    currentTracks.groups.firstOrNull { group ->
+        group.type == trackType && group.isSelected && group.mediaTrackGroup.length > 0
+    }?.mediaTrackGroup?.getFormat(0)
+
+private fun Format.toTrackLogSummary(trackType: Int): String =
+    buildString {
+        append("mime=")
+        append(sampleMimeType ?: "unknown")
+        append(" codec=")
+        append(codecs ?: "unknown")
+        if (!id.isNullOrBlank()) append(" id=$id")
+        if (!label.isNullOrBlank()) append(" label=$label")
+        if (!language.isNullOrBlank()) append(" lang=$language")
+        when (trackType) {
+            C.TRACK_TYPE_VIDEO -> {
+                append(" resolution=")
+                append(if (width > 0 && height > 0) "${width}x$height" else "unknown")
+                if (frameRate > 0f) append(" fps=${frameRate.formatOneDecimal()}")
+                if (bitrate > 0) append(" bitrate=${bitrate.toLong().formatBitrate()}")
+                append(" dynamicRange=${dynamicRangeSummary()}")
+            }
+            C.TRACK_TYPE_AUDIO -> {
+                if (channelCount > 0) append(" channels=$channelCount")
+                if (sampleRate > 0) append(" sampleRate=${sampleRate}Hz")
+                if (bitrate > 0) append(" bitrate=${bitrate.toLong().formatBitrate()}")
+            }
+        }
+    }
+
+private fun Format.dynamicRangeSummary(): String {
+    val codecString = codecs.orEmpty().lowercase()
+    if (sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION || codecString.contains("dvhe") || codecString.contains("dvh1")) {
+        return "DolbyVision"
+    }
+    val info = colorInfo ?: return "unknown"
+    return when (info.colorTransfer) {
+        C.COLOR_TRANSFER_ST2084 -> {
+            if (codecString.contains("hdr10+")) "HDR10+" else "HDR10/PQ"
+        }
+        C.COLOR_TRANSFER_HLG -> "HLG"
+        C.COLOR_TRANSFER_SDR -> "SDR"
+        else -> "transfer=${info.colorTransfer} space=${info.colorSpace} range=${info.colorRange}"
+    }
+}
+
+private fun VideoSize.toLogSummary(): String =
+    buildString {
+        append(width)
+        append('x')
+        append(height)
+        if (unappliedRotationDegrees != 0) append(" rotation=$unappliedRotationDegrees")
+        if (pixelWidthHeightRatio != 1f) append(" pixelRatio=${pixelWidthHeightRatio.formatOneDecimal()}")
+    }
+
+private fun Int.decoderPriorityName(): String =
+    when (this) {
+        DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF -> "OFF"
+        DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON -> "ON"
+        DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER -> "PREFER"
+        else -> toString()
+    }
+
+private fun String.decoderAccelerationHint(): String {
+    val value = lowercase()
+    return when {
+        value.contains("omx.google") || value.contains("c2.android") || value.contains("ffmpeg") || value.contains("software") -> "software"
+        value.contains("omx.") || value.contains("c2.") || value.contains("mediacodec") -> "hardware"
+        else -> "unknown"
+    }
+}
+
+private fun Long.formatBitrate(): String =
+    when {
+        this <= 0L -> "unknown"
+        this >= 1_000_000L -> "${(this / 1_000_000.0).formatOneDecimal()}Mbps"
+        this >= 1_000L -> "${(this / 1_000.0).formatOneDecimal()}Kbps"
+        else -> "${this}bps"
+    }
+
+private fun Long.formatBytes(): String =
+    when {
+        this >= 1024L * 1024L -> "${(this / (1024.0 * 1024.0)).formatOneDecimal()}MiB"
+        this >= 1024L -> "${(this / 1024.0).formatOneDecimal()}KiB"
+        else -> "${this}B"
+    }
+
+private fun Float.formatOneDecimal(): String =
+    ((this * 10f).toInt() / 10f).toString()
+
+private fun Double.formatOneDecimal(): String =
+    ((this * 10.0).toInt() / 10.0).toString()
+
+private fun MPVNode.toMpvNodeSummary(): String =
+    runCatching { toString() }
+        .getOrElse { "<unavailable>" }
+        .let { if (it.length <= 240) it else it.take(240) + "…" }
+
 private fun libmpvCacheBytes(): Int =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) 64 * 1024 * 1024 else 32 * 1024 * 1024
 
 private fun Int.logIfMpvError(option: String) {
-    if (this < 0) Log.w(TAG, "libmpv option failed: $option status=$this")
+    if (this < 0) {
+        Log.w(TAG, "libmpv option failed: $option status=$this")
+        InAppLogger.warn("MPV/Android", "libmpv option failed: $option status=$this")
+    }
+}
+
+private fun String.redactedPlaybackUrlForLogs(maxLength: Int = 180): String {
+    val withoutQuery = substringBefore('?')
+    return if (withoutQuery.length <= maxLength) {
+        withoutQuery
+    } else {
+        withoutQuery.take(maxLength) + "…"
+    }
 }
 
 private fun Double?.toMillis(): Long =
@@ -1748,7 +2324,7 @@ private const val MPV_SUBTITLE_FONT_SIZE_MIN = 36
 private const val MPV_SUBTITLE_FONT_SIZE_MAX = 122
 private const val MPV_SUBTITLE_OUTLINE_SIZE_SCALE = 1.5
 
-private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot {
+private fun ExoPlayer.snapshot(videoDecoder: String?, audioDecoder: String?): PlayerPlaybackSnapshot {
     val (videoWidth, videoHeight) = videoDimensions()
     return PlayerPlaybackSnapshot(
         isLoading = playbackState == Player.STATE_IDLE || playbackState == Player.STATE_BUFFERING,
@@ -1760,6 +2336,7 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot {
         playbackSpeed = playbackParameters.speed,
         videoWidth = videoWidth,
         videoHeight = videoHeight,
+        mediaInfoJson = buildExoPlayerMediaInfoJson(videoDecoder, audioDecoder),
     )
 }
 
@@ -1773,6 +2350,172 @@ private fun ExoPlayer.videoDimensions(): Pair<Int, Int> {
     val ratio = format.pixelWidthHeightRatio
     return if (ratio != 1f) (baseWidth * ratio).roundToInt() to baseHeight else baseWidth to baseHeight
 }
+
+
+private fun ExoPlayer.buildExoPlayerMediaInfoJson(videoDecoder: String?, audioDecoder: String?): String {
+    return try {
+        val videoFormat = selectedPlaybackInfoFormat(C.TRACK_TYPE_VIDEO)
+        val audioFormat = selectedPlaybackInfoFormat(C.TRACK_TYPE_AUDIO)
+        val filename = currentMediaItem
+            ?.localConfiguration
+            ?.uri
+            ?.toString()
+            ?.substringBefore('?')
+            ?.substringAfterLast('/')
+            .orEmpty()
+
+        buildString {
+            append('{')
+            appendJsonString("engine", "ExoPlayer")
+            append(',')
+            appendJsonString("filename", filename)
+            append(',')
+
+            if (videoFormat != null) {
+                val videoCodec = videoFormat.codecs ?: videoFormat.sampleMimeType.orEmpty()
+                appendJsonString("videoCodec", videoCodec)
+                append(',')
+                append("\"videoWidth\":").append(videoFormat.width.coerceAtLeast(0)).append(',')
+                append("\"videoHeight\":").append(videoFormat.height.coerceAtLeast(0)).append(',')
+                append("\"fps\":").append(if (videoFormat.frameRate > 0f) videoFormat.frameRate else 0f).append(',')
+                append("\"videoBitrateKbps\":").append(if (videoFormat.bitrate > 0) videoFormat.bitrate / 1000 else 0).append(',')
+                appendJsonString("videoDecoder", videoDecoder.orEmpty())
+                append(',')
+                appendJsonString("hwdecCurrent", videoDecoder?.decoderAccelerationHint().orEmpty())
+                append(',')
+                appendJsonString("hdrFormat", videoFormat.hdrFormatForPlaybackInfo())
+                append(',')
+                appendJsonString("dvProfile", videoFormat.dolbyVisionProfileForPlaybackInfo())
+                append(',')
+                appendJsonString("codecProfile", videoFormat.sampleMimeType.orEmpty())
+                append(',')
+                appendJsonString("gamma", videoFormat.transferFunctionForPlaybackInfo())
+                append(',')
+                appendJsonString("primaries", videoFormat.colorPrimariesForPlaybackInfo())
+                append(',')
+                appendJsonString("pixelFormat", "")
+                append(',')
+            } else {
+                appendJsonString("videoCodec", "")
+                append(',')
+                append("\"videoWidth\":0,\"videoHeight\":0,\"fps\":0,\"videoBitrateKbps\":0,")
+                appendJsonString("videoDecoder", "")
+                append(',')
+                appendJsonString("hwdecCurrent", "")
+                append(',')
+                appendJsonString("hdrFormat", "")
+                append(',')
+                appendJsonString("dvProfile", "")
+                append(',')
+                appendJsonString("codecProfile", "")
+                append(',')
+                appendJsonString("gamma", "")
+                append(',')
+                appendJsonString("primaries", "")
+                append(',')
+                appendJsonString("pixelFormat", "")
+                append(',')
+            }
+
+            if (audioFormat != null) {
+                val audioCodec = audioFormat.codecs ?: audioFormat.sampleMimeType.orEmpty()
+                appendJsonString("audioCodec", audioCodec)
+                append(',')
+                appendJsonString("audioDecoder", audioDecoder.orEmpty())
+                append(',')
+                appendJsonString("audioChannels", audioFormat.channelCount.takeIf { it > 0 }?.toString().orEmpty())
+                append(',')
+                appendJsonString("audioSampleRate", audioFormat.sampleRate.takeIf { it > 0 }?.toString().orEmpty())
+                append(',')
+                appendJsonString("audioLang", audioFormat.language.orEmpty())
+                append(',')
+                append("\"audioBitrateKbps\":").append(if (audioFormat.bitrate > 0) audioFormat.bitrate / 1000 else 0)
+            } else {
+                appendJsonString("audioCodec", "")
+                append(',')
+                appendJsonString("audioDecoder", "")
+                append(',')
+                appendJsonString("audioChannels", "")
+                append(',')
+                appendJsonString("audioSampleRate", "")
+                append(',')
+                appendJsonString("audioLang", "")
+                append(',')
+                append("\"audioBitrateKbps\":0")
+            }
+            append('}')
+        }
+    } catch (error: Throwable) {
+        InAppLogger.warn("ExoPlayer/Android", "Failed to build playback info: ${InAppLogger.throwableSummary(error)}")
+        "{}"
+    }
+}
+
+private fun ExoPlayer.selectedPlaybackInfoFormat(trackType: Int): Format? {
+    for (group in currentTracks.groups) {
+        if (group.type != trackType || !group.isSelected) continue
+        for (index in 0 until group.length) {
+            if (group.isTrackSelected(index)) {
+                return group.mediaTrackGroup.getFormat(index)
+            }
+        }
+    }
+    return null
+}
+
+private fun Format.hdrFormatForPlaybackInfo(): String {
+    val codecString = codecs.orEmpty().lowercase()
+    if (sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION || codecString.contains("dvhe") || codecString.contains("dvh1")) {
+        return "dolby_vision"
+    }
+    val info = colorInfo ?: return ""
+    return when (info.colorTransfer) {
+        C.COLOR_TRANSFER_ST2084 -> if (codecString.contains("hdr10+")) "hdr10_plus" else "hdr"
+        C.COLOR_TRANSFER_HLG -> "hlg"
+        C.COLOR_TRANSFER_SDR -> "sdr"
+        else -> ""
+    }
+}
+
+private fun Format.dolbyVisionProfileForPlaybackInfo(): String {
+    val codecString = codecs.orEmpty().lowercase()
+    val prefix = when {
+        codecString.contains("dvhe") -> "dvhe"
+        codecString.contains("dvh1") -> "dvh1"
+        else -> return ""
+    }
+    val profile = codecString.substringAfter("$prefix.", missingDelimiterValue = "")
+        .substringBefore('.')
+        .takeIf { it.isNotBlank() }
+    return profile?.toIntOrNull()?.let { "Profile $it" } ?: profile.orEmpty()
+}
+
+private fun Format.transferFunctionForPlaybackInfo(): String =
+    when (colorInfo?.colorTransfer) {
+        C.COLOR_TRANSFER_ST2084 -> "pq"
+        C.COLOR_TRANSFER_HLG -> "hlg"
+        C.COLOR_TRANSFER_SDR -> "sdr"
+        else -> ""
+    }
+
+private fun Format.colorPrimariesForPlaybackInfo(): String =
+    when (colorInfo?.colorSpace) {
+        C.COLOR_SPACE_BT2020 -> "bt.2020"
+        C.COLOR_SPACE_BT709 -> "bt.709"
+        C.COLOR_SPACE_BT601 -> "bt.601"
+        else -> ""
+    }
+
+private fun StringBuilder.appendJsonString(key: String, value: String) {
+    append('"').append(key).append("\":\"").append(value.escapeJson()).append('"')
+}
+
+private fun String.escapeJson(): String =
+    replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
 
 private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =
     playerError == null &&
@@ -2104,7 +2847,10 @@ private fun ExoPlayer.selectTrackByPredicate(
 
 private fun ExoPlayer.logCurrentTracks(context: String) {
     Log.d(TAG, "--- logCurrentTracks ($context) ---")
-    Log.d(TAG, "  textDisabled=${trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)}")
+    val textDisabled = trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+    Log.d(TAG, "  textDisabled=$textDisabled")
+    InAppLogger.debug("ExoPlayer/Android", "tracks context=$context textDisabled=$textDisabled groups=${currentTracks.groups.size}")
+
     for (group in currentTracks.groups) {
         val typeName = when (group.type) {
             C.TRACK_TYPE_AUDIO -> "AUDIO"
@@ -2112,14 +2858,57 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
             C.TRACK_TYPE_VIDEO -> "VIDEO"
             else -> "OTHER(${group.type})"
         }
-        if (group.type != C.TRACK_TYPE_TEXT && group.type != C.TRACK_TYPE_AUDIO) continue
+        if (group.mediaTrackGroup.length <= 0) continue
         val format = group.mediaTrackGroup.getFormat(0)
-        Log.d(TAG, "  group type=$typeName id=${format.id} lang=${format.language} label=${format.label} selected=${group.isSelected} supported=${group.isSupported}")
+        val message = "group type=$typeName selected=${group.isSelected} supported=${group.isSupported} " +
+            format.toTrackLogSummary(group.type)
+        Log.d(TAG, "  $message")
+        if (group.type == C.TRACK_TYPE_VIDEO || group.type == C.TRACK_TYPE_AUDIO || group.type == C.TRACK_TYPE_TEXT) {
+            if (group.isSelected) {
+                InAppLogger.info("ExoPlayer/Android", message)
+            } else {
+                InAppLogger.debug("ExoPlayer/Android", message)
+            }
+        }
     }
     Log.d(TAG, "--- end logCurrentTracks ---")
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
+private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
+    @Volatile
+    var gain: Float = 1f
+        set(value) {
+            field = value.coerceIn(0f, 2f)
+        }
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        return if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
+            inputAudioFormat
+        } else {
+            AudioProcessor.AudioFormat.NOT_SET
+        }
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val inputSize = inputBuffer.remaining()
+        val outputBuffer = replaceOutputBuffer(inputSize).order(ByteOrder.nativeOrder())
+        val input = inputBuffer.order(ByteOrder.nativeOrder())
+        val localGain = gain
+
+        while (input.remaining() >= 2) {
+            val sample = input.short.toInt()
+            val amplified = (sample * localGain)
+                .toInt()
+                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+            outputBuffer.putShort(amplified.toShort())
+        }
+
+        input.position(input.limit())
+        outputBuffer.flip()
+    }
+}
+
 private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
     val subtitleView = this.subtitleView ?: return null
     val viewWidth = subtitleView.width.toFloat()
@@ -2163,8 +2952,21 @@ private class SubtitleOffsetRenderersFactory(
     private val subtitleDelayUsProvider: () -> Long,
     private val shouldNormalizeCuePositionProvider: () -> Boolean,
     private val shouldStripSdhProvider: () -> Boolean,
+    private val volumeBoostAudioProcessor: VolumeBoostAudioProcessor,
     private val videoBoundsFractionProvider: () -> RectF?,
 ) : DefaultRenderersFactory(context) {
+    override fun buildAudioSink(
+        context: Context,
+        enableFloatOutput: Boolean,
+        enableAudioTrackPlaybackParams: Boolean,
+    ): AudioSink? {
+        return DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(false)
+            .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+            .setAudioProcessors(arrayOf(volumeBoostAudioProcessor))
+            .build()
+    }
+
     override fun buildTextRenderers(
         context: Context,
         output: TextOutput,
@@ -2302,6 +3104,82 @@ private class SubtitleOffsetRenderer(
     override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
         val adjustedPositionUs = (positionUs - subtitleDelayUsProvider()).coerceAtLeast(0L)
         super.render(adjustedPositionUs, elapsedRealtimeUs)
+    }
+}
+
+private fun resolveSubtitleMimeType(url: String, headers: Map<String, String>? = null): String {
+    probeSubtitleHeaders(url, headers)?.let { (contentType, contentDisposition) ->
+        mapSubtitleMime(contentType)?.let { return it }
+        filenameFromContentDisposition(contentDisposition)?.let(::guessSubtitleMime)?.let { return it }
+    }
+    return guessSubtitleMime(url)
+}
+
+private fun probeSubtitleHeaders(url: String, headers: Map<String, String>? = null): Pair<String?, String?>? {
+    val methods = listOf("HEAD", "GET")
+    methods.forEach { method ->
+        runCatching {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 5_000
+                readTimeout = 5_000
+                instanceFollowRedirects = true
+                setRequestProperty("Accept", "*/*")
+                headers?.forEach { (key, value) ->
+                    setRequestProperty(key, value)
+                }
+            }
+            try {
+                connection.responseCode
+                connection.contentType to connection.getHeaderField("Content-Disposition")
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()?.let { return it }
+    }
+    return null
+}
+
+private fun mapSubtitleMime(contentType: String?): String? {
+    val normalized = contentType
+        ?.substringBefore(';')
+        ?.trim()
+        ?.lowercase()
+        ?: return null
+
+    return when (normalized) {
+        "application/x-subrip",
+        "application/srt",
+        "text/srt",
+        "text/plain" -> MimeTypes.APPLICATION_SUBRIP
+        "text/vtt",
+        "application/vtt" -> MimeTypes.TEXT_VTT
+        "text/x-ssa",
+        "text/ssa",
+        "text/ass",
+        "application/x-ssa" -> MimeTypes.TEXT_SSA
+        "application/ttml+xml",
+        "text/xml",
+        "application/xml" -> MimeTypes.APPLICATION_TTML
+        else -> null
+    }
+}
+
+private fun filenameFromContentDisposition(contentDisposition: String?): String? =
+    contentDisposition
+        ?.substringAfter("filename=", missingDelimiterValue = "")
+        ?.trim()
+        ?.trim('"')
+        ?.takeIf { it.isNotEmpty() }
+
+private fun guessSubtitleMime(url: String): String {
+    val lower = url.lowercase()
+    return when {
+        lower.contains(".srt") -> MimeTypes.APPLICATION_SUBRIP
+        lower.contains(".vtt") || lower.contains(".webvtt") -> MimeTypes.TEXT_VTT
+        lower.contains(".ass") || lower.contains(".ssa") -> MimeTypes.TEXT_SSA
+        lower.contains(".ttml") || lower.contains(".dfxp") || lower.contains(".xml") -> MimeTypes.APPLICATION_TTML
+        else -> MimeTypes.TEXT_VTT
     }
 }
 

@@ -25,6 +25,7 @@ import androidx.compose.ui.interop.UIKitViewController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.logging.InAppLogger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.delay
@@ -68,6 +69,8 @@ actual fun PlatformPlayerSurface(
     PlayerSettingsRepository.ensureLoaded()
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
+    val experimentalSinglePrimaryPictureInPictureEnabled =
+        IosExperimentalPictureInPictureSettingsStorage.loadSinglePrimaryRendererEnabled()
 
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
@@ -75,30 +78,41 @@ actual fun PlatformPlayerSurface(
 
     if (bridge == null) {
         LaunchedEffect(Unit) {
+            InAppLogger.error("Player/iOS", "MPV bridge unavailable")
             latestOnError.value(getString(Res.string.player_error_mpv_unavailable))
         }
         return
     }
 
+    bridge.setExperimentalSinglePrimaryPictureInPictureEnabled(experimentalSinglePrimaryPictureInPictureEnabled)
+
     val controller = remember(bridge) {
         object : PlayerEngineController {
             override fun play() {
+                InAppLogger.debug("Player/iOS", "control play positionMs=${bridge.getPositionMs()}")
                 bridge.play()
             }
 
             override fun pause() {
+                InAppLogger.debug("Player/iOS", "control pause positionMs=${bridge.getPositionMs()}")
                 bridge.pause()
             }
 
             override fun seekTo(positionMs: Long) {
-                bridge.seekTo(positionMs)
+                val targetMs = positionMs.coerceAtLeast(0L)
+                InAppLogger.info("Player/iOS", "control seekTo fromMs=${bridge.getPositionMs()} targetMs=$targetMs")
+                bridge.seekTo(targetMs)
             }
 
             override fun seekBy(offsetMs: Long) {
+                val currentMs = bridge.getPositionMs().coerceAtLeast(0L)
+                val targetMs = (currentMs + offsetMs).coerceAtLeast(0L)
+                InAppLogger.info("Player/iOS", "control seekBy offsetMs=$offsetMs fromMs=$currentMs targetMs=$targetMs")
                 bridge.seekBy(offsetMs)
             }
 
             override fun retry() {
+                InAppLogger.info("Player/iOS", "control retry positionMs=${bridge.getPositionMs()}")
                 bridge.retry()
             }
 
@@ -122,21 +136,47 @@ actual fun PlatformPlayerSurface(
                 }
             }
 
+            override fun isPictureInPictureSupported(): Boolean = bridge.isPictureInPictureSupported()
+
+            override fun startPictureInPicture() {
+                bridge.startPictureInPicture()
+            }
+
             override fun configureIosVideoOutput(settings: PlayerSettingsUiState) {
                 bridge.applyIosVideoOutputSettings(settings)
             }
 
             override fun setPlaybackSpeed(speed: Float) {
+                InAppLogger.info("Player/iOS", "control speed=$speed")
                 bridge.setPlaybackSpeed(speed)
             }
 
+            override fun currentPlayerVolume(): PlayerAudioLevel {
+                val current = bridge.getVolume().coerceIn(0f, 2f)
+                return PlayerAudioLevel(
+                    fraction = current,
+                    isMuted = current <= 0.001f,
+                )
+            }
+
+            override fun setPlayerVolume(level: Float): PlayerAudioLevel {
+                val target = level.coerceIn(0f, 2f)
+                InAppLogger.debug("Player/iOS", "control volume target=$target muted=${target <= 0.001f}")
+                bridge.setVolume(target)
+                return PlayerAudioLevel(
+                    fraction = target,
+                    isMuted = target <= 0.001f,
+                )
+            }
+
             override fun setMuted(muted: Boolean) {
+                InAppLogger.debug("Player/iOS", "control muted=$muted")
                 bridge.setMuted(muted)
             }
 
             override fun getAudioTracks(): List<AudioTrack> {
                 val count = bridge.getAudioTrackCount()
-                return (0 until count).map { i ->
+                val tracks = (0 until count).map { i ->
                     AudioTrack(
                         index = bridge.getAudioTrackIndex(i),
                         id = bridge.getAudioTrackId(i),
@@ -145,6 +185,11 @@ actual fun PlatformPlayerSurface(
                         isSelected = bridge.isAudioTrackSelected(i),
                     )
                 }
+                InAppLogger.debug(
+                    "Player/iOS",
+                    "getAudioTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                )
+                return tracks
             }
 
             override fun getSubtitleTracks(): List<SubtitleTrack> {
@@ -167,13 +212,18 @@ actual fun PlatformPlayerSurface(
                     )
                 }
                 Logger.d(TAG) { "getSubtitleTracks: found ${tracks.size} tracks" }
+                InAppLogger.debug("Player/iOS", "getSubtitleTracks count=${tracks.size}")
                 return tracks
             }
 
             override fun selectAudioTrack(index: Int) {
                 // Convert from logical track index to mpv track id
                 val count = bridge.getAudioTrackCount()
-                if (count <= 0) return
+                InAppLogger.info("Player/iOS", "select audio track index=$index available=$count")
+                if (count <= 0) {
+                    InAppLogger.warn("Player/iOS", "select audio track ignored: no audio tracks")
+                    return
+                }
 
                 val trackId = (0 until count)
                     .firstNotNullOfOrNull { at ->
@@ -190,7 +240,10 @@ actual fun PlatformPlayerSurface(
                     }
 
                 if (trackId != null) {
+                    InAppLogger.debug("Player/iOS", "select audio track mpvId=$trackId")
                     bridge.selectAudioTrack(trackId)
+                } else {
+                    InAppLogger.warn("Player/iOS", "select audio track failed to resolve index=$index")
                 }
             }
 
@@ -199,11 +252,15 @@ actual fun PlatformPlayerSurface(
             }
 
             override fun selectSubtitleTrack(index: Int) {
+                InAppLogger.info("Player/iOS", "select subtitle track index=$index")
                 if (index < 0) {
                     bridge.selectSubtitleTrack(-1) // disable
                 } else {
                     val count = bridge.getSubtitleTrackCount()
-                    if (count <= 0) return
+                    if (count <= 0) {
+                        InAppLogger.warn("Player/iOS", "select subtitle track ignored: no subtitle tracks")
+                        return
+                    }
 
                     val trackId = (0 until count)
                         .firstNotNullOfOrNull { at ->
@@ -220,21 +277,27 @@ actual fun PlatformPlayerSurface(
                         }
 
                     if (trackId != null) {
+                        InAppLogger.debug("Player/iOS", "select subtitle track mpvId=$trackId")
                         bridge.selectSubtitleTrack(trackId)
+                    } else {
+                        InAppLogger.warn("Player/iOS", "select subtitle track failed to resolve index=$index")
                     }
                 }
             }
 
             override fun setSubtitleUri(url: String) {
                 Logger.d(TAG) { "setSubtitleUri: $url" }
+                InAppLogger.info("Player/iOS", "setSubtitleUri url=${InAppLogger.redactUrl(url)}")
                 bridge.setSubtitleUrl(url)
             }
 
             override fun clearExternalSubtitle() {
+                InAppLogger.info("Player/iOS", "clear external subtitle")
                 bridge.clearExternalSubtitle()
             }
 
             override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
+                InAppLogger.info("Player/iOS", "clear external subtitle and select builtInIndex=$trackIndex")
                 val trackId = if (trackIndex < 0) {
                     -1
                 } else {
@@ -257,14 +320,21 @@ actual fun PlatformPlayerSurface(
                             }
                     }
                 }
+                InAppLogger.debug("Player/iOS", "clear external subtitle select mpvId=$trackId")
                 bridge.clearExternalSubtitleAndSelect(trackId)
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
-                bridge.setSubtitleDelayMs(delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS))
+                val targetMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                InAppLogger.info("Player/iOS", "set subtitle delay ms=$targetMs")
+                bridge.setSubtitleDelayMs(targetMs)
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
+                InAppLogger.debug(
+                    "Player/iOS",
+                    "apply subtitle style font=${style.fontSizeSp} bold=${style.bold} outline=${style.outlineEnabled}:${style.outlineWidth} bottom=${style.bottomOffset}",
+                )
                 bridge.applySubtitleStyle(
                     textColor = style.textColor.toMpvColorString(),
                     backgroundColor = style.backgroundColor.toMpvColorString(),
@@ -276,6 +346,21 @@ actual fun PlatformPlayerSurface(
                     stripSdh = style.stripSdh,
                 )
             }
+
+            override fun setKeyboardShortcutsEnabled(enabled: Boolean) {
+                bridge.setKeyboardShortcutsEnabled(enabled)
+            }
+
+            override fun setKeyboardShortcutHandler(handler: ((PlayerKeyboardShortcut) -> Unit)?) {
+                if (handler == null) {
+                    bridge.setKeyboardShortcutHandler(null)
+                    return
+                }
+                // The bridge speaks plain strings so the Swift side stays free of Kotlin enums.
+                bridge.setKeyboardShortcutHandler { code ->
+                    PlayerKeyboardShortcut.fromWireCode(code)?.let(handler)
+                }
+            }
         }
     }
 
@@ -285,6 +370,12 @@ actual fun PlatformPlayerSurface(
 
     // Load file and set initial state
     LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders, externalSubtitles) {
+        InAppLogger.info(
+            "Player/iOS",
+            "load mpv url=${InAppLogger.redactUrl(sourceUrl)} audio=${!sourceAudioUrl.isNullOrBlank()} " +
+                "subtitles=${externalSubtitles.size} headers=${InAppLogger.headerKeys(sanitizePlaybackHeaders(sourceHeaders))} " +
+                "hwdec=${latestPlayerSettings.value.iosHardwareDecoderMode.mpvValue} toneMapping=${latestPlayerSettings.value.iosToneMappingMode.mpvValue}",
+        )
         bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
         bridge.loadFileWithAudio(
             videoUrl = sourceUrl,
@@ -293,19 +384,23 @@ actual fun PlatformPlayerSurface(
             subtitlesJson = encodeExternalSubtitlesForBridge(externalSubtitles),
         )
         if (playWhenReady) {
+            InAppLogger.debug("Player/iOS", "initial play requested")
             bridge.play()
         } else {
+            InAppLogger.debug("Player/iOS", "initial pause requested")
             bridge.pause()
         }
     }
 
     // Update playWhenReady
     LaunchedEffect(bridge, playWhenReady) {
+        InAppLogger.debug("Player/iOS", "playWhenReady changed=$playWhenReady")
         if (playWhenReady) bridge.play() else bridge.pause()
     }
 
     // Update resize mode
     LaunchedEffect(bridge, resizeMode) {
+        InAppLogger.debug("Player/iOS", "resizeMode=$resizeMode")
         bridge.setResizeMode(
             when (resizeMode) {
                 PlayerResizeMode.Fit -> 0
@@ -331,11 +426,17 @@ actual fun PlatformPlayerSurface(
                 positionMs = bridge.getPositionMs(),
                 bufferedPositionMs = bridge.getBufferedMs(),
                 playbackSpeed = bridge.getPlaybackSpeed(),
+                videoWidth = bridge.getVideoWidth().coerceAtLeast(0),
+                videoHeight = bridge.getVideoHeight().coerceAtLeast(0),
+                mediaInfoJson = bridge.getMediaInfoJson(),
             )
             latestOnSnapshot.value(snapshot)
             val errorMessage = bridge.getErrorMessage().ifBlank { null }
             if (errorMessage != lastReportedError) {
                 lastReportedError = errorMessage
+                if (errorMessage != null) {
+                    InAppLogger.error("Player/iOS", "Bridge error=$errorMessage")
+                }
                 latestOnError.value(errorMessage)
             }
             delay(250L)
@@ -345,6 +446,7 @@ actual fun PlatformPlayerSurface(
     // Cleanup
     DisposableEffect(bridge) {
         onDispose {
+            InAppLogger.info("Player/iOS", "destroy bridge positionMs=${bridge.getPositionMs()} durationMs=${bridge.getDurationMs()}")
             bridge.destroy()
         }
     }
@@ -407,6 +509,13 @@ actual fun PlatformPlayerSurface(
 }
 
 private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettingsUiState) {
+    InAppLogger.debug(
+        "Player/iOS",
+        "videoOutput hwdec=${settings.iosHardwareDecoderMode.mpvValue} targetColorspaceHint=${settings.iosTargetColorspaceHintEnabled} " +
+            "toneMapping=${settings.iosToneMappingMode.mpvValue} hdrComputePeak=${settings.iosHdrComputePeakEnabled} " +
+            "targetPrimaries=${settings.iosTargetPrimaries.mpvValue} targetTransfer=${settings.iosTargetTransfer.mpvValue} " +
+            "extendedDynamicRange=${settings.iosExtendedDynamicRangeEnabled} audioOutput=${settings.iosAudioOutputMode.mpvValue}",
+    )
     configureAudioOutput(audioOutput = settings.iosAudioOutputMode.mpvValue)
     configureVideoOutput(
         hardwareDecoder = settings.iosHardwareDecoderMode.mpvValue,

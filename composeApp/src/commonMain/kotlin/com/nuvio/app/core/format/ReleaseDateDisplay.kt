@@ -19,6 +19,16 @@ fun formatReleaseDateForDisplay(raw: String): String {
     return "$year ${localizedMonthName(month)} $day"
 }
 
+internal fun resolveReleaseInfoForDisplay(
+    stored: String?,
+    hydrated: String?,
+    fallback: String,
+): String = formatReleaseDateForDisplay(
+    stored?.trim()?.takeIf { it.isNotBlank() }
+        ?: hydrated?.trim()?.takeIf { it.isNotBlank() }
+        ?: fallback,
+)
+
 fun formatReleaseDateWithoutYear(raw: String): String {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) return raw

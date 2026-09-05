@@ -348,8 +348,13 @@ object WatchProgressRepository {
             lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs
             deltaCursorEventId = storedPayload.deltaCursorEventId
             deltaInitialized = storedPayload.deltaInitialized
-            replaceLocalEntries(storedPayload.entries)
+            val liveTvEntries = storedPayload.entries.filter { it.isLiveTvEntry() }
+            replaceLocalEntries(storedPayload.entries.filterNot { it.isLiveTvEntry() })
             replaceDirtyProgressKeys(storedPayload.dirtyProgressKeys)
+            if (liveTvEntries.isNotEmpty()) {
+                persist()
+                pushDeleteToServer(liveTvEntries)
+            }
         } else {
             lastSuccessfulPushEpochMs = 0L
             deltaCursorEventId = 0L
@@ -719,7 +724,7 @@ object WatchProgressRepository {
     ) {
         val serverEntries = syncAdapter.pull(profileId = profileId)
         if (!isActiveOperation(profileId, operationGeneration)) return
-        log.d {
+        log.i {
             "Watch progress snapshot fetched ${serverEntries.size} entries for profile $profileId " +
                 "resetDeltaState=$resetDeltaState preserveLocalEntries=$preserveLocalEntries"
         }
@@ -1238,6 +1243,8 @@ object WatchProgressRepository {
         persist: Boolean,
         syncRemote: Boolean,
     ) {
+        if (session.isLiveTvSession()) return
+
         val targetProfileId = session.profileId
         val positionMs = snapshot.positionMs.coerceAtLeast(0L)
         val durationMs = snapshot.durationMs.coerceAtLeast(0L)
@@ -1546,11 +1553,13 @@ object WatchProgressRepository {
             nuvioEntries = localEntriesSnapshot(),
             providerEntries = providerEntries,
         )
-        return if (activeSource.providerId == null) {
+        val entries = if (activeSource.providerId == null) {
             projectedEntries
         } else {
             providerMetadataOverlay.project(source = activeSource, entries = projectedEntries)
         }
+
+        return entries.filterNot { it.isLiveTvEntry() }
     }
 
     private fun localEntriesSnapshot(): List<WatchProgressEntry> =
@@ -1730,3 +1739,15 @@ internal fun projectWatchProgressUiState(
     hasLoadedRemoteProgress =
         providerSnapshot?.hasLoadedRemoteProgress ?: hasLoadedNuvioRemoteProgress,
 )
+
+private fun WatchProgressPlaybackSession.isLiveTvSession(): Boolean =
+    contentType.equals("live", ignoreCase = true) ||
+        parentMetaType.equals("live", ignoreCase = true) ||
+        providerName.equals("Live TV", ignoreCase = true) ||
+        providerAddonId?.equals("live-tv", ignoreCase = true) == true
+
+private fun WatchProgressEntry.isLiveTvEntry(): Boolean =
+    contentType.equals("live", ignoreCase = true) ||
+        parentMetaType.equals("live", ignoreCase = true) ||
+        providerName?.equals("Live TV", ignoreCase = true) == true ||
+        providerAddonId?.equals("live-tv", ignoreCase = true) == true

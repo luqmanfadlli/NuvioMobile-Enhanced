@@ -24,6 +24,7 @@ internal data class PlayerSurfaceGestureCallbacks(
     val revealLockedOverlay: State<() -> Unit>,
     val isHoldToSpeedGestureActive: State<Boolean>,
     val touchGesturesEnabled: State<Boolean>,
+    val swipeToSeekEnabled: State<Boolean>,
     val playerControlsLocked: State<Boolean>,
     val currentPositionMs: State<Long>,
     val currentDurationMs: State<Long>,
@@ -66,6 +67,7 @@ internal fun PlayerScreenRuntime.lockPlayerControls() {
     showAudioModal = false
     showSubtitleModal = false
     showVideoSettingsModal = false
+    showStreamInfoModal = false
     showSourcesPanel = false
     showEpisodesPanel = false
     episodeStreamsPanelState = EpisodeStreamsPanelState()
@@ -134,7 +136,9 @@ internal fun PlayerScreenRuntime.showBrightnessFeedback(level: Float) {
 }
 
 internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
-    val percentage = (level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()
+    val normalized = level.fraction.coerceIn(0f, PlayerMaxVolumeBoost)
+    val percentage = (normalized * 100f).roundToInt()
+    val isBoosted = normalized > PlayerNormalVolumeCeiling
     showGestureFeedback(
         GestureFeedbackState(
             messageRes = if (level.isMuted) {
@@ -144,7 +148,8 @@ internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
             },
             messageArgs = if (level.isMuted) emptyList() else listOf("$percentage%"),
             icon = if (level.isMuted) GestureFeedbackIcon.VolumeMuted else GestureFeedbackIcon.Volume,
-            isDanger = level.isMuted,
+            // Reuse the existing alternate feedback color path to distinguish boosted volume.
+            isDanger = level.isMuted || isBoosted,
         ),
     )
 }
@@ -170,6 +175,24 @@ internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
     when {
         offsetMs > 0L -> showSeekFeedback(PlayerSeekDirection.Forward, offsetMs)
         offsetMs < 0L -> showSeekFeedback(PlayerSeekDirection.Backward, abs(offsetMs))
+    }
+}
+
+/**
+ * Single entry point for hardware-keyboard shortcuts, whichever layer recognised the key. Routing
+ * through the ordinary runtime actions is what keeps a key press equivalent to the same action
+ * from a tap: seek feedback, control reveal and the debounced watch-progress sync all still run.
+ */
+internal fun PlayerScreenRuntime.handleKeyboardShortcut(shortcut: PlayerKeyboardShortcut) {
+    if (playerControlsLocked || isAnyOverlayVisible) return
+    when (shortcut) {
+        PlayerKeyboardShortcut.TogglePlayback -> togglePlayback()
+        PlayerKeyboardShortcut.SeekBackward -> seekBy(-PlayerDoubleTapSeekStepMs)
+        PlayerKeyboardShortcut.SeekForward -> seekBy(PlayerDoubleTapSeekStepMs)
+        PlayerKeyboardShortcut.Exit -> {
+            flushWatchProgress()
+            args.onBack()
+        }
     }
 }
 
@@ -305,6 +328,7 @@ internal fun PlayerScreenRuntime.rememberSurfaceGestureCallbacks(): PlayerSurfac
         revealLockedOverlay = rememberUpdatedState(::revealLockedOverlay),
         isHoldToSpeedGestureActive = rememberUpdatedState(isHoldToSpeedGestureActive),
         touchGesturesEnabled = rememberUpdatedState(playerSettingsUiState.touchGesturesEnabled),
+        swipeToSeekEnabled = rememberUpdatedState(playerSettingsUiState.swipeToSeekEnabled),
         playerControlsLocked = rememberUpdatedState(playerControlsLocked),
         currentPositionMs = rememberUpdatedState(playbackSnapshot.positionMs.coerceAtLeast(0L)),
         currentDurationMs = rememberUpdatedState(playbackSnapshot.durationMs),

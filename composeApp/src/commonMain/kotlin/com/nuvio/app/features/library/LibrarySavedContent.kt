@@ -104,6 +104,7 @@ internal fun LibrarySavedControls(
 internal fun LazyListScope.libraryVerticalContent(
     projection: LibraryVerticalProjection,
     columns: Int,
+    releaseInfoFor: (LibraryItem) -> String,
     watchedKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String>,
     onPosterClick: ((LibraryItem) -> Unit)?,
@@ -117,7 +118,9 @@ internal fun LazyListScope.libraryVerticalContent(
         },
     ) { rowEntries ->
         PosterGridRow(
-            items = rowEntries.map { entry -> entry.item.toMetaPreview() },
+            items = rowEntries.map { entry ->
+                entry.item.toMetaPreview().copy(releaseInfo = releaseInfoFor(entry.item))
+            },
             columns = columns,
             modifier = libraryContentTransitionModifier()
                 .padding(horizontal = 16.dp),

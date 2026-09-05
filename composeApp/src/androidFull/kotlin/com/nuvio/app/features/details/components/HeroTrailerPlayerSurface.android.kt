@@ -28,6 +28,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import com.nuvio.app.features.player.PlatformPlaybackDataSourceFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -37,9 +39,11 @@ actual fun HeroTrailerPlayerSurface(
     playWhenReady: Boolean,
     muted: Boolean,
     modifier: Modifier,
+    startPositionMs: Long,
     onReady: () -> Unit,
     onEnded: () -> Unit,
     onError: () -> Unit,
+    onPositionUpdate: (Long) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -47,6 +51,7 @@ actual fun HeroTrailerPlayerSurface(
     val latestOnReady = rememberUpdatedState(onReady)
     val latestOnEnded = rememberUpdatedState(onEnded)
     val latestOnError = rememberUpdatedState(onError)
+    val latestOnPositionUpdate = rememberUpdatedState(onPositionUpdate)
     var playerContainer by remember { mutableStateOf<HeroTrailerTextureContainer?>(null) }
 
     val dataSourceFactory = remember(context) {
@@ -69,9 +74,10 @@ actual fun HeroTrailerPlayerSurface(
                             mediaSourceFactory.createMediaSource(MediaItem.fromUri(sourceUrl)),
                             mediaSourceFactory.createMediaSource(MediaItem.fromUri(sourceAudioUrl)),
                         ),
+                        startPositionMs.coerceAtLeast(0L),
                     )
                 } else {
-                    setMediaItem(MediaItem.fromUri(sourceUrl))
+                    setMediaItem(MediaItem.fromUri(sourceUrl), startPositionMs.coerceAtLeast(0L))
                 }
                 repeatMode = Player.REPEAT_MODE_OFF
                 volume = if (muted) 0f else 1f
@@ -137,6 +143,7 @@ actual fun HeroTrailerPlayerSurface(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             exoPlayer.removeListener(listener)
+            latestOnPositionUpdate.value(exoPlayer.currentPosition)
             detachVideoSurface()
             exoPlayer.stop()
             exoPlayer.release()
@@ -160,6 +167,13 @@ actual fun HeroTrailerPlayerSurface(
 
     LaunchedEffect(exoPlayer, muted) {
         exoPlayer.volume = if (muted) 0f else 1f
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (isActive) {
+            latestOnPositionUpdate.value(exoPlayer.currentPosition)
+            delay(500L)
+        }
     }
 
     AndroidView(

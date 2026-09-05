@@ -78,11 +78,6 @@ internal fun MemberBrandWordmark(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val access by remember {
-        MemberAccessRepository.ensureStarted()
-        MemberAccessRepository.access
-    }.collectAsStateWithLifecycle()
-
     Row(
         modifier = modifier.height(height),
         verticalAlignment = Alignment.CenterVertically,
@@ -91,19 +86,39 @@ internal fun MemberBrandWordmark(
             modifier = Modifier.height(height),
             contentDescription = contentDescription,
         )
-        val tier = access.tier
-        AnimatedVisibility(
-            visible = tier != null,
-            enter = fadeIn(tween(360)) +
-                expandHorizontally(tween(420), expandFrom = Alignment.Start) +
-                scaleIn(tween(420), initialScale = 0.94f),
-        ) {
-            if (tier != null) {
-                MemberBadge(
-                    tier = tier,
-                    height = height,
-                )
-            }
+        SupporterBadgeIfPresent(height = height)
+    }
+}
+
+/**
+ * Just the "Supporter"/"Supporter+" badge, with no wordmark alongside it — split out of
+ * [MemberBrandWordmark] so screens that need to fade the rest of their header away (see the
+ * profile-select → center transition in ProfileSelectionScreen) can keep this piece visible on
+ * its own, independent of whatever alpha the wordmark next to it is animating through.
+ */
+@Composable
+internal fun SupporterBadgeIfPresent(
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val access by remember {
+        MemberAccessRepository.ensureStarted()
+        MemberAccessRepository.access
+    }.collectAsStateWithLifecycle()
+
+    val tier = access.tier
+    AnimatedVisibility(
+        visible = tier != null,
+        enter = fadeIn(tween(360)) +
+            expandHorizontally(tween(420), expandFrom = Alignment.Start) +
+            scaleIn(tween(420), initialScale = 0.94f),
+        modifier = modifier,
+    ) {
+        if (tier != null) {
+            MemberBadge(
+                tier = tier,
+                height = height,
+            )
         }
     }
 }

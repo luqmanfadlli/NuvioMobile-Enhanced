@@ -57,11 +57,15 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
     onCountdownChanged(null)
 
     val type = contentType ?: parentMetaType
+    // Mirrors StreamAutoPlayPolicy.isEffectivelyEnabled: a user whose initial-playback source
+    // gets auto-picked via "reuse last link" (or a reused binge group) shouldn't be prompted to
+    // choose a source again just because they hit Next Episode instead of starting fresh.
     val shouldAutoSelectInManualMode =
         settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL &&
             (
                 settings.streamAutoPlayNextEpisodeEnabled ||
-                    settings.streamAutoPlayPreferBingeGroup
+                    settings.streamAutoPlayPreferBingeGroup ||
+                    settings.streamReuseLastLinkEnabled
                 )
 
     val bingeGroupOnlyManualMode =

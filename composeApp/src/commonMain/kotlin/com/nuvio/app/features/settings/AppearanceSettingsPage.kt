@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppTheme
-import com.nuvio.app.isIos
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
@@ -39,13 +38,17 @@ import nuvio.composeapp.generated.resources.compose_settings_page_streams
 import nuvio.composeapp.generated.resources.settings_appearance_app_language
 import nuvio.composeapp.generated.resources.settings_appearance_app_language_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_app_icon
+import nuvio.composeapp.generated.resources.settings_appearance_tab_bar_behavior
+import nuvio.composeapp.generated.resources.settings_appearance_tab_bar_behavior_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style
 import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_black
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_description
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background_description
+import nuvio.composeapp.generated.resources.settings_appearance_catalog_accent
+import nuvio.composeapp.generated.resources.settings_appearance_catalog_accent_description
 import nuvio.composeapp.generated.resources.settings_appearance_continue_watching_description
-import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass
-import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass_description
 import nuvio.composeapp.generated.resources.settings_appearance_poster_customization_description
 import nuvio.composeapp.generated.resources.settings_appearance_section_detail_page
 import nuvio.composeapp.generated.resources.settings_appearance_section_display
@@ -67,9 +70,13 @@ internal fun LazyListScope.appearanceSettingsContent(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    dynamicArtworkBackgroundEnabled: Boolean,
+    onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
+    showCatalogAccentEnabled: Boolean,
+    onShowCatalogAccentToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
-    liquidGlassNativeTabBarEnabled: Boolean,
-    onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
+    tabBarBehavior: NuvioTabBarBehavior,
+    onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
     appIconState: AppIconSettingsState,
     onAppIconSelected: (AppIconOption) -> Unit,
     onAppIconFailureDismissed: () -> Unit,
@@ -101,6 +108,7 @@ internal fun LazyListScope.appearanceSettingsContent(
     item {
         var showLanguageSheet by remember { mutableStateOf(false) }
         var showNavBarStyleSheet by remember { mutableStateOf(false) }
+        var showTabBarBehaviorSheet by remember { mutableStateOf(false) }
         var showAppIconPicker by remember { mutableStateOf(false) }
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_display),
@@ -114,14 +122,31 @@ internal fun LazyListScope.appearanceSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = onAmoledToggle,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
+                    description = stringResource(
+                        Res.string.settings_appearance_dynamic_artwork_background_description,
+                    ),
+                    checked = dynamicArtworkBackgroundEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = onDynamicArtworkBackgroundToggle,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_catalog_accent),
+                    description = stringResource(Res.string.settings_appearance_catalog_accent_description),
+                    checked = showCatalogAccentEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = onShowCatalogAccentToggle,
+                )
                 if (liquidGlassNativeTabBarSupported) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_appearance_liquid_glass),
-                        description = stringResource(Res.string.settings_appearance_liquid_glass_description),
-                        checked = liquidGlassNativeTabBarEnabled,
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_appearance_tab_bar_behavior),
+                        description = stringResource(tabBarBehavior.labelRes),
                         isTablet = isTablet,
-                        onCheckedChange = onLiquidGlassNativeTabBarToggle,
+                        onClick = { showTabBarBehaviorSheet = true },
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
@@ -149,7 +174,10 @@ internal fun LazyListScope.appearanceSettingsContent(
                     isTablet = isTablet,
                     onClick = { showLanguageSheet = true },
                 )
-                if (!isIos) {
+                // Relevant wherever the Compose pill is the navigation bar: Android, iPad, and
+                // iPhone before iOS 26. Only an iPhone on iOS 26 hides it, because there the tab
+                // bar is native and governed by the Liquid Glass row above instead.
+                if (!liquidGlassNativeTabBarSupported) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_appearance_nav_bar_style),
@@ -169,6 +197,17 @@ internal fun LazyListScope.appearanceSettingsContent(
                     showLanguageSheet = false
                 },
                 onDismiss = { showLanguageSheet = false },
+            )
+        }
+
+        if (showTabBarBehaviorSheet) {
+            TabBarBehaviorBottomSheet(
+                selectedBehavior = tabBarBehavior,
+                onBehaviorSelected = {
+                    onTabBarBehaviorSelected(it)
+                    showTabBarBehaviorSheet = false
+                },
+                onDismiss = { showTabBarBehaviorSheet = false },
             )
         }
 
@@ -324,6 +363,66 @@ private fun AppearanceLanguageBottomSheet(
                     },
                     trailingContent = {
                         if (option.language == selectedLanguage) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(Res.string.cd_selected),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TabBarBehaviorBottomSheet(
+    selectedBehavior: NuvioTabBarBehavior,
+    onBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+        ) {
+            item {
+                Text(
+                    text = stringResource(Res.string.settings_appearance_tab_bar_behavior_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                )
+            }
+
+            itemsIndexed(NuvioTabBarBehavior.entries.toList()) { index, behavior ->
+                if (index > 0) {
+                    NuvioBottomSheetDivider()
+                }
+                NuvioBottomSheetActionRow(
+                    title = stringResource(behavior.labelRes),
+                    onClick = {
+                        onBehaviorSelected(behavior)
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                    trailingContent = {
+                        if (behavior == selectedBehavior) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = stringResource(Res.string.cd_selected),

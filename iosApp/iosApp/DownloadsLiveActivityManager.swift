@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 #if canImport(ActivityKit) && os(iOS) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
@@ -32,8 +33,19 @@ final class DownloadsLiveActivityManager {
         guard #available(iOS 16.1, *) else { return }
 
         let payload = loadPayload()
+
+        var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "DownloadsLiveActivitySync") {
+            UIApplication.shared.endBackgroundTask(backgroundTaskId)
+            backgroundTaskId = .invalid
+        }
+
         Task {
             await apply(payload)
+            if backgroundTaskId != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskId)
+                backgroundTaskId = .invalid
+            }
         }
 #endif
     }

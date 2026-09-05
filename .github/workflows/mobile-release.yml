@@ -1,4 +1,5 @@
 name: Build Mobile Release
+run-name: ${{ inputs.description != '' && format('Build Mobile Release - {0}', inputs.description) || 'Build Mobile Release' }}
 
 on:
   workflow_dispatch:
@@ -9,9 +10,23 @@ on:
         type: choice
         options:
           - dry-run
+          - test-build
           - draft
           - publish
         default: dry-run
+      target:
+        description: Choose which platform to build
+        required: true
+        type: choice
+        options:
+          - all
+          - android-only
+          - ios-only
+        default: all
+      description:
+        description: Run description
+        required: false
+        type: string
       exclude_commits:
         description: Optional comma-separated commit hashes to omit from the notes
         required: false
@@ -36,6 +51,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
 
     steps:
       - name: Check out full history
@@ -61,30 +77,37 @@ jobs:
             echo "Releases must be dispatched from a branch, not ${RELEASE_REF_TYPE}." >&2
             exit 1
           fi
-          if [[ "${RELEASE_BRANCH}" != "${DEFAULT_BRANCH}" ]]; then
-            echo "Releases must be dispatched from the default branch (${DEFAULT_BRANCH})." >&2
-            exit 1
+          if [[ "${RELEASE_MODE}" == "draft" || "${RELEASE_MODE}" == "publish" ]]; then
+            if [[ "${RELEASE_BRANCH}" != "${DEFAULT_BRANCH}" ]]; then
+              echo "Mode '${RELEASE_MODE}' creates a tag, so it must be dispatched from the default branch (${DEFAULT_BRANCH})." >&2
+              echo "Use mode 'test-build' to build '${RELEASE_BRANCH}' without tagging." >&2
+              exit 1
+            fi
+          else
+            echo "Mode '${RELEASE_MODE}' on branch '${RELEASE_BRANCH}': no tag or release will be created."
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-            echo "Tag ${RELEASE_TAG} already exists." >&2
-            exit 1
-          fi
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
-            exit 1
-          fi
+          if [[ "${RELEASE_MODE}" != "test-build" ]]; then
+            if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              echo "Tag ${RELEASE_TAG} already exists." >&2
+              exit 1
+            fi
+            if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
+              exit 1
+            fi
 
-          unexpected_changes="$(
-            git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
-              | grep -Ev '^(\.github/workflows/(android-release|update-store-source)\.yml|store\.json|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh|scripts/update-store-source\.py)$' \
-              || true
-          )"
-          if [[ -n "${unexpected_changes}" ]]; then
-            echo "The version bump must be the final application change before release." >&2
-            echo "Unexpected files changed after the bump:" >&2
-            echo "${unexpected_changes}" >&2
-            exit 1
+            unexpected_changes="$(
+              git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
+                | grep -Ev '^(\.github/workflows/(mobile-release|update-store-source)\.yml|store\.json|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh|scripts/update-store-source\.py)$' \
+                || true
+            )"
+            if [[ -n "${unexpected_changes}" ]]; then
+              echo "The version bump must be the final application change before release." >&2
+              echo "Unexpected files changed after the bump:" >&2
+              echo "${unexpected_changes}" >&2
+              exit 1
+            fi
           fi
 
           if [[ "${RELEASE_MODE}" != "dry-run" ]]; then
@@ -138,12 +161,13 @@ jobs:
 
   android:
     name: Build Android APKs
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'android-only')
     needs: prepare
     runs-on: ubuntu-latest
     env:
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
 
     steps:
       - name: Check out source
@@ -166,6 +190,9 @@ jobs:
 
           sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
           printf '\nNUVIO_RELEASE_STORE_FILE=%s\n' "${keystore_path}" >> local.properties
+          if [[ -n "${CONTRIBUTIONS_URL}" ]]; then
+            printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}" >> local.properties
+          fi
 
           required_properties=(
             NUVIO_RELEASE_STORE_PASSWORD
@@ -173,6 +200,7 @@ jobs:
             NUVIO_RELEASE_KEY_PASSWORD
             TRAKT_CLIENT_ID
             TRAKT_CLIENT_SECRET
+            SIMKL_CLIENT_ID
           )
           for property_name in "${required_properties[@]}"; do
             if ! grep -Eq "^${property_name}=.+" local.properties; then
@@ -193,7 +221,7 @@ jobs:
 
   ios:
     name: Build iOS IPA
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'ios-only')
     needs: prepare
     runs-on: macos-26
     timeout-minutes: 120
@@ -204,6 +232,7 @@ jobs:
       NUVIO_GRADLE_JVMARGS: -Xmx4608M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx4608M
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+      CONTRIBUTIONS_URL: ${{ secrets.CONTRIBUTIONS_URL }}
 
     steps:
       - name: Check out source
@@ -235,6 +264,9 @@ jobs:
         run: |
           printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
           sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          if [[ -n "${CONTRIBUTIONS_URL}" ]]; then
+            printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}" >> local.properties
+          fi
 
       - name: Prepare iOS dependencies
         run: ./scripts/prepare-ios-dependencies.sh
@@ -263,7 +295,7 @@ jobs:
 
   release:
     name: Create ${{ inputs.mode }} release
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode == 'draft' || inputs.mode == 'publish'
     needs:
       - prepare
       - android
@@ -307,7 +339,7 @@ jobs:
 
   store:
     name: Update sideload source
-    if: inputs.mode == 'publish'
+    if: inputs.mode == 'publish' && (inputs.target == 'all' || inputs.target == 'ios-only')
     needs:
       - prepare
       - release

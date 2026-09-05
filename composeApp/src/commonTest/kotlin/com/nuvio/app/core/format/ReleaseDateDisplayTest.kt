@@ -25,6 +25,21 @@ class ReleaseDateDisplayTest {
     }
 
     @Test
+    fun storedReleaseInfoWins() {
+        assertEquals("2024", resolveReleaseInfoForDisplay("2024", "2025", "Unknown"))
+    }
+
+    @Test
+    fun hydratedReleaseInfoFillsBlankValue() {
+        assertEquals("2025 February 1", resolveReleaseInfoForDisplay(" ", "2025-02-01", "Unknown"))
+    }
+
+    @Test
+    fun missingReleaseInfoUsesFallback() {
+        assertEquals("Unknown", resolveReleaseInfoForDisplay(null, null, "Unknown"))
+    }
+
+    @Test
     fun extractsYearFromIso() {
         assertEquals(2025, extractReleaseYearForDisplay("2025-03-15"))
     }

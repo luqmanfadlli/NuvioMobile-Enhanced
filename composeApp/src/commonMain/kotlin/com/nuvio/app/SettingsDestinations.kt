@@ -46,6 +46,8 @@ internal fun SettingsRootDestination(
     collectionsTitle: String,
     onCheckForUpdates: (() -> Unit)?,
     onTestUpdateBanner: (() -> Unit)?,
+    onSwitchProfile: (() -> Unit)? = null,
+    onEditProfile: (() -> Unit)? = null,
 ) {
     val onBack = rememberGuardedPopBackStack(navController, route)
     SettingsScreen(
@@ -57,6 +59,11 @@ internal fun SettingsRootDestination(
         },
         onExternalBack = onBack,
         showInternalHeader = !useNativeNavigation,
+        onSwitchProfile = onSwitchProfile,
+        onEditProfile = onEditProfile,
+        onPosterClick = { meta ->
+            navController.navigate(DetailRoute(type = meta.type, id = meta.id, title = meta.name))
+        },
         onDownloadsClick = {
             navController.navigate(DownloadsSettingsRoute(downloadsTitle))
         },

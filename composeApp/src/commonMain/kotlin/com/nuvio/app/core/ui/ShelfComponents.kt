@@ -27,8 +27,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -246,6 +249,7 @@ private fun NuvioShelfSectionHeader(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
 ) {
     val tokens = MaterialTheme.nuvio
+    val showAccent by ThemeSettingsRepository.showCatalogAccentEnabled.collectAsState()
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -273,6 +277,15 @@ private fun NuvioShelfSectionHeader(
                 onClick = onViewAllClick,
                 size = viewAllPillSize,
                 modifier = viewAllPlaceholderModifier,
+            )
+        }
+        if (showAccent) {
+            Box(
+                modifier = Modifier
+                    .padding(top = NuvioTokens.Space.s6)
+                    .width(NuvioTokens.Space.s64 - NuvioTokens.Space.s4)
+                    .height(NuvioTokens.Space.s4)
+                    .background(color = tokens.colors.accent, shape = tokens.shapes.chip),
             )
         }
     }

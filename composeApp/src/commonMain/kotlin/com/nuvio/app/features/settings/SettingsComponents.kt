@@ -228,6 +228,35 @@ internal fun SettingsSection(
 }
 
 @Composable
+internal fun SettingsClickableRow(
+    title: String,
+    enabled: Boolean = true,
+    isTablet: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
+            .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = tokens.colors.accent,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
 internal fun SettingsNavigationRow(
     title: String,
     description: String?,

@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -38,6 +37,9 @@ import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
@@ -52,7 +54,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,8 +103,6 @@ import com.nuvio.app.features.details.components.DetailMetaInfo
 import com.nuvio.app.features.details.components.DetailPosterRailSection
 import com.nuvio.app.features.details.components.DetailProductionSection
 import com.nuvio.app.features.details.components.DetailSeriesContent
-import com.nuvio.app.features.details.components.DetailSeriesListEpisode
-import com.nuvio.app.features.details.components.DetailSeriesListHeader
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
 import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
@@ -116,10 +115,9 @@ import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
-import com.nuvio.app.features.streams.rememberPlaybackAvailability
+import com.nuvio.app.features.player.RandomEpisodePlaybackTracker
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
-import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
@@ -146,6 +144,7 @@ import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
 import com.kmpalette.rememberDominantColorState
 import com.kmpalette.extensions.painter.rememberPainterDominantColorState
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -163,13 +162,13 @@ fun MetaDetailsScreen(
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onOpenMeta: ((MetaPreview) -> Unit)? = null,
+    onOpenMoreLikeThis: ((MetaDetails) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
-    val playbackAvailability = rememberPlaybackAvailability()
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
     val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
         ?: MetaDetailsRepository.peek(type, id)
@@ -237,7 +236,6 @@ fun MetaDetailsScreen(
         mutableStateOf<PendingTrackingMembershipRemoval?>(null)
     }
     val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
-    var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
 
     LaunchedEffect(
@@ -329,31 +327,6 @@ fun MetaDetailsScreen(
         isCommentsLoading = false
     }
 
-    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos, deferredMetaWorkAllowed) {
-        val metaForRatings = displayedMeta
-        if (!deferredMetaWorkAllowed) return@LaunchedEffect
-        if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
-            episodeImdbRatings = emptyMap()
-            return@LaunchedEffect
-        }
-
-        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
-        val tmdbId = extractTmdbId(metaForRatings.id)
-            ?: extractTmdbId(id)
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
-
-        if (imdbId == null && tmdbId == null) {
-            episodeImdbRatings = emptyMap()
-            return@LaunchedEffect
-        }
-
-        episodeImdbRatings = ImdbEpisodeRatingsRepository.getEpisodeRatings(
-            imdbId = imdbId,
-            tmdbId = tmdbId,
-        )
-    }
-
     LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
         if (!autoLoadAttempted && displayedMeta == null && !uiState.isLoading) {
             autoLoadAttempted = true
@@ -370,6 +343,7 @@ fun MetaDetailsScreen(
         traktAuthUiState.mode,
         tmdbSettingsUiState.enabled,
         tmdbSettingsUiState.useMoreLikeThis,
+        tmdbSettingsUiState.useEpisodeRatings,
         tmdbSettingsUiState.language,
     ) {
         if (displayedMeta != null && !uiState.isLoading) {
@@ -607,29 +581,6 @@ fun MetaDetailsScreen(
                     seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
-                val episodeListGroupedEpisodes = remember(
-                    meta.videos,
-                    meta.type,
-                    metaScreenSettingsUiState.episodeCardStyle,
-                ) {
-                    if (metaScreenSettingsUiState.episodeCardStyle == MetaEpisodeCardStyle.List) {
-                        meta.groupedEpisodesForDisplay()
-                    } else {
-                        emptyMap()
-                    }
-                }
-                val episodeListSeasons = remember(episodeListGroupedEpisodes) {
-                    episodeListGroupedEpisodes.keys.sortedBy(::seasonSortKey)
-                }
-                var selectedEpisodeListSeason by rememberSaveable(meta.id) {
-                    mutableStateOf<Int?>(null)
-                }
-                val defaultEpisodeListSeason = seriesAction?.seasonNumber
-                    ?.takeIf { it in episodeListGroupedEpisodes }
-                    ?: episodeListSeasons.firstOrNull()
-                val currentEpisodeListSeason = selectedEpisodeListSeason
-                    ?.takeIf { it in episodeListGroupedEpisodes }
-                    ?: defaultEpisodeListSeason
                 val hasProductionSection = remember(meta) {
                     meta.productionCompanies.isNotEmpty() || meta.networks.isNotEmpty()
                 }
@@ -669,11 +620,13 @@ fun MetaDetailsScreen(
                 var heroTrailerReady by remember(meta.id, heroTrailerCandidate?.id) { mutableStateOf(false) }
                 var heroTrailerFinished by remember(meta.id, heroTrailerCandidate?.id) { mutableStateOf(false) }
                 val heroTrailerMuted by HeroTrailerAudioState.muted.collectAsStateWithLifecycle()
+                val heroTrailerStartDelaySeconds = metaScreenSettingsUiState.heroTrailerStartDelaySeconds
                 LaunchedEffect(
                     heroTrailerPlaybackEnabled,
                     heroTrailerCandidate?.id,
                     heroTrailerCandidate?.key,
                     deferredMetaWorkAllowed,
+                    heroTrailerStartDelaySeconds,
                 ) {
                     heroTrailerPlaybackSource = null
                     heroTrailerReady = false
@@ -681,13 +634,19 @@ fun MetaDetailsScreen(
                     if (!deferredMetaWorkAllowed || !heroTrailerPlaybackEnabled || heroTrailerCandidate == null) {
                         return@LaunchedEffect
                     }
-                    val resolvedSource = runCatching {
-                        TrailerPlaybackResolver.resolveFromYouTubeUrl(heroTrailerCandidate.youtubePlaybackUrl())
-                    }.getOrNull()
-                    if (resolvedSource == null) {
+                    val resolvedSource = async {
+                        runCatching {
+                            TrailerPlaybackResolver.resolveFromYouTubeUrl(heroTrailerCandidate.youtubePlaybackUrl())
+                        }.getOrNull()
+                    }
+                    if (heroTrailerStartDelaySeconds > 0) {
+                        delay(heroTrailerStartDelaySeconds.toLong() * 1000L)
+                    }
+                    val source = resolvedSource.await()
+                    if (source == null) {
                         heroTrailerFinished = true
                     } else {
-                        heroTrailerPlaybackSource = resolvedSource
+                        heroTrailerPlaybackSource = source
                     }
                 }
                 val onBackFromDetails: () -> Unit = {
@@ -726,22 +685,23 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
-                val primaryVideoId = seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id
-                val isPrimaryPlayEnabled = playbackAvailability.canPlay(
-                    type = meta.type,
-                    videoId = primaryVideoId,
-                    parentMetaId = meta.id,
-                    seasonNumber = seriesAction?.seasonNumber,
-                    episodeNumber = seriesAction?.episodeNumber,
-                )
                 val playText = stringResource(Res.string.action_play)
                 val resumeText = stringResource(Res.string.action_resume)
-                val playButtonLabel = remember(movieProgress, seriesAction, meta.type, hasEpisodes, playText, resumeText) {
+                val watchAgainText = stringResource(Res.string.action_watch_again)
+                val isMovieWatched = remember(meta.id, meta.type, hasEpisodes, watchedUiState.watchedKeys) {
+                    meta.type != "series" && !hasEpisodes && WatchedRepository.isWatched(
+                        id = meta.id,
+                        type = meta.type,
+                    )
+                }
+                val playButtonLabel = remember(movieProgress, isMovieWatched, seriesAction, meta.type, hasEpisodes, playText, resumeText, watchAgainText) {
                     when {
                         (meta.type == "series" || hasEpisodes) && seriesAction != null ->
                             seriesAction.label
                         meta.type != "series" && !hasEpisodes && movieProgress != null ->
                             resumeText
+                        isMovieWatched ->
+                            watchAgainText
                         else -> playText
                     }
                 }
@@ -789,7 +749,7 @@ fun MetaDetailsScreen(
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
-                    ?.takeIf { showManualPlayOption && playbackAvailability.canStream(meta.type, primaryVideoId) }
+                    ?.takeIf { showManualPlayOption }
                     ?.let { manualPlay ->
                         {
                             when {
@@ -901,6 +861,29 @@ fun MetaDetailsScreen(
                         savedProgress?.lastPositionMs,
                     )
                 }
+                val onRandomEpisodeClick: (() -> Unit)? = if (meta.type == "series" || hasEpisodes) {
+                    {
+                        RandomEpisodePlaybackTracker.mark(meta.id)
+                        val episodes = meta.releasedPlayableEpisodes(todayIsoDate)
+                        val unwatched = episodes.filterNot { episode ->
+                            WatchingState.isEpisodeWatched(
+                                watchedKeys = watchedUiState.watchedKeys,
+                                metaType = meta.type,
+                                metaId = meta.id,
+                                episode = episode,
+                            )
+                        }
+                        val candidates = if (playerSettingsUiState.randomEpisodesIncludeWatched) {
+                            episodes
+                        } else {
+                            unwatched.ifEmpty { episodes }
+                        }
+                        candidates.randomOrNull()
+                            ?.let(onEpisodePlayClick)
+                    }
+                } else {
+                    null
+                }
                 val listState = rememberLazyListState()
                 val heroStretchState = rememberHeroStretchState(listState)
                 val density = LocalDensity.current
@@ -911,8 +894,6 @@ fun MetaDetailsScreen(
                         .toPx()
                 }
                 val heroHeightPx = remember(meta.id) { mutableIntStateOf(0) }
-                // Keep pixel-by-pixel list state reads out of this composition. Reading the
-                // offset here would recompose every metadata section on every scroll frame.
                 val detailScrollOffsetPx = remember(listState, heroHeightPx) {
                     {
                         if (listState.firstVisibleItemIndex == 0) {
@@ -1078,11 +1059,11 @@ fun MetaDetailsScreen(
                                 contentHorizontalPadding = contentHorizontalPadding,
                                 contentMaxWidth = if (isTablet) contentMaxWidth else Dp.Unspecified,
                                 playButtonLabel = playButtonLabel,
-                                isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                                 isSaved = isSaved,
                                 isWatched = isWatched,
                                 onPrimaryPlayClick = onPrimaryPlayClick,
                                 onPrimaryPlayLongClick = onPrimaryPlayLongClick,
+                                onRandomEpisodeClick = onRandomEpisodeClick,
                                 onSaveClick = toggleSaved,
                                 onSaveLongClick = openLibraryListPicker,
                                 onWatchedClick = toggleWatched,
@@ -1102,11 +1083,6 @@ fun MetaDetailsScreen(
                                 commentsCurrentPage = commentsCurrentPage,
                                 commentsPageCount = commentsPageCount,
                                 commentsError = commentsError,
-                                episodeImdbRatings = episodeImdbRatings,
-                                episodeListGroupedEpisodes = episodeListGroupedEpisodes,
-                                episodeListSeasons = episodeListSeasons,
-                                episodeListCurrentSeason = currentEpisodeListSeason,
-                                onEpisodeListSeasonSelect = { selectedEpisodeListSeason = it },
                                 onRetryComments = {
                                     detailsScope.launch {
                                         isCommentsLoading = true
@@ -1149,6 +1125,7 @@ fun MetaDetailsScreen(
                                 },
                                 onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                 onOpenMeta = onOpenMeta,
+                                onOpenMoreLikeThis = onOpenMoreLikeThis,
                                 onCastClick = onCastClick,
                                 onCompanyClick = onCompanyClick,
                                 sharedTransitionScope = sharedTransitionScope,
@@ -1263,7 +1240,7 @@ fun MetaDetailsScreen(
                                         areCurrentlyWatched = isSeasonWatched,
                                     )
                                 },
-                                showPlayManually = showManualPlayOption && playbackAvailability.canStream(meta.type, selectedEpisode.id),
+                                showPlayManually = showManualPlayOption,
                                 onPlayManually = {
                                     onEpisodeManualPlayClick(selectedEpisode)
                                 },
@@ -1578,11 +1555,7 @@ fun MetaDetailsScreen(
                             },
                         ),
                     )
-                    if (
-                        onPlayManually != null &&
-                        StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) &&
-                        playbackAvailability.canStream(meta.type, selectedEpisode.id)
-                    ) {
+                    if (onPlayManually != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)) {
                         add(
                             PosterZoomOverlayAction(
                                 icon = Icons.Default.PlayArrow,
@@ -1626,12 +1599,6 @@ fun MetaDetailsScreen(
             )
         }
     }
-}
-
-private fun MetaDetails.isSeriesLikeForEpisodeRatings(): Boolean {
-    val normalizedType = type.trim().lowercase()
-    val hasNumberedEpisodes = videos.any { it.season != null && it.episode != null }
-    return hasNumberedEpisodes && normalizedType in setOf("series", "show", "tv", "tvshow")
 }
 
 @Composable
@@ -1721,24 +1688,6 @@ private fun areEpisodesWatchedForActions(
     )
 }
 
-private fun extractImdbId(value: String?): String? =
-    value
-        ?.trim()
-        ?.split(':', '/', '?', '&')
-        ?.firstOrNull { part -> part.startsWith("tt", ignoreCase = true) }
-        ?.takeIf { it.length > 2 }
-
-private fun extractTmdbId(value: String?): Int? {
-    val trimmed = value?.trim().orEmpty()
-    if (trimmed.isBlank()) return null
-    return trimmed
-        .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
-        ?.substringAfter(':')
-        ?.substringBefore(':')
-        ?.substringBefore('/')
-        ?.toIntOrNull()
-}
-
 private fun MetaDetails.toMetaPreview(): MetaPreview =
     MetaPreview(
         id = id,
@@ -1760,11 +1709,11 @@ private fun LazyListScope.configuredMetaSectionItems(
     contentHorizontalPadding: Dp,
     contentMaxWidth: Dp,
     playButtonLabel: String,
-    isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
+    onRandomEpisodeClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
@@ -1784,11 +1733,6 @@ private fun LazyListScope.configuredMetaSectionItems(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
-    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
-    episodeListGroupedEpisodes: Map<Int, List<MetaVideo>>,
-    episodeListSeasons: List<Int>,
-    episodeListCurrentSeason: Int?,
-    onEpisodeListSeasonSelect: (Int) -> Unit,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
@@ -1800,6 +1744,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
+    onOpenMoreLikeThis: ((MetaDetails) -> Unit)?,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
@@ -1841,11 +1786,11 @@ private fun LazyListScope.configuredMetaSectionItems(
                     isTablet = isTablet,
                     horizontalScrollPadding = contentHorizontalPadding,
                     playButtonLabel = playButtonLabel,
-                    isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                     isSaved = isSaved,
                     isWatched = isWatched,
                     onPrimaryPlayClick = onPrimaryPlayClick,
                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
+                    onRandomEpisodeClick = onRandomEpisodeClick,
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
                     onWatchedClick = onWatchedClick,
@@ -1865,7 +1810,6 @@ private fun LazyListScope.configuredMetaSectionItems(
                     commentsCurrentPage = commentsCurrentPage,
                     commentsPageCount = commentsPageCount,
                     commentsError = commentsError,
-                    episodeImdbRatings = episodeImdbRatings,
                     onRetryComments = onRetryComments,
                     onLoadMoreComments = onLoadMoreComments,
                     onCommentClick = onCommentClick,
@@ -1877,6 +1821,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onEpisodeLongPress = onEpisodeLongPress,
                     onSeasonLongPress = onSeasonLongPress,
                     onOpenMeta = onOpenMeta,
+                    onOpenMoreLikeThis = onOpenMoreLikeThis,
                     onCastClick = onCastClick,
                     onCompanyClick = onCompanyClick,
                     sharedTransitionScope = sharedTransitionScope,
@@ -1886,80 +1831,14 @@ private fun LazyListScope.configuredMetaSectionItems(
         }
     }
 
-    fun addLazyEpisodeListItems(key: String) {
-        val currentSeason = episodeListCurrentSeason ?: return
-        val episodes = episodeListGroupedEpisodes[currentSeason].orEmpty()
-        if (episodes.isEmpty()) return
-
-        item(
-            key = "$key-header",
-            contentType = "detail-episode-header",
-        ) {
-            DetailSectionContainer(
-                horizontalPadding = contentHorizontalPadding,
-                contentMaxWidth = contentMaxWidth,
-                bottomPadding = 12.dp,
-            ) {
-                DetailSeriesListHeader(
-                    meta = meta,
-                    groupedEpisodes = episodeListGroupedEpisodes,
-                    seasons = episodeListSeasons,
-                    currentSeason = currentSeason,
-                    horizontalScrollPadding = contentHorizontalPadding,
-                    onSeasonSelect = onEpisodeListSeasonSelect,
-                    onSeasonLongPress = onSeasonLongPress,
-                )
-            }
-        }
-        itemsIndexed(
-            items = episodes,
-            key = { index, episode ->
-                "$key-episode-$currentSeason-${episode.episode}-${episode.id}-$index"
-            },
-            contentType = { _, _ -> "detail-episode" },
-        ) { index, episode ->
-            DetailSectionContainer(
-                horizontalPadding = contentHorizontalPadding,
-                contentMaxWidth = contentMaxWidth,
-                bottomPadding = if (index == episodes.lastIndex) 20.dp else 12.dp,
-            ) {
-                DetailSeriesListEpisode(
-                    meta = meta,
-                    episode = episode,
-                    progressByVideoId = progressByVideoId,
-                    watchedKeys = watchedKeys,
-                    episodeRatings = episodeImdbRatings,
-                    blurUnwatchedEpisodes = blurUnwatchedEpisodes,
-                    onEpisodeClick = onEpisodeClick,
-                    onEpisodeLongPress = onEpisodeLongPress,
-                )
-            }
-        }
-    }
-
-    fun addStandaloneSection(
-        section: MetaScreenSectionItem,
-        key: String,
-        forceTabLayout: Boolean = false,
-    ) {
-        if (section.key == MetaScreenSectionKey.EPISODES && settings.episodeCardStyle == MetaEpisodeCardStyle.List) {
-            addLazyEpisodeListItems(key)
-        } else {
-            addSectionItem(
-                key = key,
-                sectionItems = listOf(section),
-                forceTabLayout = forceTabLayout,
-            )
-        }
-    }
-
     if (!settings.tabLayout) {
         enabledItems
             .filter { sectionHasContent(it.key) }
             .forEach { section ->
-                addStandaloneSection(
-                    section = section,
+                addSectionItem(
                     key = "detail-section-${section.key.name}",
+                    sectionItems = listOf(section),
+                    forceTabLayout = false,
                 )
             }
         return
@@ -1967,33 +1846,26 @@ private fun LazyListScope.configuredMetaSectionItems(
 
     val processedGroups = mutableSetOf<Int>()
     enabledItems.forEach { section ->
-        val groupId = section.tabGroupForRendering(settings.episodeCardStyle)
+        val groupId = section.tabGroup
         if (groupId == null) {
             if (sectionHasContent(section.key)) {
-                addStandaloneSection(
-                    section = section,
+                addSectionItem(
                     key = "detail-section-${section.key.name}",
+                    sectionItems = listOf(section),
                     forceTabLayout = true,
                 )
             }
         } else if (groupId !in processedGroups) {
             processedGroups.add(groupId)
             val groupMembers = enabledItems.filter { item ->
-                item.tabGroupForRendering(settings.episodeCardStyle) == groupId && sectionHasContent(item.key)
+                item.tabGroup == groupId && sectionHasContent(item.key)
             }
             if (groupMembers.isNotEmpty()) {
-                if (groupMembers.size == 1) {
-                    addStandaloneSection(
-                        section = groupMembers.single(),
-                        key = "detail-section-group-$groupId",
-                    )
-                } else {
-                    addSectionItem(
-                        key = "detail-section-group-$groupId",
-                        sectionItems = groupMembers,
-                        forceTabLayout = true,
-                    )
-                }
+                addSectionItem(
+                    key = "detail-section-group-$groupId",
+                    sectionItems = groupMembers,
+                    forceTabLayout = groupMembers.size > 1,
+                )
             }
         }
     }
@@ -2003,14 +1875,13 @@ private fun LazyListScope.configuredMetaSectionItems(
 private fun DetailSectionContainer(
     horizontalPadding: Dp,
     contentMaxWidth: Dp,
-    bottomPadding: Dp = 20.dp,
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
-            .padding(bottom = bottomPadding),
+            .padding(bottom = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -2065,11 +1936,11 @@ private fun ConfiguredMetaSections(
     isTablet: Boolean,
     horizontalScrollPadding: Dp,
     playButtonLabel: String,
-    isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
+    onRandomEpisodeClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
@@ -2089,7 +1960,6 @@ private fun ConfiguredMetaSections(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
-    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
@@ -2101,6 +1971,7 @@ private fun ConfiguredMetaSections(
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
+    onOpenMoreLikeThis: ((MetaDetails) -> Unit)?,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
@@ -2108,7 +1979,6 @@ private fun ConfiguredMetaSections(
 ) {
     val enabledItems = settings.items.filter { it.enabled }
 
-    // Helper to check if a section actually has content to show
     val sectionHasContent: (MetaScreenSectionKey) -> Boolean = { key ->
         when (key) {
             MetaScreenSectionKey.ACTIONS -> true
@@ -2129,8 +1999,7 @@ private fun ConfiguredMetaSections(
         when (key) {
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
-                    playLabel = if (isPrimaryPlayEnabled) playButtonLabel else stringResource(Res.string.playback_unavailable),
-                    playEnabled = isPrimaryPlayEnabled,
+                    playLabel = playButtonLabel,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(
                             label = if (isWatched) {
@@ -2139,13 +2008,20 @@ private fun ConfiguredMetaSections(
                                 stringResource(Res.string.hero_mark_watched)
                             },
                             icon = if (isWatched) {
-                                Icons.Default.CheckCircle
+                                Icons.Default.Visibility
                             } else {
-                                Icons.Default.CheckCircleOutline
+                                Icons.Default.VisibilityOff
                             },
                             isActive = isWatched,
                             onClick = onWatchedClick,
                         ))
+                        onRandomEpisodeClick?.let { playRandomEpisode ->
+                            add(DetailSecondaryAction(
+                                label = stringResource(Res.string.detail_play_random_episode),
+                                icon = Icons.Default.Shuffle,
+                                onClick = playRandomEpisode,
+                            ))
+                        }
                         add(DetailSecondaryAction(
                             label = if (isSaved) {
                                 stringResource(Res.string.hero_remove_from_library)
@@ -2225,7 +2101,6 @@ private fun ConfiguredMetaSections(
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
-                        episodeRatings = episodeImdbRatings,
                         blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeLongPress = onEpisodeLongPress,
@@ -2264,6 +2139,9 @@ private fun ConfiguredMetaSections(
                         showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
                         sourceLabel = sourceLabel,
+                        onViewAllClick = onOpenMoreLikeThis
+                            ?.takeIf { meta.moreLikeThisHasMore && meta.moreLikeThisSource != null }
+                            ?.let { open -> { open(meta) } },
                         onPosterClick = onOpenMeta,
                     )
                 }

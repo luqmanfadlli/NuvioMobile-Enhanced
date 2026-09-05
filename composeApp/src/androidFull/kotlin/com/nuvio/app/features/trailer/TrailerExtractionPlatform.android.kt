@@ -2,11 +2,10 @@ package com.nuvio.app.features.trailer
 
 import android.net.Uri
 import com.nuvio.app.core.network.IPv4FirstDns
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Headers
@@ -14,6 +13,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+
+private const val PROBE_TIMEOUT_MS = 2_000L
+private const val PROBE_TIER_TIMEOUT_MS = 3_000L
 
 internal object TrailerExtractionPlatform {
     val defaultHeaders: Map<String, String> = mapOf(
@@ -25,6 +27,7 @@ internal object TrailerExtractionPlatform {
 
     private val httpClient = OkHttpClient.Builder()
         .dns(IPv4FirstDns())
+        .callTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .connectTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .readTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .writeTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -34,8 +37,9 @@ internal object TrailerExtractionPlatform {
 
     private val probeClient = OkHttpClient.Builder()
         .dns(IPv4FirstDns())
-        .connectTimeout(2, TimeUnit.SECONDS)
-        .readTimeout(2, TimeUnit.SECONDS)
+        .callTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .connectTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .readTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
@@ -59,6 +63,7 @@ internal object TrailerExtractionPlatform {
         }
 
         httpClient.newBuilder()
+            .callTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
             .connectTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
             .writeTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
@@ -75,46 +80,31 @@ internal object TrailerExtractionPlatform {
             }
     }
 
-    suspend fun buildPlaybackSource(
-        bestManifest: ManifestCandidate?,
-        bestProgressive: StreamCandidate?,
-        bestVideo: StreamCandidate?,
-        bestAudio: StreamCandidate?,
-    ): TrailerPlaybackSource? = withContext(Dispatchers.IO) {
-        val bestCombinedIsManifest = bestManifest != null &&
-            (bestProgressive == null || bestManifest.height > bestProgressive.height)
+    suspend fun resolvePlayableUrl(url: String): String? = withContext(Dispatchers.IO) {
+        if (!url.contains("googlevideo.com")) return@withContext url
 
-        val combinedUrl = if (bestCombinedIsManifest) {
-            bestManifest.selectedVariantUrl
-        } else {
-            bestProgressive?.url
+        val candidates = buildHostCandidates(url)
+        if (candidates.size == 1) {
+            return@withContext if (isUrlReachable(candidates[0])) candidates[0] else null
         }
 
-        val separatedVideoUrl = bestVideo?.url?.let { resolveReachableUrlOrNull(it) }
-        val combinedCandidateUrl = combinedUrl?.let { resolveReachableUrlOrNull(it) }
-        val videoUrl = separatedVideoUrl ?: combinedCandidateUrl ?: return@withContext null
-        val audioUrl = if (!separatedVideoUrl.isNullOrBlank()) {
-            bestAudio?.url?.let { resolveReachableUrlOrNull(it) }
-        } else {
-            null
+        coroutineScope {
+            val probes = candidates.map { candidate ->
+                async { if (isUrlReachable(candidate)) candidate else null }
+            }
+            withTimeoutOrNull(PROBE_TIER_TIMEOUT_MS) {
+                probes.awaitAll().firstOrNull { !it.isNullOrBlank() }
+            }
         }
-
-        TrailerPlaybackSource(
-            videoUrl = videoUrl,
-            audioUrl = audioUrl,
-        )
     }
 
-    private suspend fun resolveReachableUrlOrNull(url: String): String? {
-        if (!url.contains("googlevideo.com")) return url
+    private fun buildHostCandidates(url: String): List<String> {
         val uri = Uri.parse(url)
-        val mnParam = uri.getQueryParameter("mn") ?: return url
+        val host = uri.host ?: return listOf(url)
+        val mnParam = uri.getQueryParameter("mn") ?: return listOf(url)
         val servers = mnParam.split(',').map { it.trim() }.filter { it.isNotBlank() }
-        if (servers.size < 2) {
-            return if (isUrlReachable(url)) url else null
-        }
+        if (servers.size < 2) return listOf(url)
 
-        val host = uri.host ?: return if (isUrlReachable(url)) url else null
         val candidates = mutableListOf(url)
         servers.forEachIndexed { index, server ->
             val altHost = host
@@ -124,35 +114,15 @@ internal object TrailerExtractionPlatform {
                 candidates += url.replace(host, altHost)
             }
         }
-
-        if (candidates.size == 1) {
-            return if (isUrlReachable(candidates[0])) candidates[0] else null
-        }
-
-        val result = CompletableDeferred<String>()
-        val probeScope = CoroutineScope(Dispatchers.IO)
-        candidates.forEach { candidate ->
-            probeScope.launch {
-                if (isUrlReachable(candidate)) {
-                    result.complete(candidate)
-                }
-            }
-        }
-
-        return try {
-            withTimeoutOrNull(2_000L) { result.await() }
-        } finally {
-            probeScope.cancel()
-        }
+        return candidates
     }
 
-    private fun isUrlReachable(url: String): Boolean {
-        return runCatching {
+    private suspend fun isUrlReachable(url: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
             val request = Request.Builder()
                 .url(url)
                 .get()
-                .header("Range", "bytes=0-0")
-                .headers(buildHeaders(defaultHeaders))
+                .headers(buildHeaders(defaultHeaders + mapOf("Range" to "bytes=0-0")))
                 .build()
 
             probeClient.newCall(request).execute().use { response ->

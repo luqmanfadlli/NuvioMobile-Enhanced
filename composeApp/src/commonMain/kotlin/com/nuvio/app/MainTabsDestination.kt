@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,6 +35,7 @@ import dev.chrisbanes.haze.rememberHazeState
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
 import nuvio.composeapp.generated.resources.compose_nav_library
+import nuvio.composeapp.generated.resources.compose_nav_live_tv
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.sidebar_library
@@ -50,6 +52,7 @@ internal fun MainTabsDestination(
     useNativeTabBar: Boolean,
     liquidGlassNativeTabBarSupported: Boolean,
     liquidGlassNativeTabBarEnabled: Boolean,
+    showLiveTvInNavigation: Boolean,
     requests: AppTabRequests,
     state: AppTabState,
     actions: (isTabletLayout: Boolean) -> AppTabActions,
@@ -79,7 +82,7 @@ internal fun MainTabsDestination(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                     NuvioClassicNavigationBar {
                         NavItem(
                             selected = selectedTab == AppScreenTab.Home,
@@ -99,6 +102,14 @@ internal fun MainTabsDestination(
                             icon = Res.drawable.sidebar_library,
                             contentDescription = stringResource(Res.string.compose_nav_library),
                         )
+                        if (showLiveTvInNavigation) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.LiveTv,
+                                onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                                icon = Icons.Filled.Tv,
+                                contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Settings,
                             onClick = { onTabSelected(AppScreenTab.Settings) },
@@ -116,7 +127,11 @@ internal fun MainTabsDestination(
         ) { innerPadding ->
             Box(modifier = Modifier.fillMaxSize()) {
                 CompositionLocalProvider(
-                    LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else if (!isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC) 72.dp else 0.dp,
+                    LocalNuvioBottomNavigationOverlayPadding provides when {
+                        tabsRouteActive && useNativeBottomTabs -> 49.dp
+                        tabsRouteActive && navBarStyleSetting != NavBarStyle.CLASSIC -> 72.dp
+                        else -> 0.dp
+                    },
                     LocalNuvioNavBarScrollState provides navBarScrollState,
                 ) {
                     AppTabHost(
@@ -126,22 +141,26 @@ internal fun MainTabsDestination(
                         actions = actions(isTabletLayout),
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
-                            .then(if (navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
+                            .then(if (tabsRouteActive && navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
+                            .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                             .padding(innerPadding),
                     )
                 }
 
-                if (isTabletLayout && !useNativeBottomTabs) {
+                // CLASSIC keeps the previous per-form-factor chrome: a top rail on
+                // tablet/landscape and the solid bottom bar on phones. Every other
+                // style now uses the floating pill at the bottom on all sizes.
+                if (isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                     TabletFloatingTopBar(
                         selectedTab = selectedTab,
+                        showLiveTv = showLiveTvInNavigation,
                         onTabSelected = onTabSelected,
                         onProfileSelected = onProfileSelected,
                         onAddProfileRequested = onAddProfileRequested,
                     )
                 }
 
-                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
+                if (tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
                     when (navBarStyleSetting) {
                         NavBarStyle.EXPANDED -> navBarScrollState.expand()
                         NavBarStyle.COMPACT -> navBarScrollState.collapse()
@@ -173,6 +192,15 @@ internal fun MainTabsDestination(
                             contentDescription = stringResource(Res.string.compose_nav_library),
                             label = stringResource(Res.string.compose_nav_library),
                         )
+                        if (showLiveTvInNavigation) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.LiveTv,
+                                onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                                icon = Icons.Filled.Tv,
+                                contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                                label = stringResource(Res.string.compose_nav_live_tv),
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Settings,
                             onClick = { onTabSelected(AppScreenTab.Settings) },

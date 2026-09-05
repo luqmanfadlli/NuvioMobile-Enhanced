@@ -8,8 +8,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
@@ -20,7 +26,6 @@ import nuvio.composeapp.generated.resources.*
 @Composable
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
-    val isInPip = rememberIsInPictureInPicture()
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
     val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
@@ -106,10 +111,92 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     }
     val gestureCallbacks = rememberSurfaceGestureCallbacks()
 
+    LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeTorrentInfoHash) {
+        val resolvingSourceUrl = activeSourceUrl
+        val resolvingAudioUrl = activeSourceAudioUrl
+        val resolvingHeaders = activeSourceHeaders
+        val resolvingTorrentInfoHash = activeTorrentInfoHash
+
+        selectedPlayerQualityId = null
+        val shouldInspectHls = activeTorrentInfoHash == null &&
+            activeSourceAudioUrl == null &&
+            activeSourceUrl.contains(".m3u8", ignoreCase = true)
+        activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
+        playerQualityState = PlayerQualitySelectionState(
+            isLoading = shouldInspectHls,
+            sourceUrl = activeSourceUrl,
+        )
+        InAppLogger.debug(
+            "Player/Quality",
+            "source changed inspectHls=$shouldInspectHls url=${InAppLogger.redactUrl(resolvingSourceUrl)} " +
+                "audio=${!resolvingAudioUrl.isNullOrBlank()} torrent=${!resolvingTorrentInfoHash.isNullOrBlank()} " +
+                "requestHeaders=${InAppLogger.headerKeys(resolvingHeaders)}",
+        )
+
+        if (shouldInspectHls) {
+            val resolved = runCatching {
+                PlayerQualityResolver.resolve(
+                    sourceUrl = resolvingSourceUrl,
+                    requestHeaders = resolvingHeaders,
+                )
+            }.getOrElse { error ->
+                InAppLogger.warn(
+                    "Player/Quality",
+                    "resolve quality failed url=${InAppLogger.redactUrl(resolvingSourceUrl)} " +
+                        "error=${InAppLogger.throwableSummary(error)}",
+                )
+                PlayerQualitySelectionState(
+                    sourceUrl = resolvingSourceUrl,
+                    errorMessage = error.message ?: "Unable to inspect HLS quality variants.",
+                )
+            }
+
+            if (activeSourceUrl != resolvingSourceUrl ||
+                activeSourceAudioUrl != resolvingAudioUrl ||
+                activeTorrentInfoHash != resolvingTorrentInfoHash
+            ) {
+                InAppLogger.debug(
+                    "Player/Quality",
+                    "discard stale quality result url=${InAppLogger.redactUrl(resolvingSourceUrl)}",
+                )
+                return@LaunchedEffect
+            }
+
+            playerQualityState = resolved
+            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
+            InAppLogger.info(
+                "Player/Quality",
+                "quality state ready variants=${resolved.variants.size} " +
+                    "recommended=${resolved.labelFor(null).orEmpty()} " +
+                    "playbackUrl=${InAppLogger.redactUrl(activePlaybackSourceUrl)}",
+            )
+        } else {
+            playerQualityState = PlayerQualitySelectionState(sourceUrl = resolvingSourceUrl)
+        }
+    }
+
+    // Compose only delivers key events to the focused subtree, and overlays take focus while they
+    // are open, so focus is re-requested whenever the last one closes.
+    val keyboardFocusRequester = remember { FocusRequester() }
+    val keyboardShortcutsEnabled = remember {
+        derivedStateOf { !isAnyOverlayVisible && !playerControlsLocked }
+    }
+    val onKeyboardShortcut = rememberUpdatedState(::handleKeyboardShortcut)
+    LaunchedEffect(keyboardShortcutsEnabled.value) {
+        if (keyboardShortcutsEnabled.value) {
+            runCatching { keyboardFocusRequester.requestFocus() }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { layoutSize = it }
+            .playerKeyboardShortcuts(
+                focusRequester = keyboardFocusRequester,
+                enabledState = keyboardShortcutsEnabled,
+                onShortcutState = onKeyboardShortcut,
+            )
             .playerSurfaceTapGestures(
                 layoutSize = layoutSize,
                 playerControlsLockedState = gestureCallbacks.playerControlsLocked,
@@ -121,10 +208,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             )
             .playerSurfaceDragGestures(
                 gestureController = gestureController,
+                playerController = playerController,
                 layoutSize = layoutSize,
                 sideGestureSystemEdgeExclusionPx = sideGestureSystemEdgeExclusionPx,
                 playerControlsLockedState = gestureCallbacks.playerControlsLocked,
                 touchGesturesEnabledState = gestureCallbacks.touchGesturesEnabled,
+                swipeToSeekEnabledState = gestureCallbacks.swipeToSeekEnabled,
                 isHoldToSpeedGestureActiveState = gestureCallbacks.isHoldToSpeedGestureActive,
                 currentPositionMsState = gestureCallbacks.currentPositionMs,
                 currentDurationMsState = gestureCallbacks.currentDurationMs,
@@ -137,7 +226,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 commitHorizontalSeekState = gestureCallbacks.commitHorizontalSeek,
             ),
     ) {
-        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
+        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
         val initialPositionRequestKey = currentInitialPositionRequestKey()
         if (playerSurfaceSourceUrl != null) {
             PlatformPlayerSurface(
@@ -159,7 +248,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 },
                 onControllerReady = { controller ->
                     playerController = controller
-                    playerControllerSourceUrl = activeSourceUrl
+                    playerControllerSourceUrl = playerSurfaceSourceUrl
                 },
                 onSnapshot = { snapshot ->
                     playbackSnapshot = snapshot
@@ -189,8 +278,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             exit = fadeOut(animationSpec = tween(durationMillis = 180)),
         ) {
             PauseMetadataOverlay(
-                title = title,
-                logo = logo,
+                title = if (isLiveTvPlayback) activeStreamTitle else title,
+                logo = if (isLiveTvPlayback) activeLogo else logo,
                 isEpisode = isEpisode,
                 seasonNumber = activeSeasonNumber,
                 episodeNumber = activeEpisodeNumber,
@@ -244,6 +333,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
         enter = fadeIn(),
         exit = fadeOut(),
     ) {
+        val pipAvailable = isIos && playerController?.isPictureInPictureSupported() == true
         PlayerControlsShell(
             title = title,
             streamTitle = activeStreamTitle,
@@ -268,14 +358,38 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSeekBack = { seekBy(-10_000L) },
             onSeekForward = { seekBy(10_000L) },
             onResizeModeClick = { cycleResizeMode() },
-            onSpeedClick = { cyclePlaybackSpeed() },
-            onSubtitleClick = {
-                refreshTracks()
-                showSubtitleModal = true
-            },
+            onSpeedClick = if (!isLiveTvPlayback) {
+                {
+                    cyclePlaybackSpeed()
+                }
+            } else null,
+            onSubtitleClick = if (!isLiveTvPlayback) {
+                {
+                    refreshTracks()
+                    showSubtitleModal = true
+                }
+            } else null,
             onAudioClick = {
                 refreshTracks()
                 showAudioModal = true
+            },
+            onPictureInPictureClick = if (pipAvailable) {
+                {
+                    InAppLogger.info("Player/PiP", "start requested")
+                    playerController?.startPictureInPicture()
+                    controlsVisible = false
+                }
+            } else null,
+            onInfoClick = {
+                val selectedQuality = playerQualityState.selectedVariantFor(selectedPlayerQualityId)
+                InAppLogger.info(
+                    "Player/Info",
+                    "open playback info selectedQuality=${selectedQuality?.qualityName ?: "source"} " +
+                        "actual=${playbackSnapshot.videoWidth ?: 0}x${playbackSnapshot.videoHeight ?: 0} " +
+                        "mediaInfoChars=${playbackSnapshot.mediaInfoJson.length} " +
+                        "source=${InAppLogger.redactUrl(activePlaybackSourceUrl ?: activeSourceUrl)}",
+                )
+                showStreamInfoModal = true
             },
             onVideoSettingsClick = if (isIos) {
                 {
@@ -285,8 +399,25 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             } else {
                 null
             },
-            onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
-            onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
+            onSourcesClick = if (!isLiveTvPlayback && activeVideoId != null) {
+                {
+                    openSourcesPanel()
+                }
+            } else null,
+            onEpisodesClick = if (isSeries) {
+                {
+                    openEpisodesPanel()
+                }
+            } else null,
+            onLiveChannelsClick = if (isLiveTvPlayback) {
+                {
+                    showLiveChannelsPanel = true
+                }
+            } else null,
+            qualityLabel = playerQualityControlLabel(),
+            onQualityClick = {
+                openQualityPanel()
+            },
             onOpenInExternalPlayer = args.onOpenInExternalPlayer?.let { openExternal ->
                 {
                     val loadedSubtitles = addonSubtitles
@@ -321,7 +452,14 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
                 playerSettingsUiState.introSubmitEnabled &&
                 playerSettingsUiState.introDbApiKey.isNotBlank()
             ) {
-                { showSubmitIntroModal = true }
+                {
+                    InAppLogger.info(
+                        "Player/SkipIntro",
+                        "open submit dialog videoId=${activeVideoId.orEmpty()} s=${activeSeasonNumber ?: 0} " +
+                            "e=${activeEpisodeNumber ?: 0} positionMs=$displayedPositionMs",
+                    )
+                    showSubmitIntroModal = true
+                }
             } else {
                 null
             },
@@ -365,9 +503,9 @@ private fun BoxScope.RenderPlaybackOverlays(
         horizontalSafePadding = horizontalSafePadding,
         onUnlock = { unlockPlayerControls() },
         showOpeningOverlay = playerSettingsUiState.showLoadingOverlay && !initialLoadCompleted && errorMessage == null,
-        backdropArtwork = background ?: poster,
-        logo = logo,
-        title = title,
+        backdropArtwork = if (isLiveTvPlayback) activeLogo?.takeIf(String::isNotBlank) ?: background ?: poster else background ?: poster,
+        logo = if (isLiveTvPlayback) activeLogo else logo,
+        title = if (isLiveTvPlayback) activeStreamTitle else title,
         onBackWithProgress = {
             flushWatchProgress()
             args.onBack()
@@ -388,11 +526,26 @@ private fun BoxScope.RenderPlaybackOverlays(
             val rawMs = (interval.endTime * 1000.0).toLong()
             val durationMs = playbackSnapshot.durationMs
             val seekMs = if (durationMs > 0L) rawMs.coerceAtMost(durationMs - 1) else rawMs
+            InAppLogger.info(
+                "Player/SkipIntro",
+                "skip type=${interval.type} provider=${interval.provider} " +
+                    "fromMs=${playbackSnapshot.positionMs} targetMs=$seekMs rawMs=$rawMs " +
+                    "startSec=${interval.startTime} endSec=${interval.endTime}",
+            )
             playerController?.seekTo(seekMs)
             scheduleProgressSyncAfterSeek()
             skipIntervalDismissed = true
         },
-        onDismissSkipInterval = { skipIntervalDismissed = true },
+        onDismissSkipInterval = {
+            activeSkipInterval?.let { interval ->
+                InAppLogger.debug(
+                    "Player/SkipIntro",
+                    "dismiss type=${interval.type} provider=${interval.provider} " +
+                        "positionMs=${playbackSnapshot.positionMs}",
+                )
+            }
+            skipIntervalDismissed = true
+        },
         sliderEdgePadding = sliderEdgePadding,
         overlayBottomPadding = overlayBottomPadding,
         isSeries = isSeries,
@@ -422,6 +575,44 @@ private fun BoxScope.RenderPlaybackOverlays(
         )
     }
 }
+
+private fun PlayerScreenRuntime.openQualityPanel() {
+    InAppLogger.info(
+        "Player/Quality",
+        "open quality panel selected=${selectedPlayerQualityId ?: "auto"} " +
+            "variants=${playerQualityState.variants.size} loading=${playerQualityState.isLoading} " +
+            "actual=${playbackSnapshot.videoWidth ?: 0}x${playbackSnapshot.videoHeight ?: 0}",
+    )
+    showQualityPanel = true
+    showSourcesPanel = false
+    showEpisodesPanel = false
+    controlsVisible = false
+}
+
+private fun PlayerScreenRuntime.playerQualityControlLabel(): String {
+    if (playerQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
+    val label = playerQualityState.labelFor(selectedPlayerQualityId, forButton = true)
+    if (!label.isNullOrBlank()) {
+        return if (selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
+            "Auto $label"
+        } else {
+            label
+        }
+    }
+    return playbackResolutionLabel(forButton = true) ?: "Quality"
+}
+
+private fun PlayerScreenRuntime.currentQualityPanelResolutionLabel(): String? {
+    playbackResolutionLabel(forButton = false)?.let { return it }
+    return playerQualityState.labelFor(selectedPlayerQualityId, forButton = false)
+}
+
+private fun PlayerScreenRuntime.playbackResolutionLabel(forButton: Boolean): String? =
+    playerQualityNameForResolution(
+        width = playbackSnapshot.videoWidth,
+        height = playbackSnapshot.videoHeight,
+        forButton = forButton,
+    )
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
@@ -501,6 +692,17 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         activeEpisodeTitle = activeEpisodeTitle,
         activeSourceUrl = activeSourceUrl,
         activeStreamTitle = activeStreamTitle,
+        showQualityPanel = showQualityPanel,
+        playerQualityState = playerQualityState,
+        selectedPlayerQualityId = selectedPlayerQualityId,
+        currentQualityLabel = currentQualityPanelResolutionLabel(),
+        selectedQualityVariant = playerQualityState.selectedVariantFor(selectedPlayerQualityId),
+        selectedQualityIsAuto = selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities,
+        onPlayerQualitySelected = { qualityId -> selectPlayerQuality(qualityId) },
+        onQualityPanelDismissed = {
+            showQualityPanel = false
+            controlsVisible = true
+        },
         onSourceFilterSelected = PlayerStreamsRepository::selectSourceFilter,
         onSourceStreamSelected = { stream -> switchToSource(stream) },
         onReloadSources = {
@@ -517,6 +719,14 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         },
         onSourcesPanelDismissed = {
             showSourcesPanel = false
+            controlsVisible = true
+        },
+        showLiveChannelsPanel = showLiveChannelsPanel,
+        liveTvChannels = liveTvUiState.channels,
+        activeLiveChannelId = activeVideoId,
+        onLiveChannelSelected = { channel -> switchToLiveChannel(channel) },
+        onLiveChannelsPanelDismissed = {
+            showLiveChannelsPanel = false
             controlsVisible = true
         },
         isSeries = isSeries,
@@ -583,10 +793,19 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onSubmitIntroEndTimeChanged = { submitIntroEndTimeStr = it },
         onSubmitIntroDismissed = { showSubmitIntroModal = false },
         onSubmitIntroSuccess = {
+            InAppLogger.info(
+                "Player/SkipIntro",
+                "submit success videoId=${activeVideoId.orEmpty()} s=${activeSeasonNumber ?: 0} " +
+                    "e=${activeEpisodeNumber ?: 0} type=$submitIntroSegmentType " +
+                    "start=$submitIntroStartTimeStr end=$submitIntroEndTimeStr",
+            )
             submitIntroStartTimeStr = "00:00"
             submitIntroEndTimeStr = "00:00"
             submitIntroSegmentType = "intro"
             showSubmitIntroModal = false
         },
+        showStreamInfoModal = showStreamInfoModal,
+        mediaInfoJson = playbackSnapshot.mediaInfoJson,
+        onStreamInfoModalDismissed = { showStreamInfoModal = false },
     )
 }
