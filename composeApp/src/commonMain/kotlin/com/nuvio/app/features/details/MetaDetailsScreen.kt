@@ -651,10 +651,13 @@ fun MetaDetailsScreen(
                         heroTrailerPlaybackSource = source
                     }
                 }
-                val onBackFromDetails: () -> Unit = {
+                val stopHeroTrailerForNavigation: () -> Unit = {
                     isLeavingDetails = true
                     heroTrailerReady = false
                     heroTrailerFinished = true
+                }
+                val onBackFromDetails: () -> Unit = {
+                    stopHeroTrailerForNavigation()
                     onBack()
                 }
                 val resolveTrailer: (MetaTrailer) -> Unit = remember(meta.id, inAppTrailerPlaybackEnabled, uriHandler) {
@@ -708,6 +711,7 @@ fun MetaDetailsScreen(
                     }
                 }
                 val onPrimaryPlayClick: () -> Unit = {
+                    stopHeroTrailerForNavigation()
                     when {
                         (meta.type == "series" || hasEpisodes) && seriesAction != null -> {
                             onPlay?.invoke(
@@ -754,6 +758,7 @@ fun MetaDetailsScreen(
                     ?.takeIf { showManualPlayOption }
                     ?.let { manualPlay ->
                         {
+                            stopHeroTrailerForNavigation()
                             when {
                                 (meta.type == "series" || hasEpisodes) && seriesAction != null -> {
                                     manualPlay(
@@ -812,6 +817,7 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                     )
                         ?.takeUnless { it.isCompleted }
+                    stopHeroTrailerForNavigation()
                     onPlay?.invoke(
                         meta.type,
                         streamVideoId,
@@ -846,6 +852,7 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                     )
                         ?.takeUnless { it.isCompleted }
+                    stopHeroTrailerForNavigation()
                     onPlayManually?.invoke(
                         meta.type,
                         streamVideoId,
