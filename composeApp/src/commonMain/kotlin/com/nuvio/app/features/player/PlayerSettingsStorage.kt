@@ -17,6 +17,10 @@ internal expect object PlayerSettingsStorage {
     fun saveTouchGesturesEnabled(enabled: Boolean)
     fun loadSwipeToSeekEnabled(): Boolean?
     fun saveSwipeToSeekEnabled(enabled: Boolean)
+    fun loadAutoShowSubtitlesOnRewindEnabled(): Boolean?
+    fun saveAutoShowSubtitlesOnRewindEnabled(enabled: Boolean)
+    fun loadAutoShowSubtitlesOnMuteEnabled(): Boolean?
+    fun saveAutoShowSubtitlesOnMuteEnabled(enabled: Boolean)
     fun loadExternalPlayerEnabled(): Boolean?
     fun saveExternalPlayerEnabled(enabled: Boolean)
     fun loadExternalPlayerForwardSubtitles(): Boolean?

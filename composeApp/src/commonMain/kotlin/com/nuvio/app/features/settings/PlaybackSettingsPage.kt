@@ -554,6 +554,24 @@ private fun PlaybackSettingsSection(
                         )
                     },
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_show_subtitles_on_rewind),
+                    description = stringResource(Res.string.settings_playback_auto_show_subtitles_on_rewind_description),
+                    checked = autoPlayPlayerSettings.autoShowSubtitlesOnRewindEnabled,
+                    enabled = otherSubtitleOptionsEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoShowSubtitlesOnRewindEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_show_subtitles_on_mute),
+                    description = stringResource(Res.string.settings_playback_auto_show_subtitles_on_mute_description),
+                    checked = autoPlayPlayerSettings.autoShowSubtitlesOnMuteEnabled,
+                    enabled = otherSubtitleOptionsEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoShowSubtitlesOnMuteEnabled,
+                )
             }
         }
 

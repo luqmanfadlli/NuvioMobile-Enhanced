@@ -223,13 +223,12 @@ internal class PlayerScreenRuntime(
     var trackPreferenceRestoreApplied by mutableStateOf(false)
     var subtitleDelayMs by mutableStateOf(0)
     var subtitleAutoSyncState by mutableStateOf(SubtitleAutoSyncUiState())
+    var isAutoSubtitleShowing by mutableStateOf(false)
+    var autoSubtitleRewindWatermarkMs by mutableStateOf<Long?>(null)
+    var isAutoSubtitleMuteActive by mutableStateOf(false)
+    var wasAutoSubtitleVolumeMuted by mutableStateOf(false)
+    var autoSubtitleMuteActivationJob by mutableStateOf<Job?>(null)
 
-    /**
-     * True while anything above the player surface owns the screen. Keyboard shortcuts are
-     * suppressed then, so an overlay's own keys (a subtitle search field, list navigation) keep
-     * working. Kept here rather than rebuilt at each call site so the modal set only has to be
-     * maintained in one place.
-     */
     val isAnyOverlayVisible: Boolean
         get() = showAudioModal ||
             showSubtitleModal ||

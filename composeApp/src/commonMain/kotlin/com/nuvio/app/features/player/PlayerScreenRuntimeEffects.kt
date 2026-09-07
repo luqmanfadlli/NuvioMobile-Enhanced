@@ -97,6 +97,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         isUserExplicitAudioSelection = false
         isUserExplicitSubtitleSelection = false
         hasScannedTextTracksOnce = false
+        clearAutoSubtitleState()
+        wasAutoSubtitleVolumeMuted = false
         selectedSubtitleIndex = -1
         selectedAddonSubtitleId = null
         useCustomSubtitles = false

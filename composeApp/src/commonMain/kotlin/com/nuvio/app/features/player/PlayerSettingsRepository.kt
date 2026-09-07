@@ -39,6 +39,8 @@ data class PlayerSettingsUiState(
     val holdToSpeedValue: Float = 2f,
     val touchGesturesEnabled: Boolean = true,
     val swipeToSeekEnabled: Boolean = true,
+    val autoShowSubtitlesOnRewindEnabled: Boolean = true,
+    val autoShowSubtitlesOnMuteEnabled: Boolean = true,
     val externalPlayerEnabled: Boolean = false,
     val externalPlayerForwardSubtitles: Boolean = false,
     val externalPlayerSendSkipSegments: Boolean = false,
@@ -107,6 +109,8 @@ object PlayerSettingsRepository {
     private var holdToSpeedValue = 2f
     private var touchGesturesEnabled = true
     private var swipeToSeekEnabled = true
+    private var autoShowSubtitlesOnRewindEnabled = true
+    private var autoShowSubtitlesOnMuteEnabled = true
     private var externalPlayerEnabled = false
     private var externalPlayerForwardSubtitles = false
     private var externalPlayerSendSkipSegments = false
@@ -180,6 +184,8 @@ object PlayerSettingsRepository {
         holdToSpeedValue = 2f
         touchGesturesEnabled = true
         swipeToSeekEnabled = true
+        autoShowSubtitlesOnRewindEnabled = true
+        autoShowSubtitlesOnMuteEnabled = true
         externalPlayerEnabled = false
         externalPlayerForwardSubtitles = false
         externalPlayerSendSkipSegments = false
@@ -247,6 +253,8 @@ object PlayerSettingsRepository {
         holdToSpeedValue = PlayerSettingsStorage.loadHoldToSpeedValue() ?: 2f
         touchGesturesEnabled = PlayerSettingsStorage.loadTouchGesturesEnabled() ?: true
         swipeToSeekEnabled = PlayerSettingsStorage.loadSwipeToSeekEnabled() ?: true
+        autoShowSubtitlesOnRewindEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnRewindEnabled() ?: true
+        autoShowSubtitlesOnMuteEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnMuteEnabled() ?: true
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
         externalPlayerForwardSubtitles = PlayerSettingsStorage.loadExternalPlayerForwardSubtitles() ?: false
         externalPlayerSendSkipSegments = PlayerSettingsStorage.loadExternalPlayerSendSkipSegments() ?: false
@@ -427,6 +435,22 @@ object PlayerSettingsRepository {
         swipeToSeekEnabled = enabled
         publish()
         PlayerSettingsStorage.saveSwipeToSeekEnabled(enabled)
+    }
+
+    fun setAutoShowSubtitlesOnRewindEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (autoShowSubtitlesOnRewindEnabled == enabled) return
+        autoShowSubtitlesOnRewindEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAutoShowSubtitlesOnRewindEnabled(enabled)
+    }
+
+    fun setAutoShowSubtitlesOnMuteEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (autoShowSubtitlesOnMuteEnabled == enabled) return
+        autoShowSubtitlesOnMuteEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAutoShowSubtitlesOnMuteEnabled(enabled)
     }
 
     fun setExternalPlayerEnabled(enabled: Boolean) {
@@ -940,6 +964,8 @@ object PlayerSettingsRepository {
             holdToSpeedValue = holdToSpeedValue,
             touchGesturesEnabled = touchGesturesEnabled,
             swipeToSeekEnabled = swipeToSeekEnabled,
+            autoShowSubtitlesOnRewindEnabled = autoShowSubtitlesOnRewindEnabled,
+            autoShowSubtitlesOnMuteEnabled = autoShowSubtitlesOnMuteEnabled,
             externalPlayerEnabled = externalPlayerEnabled,
             externalPlayerForwardSubtitles = externalPlayerForwardSubtitles,
             externalPlayerSendSkipSegments = externalPlayerSendSkipSegments,

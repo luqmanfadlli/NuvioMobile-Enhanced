@@ -252,6 +252,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 },
                 onSnapshot = { snapshot ->
                     playbackSnapshot = snapshot
+                    checkAutoSubtitleRewindWatermark(snapshot.positionMs)
                     refreshAudioTracksIfChanged()
                     if (!snapshot.isLoading) initialLoadCompleted = true
                     if (snapshot.isEnded) {
@@ -651,6 +652,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         subtitleAutoSyncState = subtitleAutoSyncState,
         onBuiltInSubtitleTrackSelected = { index ->
             val wasCustom = useCustomSubtitles
+            clearAutoSubtitleState()
             isUserExplicitSubtitleSelection = true
             preferredSubtitleSelectionApplied = true
             selectedSubtitleIndex = index
@@ -664,6 +666,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             }
         },
         onAddonSubtitleSelected = { addon ->
+            clearAutoSubtitleState()
             isUserExplicitSubtitleSelection = true
             selectedAddonSubtitleId = addon.selectionKey
             selectedSubtitleIndex = -1

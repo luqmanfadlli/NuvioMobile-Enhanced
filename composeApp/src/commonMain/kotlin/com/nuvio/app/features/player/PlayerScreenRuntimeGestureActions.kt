@@ -136,6 +136,7 @@ internal fun PlayerScreenRuntime.showBrightnessFeedback(level: Float) {
 }
 
 internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
+    notifyVolumeLevelForAutoSubtitle(level)
     val normalized = level.fraction.coerceIn(0f, PlayerMaxVolumeBoost)
     val percentage = (normalized * 100f).roundToInt()
     val isBoosted = normalized > PlayerNormalVolumeCeiling
@@ -169,12 +170,16 @@ internal fun PlayerScreenRuntime.togglePlayback() {
 }
 
 internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
+    val fromPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     playerController?.seekBy(offsetMs)
     scheduleProgressSyncAfterSeek()
     controlsVisible = true
     when {
         offsetMs > 0L -> showSeekFeedback(PlayerSeekDirection.Forward, offsetMs)
-        offsetMs < 0L -> showSeekFeedback(PlayerSeekDirection.Backward, abs(offsetMs))
+        offsetMs < 0L -> {
+            showSeekFeedback(PlayerSeekDirection.Backward, abs(offsetMs))
+            notifyRewindOccurred(fromPositionMs)
+        }
     }
 }
 
@@ -223,6 +228,9 @@ internal fun PlayerScreenRuntime.handleDoubleTapSeek(direction: PlayerSeekDirect
     playerController?.seekTo(targetPositionMs)
     scheduleProgressSyncAfterSeek()
     showSeekFeedback(direction, nextState.amountMs)
+    if (direction == PlayerSeekDirection.Backward) {
+        notifyRewindOccurred(nextState.baselinePositionMs)
+    }
 
     accumulatedSeekResetJob?.cancel()
     accumulatedSeekResetJob = scope.launch {
@@ -333,8 +341,12 @@ internal fun PlayerScreenRuntime.rememberSurfaceGestureCallbacks(): PlayerSurfac
         currentPositionMs = rememberUpdatedState(playbackSnapshot.positionMs.coerceAtLeast(0L)),
         currentDurationMs = rememberUpdatedState(playbackSnapshot.durationMs),
         commitHorizontalSeek = rememberUpdatedState { targetPositionMs: Long ->
+            val fromPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
             playerController?.seekTo(targetPositionMs)
             scheduleProgressSyncAfterSeek()
+            if (targetPositionMs < fromPositionMs) {
+                notifyRewindOccurred(fromPositionMs)
+            }
         },
     )
 }

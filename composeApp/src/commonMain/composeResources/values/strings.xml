@@ -1179,6 +1179,10 @@
     <string name="settings_playback_touch_gestures_description">Allow swipes and double-taps on the player surface to seek, adjust brightness, or adjust volume.</string>
     <string name="settings_playback_swipe_to_seek">Swipe to Seek</string>
     <string name="settings_playback_swipe_to_seek_description">Swipe left or right across the player to scrub through the video. Turn this off to keep only the up and down swipes for brightness and volume — double-tapping to skip still works.</string>
+    <string name="settings_playback_auto_show_subtitles_on_rewind">Auto-Show Subtitles on Rewind</string>
+    <string name="settings_playback_auto_show_subtitles_on_rewind_description">When subtitles are off, automatically turn them on while you rewind, then hide them again once playback catches back up to where you rewound from.</string>
+    <string name="settings_playback_auto_show_subtitles_on_mute">Auto-Show Subtitles on Mute</string>
+    <string name="settings_playback_auto_show_subtitles_on_mute_description">When subtitles are off, automatically turn them on while muted or with the volume at zero, then hide them again once you unmute.</string>
     <string name="settings_playback_invalid_regex_pattern">Invalid regex pattern</string>
     <string name="settings_playback_last_link_cache_duration">Last Link Cache Duration</string>
     <string name="settings_playback_map_dv7_to_hevc">DV7 - HEVC Fallback</string>
