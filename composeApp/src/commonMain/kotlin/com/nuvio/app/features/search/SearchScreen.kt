@@ -227,20 +227,8 @@ fun SearchScreen(
             else -> stringResource(Res.string.compose_nav_search)
         }
 
-        NuvioScreen(
-            horizontalPadding = 0.dp,
-            listState = listState,
-            autoHidesNativeTabBar = true,
-            modifier = Modifier.fillMaxSize(),
-        ) {
-        stickyHeader {
+        androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .nuvioConsumePointerEvents(),
-                )
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -273,107 +261,138 @@ fun SearchScreen(
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(14.dp))
                 }
             }
-        }
 
-        if (query.isBlank()) {
-            if (recentSearches.isNotEmpty()) {
-                item(key = "recent_searches") {
-                    SearchRecentSection(
-                        recentSearches = recentSearches,
-                        onSearchPress = { recentQuery -> query = recentQuery },
-                        onRemoveSearch = SearchHistoryRepository::removeSearch,
-                    )
+            NuvioScreen(
+                horizontalPadding = 0.dp,
+                topPadding = 0.dp,
+                listState = listState,
+                autoHidesNativeTabBar = true,
+                modifier = Modifier.weight(1f),
+            ) {
+                if (query.isBlank()) {
+                    item {
+                        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
+                    }
+                    stickyHeader {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .nuvioConsumePointerEvents(),
+                            )
+                            DiscoverFilterRow(
+                                state = discoverUiState,
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .padding(top = 8.dp, bottom = 14.dp),
+                                onTypeSelected = SearchRepository::selectDiscoverType,
+                                onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                                onGenreSelected = SearchRepository::selectDiscoverGenre,
+                            )
+                        }
+                    }
                 }
-            }
-                discoverContent(
-                    state = discoverUiState,
-                    isSourceLoading = addonManifestsLoading,
-                    columns = discoverColumns,
-                    networkCondition = networkStatusUiState.condition,
-                    onTypeSelected = SearchRepository::selectDiscoverType,
-                    onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                    onGenreSelected = SearchRepository::selectDiscoverGenre,
-                    onRetry = {
-                        NetworkStatusRepository.requestRefresh(force = true)
-                        if (addonsUiState.addons.firstEnabledManifestError() != null) {
-                            AddonRepository.refreshAll()
-                        } else {
-                            SearchRepository.refreshDiscover(
-                                addons = addonsUiState.addons,
-                                forceRefresh = true,
-                            )
-                        }
-                    },
-                    watchedKeys = watchedUiState.watchedKeys,
-                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                    onPosterClick = onPosterClick,
-                    onPosterLongClick = onPosterLongClick,
-                )
-            } else {
-                val normalizedQuery = query.trim()
-                val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
-                when {
-                    isWaitingForSearch -> {
-                        items(2) {
-                            HomeSkeletonRow(
-                                horizontalPadding = homeSectionPadding,
+                if (query.isBlank()) {
+                    if (recentSearches.isNotEmpty()) {
+                        item(key = "recent_searches") {
+                            SearchRecentSection(
+                                recentSearches = recentSearches,
+                                onSearchPress = { recentQuery -> query = recentQuery },
+                                onRemoveSearch = SearchHistoryRepository::removeSearch,
                             )
                         }
                     }
-
-                    (uiState.isLoading || addonManifestsLoading) && uiState.sections.isEmpty() -> {
-                        items(2) {
-                            HomeSkeletonRow(
-                                horizontalPadding = homeSectionPadding,
-                            )
-                        }
-                    }
-
-                    uiState.sections.isEmpty() -> {
-                        item {
-                            SearchEmptyStateCard(
-                                reason = uiState.emptyStateReason,
-                                errorMessage = uiState.errorMessage,
-                                networkCondition = networkStatusUiState.condition,
-                                onRetry = {
-                                    if (normalizedQuery.isNotBlank()) {
-                                        NetworkStatusRepository.requestRefresh(force = true)
-                                        if (addonsUiState.addons.firstEnabledManifestError() != null) {
-                                            AddonRepository.refreshAll()
-                                        } else {
-                                            SearchRepository.search(
-                                                query = normalizedQuery,
-                                                addons = addonsUiState.addons,
-                                                forceRefresh = true,
-                                            )
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.padding(horizontal = homeSectionPadding),
-                            )
-                        }
-                    }
-
-                    else -> {
-                        items(
-                            items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
-                            key = { section -> section.lazyKey },
-                        ) { keyedSection ->
-                            val section = keyedSection.value
-                            HomeCatalogRowSection(
-                                section = section,
-                                modifier = Modifier.padding(bottom = 12.dp),
-                                watchedKeys = watchedUiState.watchedKeys,
-                                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                                onPosterClick = onPosterClick,
-                                onPosterLongClick = onPosterLongClick,
-                            )
-                        }
-                        if (uiState.isLoading) {
-                            item(key = "search_loading_more") {
-                                HomeSkeletonRow(
-                                    horizontalPadding = homeSectionPadding,
+                    discoverContent(
+                        state = discoverUiState,
+                        isSourceLoading = addonManifestsLoading,
+                        columns = discoverColumns,
+                        networkCondition = networkStatusUiState.condition,
+                        onTypeSelected = SearchRepository::selectDiscoverType,
+                        onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                        onGenreSelected = SearchRepository::selectDiscoverGenre,
+                        onRetry = {
+                            NetworkStatusRepository.requestRefresh(force = true)
+                            if (addonsUiState.addons.firstEnabledManifestError() != null) {
+                                AddonRepository.refreshAll()
+                            } else {
+                                SearchRepository.refreshDiscover(
+                                    addons = addonsUiState.addons,
+                                    forceRefresh = true,
                                 )
+                            }
+                        },
+                        watchedKeys = watchedUiState.watchedKeys,
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                        onPosterClick = onPosterClick,
+                        onPosterLongClick = onPosterLongClick,
+                    )
+                } else {
+                    val normalizedQuery = query.trim()
+                    val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
+                    when {
+                        isWaitingForSearch -> {
+                            items(2) {
+                                HomeSkeletonRow(
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                )
+                            }
+                        }
+
+                        (uiState.isLoading || addonManifestsLoading) && uiState.sections.isEmpty() -> {
+                            items(2) {
+                                HomeSkeletonRow(
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                )
+                            }
+                        }
+
+                        uiState.sections.isEmpty() -> {
+                            item {
+                                SearchEmptyStateCard(
+                                    reason = uiState.emptyStateReason,
+                                    errorMessage = uiState.errorMessage,
+                                    networkCondition = networkStatusUiState.condition,
+                                    onRetry = {
+                                        if (normalizedQuery.isNotBlank()) {
+                                            NetworkStatusRepository.requestRefresh(force = true)
+                                            if (addonsUiState.addons.firstEnabledManifestError() != null) {
+                                                AddonRepository.refreshAll()
+                                            } else {
+                                                SearchRepository.search(
+                                                    query = normalizedQuery,
+                                                    addons = addonsUiState.addons,
+                                                    forceRefresh = true,
+                                                )
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                )
+                            }
+                        }
+
+                        else -> {
+                            items(
+                                items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
+                                key = { section -> section.lazyKey },
+                            ) { keyedSection ->
+                                val section = keyedSection.value
+                                HomeCatalogRowSection(
+                                    section = section,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+                            if (uiState.isLoading) {
+                                item(key = "search_loading_more") {
+                                    HomeSkeletonRow(
+                                        modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                    )
+                                }
                             }
                         }
                     }

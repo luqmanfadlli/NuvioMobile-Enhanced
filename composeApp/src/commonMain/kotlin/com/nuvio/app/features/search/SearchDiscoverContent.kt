@@ -44,18 +44,6 @@ internal fun LazyListScope.discoverContent(
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
-    item {
-        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
-    }
-    item {
-        DiscoverFilterRow(
-            state = state,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            onTypeSelected = onTypeSelected,
-            onCatalogSelected = onCatalogSelected,
-            onGenreSelected = onGenreSelected,
-        )
-    }
     state.selectedCatalog?.let { selectedCatalog ->
         item {
             Text(
@@ -120,7 +108,7 @@ internal fun LazyListScope.discoverContent(
 }
 
 @Composable
-private fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
+internal fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
     Text(
         text = stringResource(Res.string.compose_search_discover_title),
         modifier = modifier,
@@ -130,7 +118,7 @@ private fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DiscoverFilterRow(
+internal fun DiscoverFilterRow(
     state: DiscoverUiState,
     onTypeSelected: (String) -> Unit,
     onCatalogSelected: (String) -> Unit,
