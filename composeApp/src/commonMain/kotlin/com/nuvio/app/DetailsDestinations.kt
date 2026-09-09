@@ -90,6 +90,8 @@ internal fun DetailsDestination(
     MetaDetailsScreen(
         type = route.type,
         id = route.id,
+        initialSeasonNumber = route.initialSeasonNumber,
+        initialEpisodeNumber = route.initialEpisodeNumber,
         onBack = onBack,
         onPlay = onPlay,
         onPlayManually = onPlayManually,
