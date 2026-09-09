@@ -133,7 +133,10 @@ data class FolderDetailRoute(
 data class StreamRoute(
     val launchId: Long,
     override val title: String = "",
-) : AppRoute
+) : AppRoute {
+    override val hidesNavigationBar: Boolean
+        get() = true
+}
 
 @Serializable
 data class CatalogRoute(
