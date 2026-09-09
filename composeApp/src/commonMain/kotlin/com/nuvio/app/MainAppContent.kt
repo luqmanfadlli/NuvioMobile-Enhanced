@@ -1187,6 +1187,18 @@ internal fun MainAppContent(
             )
         }
 
+        val openLibraryCalendarEpisode: (LibraryItem, Int?, Int?) -> Unit = { item, season, episode ->
+            navController.navigate(
+                DetailRoute(
+                    type = item.type,
+                    id = item.id,
+                    title = item.name,
+                    initialSeasonNumber = season,
+                    initialEpisodeNumber = episode,
+                ),
+            )
+        }
+
         val onLibrarySectionViewAllClick: (LibrarySection, LibrarySortOption) -> Unit = { section, sortOption ->
             val launchId = CatalogLaunchStore.put(
                 CatalogLaunch(
@@ -1423,6 +1435,7 @@ internal fun MainAppContent(
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },
                                 onLibraryPosterClick = openLibraryItem,
+                                onLibraryCalendarEpisodeClick = openLibraryCalendarEpisode,
                                 onLibraryPosterLongClick = { item, section ->
                                     openPosterActions(
                                         PosterActionTarget(

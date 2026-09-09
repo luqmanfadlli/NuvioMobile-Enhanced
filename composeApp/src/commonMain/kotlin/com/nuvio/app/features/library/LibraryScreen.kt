@@ -136,6 +136,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
     onPosterClick: ((LibraryItem) -> Unit)? = null,
+    onCalendarEpisodeClick: ((LibraryItem, Int?, Int?) -> Unit)? = null,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
@@ -570,6 +571,7 @@ fun LibraryScreen(
             isLoading = releaseCalendarLoading,
             onDismiss = { showReleaseCalendar = false },
             onPosterClick = onPosterClick,
+            onCalendarEpisodeClick = onCalendarEpisodeClick,
         )
     }
 }
@@ -1324,6 +1326,7 @@ private fun LibraryReleaseCalendarPanel(
     isLoading: Boolean,
     onDismiss: () -> Unit,
     onPosterClick: ((LibraryItem) -> Unit)?,
+    onCalendarEpisodeClick: ((LibraryItem, Int?, Int?) -> Unit)?,
 ) {
     val today = remember { parseLibraryCalendarDate(CurrentDateProvider.todayIsoDate()) ?: LibraryCalendarDate(1970, 1, 1) }
     val todayIso = today.iso
@@ -1341,6 +1344,17 @@ private fun LibraryReleaseCalendarPanel(
     val eventsByDate = remember(events) { events.groupBy { event -> event.date.iso } }
 
     val selectedEvents = eventsByDate[selectedDateIso].orEmpty()
+    val handleEventClick: ((LibraryCalendarEvent) -> Unit)? = when {
+        onCalendarEpisodeClick != null -> { event ->
+            onDismiss()
+            onCalendarEpisodeClick(event.item, event.seasonNumber, event.episodeNumber)
+        }
+        onPosterClick != null -> { event ->
+            onDismiss()
+            onPosterClick(event.item)
+        }
+        else -> null
+    }
     val selectedDate = parseLibraryCalendarDate(selectedDateIso)
     Dialog(
         onDismissRequest = onDismiss,
@@ -1442,12 +1456,7 @@ private fun LibraryReleaseCalendarPanel(
                                         selectedEvents = selectedEvents,
                                         todayIso = todayIso,
                                         isLoading = isLoading,
-                                        onEventClick = onPosterClick?.let { posterClick ->
-                                            { event ->
-                                                onDismiss()
-                                                posterClick(event.item)
-                                            }
-                                        },
+                                        onEventClick = handleEventClick,
                                     )
                                 }
                             }
@@ -1495,12 +1504,7 @@ private fun LibraryReleaseCalendarPanel(
                                     selectedEvents = selectedEvents,
                                     todayIso = todayIso,
                                     isLoading = isLoading,
-                                    onEventClick = onPosterClick?.let { posterClick ->
-                                        { event ->
-                                            onDismiss()
-                                            posterClick(event.item)
-                                        }
-                                    },
+                                    onEventClick = handleEventClick,
                                 )
                             }
                         }
@@ -2202,6 +2206,8 @@ private data class LibraryCalendarEvent(
     val subtitle: String? = null,
     val imageUrl: String? = null,
     val sortTitle: String = title,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
 )
 
 private data class LibraryCalendarSelection(
@@ -2379,6 +2385,8 @@ private fun MetaVideo.toLibraryCalendarEvent(item: LibraryItem): LibraryCalendar
         subtitle = subtitle,
         imageUrl = thumbnail ?: item.banner ?: item.poster,
         sortTitle = "${item.name} ${season ?: 0} ${episode ?: 0} $title",
+        seasonNumber = seasonNumber,
+        episodeNumber = episodeNumber,
     )
 }
 
