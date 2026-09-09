@@ -1337,7 +1337,7 @@ private fun LibraryReleaseCalendarPanel(
     val today = remember { parseLibraryCalendarDate(CurrentDateProvider.todayIsoDate()) ?: LibraryCalendarDate(1970, 1, 1) }
     val todayIso = today.iso
     val initialMonth = remember { initialLibraryCalendarMonth() }
-    var calendarSelection by remember(events) {
+    var calendarSelection by remember(initialMonth, todayIso) {
         mutableStateOf(defaultLibraryCalendarSelection(events, initialMonth, todayIso))
     }
     val visibleMonth = calendarSelection.month
