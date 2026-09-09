@@ -1,6 +1,7 @@
 package com.nuvio.app.features.settings
 
 import com.nuvio.app.core.ui.AppTheme
+import com.nuvio.app.core.ui.CustomThemeColors
 import com.nuvio.app.core.ui.NativeTabBridge
 import com.nuvio.app.core.ui.ThemeColors
 import com.nuvio.app.features.membership.MemberAccessRepository
@@ -19,6 +20,11 @@ object ThemeSettingsRepository {
     val selectedThemePreference: StateFlow<AppTheme?> = _selectedThemePreference.asStateFlow()
     private val _selectedTheme = MutableStateFlow(AppTheme.WHITE)
     val selectedTheme: StateFlow<AppTheme> = _selectedTheme.asStateFlow()
+
+    private val _customThemePreference = MutableStateFlow(CustomThemeColors.Default)
+    val customThemePreference: StateFlow<CustomThemeColors> = _customThemePreference.asStateFlow()
+    private val _customThemeColors = MutableStateFlow(CustomThemeColors.solid(CustomThemeColors.Default.second))
+    val customThemeColors: StateFlow<CustomThemeColors> = _customThemeColors.asStateFlow()
 
     private val _amoledEnabled = MutableStateFlow(false)
     val amoledEnabled: StateFlow<Boolean> = _amoledEnabled.asStateFlow()
@@ -59,6 +65,8 @@ object ThemeSettingsRepository {
         hasLoaded = false
         _selectedThemePreference.value = null
         _selectedTheme.value = AppTheme.WHITE
+        _customThemePreference.value = CustomThemeColors.Default
+        _customThemeColors.value = CustomThemeColors.solid(CustomThemeColors.Default.second)
         _amoledEnabled.value = false
         _tabBarBehavior.value = NuvioTabBarBehavior.Default
         _liquidGlassNativeTabBarEnabled.value = NuvioTabBarBehavior.Default.isEnabled
@@ -84,6 +92,8 @@ object ThemeSettingsRepository {
             null
         }
         _selectedThemePreference.value = theme
+        _customThemePreference.value = CustomThemeColors.decode(ThemeSettingsStorage.loadCustomThemeColors())
+        _customThemeColors.value = _customThemePreference.value
         applyEffectiveTheme()
         _amoledEnabled.value = ThemeSettingsStorage.loadAmoledEnabled() ?: false
         // The four-way behavior replaced the old on/off toggle; fall back to it for existing profiles.
@@ -100,6 +110,13 @@ object ThemeSettingsRepository {
         ThemeSettingsStorage.applySelectedAppLanguage(appLanguage.code)
         _selectedAppLanguage.value = appLanguage
         _navBarStyle.value = NavBarStyle.fromKey(ThemeSettingsStorage.loadNavBarStyle())
+    }
+
+    fun setCustomTheme(colors: CustomThemeColors) {
+        ensureLoaded()
+        _customThemePreference.value = colors
+        _customThemeColors.value = colors
+        ThemeSettingsStorage.saveCustomThemeColors(colors.encode())
     }
 
     fun setTheme(theme: AppTheme) {

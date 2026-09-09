@@ -216,6 +216,7 @@ internal fun HomeSkeletonHero(
 @Composable
 fun HomeSkeletonRow(
     modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 0.dp,
 ) {
     val brush = rememberHomeSkeletonBrush()
     val posterCardStyle = rememberPosterCardStyleUiState()

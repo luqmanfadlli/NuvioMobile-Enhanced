@@ -61,12 +61,12 @@ internal actual object DownloadsPlatformDownloader {
         onPaused: () -> Unit,
     ): DownloadsTaskHandle {
         IosBackgroundDownloadCoordinator.startOrResume(
-            downloadId = request.downloadId,
+            downloadId = request.item.id,
             request = request,
             rangeStart = null,
             callbacks = DownloadCallbacks(onProgress, onSuccess, onFailure),
         )
-        return IosDownloadsTaskHandle(request.downloadId)
+        return IosDownloadsTaskHandle(request.item.id)
     }
 
     actual fun restoreItem(item: DownloadItem): DownloadItem =
@@ -237,7 +237,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
     ) {
         val downloadId = downloadTask.taskDescription ?: return
         val active = activeDownloads[downloadId]
-        val request = active?.request ?: DownloadsRepository.platformRequestForResume(downloadId)
+        val request = active?.request
         if (request == null) {
             runCatching { NSFileManager.defaultManager.removeItemAtPath(didFinishDownloadingToURL.path.orEmpty(), null) }
             return
@@ -307,8 +307,6 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
             tasksByDownloadId.remove(downloadId)
             if (callbacks != null) {
                 callbacks.onSuccess(localFileUri, finalSize)
-            } else {
-                DownloadsRepository.reportPlatformSuccess(downloadId, localFileUri, finalSize)
             }
         } finally {
             if (scopedStarted) base.scopedUrl?.stopAccessingSecurityScopedResource()
@@ -340,8 +338,6 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
         val callbacks = activeDownloads.remove(downloadId)?.callbacks
         if (callbacks != null) {
             callbacks.onFailure(message)
-        } else {
-            DownloadsRepository.reportPlatformFailure(downloadId, message)
         }
     }
 
@@ -366,8 +362,6 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
         val callbacks = active?.callbacks
         if (callbacks != null) {
             callbacks.onProgress(downloadedBytes, totalBytes)
-        } else {
-            DownloadsRepository.reportPlatformProgress(downloadId, downloadedBytes, totalBytes)
         }
     }
 

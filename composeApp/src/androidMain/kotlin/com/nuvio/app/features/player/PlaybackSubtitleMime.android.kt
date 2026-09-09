@@ -11,6 +11,8 @@ internal suspend fun resolveSubtitleMimeType(url: String, headers: Map<String, S
         resolveSubtitleMimeTypeBlocking(url, headers)
     }
 
+internal fun guessSubtitleMimeTypeFromUrl(url: String): String = guessSubtitleMime(url)
+
 private fun resolveSubtitleMimeTypeBlocking(url: String, headers: Map<String, String>?): String {
     probeSubtitleHeaders(url, headers)?.let { (contentType, contentDisposition) ->
         mapSubtitleMime(contentType)?.let { return it }
@@ -86,4 +88,3 @@ private fun guessSubtitleMime(url: String): String {
         else -> MimeTypes.TEXT_VTT
     }
 }
-
