@@ -9,6 +9,75 @@ import kotlin.test.assertTrue
 class StreamAutoPlaySelectorTest {
 
     @Test
+    fun `orderAddonStreams puts pinned sources ahead of the installed order`() {
+        val groups = listOf(
+            emptyGroup("addon:a", "AddonA"),
+            emptyGroup("addon:b", "AddonB"),
+            emptyGroup("plugin:c", "PluginC"),
+        )
+
+        val ordered = StreamAutoPlaySelector.orderAddonStreams(
+            groups = groups,
+            installedOrder = listOf("AddonA", "AddonB"),
+            pinnedSourceIds = listOf("plugin:c"),
+        )
+
+        assertEquals(listOf("plugin:c", "addon:a", "addon:b"), ordered.map { it.addonId })
+    }
+
+    @Test
+    fun `orderAddonStreams keeps pinned sources in the order they were pinned`() {
+        val groups = listOf(
+            emptyGroup("addon:a", "AddonA"),
+            emptyGroup("addon:b", "AddonB"),
+            emptyGroup("plugin:c", "PluginC"),
+        )
+
+        val ordered = StreamAutoPlaySelector.orderAddonStreams(
+            groups = groups,
+            installedOrder = listOf("AddonA", "AddonB"),
+            pinnedSourceIds = listOf("plugin:c", "addon:b"),
+        )
+
+        assertEquals(listOf("plugin:c", "addon:b", "addon:a"), ordered.map { it.addonId })
+    }
+
+    @Test
+    fun `orderAddonStreams keeps direct debrid ahead of pinned sources`() {
+        val groups = listOf(
+            emptyGroup("addon:a", "AddonA"),
+            emptyGroup("debrid:realdebrid", "Real-Debrid"),
+        )
+
+        val ordered = StreamAutoPlaySelector.orderAddonStreams(
+            groups = groups,
+            installedOrder = listOf("AddonA"),
+            pinnedSourceIds = listOf("addon:a"),
+        )
+
+        assertEquals(listOf("debrid:realdebrid", "addon:a"), ordered.map { it.addonId })
+    }
+
+    @Test
+    fun `orderAddonStreams ignores pins for sources that are not present`() {
+        val groups = listOf(emptyGroup("addon:a", "AddonA"))
+
+        val ordered = StreamAutoPlaySelector.orderAddonStreams(
+            groups = groups,
+            installedOrder = listOf("AddonA"),
+            pinnedSourceIds = listOf("addon:gone"),
+        )
+
+        assertEquals(listOf("addon:a"), ordered.map { it.addonId })
+    }
+
+    private fun emptyGroup(addonId: String, addonName: String) = AddonStreamGroup(
+        addonName = addonName,
+        addonId = addonId,
+        streams = emptyList(),
+    )
+
+    @Test
     fun `bingeGroup-first selects matching stream before first stream mode`() {
         val first = stream(
             addonName = "AddonA",

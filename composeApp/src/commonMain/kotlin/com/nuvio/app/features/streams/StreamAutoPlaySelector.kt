@@ -7,6 +7,7 @@ object StreamAutoPlaySelector {
     fun orderAddonStreams(
         groups: List<AddonStreamGroup>,
         installedOrder: List<String>,
+        pinnedSourceIds: List<String> = emptyList(),
     ): List<AddonStreamGroup> {
         if (groups.isEmpty()) return groups
 
@@ -21,15 +22,27 @@ object StreamAutoPlaySelector {
             group.addonId.startsWith("debrid:") ||
                 group.streams.any { stream -> stream.isAddonDebridCandidate && stream.isDirectDebridStream }
         }
-        if (installedOrder.isEmpty()) return directDebridEntries + remainingEntries
 
-        val (addonEntries, pluginEntries) = remainingEntries.partition { group ->
+        val pinnedRank = HashMap<String, Int>(pinnedSourceIds.size)
+        pinnedSourceIds.forEachIndexed { index, addonId ->
+            if (addonId !in pinnedRank) {
+                pinnedRank[addonId] = index
+            }
+        }
+        val (pinnedEntries, unpinnedEntries) = remainingEntries.partition { group ->
+            group.addonId in pinnedRank
+        }
+        val orderedPinned = pinnedEntries.sortedBy { group -> pinnedRank.getValue(group.addonId) }
+
+        if (installedOrder.isEmpty()) return directDebridEntries + orderedPinned + unpinnedEntries
+
+        val (addonEntries, pluginEntries) = unpinnedEntries.partition { group ->
             group.addonName in addonRankByName
         }
         val orderedAddons = addonEntries.sortedBy { group ->
             addonRankByName.getValue(group.addonName)
         }
-        return directDebridEntries + orderedAddons + pluginEntries
+        return directDebridEntries + orderedPinned + orderedAddons + pluginEntries
     }
 
     fun selectAutoPlayStream(

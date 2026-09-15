@@ -17,6 +17,7 @@ import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.streams.AddonStreamGroup
 import com.nuvio.app.features.streams.InstalledStreamAddonTarget
+import com.nuvio.app.features.streams.PinnedStreamSourcesRepository
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamBadgePresentation
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
@@ -287,6 +288,8 @@ object PlayerStreamsRepository {
         }
 
         val installedAddonOrder = streamAddons.map { it.addonName }
+        PinnedStreamSourcesRepository.ensureLoaded()
+        val pinnedSourceIds = PinnedStreamSourcesRepository.pinnedSourceIds.value
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
@@ -301,7 +304,7 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }, installedAddonOrder)
+        }, installedAddonOrder, pinnedSourceIds)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         stateFlow.value = StreamsUiState(
             groups = initialGroups,
@@ -344,6 +347,7 @@ object PlayerStreamsRepository {
                             if (currentGroup.addonId == group.addonId) group else currentGroup
                         },
                         installedOrder = installedAddonOrder,
+                        pinnedSourceIds = pinnedSourceIds,
                     )
                     val anyLoading = updated.any { it.isLoading }
                     current.copy(
@@ -512,6 +516,7 @@ object PlayerStreamsRepository {
                                     }
                                 },
                                 installedOrder = installedAddonOrder,
+                                pinnedSourceIds = pinnedSourceIds,
                             )
                             val anyLoading = updated.any { it.isLoading }
                             current.copy(

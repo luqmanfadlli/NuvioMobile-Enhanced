@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SearchOff
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
@@ -46,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -742,6 +745,8 @@ internal fun ProviderFilterRow(
     modifier: Modifier = Modifier,
 ) {
     val addonGroups = groups.filter { it.streams.isNotEmpty() || it.isLoading }
+    val pinnedSourceIds by rememberPinnedStreamSourceIds()
+    var pinSheetTarget by remember { mutableStateOf<AddonStreamGroup?>(null) }
 
     Row(
         modifier = modifier
@@ -766,7 +771,77 @@ internal fun ProviderFilterRow(
             FilterChip(
                 label = group.addonName,
                 isSelected = selectedFilter == group.addonId,
+                isPinned = group.addonId in pinnedSourceIds,
                 onClick = { onFilterSelected(group.addonId) },
+                onLongClick = { pinSheetTarget = group.takeIf { it.isPinnableSource } },
+            )
+        }
+    }
+
+    StreamSourcePinSheet(
+        group = pinSheetTarget,
+        onDismiss = { pinSheetTarget = null },
+    )
+}
+
+@Composable
+private fun rememberPinnedStreamSourceIds(): State<List<String>> {
+    LaunchedEffect(Unit) { PinnedStreamSourcesRepository.ensureLoaded() }
+    return PinnedStreamSourcesRepository.pinnedSourceIds.collectAsStateWithLifecycle()
+}
+
+private val AddonStreamGroup.isPinnableSource: Boolean
+    get() = !addonId.startsWith("debrid:") &&
+        streams.none { stream -> stream.isAddonDebridCandidate && stream.isDirectDebridStream }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StreamSourcePinSheet(
+    group: AddonStreamGroup?,
+    onDismiss: () -> Unit,
+) {
+    if (group == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+    val pinnedSourceIds by rememberPinnedStreamSourceIds()
+    val isPinned = group.addonId in pinnedSourceIds
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = nuvioSafeBottomPadding(16.dp)),
+        ) {
+            Text(
+                text = group.addonName,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            NuvioBottomSheetDivider()
+            NuvioBottomSheetActionRow(
+                icon = Icons.Rounded.PushPin,
+                title = stringResource(
+                    if (isPinned) Res.string.streams_unpin_source else Res.string.streams_pin_source,
+                ),
+                onClick = {
+                    PinnedStreamSourcesRepository.setPinned(group.addonId, !isPinned)
+                    StreamsRepository.applyPinnedSourceOrder()
+                    coroutineScope.launch {
+                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                    }
+                },
             )
         }
     }
@@ -778,7 +853,9 @@ private fun FilterChip(
     icon: ImageVector? = null,
     contentDescription: String? = null,
     isSelected: Boolean,
+    isPinned: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -814,10 +891,11 @@ private fun FilterChip(
             .height(36.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(containerColor)
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,
+                onLongClick = onLongClick,
             )
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
@@ -832,6 +910,14 @@ private fun FilterChip(
                     contentDescription = contentDescription,
                     tint = contentColor,
                     modifier = Modifier.size(20.dp),
+                )
+            }
+            if (isPinned) {
+                Icon(
+                    imageVector = Icons.Rounded.PushPin,
+                    contentDescription = stringResource(Res.string.streams_pinned_source),
+                    tint = contentColor,
+                    modifier = Modifier.size(14.dp),
                 )
             }
             if (label != null) {
@@ -955,8 +1041,7 @@ private fun LazyListScope.streamSection(
     if (showHeader) {
         item(key = "header_$sectionKey") {
             StreamSectionHeader(
-                addonName = group.addonName,
-                isLoading = group.isLoading,
+                group = group,
                 fetchingText = fetchingText,
             )
         }
@@ -1047,26 +1132,47 @@ internal fun streamCardRenderKey(
 
 @Composable
 private fun StreamSectionHeader(
-    addonName: String,
-    isLoading: Boolean,
+    group: AddonStreamGroup,
     fetchingText: String,
     modifier: Modifier = Modifier,
 ) {
+    val isLoading = group.isLoading
+    val pinnedSourceIds by rememberPinnedStreamSourceIds()
+    val isPinned = group.addonId in pinnedSourceIds
+    var pinSheetVisible by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { if (group.isPinnableSource) pinSheetVisible = true },
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = addonName,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (isPinned) {
+                Icon(
+                    imageVector = Icons.Rounded.PushPin,
+                    contentDescription = stringResource(Res.string.streams_pinned_source),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            Text(
+                text = group.addonName,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
+            )
+        }
         AnimatedVisibility(visible = isLoading, enter = fadeIn(), exit = fadeOut()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NuvioLoadingIndicator(
@@ -1082,6 +1188,11 @@ private fun StreamSectionHeader(
             }
         }
     }
+
+    StreamSourcePinSheet(
+        group = group.takeIf { pinSheetVisible },
+        onDismiss = { pinSheetVisible = false },
+    )
 }
 
 @Composable
@@ -1154,6 +1265,25 @@ private fun StreamActionsSheet(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+            }
+
+            if (stream.addonId.isNotBlank() && !stream.isDirectDebridStream) {
+                val pinnedSourceIds by rememberPinnedStreamSourceIds()
+                val isPinned = stream.addonId in pinnedSourceIds
+                NuvioBottomSheetDivider()
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.PushPin,
+                    title = stringResource(
+                        if (isPinned) Res.string.streams_unpin_source else Res.string.streams_pin_source,
+                    ),
+                    onClick = {
+                        PinnedStreamSourcesRepository.setPinned(stream.addonId, !isPinned)
+                        StreamsRepository.applyPinnedSourceOrder()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
             }
 
             NuvioBottomSheetDivider()

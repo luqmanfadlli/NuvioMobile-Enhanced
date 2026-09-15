@@ -19,9 +19,10 @@ actual object StreamBadgeSettingsStorage {
     private const val showAddonLogoKey = "show_addon_logo"
     private const val streamBackgroundModeKey = "stream_background_mode"
     private const val streamBadgePlacementKey = "stream_badge_placement"
+    private const val pinnedStreamSourcesKey = "pinned_stream_sources"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
 
-    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, streamBadgePlacementKey, streamBackgroundModeKey)
+    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, streamBadgePlacementKey, streamBackgroundModeKey, pinnedStreamSourcesKey)
 
     private var preferences: SharedPreferences? = null
     private var legacyDebridPreferences: SharedPreferences? = null
@@ -59,6 +60,12 @@ actual object StreamBadgeSettingsStorage {
 
     actual fun saveStreamBadgePlacement(placement: String) {
         saveString(streamBadgePlacementKey, placement)
+    }
+
+    actual fun loadPinnedStreamSources(): String? = loadString(pinnedStreamSourcesKey)
+
+    actual fun savePinnedStreamSources(sources: String) {
+        saveString(pinnedStreamSourcesKey, sources)
     }
 
     actual fun loadLegacyDebridStreamBadgeRules(): String? =
@@ -103,6 +110,7 @@ actual object StreamBadgeSettingsStorage {
         loadShowFileSizeBadges()?.let { put(showFileSizeBadgesKey, encodeSyncBoolean(it)) }
         loadStreamBadgePlacement()?.let { put(streamBadgePlacementKey, encodeSyncString(it)) }
         loadStreamBackgroundMode()?.let { put(streamBackgroundModeKey, encodeSyncString(it)) }
+        loadPinnedStreamSources()?.let { put(pinnedStreamSourcesKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -114,5 +122,6 @@ actual object StreamBadgeSettingsStorage {
         payload.decodeSyncBoolean(showFileSizeBadgesKey)?.let(::saveShowFileSizeBadges)
         payload.decodeSyncString(streamBadgePlacementKey)?.let(::saveStreamBadgePlacement)
         payload.decodeSyncString(streamBackgroundModeKey)?.let(::saveStreamBackgroundMode)
+        payload.decodeSyncString(pinnedStreamSourcesKey)?.let(::savePinnedStreamSources)
     }
 }

@@ -219,6 +219,8 @@ object StreamsRepository {
 
         // Initialise loading placeholders
         val installedAddonOrder = streamAddons.map { it.addonName }
+        PinnedStreamSourcesRepository.ensureLoaded()
+        val pinnedSourceIds = PinnedStreamSourcesRepository.pinnedSourceIds.value
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
@@ -233,7 +235,7 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }, installedAddonOrder)
+        }, installedAddonOrder, pinnedSourceIds)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
@@ -283,6 +285,7 @@ object StreamsRepository {
                             if (currentGroup.addonId == group.addonId) group else currentGroup
                         },
                         installedOrder = installedAddonOrder,
+                        pinnedSourceIds = pinnedSourceIds,
                     )
                     val anyLoading = updated.any { it.isLoading }
                     current.copy(
@@ -583,6 +586,7 @@ object StreamsRepository {
                                     }
                                 },
                                 installedOrder = installedAddonOrder,
+                                pinnedSourceIds = pinnedSourceIds,
                             )
                             val anyLoading = updated.any { it.isLoading }
                             current.copy(
@@ -765,6 +769,23 @@ object StreamsRepository {
 
     fun selectFilter(addonId: String?) {
         _uiState.update { it.copy(selectedFilter = addonId) }
+    }
+
+    fun applyPinnedSourceOrder() {
+        val pinnedSourceIds = PinnedStreamSourcesRepository.pinnedSourceIds.value
+        _uiState.update { current ->
+            if (current.groups.isEmpty()) {
+                current
+            } else {
+                current.copy(
+                    groups = StreamAutoPlaySelector.orderAddonStreams(
+                        groups = current.groups,
+                        installedOrder = emptyList(),
+                        pinnedSourceIds = pinnedSourceIds,
+                    ),
+                )
+            }
+        }
     }
 
     fun consumeAutoPlay() {

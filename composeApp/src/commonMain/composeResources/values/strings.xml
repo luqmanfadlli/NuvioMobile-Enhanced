@@ -1001,6 +1001,9 @@
     <string name="settings_stream_addon_logo_title">Addon logo</string>
     <string name="settings_stream_addon_logo_description">Show addon logo and name next to stream sources.</string>
     <string name="settings_stream_display_section">DISPLAY</string>
+    <string name="streams_pin_source">Pin to top</string>
+    <string name="streams_unpin_source">Unpin from top</string>
+    <string name="streams_pinned_source">Pinned source</string>
     <string name="settings_stream_background_title">Background</string>
     <string name="settings_stream_background_description">Choose the background for the streams screen.</string>
     <string name="settings_stream_badge_position_title">Badge position</string>
