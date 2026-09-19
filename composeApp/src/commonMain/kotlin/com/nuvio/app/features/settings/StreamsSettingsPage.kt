@@ -91,6 +91,8 @@ import nuvio.composeapp.generated.resources.settings_stream_size_badges_title
 import nuvio.composeapp.generated.resources.settings_stream_addon_logo_title
 import nuvio.composeapp.generated.resources.settings_stream_addon_logo_description
 import nuvio.composeapp.generated.resources.settings_stream_display_section
+import nuvio.composeapp.generated.resources.settings_stream_search_title
+import nuvio.composeapp.generated.resources.settings_stream_search_description
 import nuvio.composeapp.generated.resources.settings_stream_background_title
 import nuvio.composeapp.generated.resources.settings_stream_background_description
 import nuvio.composeapp.generated.resources.settings_meta_background_mode_cinematic
