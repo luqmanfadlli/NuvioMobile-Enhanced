@@ -155,48 +155,6 @@ fun DetailActionButtons(
                 onPlayLongClick = onPlayLongClick,
                 modifier = Modifier.weight(1f),
             )
-                    ),
-                shape = playShape,
-                color = if (playEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = if (playEnabled) {
-                    MaterialTheme.nuvio.colors.onAccent
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                },
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            enabled = playEnabled,
-                            onClick = {
-                                onPlayClick()
-                            },
-                            onLongClick = onPlayLongClick,
-                            role = Role.Button,
-                        )
-                        .height(buttonHeight),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        painter = playPainter,
-                        contentDescription = null,
-                        modifier = Modifier.size(if (isTablet) 20.dp else 18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = playLabel,
-                        style = if (isTablet) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.titleSmall
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
 
             if (hasSecondaryActions) {
                 Spacer(modifier = Modifier.width(12.dp))
@@ -390,4 +348,46 @@ private fun PlayButton(
                     } else {
                         Modifier
                     },
+                ),
+            shape = playShape,
+            color = if (playEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (playEnabled) {
+                MaterialTheme.nuvio.colors.onAccent
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        enabled = playEnabled,
+                        onClick = {
+                            onPlayClick()
+                        },
+                        onLongClick = onPlayLongClick,
+                        role = Role.Button,
+                    )
+                    .height(buttonHeight),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = playPainter,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isTablet) 20.dp else 18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = playLabel,
+                    style = if (isTablet) {
+                        MaterialTheme.typography.titleMedium
+                    } else {
+                        MaterialTheme.typography.titleSmall
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
 }
