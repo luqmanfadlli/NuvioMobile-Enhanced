@@ -113,7 +113,10 @@ fun DetailActionButtons(
             if (iconActions.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = if (isTablet) 20.dp else 16.dp,
+                        alignment = Alignment.CenterHorizontally,
+                    ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     iconActions.forEach { action ->
