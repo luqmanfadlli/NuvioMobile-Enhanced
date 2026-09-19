@@ -17,6 +17,7 @@ actual object StreamBadgeSettingsStorage {
     private const val streamBadgeRulesKey = "stream_badge_rules"
     private const val showFileSizeBadgesKey = "show_file_size_badges"
     private const val showAddonLogoKey = "show_addon_logo"
+    private const val showStreamSearchKey = "show_stream_search"
     private const val streamBackgroundModeKey = "stream_background_mode"
     private const val streamBadgePlacementKey = "stream_badge_placement"
     private const val pinnedStreamSourcesKey = "pinned_stream_sources"
@@ -48,6 +49,12 @@ actual object StreamBadgeSettingsStorage {
 
     actual fun saveShowAddonLogo(enabled: Boolean) {
         saveBoolean(showAddonLogoKey, enabled)
+    }
+
+    actual fun loadShowStreamSearch(): Boolean? = loadBoolean(showStreamSearchKey)
+
+    actual fun saveShowStreamSearch(enabled: Boolean) {
+        saveBoolean(showStreamSearchKey, enabled)
     }
 
     actual fun loadStreamBadgePlacement(): String? = loadString(streamBadgePlacementKey)

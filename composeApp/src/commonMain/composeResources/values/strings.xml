@@ -1003,7 +1003,12 @@
     <string name="settings_stream_size_badges_description">Show file size badges in stream results and player source panels.</string>
     <string name="settings_stream_addon_logo_title">Addon logo</string>
     <string name="settings_stream_addon_logo_description">Show addon logo and name next to stream sources.</string>
+    <string name="settings_stream_search_title">Search bar</string>
+    <string name="settings_stream_search_description">Show a filter field above the stream list to search by language, quality, codec or release group.</string>
     <string name="settings_stream_display_section">DISPLAY</string>
+    <string name="streams_search_placeholder">Filter streams</string>
+    <string name="streams_search_clear">Clear filter</string>
+    <string name="streams_search_no_results">No streams match your filter.</string>
     <string name="streams_pin_source">Pin to top</string>
     <string name="streams_unpin_source">Unpin from top</string>
     <string name="streams_pinned_source">Pinned source</string>
