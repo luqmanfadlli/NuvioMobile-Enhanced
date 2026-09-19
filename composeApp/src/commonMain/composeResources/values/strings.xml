@@ -1068,6 +1068,9 @@
     <string name="settings_meta_comments_description">Reviews from Trakt</string>
     <string name="settings_meta_details">Details</string>
     <string name="settings_meta_details_description">Runtime, status, release, language, and related info.</string>
+    <string name="settings_meta_icon_action_row">Icon action row</string>
+    <string name="settings_meta_icon_action_row_description">Show the actions as icons under the play button instead of behind a menu.</string>
+    <string name="details_action_start_from_beginning">Start from beginning</string>
     <string name="settings_meta_hero_trailer_playback">Hero Trailer Playback</string>
     <string name="settings_meta_hero_trailer_playback_description">Play trailer previews in the metadata hero when a trailer is available.</string>
     <string name="settings_meta_episode_cards">Episode Cards</string>

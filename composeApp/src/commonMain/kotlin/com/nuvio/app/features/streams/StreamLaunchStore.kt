@@ -20,6 +20,7 @@ data class StreamLaunch(
     val manualSelection: Boolean = false,
     val startFromBeginning: Boolean = false,
     val downloadMode: Boolean = false,
+    val forceExternalPlayer: Boolean = false,
 )
 
 object StreamLaunchStore {

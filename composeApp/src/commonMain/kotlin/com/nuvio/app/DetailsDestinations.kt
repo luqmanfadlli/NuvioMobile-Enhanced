@@ -79,6 +79,8 @@ internal fun DetailsDestination(
     onPlay: ContentPlayAction,
     onPlayManually: ContentPlayAction,
     onDownload: ContentPlayAction,
+    onPlayExternally: ContentPlayAction,
+    onPlayFromStart: ContentPlayAction,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
@@ -97,6 +99,8 @@ internal fun DetailsDestination(
         onPlay = onPlay,
         onPlayManually = onPlayManually,
         onDownload = onDownload,
+        onPlayExternally = onPlayExternally,
+        onPlayFromStart = onPlayFromStart,
         onOpenMeta = onOpenMeta,
         onOpenMoreLikeThis = { meta ->
             val source = meta.moreLikeThisSource

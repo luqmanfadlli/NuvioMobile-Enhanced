@@ -681,7 +681,7 @@ internal fun StreamDestination(
                     stream = stream,
                     resolvedResumePositionMs = resolvedResumePositionMs,
                     resolvedResumeProgressFraction = resolvedResumeProgressFraction,
-                    forceExternal = false,
+                    forceExternal = launch.forceExternalPlayer,
                     forceInternal = false,
                 )
             },

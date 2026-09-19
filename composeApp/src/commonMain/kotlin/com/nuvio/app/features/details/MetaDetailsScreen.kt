@@ -31,6 +31,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
@@ -166,6 +169,8 @@ fun MetaDetailsScreen(
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onDownload: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
+    onPlayExternally: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
+    onPlayFromStart: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onOpenMeta: ((MetaPreview) -> Unit)? = null,
     onOpenMoreLikeThis: ((MetaDetails) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
@@ -769,6 +774,60 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                fun runPlayAction(
+                    handler: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)?,
+                    resumePositionMs: Long?,
+                ) {
+                    handler ?: return
+                    stopHeroTrailerForNavigation()
+                    if ((meta.type == "series" || hasEpisodes) && seriesAction != null) {
+                        handler(
+                            meta.type,
+                            seriesStreamVideoId ?: seriesAction.videoId,
+                            meta.id,
+                            meta.type,
+                            meta.name,
+                            meta.logo,
+                            meta.poster,
+                            meta.background,
+                            seriesAction.seasonNumber,
+                            seriesAction.episodeNumber,
+                            seriesAction.episodeTitle,
+                            seriesAction.episodeThumbnail,
+                            seriesPauseDescription,
+                            resumePositionMs,
+                        )
+                    } else {
+                        handler(
+                            meta.type,
+                            meta.id,
+                            meta.id,
+                            meta.type,
+                            meta.name,
+                            meta.logo,
+                            meta.poster,
+                            meta.background,
+                            null,
+                            null,
+                            null,
+                            null,
+                            meta.description,
+                            resumePositionMs,
+                        )
+                    }
+                }
+
+                val activeResumePositionMs = if ((meta.type == "series" || hasEpisodes) && seriesAction != null) {
+                    seriesAction.resumePositionMs
+                } else {
+                    movieProgress?.lastPositionMs
+                }
+                val onPlayFromStartClick: (() -> Unit)? = onPlayFromStart
+                    ?.takeIf { (activeResumePositionMs ?: 0L) > 0L }
+                    ?.let { handler -> { runPlayAction(handler, 0L) } }
+                val onPlayExternallyClick: (() -> Unit)? = onPlayExternally
+                    ?.let { handler -> { runPlayAction(handler, activeResumePositionMs) } }
+
                 val showDownloadButton by remember {
                     DownloadsSettingsRepository.ensureLoaded()
                     DownloadsSettingsRepository.showDownloadButton
@@ -1140,6 +1199,8 @@ fun MetaDetailsScreen(
                                     isWatched = isWatched,
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onDownloadClick = onDownloadClick,
+                                    onPlayFromStartClick = onPlayFromStartClick,
+                                    onPlayExternallyClick = onPlayExternallyClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onRandomEpisodeClick = onRandomEpisodeClick,
                                     onSaveClick = toggleSaved,
@@ -1794,6 +1855,8 @@ private fun LazyListScope.configuredMetaSectionItems(
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onDownloadClick: (() -> Unit)?,
+    onPlayFromStartClick: (() -> Unit)?,
+    onPlayExternallyClick: (() -> Unit)?,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onRandomEpisodeClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
@@ -1874,6 +1937,8 @@ private fun LazyListScope.configuredMetaSectionItems(
                     isWatched = isWatched,
                     onPrimaryPlayClick = onPrimaryPlayClick,
                     onDownloadClick = onDownloadClick,
+                    onPlayFromStartClick = onPlayFromStartClick,
+                    onPlayExternallyClick = onPlayExternallyClick,
                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                     onRandomEpisodeClick = onRandomEpisodeClick,
                     onSaveClick = onSaveClick,
@@ -2027,6 +2092,8 @@ private fun ConfiguredMetaSections(
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onDownloadClick: (() -> Unit)?,
+    onPlayFromStartClick: (() -> Unit)?,
+    onPlayExternallyClick: (() -> Unit)?,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onRandomEpisodeClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
@@ -2087,8 +2154,61 @@ private fun ConfiguredMetaSections(
     fun RenderSection(key: MetaScreenSectionKey, showHeader: Boolean = true) {
         when (key) {
             MetaScreenSectionKey.ACTIONS -> {
+                val iconActions = buildList {
+                    onDownloadClick?.let { download ->
+                        add(DetailSecondaryAction(
+                            label = stringResource(Res.string.details_download_action),
+                            icon = Icons.Rounded.Download,
+                            onClick = download,
+                        ))
+                    }
+                    onPlayFromStartClick?.let { playFromStart ->
+                        add(DetailSecondaryAction(
+                            label = stringResource(Res.string.details_action_start_from_beginning),
+                            icon = Icons.Rounded.Replay,
+                            onClick = playFromStart,
+                        ))
+                    }
+                    onRandomEpisodeClick?.let { playRandomEpisode ->
+                        add(DetailSecondaryAction(
+                            label = stringResource(Res.string.detail_play_random_episode),
+                            icon = Icons.Default.Shuffle,
+                            onClick = playRandomEpisode,
+                        ))
+                    }
+                    onPlayExternallyClick?.let { playExternally ->
+                        add(DetailSecondaryAction(
+                            label = stringResource(Res.string.streams_open_external_player),
+                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                            onClick = playExternally,
+                        ))
+                    }
+                    add(DetailSecondaryAction(
+                        label = if (isWatched) {
+                            stringResource(Res.string.hero_mark_unwatched)
+                        } else {
+                            stringResource(Res.string.hero_mark_watched)
+                        },
+                        icon = if (isWatched) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        isActive = isWatched,
+                        onClick = onWatchedClick,
+                    ))
+                    add(DetailSecondaryAction(
+                        label = if (isSaved) {
+                            stringResource(Res.string.hero_remove_from_library)
+                        } else {
+                            stringResource(Res.string.hero_add_to_library)
+                        },
+                        icon = if (isSaved) Icons.Default.Check else Icons.Default.Add,
+                        isActive = isSaved,
+                        onClick = onSaveClick,
+                        onLongClick = onSaveLongClick,
+                    ))
+                }
                 DetailActionButtons(
                     playLabel = playButtonLabel,
+                    iconActionRow = settings.iconActionRow,
+                    iconActions = iconActions,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(
                             label = if (isWatched) {
@@ -2129,7 +2249,7 @@ private fun ConfiguredMetaSections(
                     },
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,
-                    onDownloadClick = onDownloadClick,
+                    onDownloadClick = onDownloadClick.takeIf { !settings.iconActionRow },
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                 )
             }

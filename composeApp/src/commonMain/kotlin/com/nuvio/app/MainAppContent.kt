@@ -1006,6 +1006,7 @@ internal fun MainAppContent(
             manualSelection: Boolean,
             startFromBeginning: Boolean,
             downloadMode: Boolean = false,
+            forceExternalPlayer: Boolean = false,
         ) {
             val targetResumePositionMs = if (startFromBeginning) 0L else (resumePositionMs ?: 0L)
             val targetResumeProgressFraction = if (startFromBeginning) null else resumeProgressFraction
@@ -1045,7 +1046,7 @@ internal fun MainAppContent(
                         initialPositionMs = targetResumePositionMs,
                         initialProgressFraction = targetResumeProgressFraction,
                     )
-                    if (playerSettingsUiState.externalPlayerEnabled) {
+                    if (forceExternalPlayer || playerSettingsUiState.externalPlayerEnabled) {
                         coroutineScope.launch { openExternalPlayback(playerLaunch) }
                         return
                     }
@@ -1081,6 +1082,7 @@ internal fun MainAppContent(
                     manualSelection = manualSelection,
                     startFromBeginning = startFromBeginning,
                     downloadMode = downloadMode,
+                    forceExternalPlayer = forceExternalPlayer,
                 ),
             )
             navController.navigate(
@@ -1155,6 +1157,53 @@ internal fun MainAppContent(
                     manualSelection = true,
                     startFromBeginning = false,
                     downloadMode = true,
+                )
+            }
+
+        val onPlayExternally: ContentPlayAction =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+                launchPlaybackWithDownloadPreference(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = resumePositionMs,
+                    resumeProgressFraction = null,
+                    manualSelection = false,
+                    startFromBeginning = false,
+                    forceExternalPlayer = true,
+                )
+            }
+
+        val onPlayFromStart: ContentPlayAction =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, _ ->
+                launchPlaybackWithDownloadPreference(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = 0L,
+                    resumeProgressFraction = null,
+                    manualSelection = false,
+                    startFromBeginning = true,
                 )
             }
 
@@ -1599,6 +1648,8 @@ internal fun MainAppContent(
                         onPlay = onPlay,
                         onPlayManually = onPlayManually,
                         onDownload = onDownloadContent,
+                        onPlayExternally = onPlayExternally,
+                        onPlayFromStart = onPlayFromStart,
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = LocalNavAnimatedContentScope.current,
                     )

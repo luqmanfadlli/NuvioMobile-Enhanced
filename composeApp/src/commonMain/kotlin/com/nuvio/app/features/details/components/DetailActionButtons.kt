@@ -36,6 +36,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
@@ -74,6 +76,8 @@ fun DetailActionButtons(
     onPlayClick: () -> Unit = {},
     onPlayLongClick: (() -> Unit)? = null,
     onDownloadClick: (() -> Unit)? = null,
+    iconActionRow: Boolean = false,
+    iconActions: List<DetailSecondaryAction> = emptyList(),
 ) {
     val playPainter = appIconPainter(AppIconResource.PlayerPlay)
     val buttonHeight = if (isTablet) 56.dp else 52.dp
@@ -94,6 +98,40 @@ fun DetailActionButtons(
             .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (iconActionRow) {
+            PlayButton(
+                playLabel = playLabel,
+                playEnabled = playEnabled,
+                playPainter = playPainter,
+                playShape = playShape,
+                buttonHeight = buttonHeight,
+                isTablet = isTablet,
+                onPlayClick = onPlayClick,
+                onPlayLongClick = onPlayLongClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (iconActions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    iconActions.forEach { action ->
+                        DetailIconAction(
+                            label = action.label,
+                            icon = action.icon,
+                            active = action.isActive,
+                            progress = 1f,
+                            size = iconButtonSize,
+                            onClick = action.onClick,
+                            onLongClick = action.onLongClick,
+                        )
+                    }
+                }
+            }
+            return@Column
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,18 +144,17 @@ fun DetailActionButtons(
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(buttonHeight)
-                    .then(
-                        if (playEnabled) {
-                            Modifier
-                                .clip(playShape)
-                                .background(MaterialTheme.themePalette.accentBrush())
-                        } else {
-                            Modifier
-                        },
+            PlayButton(
+                playLabel = playLabel,
+                playEnabled = playEnabled,
+                playPainter = playPainter,
+                playShape = playShape,
+                buttonHeight = buttonHeight,
+                isTablet = isTablet,
+                onPlayClick = onPlayClick,
+                onPlayLongClick = onPlayLongClick,
+                modifier = Modifier.weight(1f),
+            )
                     ),
                 shape = playShape,
                 color = if (playEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant,
@@ -327,4 +364,30 @@ internal fun DetailIconAction(
             )
         }
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PlayButton(
+    playLabel: String,
+    playEnabled: Boolean,
+    playPainter: Painter,
+    playShape: Shape,
+    buttonHeight: Dp,
+    isTablet: Boolean,
+    onPlayClick: () -> Unit,
+    onPlayLongClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+        Surface(
+            modifier = modifier
+                .height(buttonHeight)
+                .then(
+                    if (playEnabled) {
+                        Modifier
+                            .clip(playShape)
+                            .background(MaterialTheme.themePalette.accentBrush())
+                    } else {
+                        Modifier
+                    },
 }

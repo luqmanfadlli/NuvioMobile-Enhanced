@@ -47,6 +47,7 @@ data class MetaScreenSettingsUiState(
     val heroTrailerPlayback: Boolean = false,
     val heroTrailerStartDelaySeconds: Int = MetaScreenSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
+    val iconActionRow: Boolean = true,
     val tabLayout: Boolean = false,
     val episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
     val blurUnwatchedEpisodes: Boolean = false,
@@ -131,6 +132,7 @@ private data class StoredMetaScreenSettingsPayload(
     @SerialName("hero_trailer_start_delay_seconds")
     val heroTrailerStartDelaySeconds: Int = MetaScreenSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
+    val iconActionRow: Boolean = true,
     @SerialName("tvStyleLayout")
     val tabLayout: Boolean = false,
     val episodeCardStyle: String = "horizontal",
@@ -223,6 +225,7 @@ object MetaScreenSettingsRepository {
     private var heroTrailerPlayback: Boolean = false
     private var heroTrailerStartDelaySeconds: Int = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
     private var heroTrailerStartUnmuted: Boolean = false
+    private var iconActionRow: Boolean = true
     private var tabLayout: Boolean = false
     private var episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal
     private var blurUnwatchedEpisodes: Boolean = false
@@ -249,6 +252,7 @@ object MetaScreenSettingsRepository {
                     MAX_HERO_TRAILER_START_DELAY_SECONDS,
                 )
                 heroTrailerStartUnmuted = parsed.heroTrailerStartUnmuted
+                iconActionRow = parsed.iconActionRow
                 tabLayout = parsed.tabLayout
                 episodeCardStyle = MetaEpisodeCardStyle.parse(parsed.episodeCardStyle)
                     ?: MetaEpisodeCardStyle.Horizontal
@@ -275,6 +279,7 @@ object MetaScreenSettingsRepository {
         heroTrailerPlayback = false
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
+        iconActionRow = true
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
         blurUnwatchedEpisodes = false
@@ -299,6 +304,15 @@ object MetaScreenSettingsRepository {
     fun setHeroTrailerPlayback(enabled: Boolean) {
         ensureLoaded()
         heroTrailerPlayback = enabled
+        publish()
+        persist()
+    }
+
+    /** Whether the actions row shows icon buttons instead of the overflow menu. */
+    fun setIconActionRow(enabled: Boolean) {
+        ensureLoaded()
+        if (iconActionRow == enabled) return
+        iconActionRow = enabled
         publish()
         persist()
     }
@@ -389,6 +403,7 @@ object MetaScreenSettingsRepository {
         heroTrailerPlayback = false
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
+        iconActionRow = true
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
         blurUnwatchedEpisodes = false
@@ -404,6 +419,7 @@ object MetaScreenSettingsRepository {
         heroTrailerPlayback: Boolean = false,
         heroTrailerStartDelaySeconds: Int = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
         heroTrailerStartUnmuted: Boolean = false,
+        iconActionRow: Boolean = true,
         tabLayout: Boolean,
         episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
         blurUnwatchedEpisodes: Boolean = false,
@@ -420,6 +436,7 @@ object MetaScreenSettingsRepository {
             MAX_HERO_TRAILER_START_DELAY_SECONDS,
         )
         this.heroTrailerStartUnmuted = heroTrailerStartUnmuted
+        this.iconActionRow = iconActionRow
         this.tabLayout = tabLayout
         this.episodeCardStyle = episodeCardStyle
         this.blurUnwatchedEpisodes = blurUnwatchedEpisodes
@@ -452,6 +469,7 @@ object MetaScreenSettingsRepository {
         heroTrailerPlayback = false
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
+        iconActionRow = true
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
         blurUnwatchedEpisodes = false
@@ -526,6 +544,7 @@ object MetaScreenSettingsRepository {
             heroTrailerPlayback = heroTrailerPlayback,
             heroTrailerStartDelaySeconds = heroTrailerStartDelaySeconds,
             heroTrailerStartUnmuted = heroTrailerStartUnmuted,
+            iconActionRow = iconActionRow,
             tabLayout = tabLayout,
             episodeCardStyle = episodeCardStyle,
             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
@@ -545,6 +564,7 @@ object MetaScreenSettingsRepository {
                     heroTrailerPlayback = heroTrailerPlayback,
                     heroTrailerStartDelaySeconds = heroTrailerStartDelaySeconds,
                     heroTrailerStartUnmuted = heroTrailerStartUnmuted,
+                    iconActionRow = iconActionRow,
                     tabLayout = tabLayout,
                     episodeCardStyle = MetaEpisodeCardStyle.persist(episodeCardStyle),
                     blurUnwatchedEpisodes = blurUnwatchedEpisodes,
