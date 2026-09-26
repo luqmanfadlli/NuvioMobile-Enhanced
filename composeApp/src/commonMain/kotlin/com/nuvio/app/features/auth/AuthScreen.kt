@@ -736,7 +736,7 @@ private fun AuthForm(
             modifier = Modifier.onGloballyPositioned { coordinates ->
                 onEmailBoundsChange(coordinates.boundsInRoot())
             },
-            autofillContentType = ContentType.EmailAddress + ContentType.Username,
+            autofillContentType = ContentType.Username,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next,
