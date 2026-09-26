@@ -31,9 +31,6 @@ actual object ThemeSettingsStorage {
         amoledEnabledKey,
         navBarGlowEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
-        tabBarBehaviorKey,
-        dynamicArtworkBackgroundEnabledKey,
-        showCatalogAccentEnabledKey,
         navBarStyleKey,
         navBarPositionKey,
     )
@@ -197,9 +194,6 @@ actual object ThemeSettingsStorage {
         loadNavBarGlowEnabled()?.let { put(navBarGlowEnabledKey, encodeSyncBoolean(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
-        loadTabBarBehavior()?.let { put(tabBarBehaviorKey, encodeSyncString(it)) }
-        loadDynamicArtworkBackgroundEnabled()?.let { put(dynamicArtworkBackgroundEnabledKey, encodeSyncBoolean(it)) }
-        loadShowCatalogAccentEnabled()?.let { put(showCatalogAccentEnabledKey, encodeSyncBoolean(it)) }
         loadRawString(navBarStyleKey)?.let { put(navBarStyleKey, encodeSyncString(it)) }
         loadRawString(navBarPositionKey)?.let { put(navBarPositionKey, encodeSyncString(it)) }
     }
@@ -214,9 +208,6 @@ actual object ThemeSettingsStorage {
         payload.decodeSyncBoolean(navBarGlowEnabledKey)?.let(::saveNavBarGlowEnabled)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)
-        payload.decodeSyncString(tabBarBehaviorKey)?.let(::saveTabBarBehavior)
-        payload.decodeSyncBoolean(dynamicArtworkBackgroundEnabledKey)?.let(::saveDynamicArtworkBackgroundEnabled)
-        payload.decodeSyncBoolean(showCatalogAccentEnabledKey)?.let(::saveShowCatalogAccentEnabled)
         payload.decodeSyncString(navBarStyleKey)?.let { saveRawString(navBarStyleKey, it) }
         payload.decodeSyncString(navBarPositionKey)?.let { saveRawString(navBarPositionKey, it) }
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.DEVICE.code)

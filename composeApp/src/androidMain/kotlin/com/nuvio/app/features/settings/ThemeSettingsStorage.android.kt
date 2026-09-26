@@ -35,9 +35,6 @@ actual object ThemeSettingsStorage {
         amoledEnabledKey,
         navBarGlowEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
-        tabBarBehaviorKey,
-        dynamicArtworkBackgroundEnabledKey,
-        showCatalogAccentEnabledKey,
         NAV_BAR_STYLE_KEY,
         NAV_BAR_POSITION_KEY,
     )
@@ -199,9 +196,6 @@ actual object ThemeSettingsStorage {
         loadNavBarGlowEnabled()?.let { put(navBarGlowEnabledKey, encodeSyncBoolean(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
-        loadTabBarBehavior()?.let { put(tabBarBehaviorKey, encodeSyncString(it)) }
-        loadDynamicArtworkBackgroundEnabled()?.let { put(dynamicArtworkBackgroundEnabledKey, encodeSyncBoolean(it)) }
-        loadShowCatalogAccentEnabled()?.let { put(showCatalogAccentEnabledKey, encodeSyncBoolean(it)) }
         loadRawString(NAV_BAR_STYLE_KEY)?.let { put(NAV_BAR_STYLE_KEY, encodeSyncString(it)) }
         loadRawString(NAV_BAR_POSITION_KEY)?.let { put(NAV_BAR_POSITION_KEY, encodeSyncString(it)) }
     }
@@ -216,9 +210,6 @@ actual object ThemeSettingsStorage {
         payload.decodeSyncBoolean(navBarGlowEnabledKey)?.let(::saveNavBarGlowEnabled)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)
-        payload.decodeSyncString(tabBarBehaviorKey)?.let(::saveTabBarBehavior)
-        payload.decodeSyncBoolean(dynamicArtworkBackgroundEnabledKey)?.let(::saveDynamicArtworkBackgroundEnabled)
-        payload.decodeSyncBoolean(showCatalogAccentEnabledKey)?.let(::saveShowCatalogAccentEnabled)
         payload.decodeSyncString(NAV_BAR_STYLE_KEY)?.let { saveRawString(NAV_BAR_STYLE_KEY, it) }
         payload.decodeSyncString(NAV_BAR_POSITION_KEY)?.let { saveRawString(NAV_BAR_POSITION_KEY, it) }
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.DEVICE.code)
