@@ -340,6 +340,18 @@ private fun ExoPlayerSurface(
             useYoutubeChunkedPlayback = useYoutubeChunkedPlayback,
             useLongReadTimeout = isLoopbackPlaybackSource(sourceUrl),
             externalSubtitles = externalSubtitles,
+        ).withPlaybackBuffering(
+            context = context,
+            settings = playerSettings,
+            bufferedUrls = if (useYoutubeChunkedPlayback || isLoopbackPlaybackSource(sourceUrl)) {
+                emptySet()
+            } else {
+                listOfNotNull(sourceUrl, sourceAudioUrl?.takeIf { it.isNotBlank() })
+                    .filter {
+                        isProgressivePlaybackSource(it, sanitizedSourceResponseHeaders, normalizedStreamType)
+                    }
+                    .toSet()
+            },
         )
     }
 
@@ -426,15 +438,7 @@ private fun ExoPlayerSurface(
             setParameters(parameters)
         }
 
-        val loadControl = DefaultLoadControl.Builder()
-            .setBackBuffer(10_000, true)
-            .setBufferDurationsMs(
-                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
-                50_000,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
-            )
-            .build()
+        val loadControl = playerSettings.buildPlaybackLoadControl()
 
         InAppLogger.info(
             "ExoPlayer/Android",

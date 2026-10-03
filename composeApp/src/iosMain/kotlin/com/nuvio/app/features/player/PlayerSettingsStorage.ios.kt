@@ -940,7 +940,6 @@ actual object PlayerSettingsStorage {
     actual fun saveNextEpisodeThresholdMinutesBeforeEnd(minutes: Float) {
         NSUserDefaults.standardUserDefaults.setFloat(minutes, forKey = ProfileScopedKey.of(nextEpisodeThresholdMinutesBeforeEndKey))
     }
-
     actual fun loadPreloadNextEpisodeSources(): Boolean? = loadBoolean(preloadNextEpisodeSourcesKey)
 
     actual fun savePreloadNextEpisodeSources(enabled: Boolean) {
@@ -954,6 +953,50 @@ actual object PlayerSettingsStorage {
     actual fun loadLibassRenderType(): String? = null
 
     actual fun saveLibassRenderType(renderType: String) {}
+
+    actual fun loadExoNativeMemoryEnabled(): Boolean? = null
+
+    actual fun saveExoNativeMemoryEnabled(value: Boolean) {}
+
+    actual fun loadCustomPlaybackBuffersEnabled(): Boolean? = null
+
+    actual fun saveCustomPlaybackBuffersEnabled(value: Boolean) {}
+
+    actual fun loadVodDiskCacheEnabled(): Boolean? = null
+
+    actual fun saveVodDiskCacheEnabled(value: Boolean) {}
+
+    actual fun loadVodDiskCacheAutoSize(): Boolean? = null
+
+    actual fun saveVodDiskCacheAutoSize(value: Boolean) {}
+
+    actual fun loadPlaybackMinBufferSeconds(): Int? = null
+
+    actual fun savePlaybackMinBufferSeconds(value: Int) {}
+
+    actual fun loadPlaybackMaxBufferSeconds(): Int? = null
+
+    actual fun savePlaybackMaxBufferSeconds(value: Int) {}
+
+    actual fun loadPlaybackStartBufferSeconds(): Int? = null
+
+    actual fun savePlaybackStartBufferSeconds(value: Int) {}
+
+    actual fun loadPlaybackRebufferSeconds(): Int? = null
+
+    actual fun savePlaybackRebufferSeconds(value: Int) {}
+
+    actual fun loadPlaybackBackBufferSeconds(): Int? = null
+
+    actual fun savePlaybackBackBufferSeconds(value: Int) {}
+
+    actual fun loadPlaybackTargetBufferMb(): Int? = null
+
+    actual fun savePlaybackTargetBufferMb(value: Int) {}
+
+    actual fun loadVodDiskCacheSizeMb(): Int? = null
+
+    actual fun saveVodDiskCacheSizeMb(value: Int) {}
 
     actual fun loadIosVideoOutputPreset(): String? =
         NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(iosVideoOutputPresetKey))

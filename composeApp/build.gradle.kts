@@ -456,6 +456,7 @@ kotlin {
                 implementation(libs.androidx.media3.exoplayer.smoothstreaming)
                 implementation(libs.androidx.media3.exoplayer.rtsp)
                 implementation(libs.androidx.media3.datasource)
+                implementation(libs.androidx.media3.database)
                 implementation(libs.androidx.media3.datasource.okhttp)
                 implementation(libs.androidx.media3.decoder)
                 implementation(libs.androidx.media3.session)

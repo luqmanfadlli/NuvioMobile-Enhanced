@@ -1384,6 +1384,24 @@
     <string name="settings_playback_tunneled_playback">Tunneled Playback</string>
     <string name="settings_playback_audio_passthrough">Audio Passthrough</string>
     <string name="settings_playback_audio_passthrough_description">Send Dolby and DTS audio undecoded to a soundbar or AV receiver. Leave off on phones: volume boost and dialogue-friendly stereo downmix only work when the app decodes audio</string>
+    <string name="settings_playback_exo_native_memory">ExoPlayer Native Memory</string>
+    <string name="settings_playback_exo_native_memory_description">Keep playback buffers in native memory instead of the Java heap, so large files can buffer further without memory pressure.</string>
+    <string name="settings_playback_exo_native_memory_info">Device memory: %1$s GB. Safe buffer limit: %2$s MB.</string>
+    <string name="settings_playback_custom_buffers">Custom Playback Buffers</string>
+    <string name="settings_playback_custom_buffers_description">Override the player buffer. When off, ExoPlayer uses its normal buffer, or the native-memory defaults if that option is on.</string>
+    <string name="settings_playback_custom_buffers_warning">These values change how much is buffered before and during playback. A value that is too small can stall, and one that is too large can use more memory.</string>
+    <string name="settings_playback_min_buffer">Min Buffer</string>
+    <string name="settings_playback_max_buffer">Max Buffer</string>
+    <string name="settings_playback_start_buffer">Start Buffer</string>
+    <string name="settings_playback_buffer_after_stall">Buffer After Stall</string>
+    <string name="settings_playback_back_buffer">Back Buffer</string>
+    <string name="settings_playback_target_buffer_size">Target Buffer Size</string>
+    <string name="settings_playback_vod_disk_cache">VOD Disk Cache</string>
+    <string name="settings_playback_vod_disk_cache_description">Save the current progressive stream to disk. Seek-back stays instant past the memory buffer and short network drops keep playing. HLS and DASH are not cached.</string>
+    <string name="settings_playback_vod_disk_cache_auto_size">Auto Size</string>
+    <string name="settings_playback_vod_disk_cache_auto_size_description">Size the cache from free disk space. Turn off to choose a size.</string>
+    <string name="settings_playback_vod_disk_cache_size">Cache Size</string>
+    <string name="settings_playback_vod_disk_cache_note">Disk writes continue while a cached stream plays. A new size applies the next time the app starts.</string>
     <string name="settings_playback_tunneled_playback_description">Hardware-level audio/video sync. May improve playback on some Android TV devices</string>
     <string name="settings_tmdb_api_key_label">API key</string>
     <string name="settings_tmdb_api_key_override_description">Use your own TMDB API key, or leave blank to use the default.</string>
@@ -1690,11 +1708,11 @@
     <string name="detail_more_like_this_powered_by_tmdb">Powered by TMDB</string>
     <string name="detail_more_like_this_powered_by_trakt">Powered by Trakt</string>
     <string name="detail_more_like_this_powered_by_simkl">Powered by Simkl</string>
-    <string name="details_seasons">Seasons</string>
     <plurals name="details_season_count">
         <item quantity="one">%1$d Season</item>
         <item quantity="other">%1$d Seasons</item>
     </plurals>
+    <string name="details_seasons">Seasons</string>
     <string name="details_series_missing_numbers">This addon returned videos for the series, but none included season or episode numbers.</string>
     <string name="details_series_no_metadata">This addon did not provide episode metadata for this series.</string>
     <string name="details_series_unpublished">Episodes have not been published by this addon yet.</string>
