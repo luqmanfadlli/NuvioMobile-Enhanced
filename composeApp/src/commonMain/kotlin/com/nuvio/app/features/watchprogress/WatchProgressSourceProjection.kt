@@ -6,8 +6,7 @@ internal fun projectWatchProgressSourceEntries(
     source: WatchProgressSource,
     nuvioEntries: Collection<WatchProgressEntry>,
     providerEntries: Collection<WatchProgressEntry>,
-): List<WatchProgressEntry> = if (source.providerId == null) {
-    nuvioEntries.toList()
-} else {
-    providerEntries.toList()
+): List<WatchProgressEntry> = when (source) {
+    WatchProgressSource.ANILIST -> nuvioEntries.toList()
+    else -> if (source.providerId == null) nuvioEntries.toList() else providerEntries.toList()
 }
