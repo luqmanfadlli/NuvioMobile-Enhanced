@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.tracking.TrackingHistoryItem
 import com.nuvio.app.features.tracking.TrackingHistoryWriter
 import com.nuvio.app.features.tracking.TrackingListStatus
@@ -15,6 +16,8 @@ import com.nuvio.app.features.tracking.TrackingScrobbler
 import kotlinx.coroutines.CancellationException
 
 private const val ANILIST_SCROBBLE_COMPLETE_PERCENT = 80.0
+
+private val log = Logger.withTag("AniListScrobble")
 
 internal class AniListTrackingWrites : TrackingListWriter, TrackingHistoryWriter, TrackingScrobbler {
     override val providerId = TrackingProviderId.ANILIST
@@ -156,14 +159,20 @@ internal class AniListTrackingWrites : TrackingListWriter, TrackingHistoryWriter
             TrackingScrobbleAction.START -> {
                 try {
                     AniListTracker.ensureSynced()
-                    val mediaId = AniListMediaResolver.resolve(event.media) ?: return
+                    val mediaId = AniListMediaResolver.resolve(event.media)
+                    if (mediaId == null) {
+                        log.w { "START unresolved media ids=${event.media.ids} title=${event.media.title}" }
+                        return
+                    }
                     val existing = AniListTracker.entryFor(mediaId)
+                    log.d { "START mediaId=$mediaId existingStatus=${existing?.status}" }
                     if (existing == null || existing.status in setOf(ANILIST_STATUS_PLANNING, ANILIST_STATUS_PAUSED, ANILIST_STATUS_DROPPED)) {
                         AniListTracker.saveEntry(mediaId, status = ANILIST_STATUS_CURRENT)
                     }
                 } catch (error: CancellationException) {
                     throw error
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    log.e(error) { "START failed" }
                 }
             }
             TrackingScrobbleAction.PAUSE -> Unit
