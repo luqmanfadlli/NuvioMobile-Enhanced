@@ -1,11 +1,13 @@
 package com.nuvio.app.features.anilist
 
+import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.tracking.TrackingProgressProvider
 import com.nuvio.app.features.tracking.TrackingProgressSnapshot
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -16,6 +18,7 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
     override val changes: Flow<Unit>
         get() = AniListTracker.syncState.map { }
     override val providesCompleteMetadata = true
+    override val ownsCompletedHistoryProjection: Boolean = true
 
     override fun showIdSiblings(): Map<String, Set<String>> =
         AniListTracker.entries().filter { it.idMal != null }.associate { entry ->
@@ -66,6 +69,39 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
             hasLoadedRemoteProgress = state.hasLoaded,
             errorMessage = state.error?.let { "AniList sync failed" },
         )
+    }
+
+    override suspend fun prepareNextUpProgressEntries(
+        entries: List<WatchProgressEntry>,
+        contentId: String,
+    ): List<WatchProgressEntry> {
+        val targets = entries.filter { entry ->
+            entry.source == ANILIST_PROGRESS_SOURCE && entry.parentMetaId == contentId
+        }
+        if (targets.isEmpty()) return entries
+        val fetched = try {
+            MetaDetailsRepository.fetch(type = targets.first().parentMetaType, id = contentId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            null
+        }
+        val meta = fetched ?: return entries
+        return entries.map { entry ->
+            if (entry !in targets) return@map entry
+            val episodeIds = listOfNotNull(
+                "${entry.parentMetaId}:${entry.episodeNumber}",
+                entry.trackingProviderItemId?.let { "$it:${entry.episodeNumber}" },
+            )
+            val video = meta.videos.firstOrNull { video ->
+                video.id in episodeIds && video.season != null && video.episode != null
+            } ?: return@map entry
+            entry.copy(
+                seasonNumber = video.season,
+                episodeNumber = video.episode,
+                videoId = buildPlaybackVideoId(entry.parentMetaId, video.season, video.episode),
+            )
+        }
     }
 
     private fun supersededMediaIds(active: List<AniListEntry>, all: List<AniListEntry>): Set<Int> {
