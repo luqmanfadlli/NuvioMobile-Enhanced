@@ -16,8 +16,7 @@ private const val ANILIST_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 
 internal const val ANILIST_MEDIA_FIELDS =
     "id idMal format episodes seasonYear siteUrl bannerImage synonyms " +
-        "title { romaji english native } coverImage { extraLarge large } startDate { year } " +
-        "relations { edges { relationType node { id format } } }"
+        "title { romaji english native } coverImage { extraLarge large } startDate { year }"
 
 internal const val ANILIST_ENTRY_FIELDS =
     "id mediaId status progress score(format: POINT_100) updatedAt media { $ANILIST_MEDIA_FIELDS }"
