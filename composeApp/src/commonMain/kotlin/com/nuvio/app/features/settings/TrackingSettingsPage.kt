@@ -49,6 +49,9 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.tracking_source_mdblist
 import nuvio.composeapp.generated.resources.settings_mdblist_library_description
 import nuvio.composeapp.generated.resources.settings_mdblist_progress_description
+import nuvio.composeapp.generated.resources.tracking_source_anilist
+import nuvio.composeapp.generated.resources.settings_anilist_library_description
+import nuvio.composeapp.generated.resources.settings_anilist_progress_description
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.settings_tracking_connect_first
 import nuvio.composeapp.generated.resources.settings_tracking_data_sources
