@@ -31,11 +31,13 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
 
     override fun snapshot(): TrackingProgressSnapshot {
         val state = AniListTracker.syncState.value
-        val seeds = state.entries
-            .filter { entry ->
-                !entry.isMovie && entry.progress > 0 &&
-                    (entry.status == ANILIST_STATUS_CURRENT || entry.status == ANILIST_STATUS_REPEATING)
-            }
+        val active = state.entries.filter { entry ->
+            !entry.isMovie && entry.progress > 0 &&
+                (entry.status == ANILIST_STATUS_CURRENT || entry.status == ANILIST_STATUS_REPEATING)
+        }
+        val superseded = supersededMediaIds(active, state.entries)
+        val seeds = active
+            .filter { entry -> entry.mediaId !in superseded }
             .map { entry ->
                 WatchProgressEntry(
                     contentType = entry.contentType,
@@ -64,6 +66,23 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
             hasLoadedRemoteProgress = state.hasLoaded,
             errorMessage = state.error?.let { "AniList sync failed" },
         )
+    }
+
+    private fun supersededMediaIds(active: List<AniListEntry>, all: List<AniListEntry>): Set<Int> {
+        val byId = all.associateBy { it.mediaId }
+        val result = mutableSetOf<Int>()
+        active.forEach { entry ->
+            val stack = ArrayDeque(entry.prequelIds)
+            val seen = mutableSetOf<Int>()
+            while (stack.isNotEmpty()) {
+                val id = stack.removeLast()
+                if (!seen.add(id)) continue
+                val prequel = byId[id]
+                if (prequel != null && prequel.updatedAtSeconds <= entry.updatedAtSeconds) result += id
+                prequel?.prequelIds?.let(stack::addAll)
+            }
+        }
+        return result
     }
 
     private fun hiddenContentIds(): Set<String> =
