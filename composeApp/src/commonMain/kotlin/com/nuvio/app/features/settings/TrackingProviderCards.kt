@@ -88,6 +88,7 @@ import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.settings_mdblist_disconnect_description
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.settings_anilist_disconnect_description
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_tracking_connect_with_code
 import nuvio.composeapp.generated.resources.action_collapse
