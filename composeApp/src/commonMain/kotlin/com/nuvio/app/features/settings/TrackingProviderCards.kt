@@ -800,17 +800,12 @@ internal fun TrackingBrandGlyph(
             modifier = modifier,
             contentScale = ContentScale.Fit,
         )
-        TrackingBrand.ANILIST -> Box(
-            modifier = modifier.background(Color(0xFF02A9FF), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "A",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
+        TrackingBrand.ANILIST -> Image(
+            painter = org.jetbrains.compose.resources.painterResource(nuvio.composeapp.generated.resources.Res.drawable.anilist_logo),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
         TrackingBrand.TMDB -> Image(
             painter = integrationLogoPainter(IntegrationLogo.Tmdb),
             contentDescription = contentDescription,
