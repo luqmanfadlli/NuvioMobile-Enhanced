@@ -20,7 +20,9 @@ internal fun normalizeAniListTitle(value: String?): String =
     value.orEmpty().lowercase().filter { it.isLetterOrDigit() }
 
 private const val ANILIST_SEQUEL_QUERY =
-    "query(\$id:Int){Media(id:\$id,type:ANIME){id relations{edges{relationType(version:2) node{id type format}}}}}"
+    "query(\$id:Int){Media(id:\$id,type:ANIME){id relations{edges{relationType(version:2) node{id type format status episodes startDate{year month day}}}}}}"
+
+private data class AniListSeasonTarget(val id: Int, val episodes: Int?, val released: Boolean)
 
 private val ANILIST_SEASON_FORMATS = listOf("TV", "TV_SHORT", "ONA")
 
@@ -28,33 +30,40 @@ internal object AniListMediaResolver {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, Int>()
     private val kitsuCache = mutableMapOf<Long, Int>()
-    private val seasonCache = mutableMapOf<String, Int>()
+    private val seasonCache = mutableMapOf<String, AniListSeasonTarget>()
 
     suspend fun resolve(media: TrackingMediaReference): Int? {
         val base = resolveBase(media) ?: return null
         val season = media.episode?.season
         if (media.kind == TrackingMediaKind.MOVIE || season == null || season <= 1) return base
-        return resolveSeason(base, season)
+        return resolveSeason(base, season, media.episode?.number)
     }
 
-    private suspend fun resolveSeason(baseId: Int, season: Int): Int? {
+    private suspend fun resolveSeason(baseId: Int, season: Int, episodeNumber: Int?): Int? {
         val key = "$baseId:$season"
-        mutex.withLock { seasonCache[key] }?.let { return it }
-        var current = baseId
-        repeat(season - 1) {
-            current = try {
-                nextSeason(current)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                null
-            } ?: return null
+        val target = mutex.withLock { seasonCache[key] } ?: run {
+            var current: AniListSeasonTarget? = null
+            var currentId = baseId
+            repeat(season - 1) {
+                current = try {
+                    nextSeason(currentId)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    null
+                } ?: return null
+                currentId = current!!.id
+            }
+            val resolved = current ?: return null
+            mutex.withLock { seasonCache[key] = resolved }
+            resolved
         }
-        mutex.withLock { seasonCache[key] = current }
-        return current
+        if (!target.released) return null
+        if (episodeNumber != null && target.episodes != null && episodeNumber > target.episodes) return null
+        return target.id
     }
 
-    private suspend fun nextSeason(mediaId: Int): Int? {
+    private suspend fun nextSeason(mediaId: Int): AniListSeasonTarget? {
         val data = AniListTracker.api.query(
             ANILIST_SEQUEL_QUERY,
             buildJsonObject { put("id", mediaId) },
@@ -67,11 +76,20 @@ internal object AniListMediaResolver {
             if ((edge["relationType"] as? JsonPrimitive)?.contentOrNull != "SEQUEL") return@mapNotNull null
             val node = edge["node"] as? JsonObject ?: return@mapNotNull null
             if ((node["type"] as? JsonPrimitive)?.contentOrNull != "ANIME") return@mapNotNull null
-            val format = (node["format"] as? JsonPrimitive)?.contentOrNull
+            val format = (node["format"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+            if (format !in ANILIST_SEASON_FORMATS) return@mapNotNull null
             val id = (node["id"] as? JsonPrimitive)?.intOrNull ?: return@mapNotNull null
-            format to id
+            val status = (node["status"] as? JsonPrimitive)?.contentOrNull
+            val start = node["startDate"] as? JsonObject
+            fun part(name: String) = (start?.get(name) as? JsonPrimitive)?.intOrNull ?: Int.MAX_VALUE
+            val order = part("year").toLong() * 10000 + part("month") * 100L + part("day")
+            order to AniListSeasonTarget(
+                id = id,
+                episodes = (node["episodes"] as? JsonPrimitive)?.intOrNull,
+                released = status == "FINISHED" || status == "RELEASING",
+            )
         }
-        return ANILIST_SEASON_FORMATS.firstNotNullOfOrNull { format -> sequels.firstOrNull { it.first == format }?.second }
+        return sequels.minByOrNull { it.first }?.second
     }
 
     private suspend fun resolveBase(media: TrackingMediaReference): Int? {
