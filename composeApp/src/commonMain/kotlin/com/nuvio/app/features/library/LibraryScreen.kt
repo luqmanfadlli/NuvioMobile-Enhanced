@@ -438,6 +438,7 @@ fun LibraryScreen(
                             LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
                             LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
                             LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
+                            LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_title)
                         }
                     },
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -598,6 +599,7 @@ fun LibraryScreen(
                                         LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
                                         LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_load_failed)
                                         LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_load_failed)
+                                        LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_load_failed)
                                     },
                                     message = uiState.errorMessage.orEmpty(),
                                     actionLabel = stringResource(Res.string.action_retry),
@@ -616,12 +618,14 @@ fun LibraryScreen(
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_title)
                                     LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_title)
                                     LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_empty_title)
+                                    LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_empty_title)
                                 },
                                 message = when (uiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_message)
                                     LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_message)
                                     LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_message)
                                     LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_empty_message)
+                                    LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_empty_message)
                                 },
                             )
                         }
