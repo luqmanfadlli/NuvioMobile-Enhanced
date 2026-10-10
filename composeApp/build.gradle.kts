@@ -410,12 +410,18 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
             freeCompilerArgs += listOf("-Xbinary=bundleId=$iosFrameworkBundleId")
+
+            // Biometric authentication and the profile PIN cache use Apple Security,
+            // LocalAuthentication, and CoreFoundation APIs on every iOS distribution.
+            linkerOpts(
+                "-framework", "Security",
+                "-framework", "LocalAuthentication",
+                "-framework", "CoreFoundation",
+            )
             if (iosDistribution == "full") {
                 linkerOpts(
                     "-lc++",
-                    "-framework", "Security",
                     "-framework", "SystemConfiguration",
-                    "-framework", "CoreFoundation",
                 )
             }
         }
@@ -446,6 +452,7 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.core.splashscreen)
                 implementation(libs.androidx.work.runtime)
+                implementation(libs.androidx.biometric)
                 implementation(libs.coil.gif)
                 implementation("androidx.recyclerview:recyclerview:1.4.0")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")

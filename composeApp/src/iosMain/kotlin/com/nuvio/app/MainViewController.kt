@@ -4,6 +4,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.uikit.OnFocusBehavior
 import androidx.compose.ui.window.ComposeUIViewController
 import com.nuvio.app.core.ui.NativeProfileSwitcherController
+import com.nuvio.app.features.profiles.ProfileBiometricAuth
 import com.nuvio.app.navigation.AppRoute
 import platform.UIKit.UIColor
 import platform.UIKit.UIViewController
@@ -97,6 +98,7 @@ fun AppGateViewController(
         )
     },
 ).apply {
+    ProfileBiometricAuth.initialize(this)
     view.backgroundColor = UIColor.clearColor
 }
 
@@ -105,6 +107,7 @@ private fun nuvioComposeViewController(
 ): UIViewController = ComposeUIViewController(
     configure = { onFocusBehavior = OnFocusBehavior.DoNothing },
     content = content,
-).apply {
+ ).apply {
+    ProfileBiometricAuth.initialize(this)
     view.backgroundColor = nuvioBackgroundColor
 }

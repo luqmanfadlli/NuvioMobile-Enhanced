@@ -77,6 +77,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.NuvioAsyncImage
 import dev.chrisbanes.haze.HazeState
 import com.nuvio.app.isIos
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -112,6 +113,7 @@ fun ProfileSwitcherTab(
     // Keep popup composed while exit animation plays
     var popupVisible by remember { mutableStateOf(false) }
     var pinProfile by remember { mutableStateOf<NuvioProfile?>(null) }
+    var biometricAuthenticating by remember { mutableStateOf(false) }
     var dragTargetProfileIndex by remember { mutableStateOf<Int?>(null) }
     var triggerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val profileBubbleBounds = remember(profiles.map { it.profileIndex }) {
@@ -143,7 +145,7 @@ fun ProfileSwitcherTab(
         dragTargetProfileIndex = nextTargetProfileIndex
     }
 
-    fun chooseProfile(profile: NuvioProfile) {
+    fun routeProfileNormally(profile: NuvioProfile) {
         routeProfileSelection(
             profile = profile,
             isEditMode = false,
@@ -161,6 +163,45 @@ fun ProfileSwitcherTab(
                 onProfileSelected(it)
             },
         )
+    }
+
+    fun chooseProfile(profile: NuvioProfile) {
+        if (biometricAuthenticating) return
+        val isLockedPrimary = profile.profileIndex == 1 &&
+            profile.pinEnabled &&
+            profile.userId.isNotBlank() &&
+            profile.profileIndex != ProfileRepository.state.value.activeProfile?.profileIndex
+        if (!isLockedPrimary) {
+            routeProfileNormally(profile)
+            return
+        }
+
+        biometricAuthenticating = true
+        scope.launch {
+            val result = try {
+                ProfileBiometricAuth.authenticate(profile.profileIndex, profile.userId)
+            } catch (error: CancellationException) {
+                biometricAuthenticating = false
+                throw error
+            } catch (_: Exception) {
+                ProfileBiometricResult.Failed
+            }
+            biometricAuthenticating = false
+            when (result) {
+                ProfileBiometricResult.Success -> {
+                    pinProfile = null
+                    showPopup = false
+                    onProfileSelected(profile)
+                }
+                ProfileBiometricResult.Cancelled -> Unit
+                ProfileBiometricResult.FallbackRequested,
+                ProfileBiometricResult.Invalidated,
+                ProfileBiometricResult.Unavailable,
+                ProfileBiometricResult.NotConfigured,
+                ProfileBiometricResult.Failed,
+                -> routeProfileNormally(profile)
+            }
+        }
     }
 
     fun chooseDragTarget() {
@@ -328,6 +369,7 @@ fun NativeProfileSwitcherPopup(
     var showPopup by remember { mutableStateOf(false) }
     var popupVisible by remember { mutableStateOf(false) }
     var pinProfile by remember { mutableStateOf<NuvioProfile?>(null) }
+    var biometricAuthenticating by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         AvatarRepository.refreshAvatars()
@@ -347,7 +389,7 @@ fun NativeProfileSwitcherPopup(
         }
     }
 
-    fun chooseProfile(profile: NuvioProfile) {
+    fun routeProfileNormally(profile: NuvioProfile) {
         routeProfileSelection(
             profile = profile,
             isEditMode = false,
@@ -367,6 +409,46 @@ fun NativeProfileSwitcherPopup(
                 onProfileSelected(it)
             },
         )
+    }
+
+    fun chooseProfile(profile: NuvioProfile) {
+        if (biometricAuthenticating) return
+        val isLockedPrimary = profile.profileIndex == 1 &&
+            profile.pinEnabled &&
+            profile.userId.isNotBlank() &&
+            profile.profileIndex != ProfileRepository.state.value.activeProfile?.profileIndex
+        if (!isLockedPrimary) {
+            routeProfileNormally(profile)
+            return
+        }
+
+        biometricAuthenticating = true
+        scope.launch {
+            val result = try {
+                ProfileBiometricAuth.authenticate(profile.profileIndex, profile.userId)
+            } catch (error: CancellationException) {
+                biometricAuthenticating = false
+                throw error
+            } catch (_: Exception) {
+                ProfileBiometricResult.Failed
+            }
+            biometricAuthenticating = false
+            when (result) {
+                ProfileBiometricResult.Success -> {
+                    pinProfile = null
+                    showPopup = false
+                    onDismissRequest()
+                    onProfileSelected(profile)
+                }
+                ProfileBiometricResult.Cancelled -> Unit
+                ProfileBiometricResult.FallbackRequested,
+                ProfileBiometricResult.Invalidated,
+                ProfileBiometricResult.Unavailable,
+                ProfileBiometricResult.NotConfigured,
+                ProfileBiometricResult.Failed,
+                -> routeProfileNormally(profile)
+            }
+        }
     }
 
     val popupAlpha = remember { Animatable(0f) }

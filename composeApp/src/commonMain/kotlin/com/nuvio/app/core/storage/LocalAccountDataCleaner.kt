@@ -1,5 +1,11 @@
 package com.nuvio.app.core.storage
 
+import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.core.auth.AuthState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.sync.SyncManager
 import com.nuvio.app.core.sync.ProfileSettingsSync
@@ -21,6 +27,8 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.player.SubtitleRepository
+import com.nuvio.app.features.profiles.ProfileBiometricAuth
+import com.nuvio.app.features.profiles.ProfilePinCacheStorage
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.profiles.MAX_PROFILES
 import com.nuvio.app.features.search.SearchRepository
@@ -41,7 +49,35 @@ import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import com.nuvio.app.features.watched.WatchedRepository
 
 internal object LocalAccountDataCleaner {
-    fun wipe() {
+    suspend fun wipe(accountUserId: String? = null) {
+        val cleanupUserId = accountUserId
+            ?.takeIf { it.isNotBlank() }
+            ?: (AuthRepository.state.value as? AuthState.Authenticated)?.userId
+        var profileAuthenticationCleanupFailed = false
+        (1..MAX_PROFILES).forEach { profileIndex ->
+            val removed = try {
+                ProfilePinCacheStorage.removePayload(profileIndex)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                false
+            }
+            if (!removed) profileAuthenticationCleanupFailed = true
+        }
+
+        if (!cleanupUserId.isNullOrBlank()) {
+            val biometricRemoved = try {
+                withContext(Dispatchers.IO) {
+                    ProfileBiometricAuth.disable(1, cleanupUserId)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                false
+            }
+            if (!biometricRemoved) profileAuthenticationCleanupFailed = true
+        }
+
         ensureTrackingProvidersRegistered()
         TrackingProviderRegistry.removeStoredProfiles(1..MAX_PROFILES)
         SyncManager.cancelAccountSync()
@@ -87,6 +123,10 @@ internal object LocalAccountDataCleaner {
         PlayerLaunchStore.clear()
         StreamLaunchStore.clear()
         StreamContextStore.clear()
+
+        if (profileAuthenticationCleanupFailed) {
+            throw IllegalStateException("Local profile authentication cleanup could not be confirmed")
+        }
     }
 
     internal fun wipePlatformStorage(wipeStorage: () -> Unit = PlatformLocalAccountDataCleaner::wipe) {

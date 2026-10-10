@@ -52,6 +52,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +67,7 @@ import com.nuvio.app.core.ui.NuvioToastHost
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.settings.AppBrandWordmark
 import com.nuvio.app.features.settings.SupporterBadgeIfPresent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -87,6 +91,7 @@ fun ProfileSelectionScreen(
     // is verified the caller can still glide the transition emblem out from that exact spot.
     var pendingPinSelection by remember { mutableStateOf<Pair<NuvioProfile, Offset>?>(null) }
     var isEditMode by remember { mutableStateOf(false) }
+    var biometricAuthenticating by remember { mutableStateOf(false) }
 
     val titleAlpha = remember { Animatable(0f) }
     val titleOffset = remember { Animatable(20f) }
@@ -96,8 +101,58 @@ fun ProfileSelectionScreen(
     // built-in enter/exit so the supporter badge next to the wordmark — rendered as a sibling, not
     // a descendant, of whatever this is applied to — can sit outside it and stay fully visible.
     val contentFadeAlpha = remember { Animatable(1f) }
-    val onProfileClick: (NuvioProfile, Offset) -> Unit = { profile, tapCenter ->
-        if (interactionEnabled) {
+    val onProfileClick: (NuvioProfile, Offset) -> Unit = onProfileClick@{ profile, tapCenter ->
+        if (!interactionEnabled || biometricAuthenticating) return@onProfileClick
+
+        if (
+            !isEditMode &&
+            profile.profileIndex != activeProfileIndex &&
+            profile.profileIndex == 1 &&
+            profile.pinEnabled
+        ) {
+            biometricAuthenticating = true
+            scope.launch {
+                val result = try {
+                    ProfileBiometricAuth.authenticate(profile.profileIndex, profile.userId)
+                } catch (e: CancellationException) {
+                    biometricAuthenticating = false
+                    throw e
+                } catch (_: Exception) {
+                    // A platform failure is not authentication. Follow the existing PIN fallback.
+                    ProfileBiometricResult.Failed
+                }
+                when (result) {
+                    ProfileBiometricResult.Success -> {
+                        biometricAuthenticating = false
+                        onProfileSelected(profile, tapCenter)
+                    }
+                    ProfileBiometricResult.FallbackRequested -> {
+                        biometricAuthenticating = false
+                        pendingPinSelection = profile to tapCenter
+                    }
+                    ProfileBiometricResult.Invalidated,
+                    -> {
+                        biometricAuthenticating = false
+                        pendingPinSelection = profile to tapCenter
+                    }
+                    ProfileBiometricResult.Unavailable,
+                    ProfileBiometricResult.NotConfigured,
+                    -> {
+                        biometricAuthenticating = false
+                        pendingPinSelection = profile to tapCenter
+                    }
+
+                    ProfileBiometricResult.Failed,
+                    -> {
+                        biometricAuthenticating = false
+                        pendingPinSelection = profile to tapCenter
+                    }
+                    ProfileBiometricResult.Cancelled -> {
+                        biometricAuthenticating = false
+                    }
+                }
+            }
+        } else {
             routeProfileSelection(
                 profile = profile,
                 isEditMode = isEditMode,
@@ -414,8 +469,18 @@ private fun ProfileAvatarCard(
                 enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
+                onClickLabel = stringResource(
+                    if (isEditMode) {
+                        Res.string.profile_edit_accessibility
+                    } else {
+                        Res.string.profile_select_accessibility
+                    },
+                ),
                 onClick = { onClick(avatarCenterInWindow) },
             )
+            .semantics {
+                role = Role.Button
+            }
             .padding(8.dp),
     ) {
         Box(
@@ -512,7 +577,7 @@ private fun ProfileAvatarCard(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
-                        contentDescription = null,
+                        contentDescription = stringResource(Res.string.profile_locked_accessibility),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )

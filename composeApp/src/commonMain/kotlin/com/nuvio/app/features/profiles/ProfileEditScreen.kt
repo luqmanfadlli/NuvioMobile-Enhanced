@@ -55,6 +55,9 @@ import com.nuvio.app.core.ui.platformPhysicalTopInset
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.ProfileBackgroundRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -87,6 +90,32 @@ fun ProfileEditScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
     var showPinClear by remember { mutableStateOf(false) }
+    var showBiometricEnablePin by remember { mutableStateOf(false) }
+    var showBiometricDisablePin by remember { mutableStateOf(false) }
+    var biometricConfigured by remember(
+        currentProfile?.profileIndex,
+        currentProfile?.userId,
+    ) {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(currentProfile?.profileIndex, currentProfile?.userId) {
+        val profile = currentProfile
+        biometricConfigured = when {
+            profile == null || profile.profileIndex != 1 || profile.userId.isBlank() -> false
+            else -> try {
+                ProfileBiometricAuth.isConfigured(1, profile.userId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Do not display biometric unlock as disabled when its state could not be read.
+                true
+            }
+        }
+    }
+    var biometricSetupFailed by remember { mutableStateOf(false) }
+    var biometricDisableFailed by remember { mutableStateOf(false) }
+    var biometricDisableFailedMessage by remember { mutableStateOf<String?>(null) }
     val memberAccess by remember {
         MemberAccessRepository.ensureStarted()
         MemberAccessRepository.access
@@ -321,6 +350,20 @@ fun ProfileEditScreen(
 
         if (!isNew) {
             item {
+                val pinEnabled = currentProfile?.pinEnabled == true
+                val biometricAvailable = remember(
+                    currentProfile?.profileIndex,
+                    currentProfile?.userId,
+                    biometricConfigured,
+                ) {
+                    val platformAvailable = try {
+                        ProfileBiometricAuth.isAvailable()
+                    } catch (_: Exception) {
+                        false
+                    }
+                    currentProfile?.profileIndex == 1 && (platformAvailable || biometricConfigured)
+                }
+
                 NuvioSurfaceCard {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(
@@ -337,7 +380,7 @@ fun ProfileEditScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (currentProfile?.pinEnabled == true) {
+                        if (pinEnabled) {
                             NuvioPrimaryButton(
                                 text = stringResource(Res.string.profile_remove_pin_lock),
                                 onClick = { showPinClear = true },
@@ -348,11 +391,35 @@ fun ProfileEditScreen(
                                 onClick = { showPinSetup = true },
                             )
                         }
+
+                        if (currentProfile?.profileIndex == 1) {
+                            ProfileOptionRow(
+                                title = stringResource(Res.string.profile_biometric_unlock),
+                                description = when {
+                                    !pinEnabled -> stringResource(Res.string.profile_biometric_requires_pin)
+                                    !biometricAvailable -> stringResource(Res.string.profile_biometric_unavailable)
+                                    biometricConfigured -> stringResource(Res.string.profile_biometric_enabled_description)
+                                    else -> stringResource(Res.string.profile_biometric_disabled_description)
+                                },
+                                checked = biometricConfigured,
+                                enabled = pinEnabled && biometricAvailable,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) showBiometricEnablePin = true
+                                    else showBiometricDisablePin = true
+                                },
+                            )
+                            if (biometricConfigured) {
+                                Text(
+                                    text = stringResource(Res.string.profile_biometric_privacy_note),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-
         item {
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -435,6 +502,86 @@ fun ProfileEditScreen(
         onDismiss = { showDeleteConfirm = false },
     )
 
+    if (showBiometricEnablePin && currentProfile?.profileIndex == 1) {
+        PinEntryDialog(
+            profileName = stringResource(Res.string.profile_enable_biometric_for, currentProfile.name),
+            onVerify = { pin -> ProfileRepository.verifyPin(currentProfile.profileIndex, pin) },
+            onVerified = {
+                showBiometricEnablePin = false
+                scope.launch {
+                    val result = try {
+                        ProfileBiometricAuth.enable(1, currentProfile.userId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        ProfileBiometricResult.Failed
+                    }
+                    when (result) {
+                        ProfileBiometricResult.Success -> biometricConfigured = true
+                        ProfileBiometricResult.Cancelled,
+                        ProfileBiometricResult.FallbackRequested,
+                        -> Unit
+                        else -> biometricSetupFailed = true
+                    }
+                }
+            },
+            onDismiss = { showBiometricEnablePin = false },
+        )
+    }
+
+    if (showBiometricDisablePin && currentProfile?.profileIndex == 1) {
+        PinEntryDialog(
+            profileName = stringResource(Res.string.profile_disable_biometric_for, currentProfile.name),
+            onVerify = { pin -> ProfileRepository.verifyPin(currentProfile.profileIndex, pin) },
+            onVerified = {
+                showBiometricDisablePin = false
+                scope.launch {
+                    val removed = try {
+                        withContext(Dispatchers.IO) {
+                            ProfileBiometricAuth.disable(1, currentProfile.userId)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        false
+                    }
+                    biometricConfigured = !removed
+                    biometricDisableFailed = !removed
+                }
+            },
+            onDismiss = { showBiometricDisablePin = false },
+        )
+    }
+
+    if (biometricSetupFailed) {
+        NuvioStatusModal(
+            title = stringResource(Res.string.profile_biometric_setup_title),
+            message = stringResource(Res.string.profile_biometric_setup_failed),
+            isVisible = true,
+            confirmText = stringResource(Res.string.action_ok),
+            onConfirm = { biometricSetupFailed = false },
+            onDismiss = { biometricSetupFailed = false },
+        )
+    }
+
+    if (biometricDisableFailed) {
+        NuvioStatusModal(
+            title = stringResource(Res.string.profile_security),
+            message = biometricDisableFailedMessage
+                ?: stringResource(Res.string.profile_biometric_disable_failed),
+            isVisible = true,
+            confirmText = stringResource(Res.string.action_ok),
+            onConfirm = {
+                biometricDisableFailed = false
+                biometricDisableFailedMessage = null
+            },
+            onDismiss = {
+                biometricDisableFailed = false
+                biometricDisableFailedMessage = null
+            },
+        )
+    }
+
     if (showPinSetup && currentProfile != null) {
         PinSetupDialog(
             profileIndex = currentProfile.profileIndex,
@@ -449,9 +596,31 @@ fun ProfileEditScreen(
     if (showPinClear && currentProfile != null) {
         PinEntryDialog(
             profileName = stringResource(Res.string.profile_remove_pin_for, currentProfile.name),
-            onVerify = { pin -> ProfileRepository.clearPin(currentProfile.profileIndex, pin) },
+            onVerify = { pin ->
+                val result = ProfileRepository.clearPin(currentProfile.profileIndex, pin)
+                if (result.unlocked && result.message != null) {
+                    biometricDisableFailedMessage = result.message
+                    biometricDisableFailed = true
+                }
+                result
+            },
             onVerified = {
                 showPinClear = false
+                if (currentProfile.profileIndex == 1) {
+                    scope.launch {
+                        biometricConfigured = try {
+                            if (currentProfile.userId.isBlank()) {
+                                true
+                            } else {
+                                ProfileBiometricAuth.isConfigured(1, currentProfile.userId)
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            true
+                        }
+                    }
+                }
             },
             onDismiss = {
                 showPinClear = false
@@ -633,6 +802,58 @@ private fun ProfileOptionRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ProfileOptionRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                },
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,

@@ -146,6 +146,7 @@ object AuthRepository {
 
     suspend fun signOut(): Result<Unit> {
         _error.value = null
+        val accountUserId = (state.value as? AuthState.Authenticated)?.userId
         val anonymousRead = runCatching { AuthStorage.loadAnonymousUserId() }
         val wasAnonymous = anonymousRead.getOrNull() != null
         val anonymousClear = runCatching { AuthStorage.clearAnonymousUserId() }
@@ -162,7 +163,7 @@ object AuthRepository {
         } else {
             Result.success(Unit)
         }
-        val localCleanup = runCatching { LocalAccountDataCleaner.wipe() }
+        val localCleanup = runCatching { LocalAccountDataCleaner.wipe(accountUserId) }
         _state.value = AuthState.Unauthenticated
 
         val failure = anonymousRead.exceptionOrNull()
@@ -215,6 +216,7 @@ object AuthRepository {
 
     private suspend fun clearLocalSessionAfterRemoteInvalidation() {
         _error.value = null
+        val accountUserId = (state.value as? AuthState.Authenticated)?.userId
         AuthStorage.clearAnonymousUserId()
         validatedRemoteUserId = null
         runCatching {
@@ -222,7 +224,7 @@ object AuthRepository {
         }.onFailure { e ->
             log.w(e) { "Failed to clear Supabase session after remote invalidation; continuing local reset" }
         }
-        val localCleanup = runCatching { LocalAccountDataCleaner.wipe() }
+        val localCleanup = runCatching { LocalAccountDataCleaner.wipe(accountUserId) }
         _state.value = AuthState.Unauthenticated
         localCleanup.onFailure { error ->
             log.e(error) { "Local account cleanup failed after remote session invalidation" }
@@ -231,11 +233,12 @@ object AuthRepository {
 
     suspend fun deleteAccount(): Result<Unit> = runCatching {
         _error.value = null
+        val accountUserId = (state.value as? AuthState.Authenticated)?.userId
         SupabaseProvider.client.functions.invoke("delete-account")
         SupabaseProvider.client.auth.signOut()
         validatedRemoteUserId = null
         try {
-            LocalAccountDataCleaner.wipe()
+            LocalAccountDataCleaner.wipe(accountUserId)
         } finally {
             _state.value = AuthState.Unauthenticated
         }

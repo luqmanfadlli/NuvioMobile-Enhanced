@@ -2757,4 +2757,26 @@
     <string name="player_cast_casting_to">Casting to %1$s</string>
     <string name="player_cast_stream_unsupported">This stream can't be cast, so it keeps playing on this device.</string>
     <string name="player_cast_playback_failed">The Cast device couldn't play this stream. Playback continues on this device.</string>
+    <string name="profile_biometric_unlock">Biometric unlock</string>
+    <string name="profile_biometric_enabled_description">Fingerprint or face unlock is on for your primary profile. Your PIN is still available as a fallback.</string>
+    <string name="profile_biometric_disabled_description">Use your fingerprint or face recognition to unlock your primary profile instead of entering your PIN.</string>
+    <string name="profile_biometric_requires_pin">Turn on PIN lock first to use fingerprint or face unlock.</string>
+    <string name="profile_biometric_privacy_note">Your biometric data stays on your device. Biometric unlock can use any biometric enrolled when this feature is enabled. Adding or removing biometrics invalidates biometric unlock and requires your profile PIN to enable it again.</string>
+    <string name="profile_biometric_unavailable">Fingerprint or face unlock isn't available on this device.</string>
+    <string name="profile_biometric_prompt_setup_title">Set up biometric unlock</string>
+    <string name="profile_biometric_prompt_setup_subtitle">Confirm your fingerprint or face to continue.</string>
+    <string name="profile_biometric_prompt_unlock_title">Unlock primary profile</string>
+    <string name="profile_biometric_prompt_unlock_subtitle">Use your fingerprint or face to unlock.</string>
+    <string name="profile_biometric_prompt_use_pin">Use PIN</string>
+    <string name="profile_biometric_setup_reason">Confirm your fingerprint or face to turn on biometric unlock.</string>
+    <string name="profile_biometric_unlock_reason">Use your fingerprint or face to unlock your primary profile.</string>
+    <string name="profile_locked_accessibility">Locked profile. Authentication required.</string>
+    <string name="profile_select_accessibility">Select profile</string>
+    <string name="profile_edit_accessibility">Edit profile</string>
+    <string name="profile_biometric_setup_title">Biometric unlock</string>
+    <string name="profile_biometric_setup_failed">Biometric unlock couldn't be enabled. Your PIN is unchanged and remains available.</string>
+    <string name="profile_biometric_disable_failed">Nuvio couldn't confirm removal of the biometric unlock credential. Biometric unlock may still be enabled; try again.</string>
+    <string name="profile_enable_biometric_for">Enable biometric unlock for %1$s</string>
+    <string name="profile_disable_biometric_for">Disable biometric unlock for %1$s</string>
+    <string name="profile_pin_clear_cleanup_failed">Your profile PIN was removed from your account, but Nuvio couldn't confirm removal of all local profile-lock data. Biometric unlock or saved offline PIN data may still be present; reopen Profile Security and try again.</string>
 </resources>
