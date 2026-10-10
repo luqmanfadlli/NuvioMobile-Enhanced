@@ -18,7 +18,6 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
     override val changes: Flow<Unit>
         get() = AniListTracker.syncState.map { }
     override val providesCompleteMetadata = true
-    override val ownsCompletedHistoryProjection: Boolean = true
 
     override fun showIdSiblings(): Map<String, Set<String>> =
         AniListTracker.entries().filter { it.idMal != null }.associate { entry ->
@@ -93,8 +92,13 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
                 "${entry.parentMetaId}:${entry.episodeNumber}",
                 entry.trackingProviderItemId?.let { "$it:${entry.episodeNumber}" },
             )
+            val season = AniListTracker.entries()
+                .firstOrNull { it.providerItemId == entry.trackingProviderItemId }
+                ?.let(::franchiseSeasonOf)
             val video = meta.videos.firstOrNull { video ->
                 video.id in episodeIds && video.season != null && video.episode != null
+            } ?: meta.videos.firstOrNull { video ->
+                season != null && video.season == season && video.episode == entry.episodeNumber
             } ?: return@map entry
             entry.copy(
                 seasonNumber = video.season,
@@ -102,6 +106,25 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
                 videoId = buildPlaybackVideoId(entry.parentMetaId, video.season, video.episode),
             )
         }
+    }
+
+    private fun franchiseSeasonOf(entry: AniListEntry): Int {
+        val byId = AniListTracker.entries().associateBy { it.mediaId }
+        val seen = mutableSetOf(entry.mediaId)
+        var count = 1
+        var current = entry
+        while (true) {
+            val prequelId = current.prequelIds.firstOrNull { it !in seen } ?: break
+            seen += prequelId
+            val prequel = byId[prequelId]
+            if (prequel == null) {
+                count++
+                break
+            }
+            if (prequel.format == null || prequel.format == "TV") count++
+            current = prequel
+        }
+        return count
     }
 
     private fun supersededMediaIds(active: List<AniListEntry>, all: List<AniListEntry>): Set<Int> {
