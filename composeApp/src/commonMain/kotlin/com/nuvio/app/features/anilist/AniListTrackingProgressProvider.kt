@@ -129,17 +129,30 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
 
     private fun supersededMediaIds(active: List<AniListEntry>, all: List<AniListEntry>): Set<Int> {
         val byId = all.associateBy { it.mediaId }
+        val progressed = all.filter { entry ->
+            !entry.isMovie && entry.progress > 0 &&
+                entry.status != ANILIST_STATUS_PLANNING && entry.status != ANILIST_STATUS_DROPPED
+        }
         val result = mutableSetOf<Int>()
-        active.forEach { entry ->
+        progressed.forEach { entry ->
             val stack = ArrayDeque(entry.prequelIds)
             val seen = mutableSetOf<Int>()
             while (stack.isNotEmpty()) {
                 val id = stack.removeLast()
                 if (!seen.add(id)) continue
-                val prequel = byId[id]
-                if (prequel != null && prequel.updatedAtSeconds <= entry.updatedAtSeconds) result += id
-                prequel?.prequelIds?.let(stack::addAll)
+                result += id
+                byId[id]?.prequelIds?.let(stack::addAll)
             }
+        }
+        active.forEach { entry ->
+            val title = normalizeAniListTitle(entry.title)
+            if (title.length < 4) return@forEach
+            val hasLaterSeason = progressed.any { other ->
+                other.mediaId != entry.mediaId &&
+                    other.prequelIds.isEmpty() &&
+                    normalizeAniListTitle(other.title).let { it.length > title.length && it.startsWith(title) }
+            }
+            if (hasLaterSeason) result += entry.mediaId
         }
         return result
     }
