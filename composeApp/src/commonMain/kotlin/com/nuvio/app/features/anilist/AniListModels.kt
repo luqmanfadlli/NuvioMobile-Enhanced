@@ -80,8 +80,6 @@ internal data class AniListEntry(
     val year: Int? = null,
     val siteUrl: String? = null,
     val synonyms: List<String> = emptyList(),
-    val prequelIds: List<Int> = emptyList(),
-    val prequelTvIds: List<Int> = emptyList(),
 ) {
     val isMovie: Boolean
         get() = format == "MOVIE"
@@ -165,10 +163,6 @@ internal fun JsonObject.toAniListEntry(): AniListEntry? {
             (element as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::add)
         }
     }.distinct()
-    val prequels = (media.obj("relations")?.get("edges") as? JsonArray).orEmpty()
-        .mapNotNull { it as? JsonObject }
-        .filter { it.str("relationType") == "PREQUEL" }
-        .mapNotNull { it.obj("node") }
     val cover = media.obj("coverImage")
     return AniListEntry(
         entryId = int("id") ?: return null,
@@ -186,9 +180,5 @@ internal fun JsonObject.toAniListEntry(): AniListEntry? {
         year = media.int("seasonYear") ?: media.obj("startDate")?.int("year"),
         siteUrl = media.str("siteUrl"),
         synonyms = synonyms,
-        prequelIds = prequels.mapNotNull { it.int("id") },
-        prequelTvIds = prequels
-            .filter { it.str("format") == "TV" || it.str("format") == "TV_SHORT" }
-            .mapNotNull { it.int("id") },
     )
 }
