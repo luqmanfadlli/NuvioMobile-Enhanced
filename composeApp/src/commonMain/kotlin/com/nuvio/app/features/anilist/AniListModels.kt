@@ -80,6 +80,7 @@ internal data class AniListEntry(
     val year: Int? = null,
     val siteUrl: String? = null,
     val synonyms: List<String> = emptyList(),
+    val prequelIds: List<Int> = emptyList(),
 ) {
     val isMovie: Boolean
         get() = format == "MOVIE"
@@ -180,5 +181,9 @@ internal fun JsonObject.toAniListEntry(): AniListEntry? {
         year = media.int("seasonYear") ?: media.obj("startDate")?.int("year"),
         siteUrl = media.str("siteUrl"),
         synonyms = synonyms,
+        prequelIds = (media.obj("relations")?.get("edges") as? JsonArray).orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .filter { it.str("relationType") == "PREQUEL" }
+            .mapNotNull { it.obj("node")?.int("id") },
     )
 }
