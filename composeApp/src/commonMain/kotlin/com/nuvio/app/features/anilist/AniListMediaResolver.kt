@@ -19,12 +19,62 @@ import kotlinx.serialization.json.put
 internal fun normalizeAniListTitle(value: String?): String =
     value.orEmpty().lowercase().filter { it.isLetterOrDigit() }
 
+private const val ANILIST_SEQUEL_QUERY =
+    "query(\$id:Int){Media(id:\$id,type:ANIME){id relations{edges{relationType(version:2) node{id type format}}}}}"
+
+private val ANILIST_SEASON_FORMATS = listOf("TV", "TV_SHORT", "ONA")
+
 internal object AniListMediaResolver {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, Int>()
     private val kitsuCache = mutableMapOf<Long, Int>()
+    private val seasonCache = mutableMapOf<String, Int>()
 
     suspend fun resolve(media: TrackingMediaReference): Int? {
+        val base = resolveBase(media) ?: return null
+        val season = media.episode?.season
+        if (media.kind == TrackingMediaKind.MOVIE || season == null || season <= 1) return base
+        return resolveSeason(base, season)
+    }
+
+    private suspend fun resolveSeason(baseId: Int, season: Int): Int? {
+        val key = "$baseId:$season"
+        mutex.withLock { seasonCache[key] }?.let { return it }
+        var current = baseId
+        repeat(season - 1) {
+            current = try {
+                nextSeason(current)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                null
+            } ?: return null
+        }
+        mutex.withLock { seasonCache[key] = current }
+        return current
+    }
+
+    private suspend fun nextSeason(mediaId: Int): Int? {
+        val data = AniListTracker.api.query(
+            ANILIST_SEQUEL_QUERY,
+            buildJsonObject { put("id", mediaId) },
+            authenticated = false,
+        )
+        val edges = (((data["Media"] as? JsonObject)?.get("relations") as? JsonObject)?.get("edges") as? JsonArray)
+            .orEmpty()
+            .mapNotNull { it as? JsonObject }
+        val sequels = edges.mapNotNull { edge ->
+            if ((edge["relationType"] as? JsonPrimitive)?.contentOrNull != "SEQUEL") return@mapNotNull null
+            val node = edge["node"] as? JsonObject ?: return@mapNotNull null
+            if ((node["type"] as? JsonPrimitive)?.contentOrNull != "ANIME") return@mapNotNull null
+            val format = (node["format"] as? JsonPrimitive)?.contentOrNull
+            val id = (node["id"] as? JsonPrimitive)?.intOrNull ?: return@mapNotNull null
+            format to id
+        }
+        return ANILIST_SEASON_FORMATS.firstNotNullOfOrNull { format -> sequels.firstOrNull { it.first == format }?.second }
+    }
+
+    private suspend fun resolveBase(media: TrackingMediaReference): Int? {
         media.ids.anilist?.takeIf { it > 0L }?.let { return it.toInt() }
         media.ids.kitsu?.let { kitsu -> resolveKitsu(kitsu) }?.let { return it }
         val entries = AniListTracker.entries()
