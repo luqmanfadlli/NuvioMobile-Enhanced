@@ -114,15 +114,16 @@ internal class AniListTrackingProgressProvider : TrackingProgressProvider {
         var count = 1
         var current = entry
         while (true) {
-            val prequelId = current.prequelIds.firstOrNull { it !in seen } ?: break
-            seen += prequelId
-            val prequel = byId[prequelId]
-            if (prequel == null) {
+            val tvId = current.prequelTvIds.firstOrNull { it !in seen }
+            if (tvId != null) {
+                seen += tvId
                 count++
-                break
+                current = byId[tvId] ?: break
+                continue
             }
-            if (prequel.format == null || prequel.format == "TV") count++
-            current = prequel
+            val otherId = current.prequelIds.firstOrNull { it !in seen } ?: break
+            seen += otherId
+            current = byId[otherId] ?: break
         }
         return count
     }
