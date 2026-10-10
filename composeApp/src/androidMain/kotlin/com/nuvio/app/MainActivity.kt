@@ -64,6 +64,7 @@ import com.nuvio.app.features.mdblist.PlatformMdbListAuthPersistence
 import com.nuvio.app.features.mdblist.PlatformMdbListSyncStorage
 import com.nuvio.app.features.servers.ServerStorage
 import com.nuvio.app.features.simkl.SimklAuthStorage
+import com.nuvio.app.features.anilist.AniListStorage
 import com.nuvio.app.features.simkl.SimklSyncStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
 import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
@@ -139,6 +140,7 @@ open class MainActivity : AppCompatActivity() {
         ServerStorage.initialize(applicationContext)
         PlatformMdbListSyncStorage.initialize(applicationContext)
         SimklAuthStorage.initialize(applicationContext)
+        AniListStorage.initialize(applicationContext)
         SimklSyncStorage.initialize(applicationContext)
         LibraryDisplaySettingsStorage.initialize(applicationContext)
         LibraryReleaseScheduleStorage.initialize(applicationContext)
