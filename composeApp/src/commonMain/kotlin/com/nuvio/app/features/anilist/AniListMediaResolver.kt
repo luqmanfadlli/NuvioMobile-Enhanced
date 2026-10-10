@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist
 
+import com.nuvio.app.features.player.skip.SkipIntroApi
 import com.nuvio.app.features.tracking.TrackingMediaKind
 import com.nuvio.app.features.tracking.TrackingMediaReference
 import kotlinx.coroutines.CancellationException
@@ -21,9 +22,11 @@ internal fun normalizeAniListTitle(value: String?): String =
 internal object AniListMediaResolver {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, Int>()
+    private val kitsuCache = mutableMapOf<Long, Int>()
 
     suspend fun resolve(media: TrackingMediaReference): Int? {
         media.ids.anilist?.takeIf { it > 0L }?.let { return it.toInt() }
+        media.ids.kitsu?.let { kitsu -> resolveKitsu(kitsu) }?.let { return it }
         val entries = AniListTracker.entries()
         media.ids.mal?.let { mal ->
             entries.firstOrNull { it.idMal?.toLong() == mal }?.let { return it.mediaId }
@@ -56,6 +59,14 @@ internal object AniListMediaResolver {
         }
         if (resolved != null) mutex.withLock { cache[key] = resolved }
         return resolved
+    }
+
+    private suspend fun resolveKitsu(kitsuId: Long): Int? {
+        mutex.withLock { kitsuCache[kitsuId] }?.let { return it }
+        val anilistId = SkipIntroApi.resolveKitsuToAnilist(kitsuId.toString())?.anilist?.takeIf { it > 0 }
+            ?: return null
+        mutex.withLock { kitsuCache[kitsuId] = anilistId }
+        return anilistId
     }
 
     private suspend fun remote(media: TrackingMediaReference, normalizedTitle: String): Int? {
