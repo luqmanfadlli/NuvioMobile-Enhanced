@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.library.LibrarySourceMode
+import com.nuvio.app.features.anilist.AniListTracker
 import com.nuvio.app.features.mdblist.MdbListTracker
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.simkl.SimklAnimeIdPreference
@@ -212,10 +213,12 @@ private fun TrackingDataSources(
         WatchProgressSourceCoordinator.uiState
     }.collectAsStateWithLifecycle()
     val mdblistConnected by remember { MdbListTracker.ensureLoaded(); MdbListTracker.isAuthenticated }.collectAsStateWithLifecycle()
+    val anilistConnected by remember { AniListTracker.ensureLoaded(); AniListTracker.isAuthenticated }.collectAsStateWithLifecycle()
     val connectedProviders = buildSet {
         if (traktConnected) add(TrackingProviderId.TRAKT)
         if (simklConnected) add(TrackingProviderId.SIMKL)
         if (mdblistConnected) add(TrackingProviderId.MDBLIST)
+        if (anilistConnected) add(TrackingProviderId.ANILIST)
     }
     val effectiveLibrarySource = effectiveLibrarySourceMode(settingsUiState.librarySourceMode) { provider ->
         provider in connectedProviders
@@ -305,7 +308,7 @@ private fun TrackingDataSources(
             title = stringResource(Res.string.trakt_library_source_dialog_title),
             subtitle = stringResource(Res.string.trakt_library_source_dialog_subtitle),
             selectedValue = effectiveLibrarySource,
-            options = librarySourceOptions(traktConnected, simklConnected, mdblistConnected),
+            options = librarySourceOptions(traktConnected, simklConnected, mdblistConnected, anilistConnected),
             onSelected = TrackingSettingsRepository::setLibrarySourceMode,
             onDismiss = { activePickerName = null },
         )
@@ -314,7 +317,7 @@ private fun TrackingDataSources(
             title = stringResource(Res.string.trakt_watch_progress_dialog_title),
             subtitle = stringResource(Res.string.tracking_watch_progress_dialog_subtitle),
             selectedValue = effectiveProgressSource,
-            options = watchProgressSourceOptions(traktConnected, simklConnected, mdblistConnected),
+            options = watchProgressSourceOptions(traktConnected, simklConnected, mdblistConnected, anilistConnected),
             onSelected = { source ->
                 scope.launch {
                     WatchProgressSourceCoordinator.selectSource(
@@ -479,6 +482,7 @@ private fun librarySourceOptions(
     traktConnected: Boolean,
     simklConnected: Boolean,
     mdblistConnected: Boolean,
+    anilistConnected: Boolean,
 ): List<TrackingPickerOption<LibrarySourceMode>> {
     val traktAvailable = isTrackingBrandAvailable(TrackingBrand.TRAKT, traktConnected, simklConnected)
     val simklAvailable = isTrackingBrandAvailable(TrackingBrand.SIMKL, traktConnected, simklConnected)
@@ -509,6 +513,13 @@ private fun librarySourceOptions(
             enabled = mdblistConnected,
             unavailableReason = trackingUnavailableReason(TrackingBrand.MDBLIST, mdblistConnected),
         ),
+        TrackingPickerOption(
+            value = LibrarySourceMode.ANILIST,
+            title = stringResource(Res.string.tracking_source_anilist),
+            description = stringResource(Res.string.settings_anilist_library_description),
+            enabled = anilistConnected,
+            unavailableReason = trackingUnavailableReason(TrackingBrand.ANILIST, anilistConnected),
+        ),
     )
 }
 
@@ -517,6 +528,7 @@ private fun watchProgressSourceOptions(
     traktConnected: Boolean,
     simklConnected: Boolean,
     mdblistConnected: Boolean,
+    anilistConnected: Boolean,
 ): List<TrackingPickerOption<WatchProgressSource>> {
     val traktAvailable = isTrackingBrandAvailable(TrackingBrand.TRAKT, traktConnected, simklConnected)
     val simklAvailable = isTrackingBrandAvailable(TrackingBrand.SIMKL, traktConnected, simklConnected)
@@ -546,6 +558,13 @@ private fun watchProgressSourceOptions(
             description = stringResource(Res.string.settings_mdblist_progress_description),
             enabled = mdblistConnected,
             unavailableReason = trackingUnavailableReason(TrackingBrand.MDBLIST, mdblistConnected),
+        ),
+        TrackingPickerOption(
+            value = WatchProgressSource.ANILIST,
+            title = stringResource(Res.string.tracking_source_anilist),
+            description = stringResource(Res.string.settings_anilist_progress_description),
+            enabled = anilistConnected,
+            unavailableReason = trackingUnavailableReason(TrackingBrand.ANILIST, anilistConnected),
         ),
     )
 }
@@ -608,6 +627,7 @@ private fun librarySourceModeLabel(source: LibrarySourceMode): String = when (so
     LibrarySourceMode.LOCAL -> stringResource(Res.string.trakt_library_source_nuvio)
     LibrarySourceMode.SIMKL -> stringResource(Res.string.tracking_source_simkl)
     LibrarySourceMode.MDBLIST -> stringResource(Res.string.tracking_source_mdblist)
+    LibrarySourceMode.ANILIST -> stringResource(Res.string.tracking_source_anilist)
 }
 
 @Composable
@@ -616,6 +636,7 @@ private fun watchProgressSourceLabel(source: WatchProgressSource): String = when
     WatchProgressSource.NUVIO_SYNC -> stringResource(Res.string.trakt_watch_progress_source_nuvio)
     WatchProgressSource.SIMKL -> stringResource(Res.string.tracking_source_simkl)
     WatchProgressSource.MDBLIST -> stringResource(Res.string.tracking_source_mdblist)
+    WatchProgressSource.ANILIST -> stringResource(Res.string.tracking_source_anilist)
 }
 
 @Composable
