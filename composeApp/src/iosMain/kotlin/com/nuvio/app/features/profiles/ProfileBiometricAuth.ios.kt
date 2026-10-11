@@ -51,6 +51,7 @@ import platform.Security.kSecUseAuthenticationUIFail
 import platform.Security.kSecValueData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
 import org.jetbrains.compose.resources.getString
 import nuvio.composeapp.generated.resources.*
@@ -185,7 +186,7 @@ actual object ProfileBiometricAuth {
                     deleteCredential(userId)
                 }
             }
-            ProfileBiometricResult.Failed
+            return ProfileBiometricResult.Failed
         }
     }
 
