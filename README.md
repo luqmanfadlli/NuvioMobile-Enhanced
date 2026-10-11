@@ -64,8 +64,8 @@ Everythings below are added on top of upstream Nuvio Mobile.
 |---|---|---|
 | **Tap-to-seek on the timeline** — tap anywhere on the progress bar to jump there. | — | Always on |
 | **Volume Boost** — volume can be boosted past 100% | Swipe up all the way past 100% | Always on |
-| **Stream Quality Chooser** - add quality indicator and ability to choose quality on HLS stream whenever available, in both the legacy and the new control layout | Player screen overlay | Best quality supported by hardware |
-| **Info Button** add playback info button to show currently playing video and audio information, in both the legacy and the new control layout | Player screen overlay | — |
+| **Stream Quality Chooser** — add quality indicator and ability to choose quality on HLS stream whenever available, in both the legacy and the new control layout | Player screen overlay | Best quality supported by hardware |
+| **Info Button** — add playback info button to show currently playing video and audio information, in both the legacy and the new control layout | Player screen overlay | — |
 | **Picture in Picture button** — enter PiP straight from the player overlay, in both the legacy and the new control layout. | Player screen overlay | — |
 | **Gesture readouts** — swiping shows the seek target and delta, and the volume/brightness percentage, in the new control layout as well. | — | Always on |
 | **Swipe to Seek toggle** — an option to turn it off to prevent accidental seeking while keeping the up/down brightness and volume swipes. | Settings → Playback → **Swipe to Seek** (under Touch Gestures) | On |
@@ -73,9 +73,12 @@ Everythings below are added on top of upstream Nuvio Mobile.
 | **Adjustable subtitle transparency** | Settings → Playback → Subtitle Rendering → **Background Color** | — |
 | **Sync subtitles by ear** — tap **Heard** when you hear a line and **Saw** when its subtitle appears, in either order, and the offset is set for you. | Player → Subtitles panel → **Sync by ear** | — |
 | **Buffered range on the seek bar** — the timeline shows how far ahead the stream is buffered, in both the legacy and the new control layout. | — | Always on |
+| **Seek bar thumbnails** — a preview frame floats above the seek bar while you drag it, so you can see where you will land. Frames are grabbed from the stream itself (stream headers and extension-less HLS included) only while you scrub, and the connection is released when you let go. | Settings → Playback → **Seek Bar Thumbnails** | On |
+| **Chapters** — when the file has embedded chapters, the seek bar is split into chapter segments and the current chapter's name is shown in the player. Tap the chapter name or the **Chapters** button to open the list and jump to any chapter. | Player screen overlay → chapter label / **Chapters** | Shown when the stream has chapters |
 | **Movie recommendations** — in the last four minutes of a movie, a small card suggests More Like This titles you haven't watched. Dismissing it snoozes it for a minute. | Settings → Playback → **Movie Recommendations** | On |
 | **Custom playback buffers** *(Android)* — set min, max, start, after-stall and back buffer, and the target buffer size. | Settings → Playback → **Custom Playback Buffers** | Upstream defaults |
 | **ExoPlayer native memory** *(Android, experimental)* — buffers in native memory instead of the Java heap, so you can set a larger buffer. The limit depends on how much memory the device has. | Settings → Playback → **ExoPlayer Native Memory (Experimental)** | Off |
+
 ### Live TV
 
 Upstream Nuvio has no Live TV. This fork adds the whole feature.
@@ -93,6 +96,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 |---|---|---|
 | **Profile Insights** — activity, library and taste breakdowns for the active profile, in Overview and Taste sections. | Settings → **Profile** | Always available |
 | **Custom profile background** — point a profile at any `http(s)` image URL. | Edit Profile → **Choose Profile Background** → Custom → **Custom background URL** | None |
+| **Biometric unlock** — unlock the PIN-locked primary profile with fingerprint or Face ID at launch and when switching profiles. The PIN stays available as a fallback. Biometric data never leaves the device; adding or removing a fingerprint or face turns it off until you re-enable it with your PIN. | Edit Profile (primary profile, PIN lock on) → **Biometric unlock** | Off |
 
 ### Details & discovery
 
@@ -106,7 +110,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | **Trailer start with sound** — start the details-page trailer unmuted. Appears once trailer playback is on. | Settings → Layout → Detail Page → **Start with sound** | Off |
 | **Random Episode** — Play random episode for series. | 3 dots next to play button → **random icon** | — |
 | **Include watched episodes toggle** — Include watched episodes in random playback. | Settings → Playback → **Include watched episodes in random playback**| Off |
-| **In-app ratings** — rate a movie, show, season or episode from 1 to 10 on the details page. The rating syncs to Trakt, SIMKL and/or MDBList. | Details page → star row under the actions → **Rate** | — |
+| **In-app ratings** — rate a movie, show, season or episode from 1 to 10 on the details page. The rating syncs to Trakt, SIMKL, MDBList, and/or AniList. | Details page → star row under the actions → **Rate** | — |
 | **Library icon on saved items** — the library action shows when a title is already saved. | — | Always on |
 | **Trailer letterbox zoom** *(Android)* — finds the black bars in a hero trailer and zooms in to cut them off. | — | Always on |
 | **Desktop hero on tablets** — tablets use the wide desktop details hero with a reworked action layout. | — | Always on on tablets |
@@ -123,6 +127,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | Feature | Where | Default |
 |---|---|---|
 | **Library Calendar** — show release date of ongoing series in the library. | Library screen → **calendar icon toggle** | — |
+| **AniList Library** — browse your AniList anime lists as a Library source once AniList is connected. | Library screen → source picker → **AniList** | — |
 
 ### Downloads
 
@@ -137,6 +142,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 
 | Feature | Where | Default |
 |---|---|---|
+| **AniList** — connect your AniList account to sync anime watch progress, watched episodes, list status (Watching, Planning, Completed, Paused, Dropped, Rewatching) and scores. AniList can also be the source for Continue Watching and the Library. Titles are matched to AniList through IMDb, MAL, Kitsu and AniDB IDs. Connected per profile. | Settings → Tracking → **AniList** → **Connect AniList** | Not connected |
 | **Sign in with a code** — device-code sign-in for **Trakt** and **SIMKL**, for when the browser redirect will not come back, especially for installation within LiveContainer. Shows a code to enter on any other device. | Settings → Tracking → provider card → **Connect with code** | — |
 
 ### Navigation & settings
