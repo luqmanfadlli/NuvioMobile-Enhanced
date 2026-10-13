@@ -164,6 +164,7 @@ internal class PlayerScreenRuntime(
     var seekProgressSyncJob by mutableStateOf<Job?>(null)
     var accumulatedSeekState by mutableStateOf<PlayerAccumulatedSeekState?>(null)
     var initialLoadCompleted by mutableStateOf(false)
+    var isMiniPresentation by mutableStateOf(false)
     var speedBoostRestoreSpeed by mutableStateOf<Float?>(null)
     var isHoldToSpeedGestureActive by mutableStateOf(false)
     var initialSeekApplied by mutableStateOf(
