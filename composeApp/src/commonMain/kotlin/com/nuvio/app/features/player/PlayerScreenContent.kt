@@ -78,6 +78,8 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
 
     val runtime = remember { PlayerScreenRuntime(args) }
     runtime.args = args
+    val miniPresentation = LocalPlayerMiniPresentation.current
+    runtime.isMiniPresentation = miniPresentation == true
 
     BoxWithConstraints(
         modifier = args.modifier
@@ -90,9 +92,13 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
 
         runtime.scope = rememberCoroutineScope()
         runtime.hapticFeedback = LocalHapticFeedback.current
-        runtime.gestureController = rememberPlayerGestureController(
-            restoreBrightness = playerSettingsUiState.touchGesturesEnabled,
-        )
+        runtime.gestureController = if (runtime.isMiniPresentation) {
+            null
+        } else {
+            rememberPlayerGestureController(
+                restoreBrightness = playerSettingsUiState.touchGesturesEnabled,
+            )
+        }
         runtime.playerSettingsUiState = playerSettingsUiState
         runtime.p2pSettingsUiState = p2pSettingsUiState
         runtime.p2pStreamingState = p2pStreamingState
@@ -165,12 +171,14 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
                 )
             }
         }
-        EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
-        ManagePlayerPictureInPicture(
-            isPlaying = pipIsPlaying,
-            videoSize = pipVideoSize,
-        )
-        runtime.BindMiniPlayerEffects()
+        if (!runtime.isMiniPresentation) {
+            EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+            ManagePlayerPictureInPicture(
+                isPlaying = pipIsPlaying,
+                videoSize = pipVideoSize,
+            )
+        }
+        runtime.BindMiniPlayerEffects(miniPresentation)
         runtime.BindPlayerRuntimeEffects()
         runtime.RenderPlayerRuntimeUi()
     }
