@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.nuvio.app.core.auth.AuthStorage
 import com.nuvio.app.core.network.ServerConfigurationStorage
@@ -17,6 +18,8 @@ import com.nuvio.app.core.poster.CustomPosterUrlStorage
 import com.nuvio.app.core.storage.PlatformLocalAccountDataCleaner
 import com.nuvio.app.core.sync.SyncClientIdentityStorage
 import com.nuvio.app.core.ui.CardDepthStyleStorage
+import com.nuvio.app.core.ui.NuvioSheetHaze
+import com.nuvio.app.core.ui.NuvioSheetHazeHost
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.addons.AddonHttpClientProvider
 import com.nuvio.app.features.addons.AddonStorage
@@ -83,6 +86,7 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
 import com.nuvio.app.features.watchprogress.ResumePromptStorage
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
+import dev.chrisbanes.haze.rememberHazeState
 
 open class MainActivity : AppCompatActivity() {
 
@@ -176,7 +180,11 @@ open class MainActivity : AppCompatActivity() {
         handleIncomingAppIntent(intent)
 
         setContent {
-            App()
+            val sheetHazeState = rememberHazeState()
+            val sheetHaze = remember(sheetHazeState) { NuvioSheetHaze(sheetHazeState) }
+            NuvioSheetHazeHost(sheetHaze = sheetHaze) {
+                App()
+            }
         }
     }
 
