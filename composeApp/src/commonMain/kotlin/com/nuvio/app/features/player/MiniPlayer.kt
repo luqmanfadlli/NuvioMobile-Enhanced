@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -30,9 +31,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,26 +55,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.servers.ServerPlayback
-import com.nuvio.app.features.tracking.TrackingMediaReference
-import com.nuvio.app.features.tracking.TrackingScrobbleAction
-import com.nuvio.app.features.tracking.TrackingScrobbleCoordinator
-import com.nuvio.app.features.tracking.TrackingScrobbleEvent
-import com.nuvio.app.features.watching.domain.isShortPlaceholderDuration
-import com.nuvio.app.features.watchprogress.WatchProgressClock
-import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
-import com.nuvio.app.features.watchprogress.WatchProgressRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import com.nuvio.app.navigation.PlayerRoute
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.mini_player_close
@@ -82,184 +68,105 @@ import nuvio.composeapp.generated.resources.mini_player_play
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
-data class MiniPlayerSession(
-    val id: Long,
-    val launch: PlayerLaunch,
-    val playbackUrl: String,
-    val startPositionMs: Long,
-    val startPlaying: Boolean,
-    val progressSession: WatchProgressPlaybackSession?,
-    val trackingMedia: TrackingMediaReference?,
-)
+val LocalPlayerMiniPresentation = compositionLocalOf<Boolean?> { null }
 
 object MiniPlayerController {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var nextSessionId = 1L
-    private val _session = MutableStateFlow<MiniPlayerSession?>(null)
-    val session: StateFlow<MiniPlayerSession?> = _session.asStateFlow()
-    private val _activeFullPlayers = MutableStateFlow(0)
-    val activeFullPlayers: StateFlow<Int> = _activeFullPlayers.asStateFlow()
-    var isActive by mutableStateOf(false)
+    private var ownedRoute by mutableStateOf<PlayerRoute?>(null)
+    private var minimized by mutableStateOf(false)
+    internal var hostedRuntime by mutableStateOf<PlayerScreenRuntime?>(null)
         private set
-    private var lastSnapshot: PlayerPlaybackSnapshot? = null
-    private var lastPersistEpochMs = 0L
+    private val hostedLaunchIds = mutableSetOf<Long>()
+    private val placeholderLaunchIds = mutableSetOf<Long>()
 
-    internal fun start(
-        launch: PlayerLaunch,
-        playbackUrl: String,
-        startPositionMs: Long,
-        startPlaying: Boolean,
-        progressSession: WatchProgressPlaybackSession?,
-        trackingMedia: TrackingMediaReference?,
-    ) {
-        close()
-        lastSnapshot = null
-        lastPersistEpochMs = WatchProgressClock.nowEpochMs()
-        _session.value = MiniPlayerSession(
-            id = nextSessionId++,
-            launch = launch,
-            playbackUrl = playbackUrl,
-            startPositionMs = startPositionMs,
-            startPlaying = startPlaying,
-            progressSession = progressSession,
-            trackingMedia = trackingMedia,
-        )
-        isActive = true
-    }
+    val isActive: Boolean
+        get() = minimized && ownedRoute != null
 
-    internal fun onSnapshot(sessionId: Long, snapshot: PlayerPlaybackSnapshot) {
-        val current = _session.value ?: return
-        if (current.id != sessionId) return
-        lastSnapshot = snapshot
-        if (snapshot.isEnded) {
-            close()
-            return
+    fun hostedRoute(topPlayerRoute: PlayerRoute?, enabled: Boolean): PlayerRoute? {
+        val owned = ownedRoute
+        if (topPlayerRoute != null) {
+            return if (topPlayerRoute == owned || enabled) topPlayerRoute else null
         }
-        if (!snapshot.isPlaying) return
-        val progressSession = current.progressSession ?: return
-        if (isShortPlaceholderDuration(snapshot.durationMs)) return
-        val now = WatchProgressClock.nowEpochMs()
-        if (now - lastPersistEpochMs < PlaybackProgressPersistIntervalMs) return
-        lastPersistEpochMs = now
-        WatchProgressRepository.upsertPlaybackProgress(
-            session = progressSession,
-            snapshot = snapshot,
-            syncRemote = false,
-        )
+        return if (minimized) owned else null
     }
 
-    internal fun resumePositionMs(session: MiniPlayerSession): Long {
-        if (_session.value?.id != session.id) return session.startPositionMs
-        return lastSnapshot?.positionMs?.takeIf { it > 0L } ?: session.startPositionMs
-    }
-
-    fun expand(): PlayerLaunch? {
-        val current = _session.value ?: return null
-        val positionMs = lastSnapshot?.positionMs?.takeIf { it > 0L } ?: current.startPositionMs
-        clearSession()
-        return current.launch.copy(
-            initialPositionMs = positionMs,
-            initialProgressFraction = null,
-        )
-    }
+    fun isHostedRoute(route: PlayerRoute, topPlayerRoute: PlayerRoute?, enabled: Boolean): Boolean =
+        route.launchId in hostedLaunchIds || hostedRoute(topPlayerRoute, enabled) == route
 
     fun close() {
-        val current = _session.value ?: return
-        val snapshot = lastSnapshot
-        clearSession()
-        recordProgress(current, snapshot)
+        minimized = false
     }
 
-    fun discard() {
-        clearSession()
-    }
-
-    internal fun onFullPlayerEntered() {
-        _activeFullPlayers.update { it + 1 }
-        close()
-    }
-
-    internal fun onFullPlayerExited() {
-        _activeFullPlayers.update { (it - 1).coerceAtLeast(0) }
-    }
-
-    private fun clearSession() {
-        _session.value = null
-        lastSnapshot = null
-        isActive = false
-    }
-
-    private fun recordProgress(session: MiniPlayerSession, snapshot: PlayerPlaybackSnapshot?) {
-        val progressSession = session.progressSession ?: return
-        val finalSnapshot = snapshot ?: return
-        if (finalSnapshot.durationMs <= 0L || isShortPlaceholderDuration(finalSnapshot.durationMs)) return
-        WatchProgressRepository.flushPlaybackProgress(
-            session = progressSession,
-            snapshot = finalSnapshot.copy(isPlaying = false, isLoading = false),
-        )
-        val media = session.trackingMedia ?: return
-        if (!media.hasResolvableIdentity) return
-        val progressPercent = (finalSnapshot.positionMs.toDouble() / finalSnapshot.durationMs.toDouble() * 100.0)
-            .coerceIn(0.0, 100.0)
-        if (progressPercent < 1.0) return
-        scope.launch {
-            runCatching {
-                TrackingScrobbleCoordinator.scrobble(
-                    profileId = progressSession.profileId,
-                    action = TrackingScrobbleAction.STOP,
-                    event = TrackingScrobbleEvent(
-                        media = media,
-                        progressPercent = progressPercent,
-                    ),
-                )
+    internal fun commit(topPlayerRoute: PlayerRoute?, hostedRoute: PlayerRoute?) {
+        if (hostedRoute != null) hostedLaunchIds += hostedRoute.launchId
+        val previousOwned = ownedRoute
+        if (previousOwned != hostedRoute) {
+            ownedRoute = hostedRoute
+            if (previousOwned != null && previousOwned.launchId !in placeholderLaunchIds) {
+                hostedLaunchIds -= previousOwned.launchId
             }
         }
+        if ((hostedRoute == null || topPlayerRoute != null) && minimized) minimized = false
+    }
+
+    internal fun onPlaceholderEntered(route: PlayerRoute) {
+        placeholderLaunchIds += route.launchId
+    }
+
+    internal fun onPlaceholderDisposed(route: PlayerRoute) {
+        placeholderLaunchIds -= route.launchId
+        if (ownedRoute != route) hostedLaunchIds -= route.launchId
+    }
+
+    internal fun requestMinimize(): Boolean {
+        if (ownedRoute == null) return false
+        minimized = true
+        return true
+    }
+
+    internal fun attach(runtime: PlayerScreenRuntime) {
+        hostedRuntime = runtime
+    }
+
+    internal fun detach(runtime: PlayerScreenRuntime) {
+        if (hostedRuntime === runtime) hostedRuntime = null
     }
 }
 
-internal fun PlayerScreenRuntime.handOffToMiniPlayer() {
-    if (!playerSettingsUiState.miniPlayerEnabled) return
-    if (errorMessage != null || !initialLoadCompleted || playbackSnapshot.isEnded) return
-    if (activeTorrentInfoHash != null || p2pResolvedSourceUrl != null) return
-    if (playbackSnapshot.castDeviceName != null) return
-    if (ServerPlayback.session(activeSourceUrl) != null) return
-    val launchId = args.launchId ?: return
-    val baseLaunch = PlayerLaunchStore.get(launchId) ?: return
-    val playbackUrl = activePlaybackSourceUrl ?: activeSourceUrl
-    if (playbackUrl.isBlank()) return
-    val positionMs = if (isLiveTvPlayback) 0L else playbackSnapshot.positionMs.coerceAtLeast(0L)
-    val trackProgress = shouldTrackWatchProgress
-    MiniPlayerController.start(
-        launch = currentLaunch(baseLaunch).copy(
-            initialPositionMs = positionMs,
-            initialProgressFraction = null,
-        ),
-        playbackUrl = playbackUrl,
-        startPositionMs = positionMs,
-        startPlaying = shouldPlay,
-        progressSession = if (trackProgress) playbackSession else null,
-        trackingMedia = if (trackProgress) currentTrackingMedia() else null,
-    )
+internal fun PlayerScreenRuntime.handOffToMiniPlayer(): Boolean {
+    if (MiniPlayerController.hostedRuntime !== this || isMiniPresentation) return false
+    return MiniPlayerController.requestMinimize()
 }
 
 @Composable
-internal fun PlayerScreenRuntime.BindMiniPlayerEffects() {
-    val settings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
-    DisposableEffect(Unit) {
-        MiniPlayerController.onFullPlayerEntered()
-        onDispose { MiniPlayerController.onFullPlayerExited() }
+internal fun PlayerScreenRuntime.BindMiniPlayerEffects(presentation: Boolean?) {
+    val runtime = this
+    if (presentation != null) {
+        DisposableEffect(runtime) {
+            MiniPlayerController.attach(runtime)
+            onDispose { MiniPlayerController.detach(runtime) }
+        }
     }
-    val canMinimize by remember(this) {
-        derivedStateOf { errorMessage == null && initialLoadCompleted }
-    }
-    PlatformBackHandler(enabled = settings.miniPlayerEnabled && canMinimize) {
-        flushWatchProgress()
-        handOffToMiniPlayer()
+    PlatformBackHandler(enabled = presentation == false) {
+        if (!handOffToMiniPlayer()) flushWatchProgress()
         args.onBack()
     }
 }
 
+@Composable
+fun HostedPlayerRoutePlaceholder(route: PlayerRoute) {
+    DisposableEffect(route) {
+        MiniPlayerController.onPlaceholderEntered(route)
+        onDispose { MiniPlayerController.onPlaceholderDisposed(route) }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    )
+}
+
 private val MiniPlayerShape = RoundedCornerShape(14.dp)
+private val MiniPlayerVideoShape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
 private val MiniPlayerInfoHeight = 52.dp
 private val MiniPlayerProgressHeight = 2.dp
 private val MiniPlayerEdgeMargin = 12.dp
@@ -267,77 +174,55 @@ private val MiniPlayerBottomClearance = 96.dp
 
 @Composable
 fun MiniPlayerHost(
-    hidden: Boolean,
-    onExpand: (PlayerLaunch) -> Unit,
+    hostedRoute: PlayerRoute?,
+    topPlayerRoute: PlayerRoute?,
+    onExpand: (PlayerRoute) -> Unit,
     modifier: Modifier = Modifier,
+    content: @Composable (PlayerRoute) -> Unit,
 ) {
-    val session by MiniPlayerController.session.collectAsStateWithLifecycle()
-    val activeFullPlayers by MiniPlayerController.activeFullPlayers.collectAsStateWithLifecycle()
+    SideEffect { MiniPlayerController.commit(topPlayerRoute, hostedRoute) }
+    val route = hostedRoute ?: return
+    val mini = topPlayerRoute == null
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
-    val current = session
-    LaunchedEffect(current?.id, profileState) {
-        if (current != null && current.launch.profileId != ProfileRepository.activeProfileId) {
-            MiniPlayerController.discard()
+    LaunchedEffect(route, mini, profileState) {
+        val runtime = MiniPlayerController.hostedRuntime ?: return@LaunchedEffect
+        if (mini && runtime.profileId != ProfileRepository.activeProfileId) {
+            MiniPlayerController.close()
         }
     }
-    if (current == null || hidden) return
-    key(current.id) {
-        MiniPlayerWindow(
-            session = current,
-            surfaceEnabled = activeFullPlayers == 0,
+    key(route.launchId) {
+        MiniPlayerFrame(
+            route = route,
+            mini = mini,
             onExpand = onExpand,
             modifier = modifier,
+            content = content,
         )
     }
 }
 
 @Composable
-private fun MiniPlayerWindow(
-    session: MiniPlayerSession,
-    surfaceEnabled: Boolean,
-    onExpand: (PlayerLaunch) -> Unit,
+private fun MiniPlayerFrame(
+    route: PlayerRoute,
+    mini: Boolean,
+    onExpand: (PlayerRoute) -> Unit,
     modifier: Modifier,
+    content: @Composable (PlayerRoute) -> Unit,
 ) {
     val colors = MaterialTheme.nuvio.colors
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    val startPositionMs = remember { MiniPlayerController.resumePositionMs(session) }
-    var controller by remember { mutableStateOf<PlayerEngineController?>(null) }
-    var snapshot by remember { mutableStateOf(PlayerPlaybackSnapshot(positionMs = startPositionMs)) }
-    var playing by remember { mutableStateOf(session.startPlaying) }
-    var initialSeekDone by remember { mutableStateOf(startPositionMs <= 0L) }
-    var failed by remember { mutableStateOf(false) }
-    val requestKey = remember { "mini-player:${session.id}" }
-    val expand: () -> Unit = {
-        MiniPlayerController.expand()?.let(onExpand)
-    }
-    val launch = session.launch
-    val isLive = launch.contentType == "live"
-    val title = if (isLive) launch.streamTitle else launch.title
-    val subtitle = when {
-        launch.seasonNumber != null && launch.episodeNumber != null -> listOfNotNull(
-            "S${launch.seasonNumber} E${launch.episodeNumber}",
-            launch.episodeTitle?.takeIf { it.isNotBlank() },
-        ).joinToString(" · ")
-        isLive -> launch.streamSubtitle?.takeIf { it.isNotBlank() }
-        else -> launch.streamTitle.takeIf { it.isNotBlank() } ?: launch.providerName.takeIf { it.isNotBlank() }
-    }
-    val artwork = launch.background ?: launch.poster ?: launch.logo
+    val runtime = MiniPlayerController.hostedRuntime
 
-    LaunchedEffect(controller, snapshot.isLoading, snapshot.durationMs, initialSeekDone) {
-        val player = controller ?: return@LaunchedEffect
-        if (initialSeekDone || snapshot.isLoading || snapshot.durationMs <= 0L) return@LaunchedEffect
-        player.seekTo(startPositionMs.coerceAtMost(snapshot.durationMs))
-        initialSeekDone = true
-    }
-
-    BoxWithConstraints(modifier = modifier) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val containerWidthPx = constraints.maxWidth.toFloat()
         val containerHeightPx = constraints.maxHeight.toFloat()
         val cardWidth = if (maxWidth >= 600.dp) 320.dp else maxWidth * 0.58f
         val videoHeight = cardWidth * 9f / 16f
+        val cardHeight = videoHeight + MiniPlayerProgressHeight + MiniPlayerInfoHeight
         val cardWidthPx = with(density) { cardWidth.toPx() }
-        val cardHeightPx = with(density) { (videoHeight + MiniPlayerInfoHeight + MiniPlayerProgressHeight).toPx() }
+        val cardHeightPx = with(density) { cardHeight.toPx() }
+        val videoHeightPx = with(density) { videoHeight.toPx() }
         val marginPx = with(density) { MiniPlayerEdgeMargin.toPx() }
         val topInsetPx = WindowInsets.safeDrawing.getTop(density).toFloat()
         val bottomInsetPx = WindowInsets.safeDrawing.getBottom(density).toFloat()
@@ -357,71 +242,54 @@ private fun MiniPlayerWindow(
             offsetY.snapTo(offsetY.value.coerceIn(minY, maxY))
         }
 
-        Column(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
-                .width(cardWidth)
-                .shadow(16.dp, MiniPlayerShape)
-                .clip(MiniPlayerShape)
-                .background(colors.surfaceElevated)
-                .pointerInput(minX, maxX, minY, maxY) {
-                    val dock: () -> Unit = {
-                        dockedToEnd = offsetX.value + cardWidthPx / 2f > containerWidthPx / 2f
-                        scope.launch {
-                            offsetX.animateTo(if (dockedToEnd) maxX else minX, tween(durationMillis = 220))
-                        }
-                    }
-                    detectDragGestures(
-                        onDragEnd = dock,
-                        onDragCancel = dock,
-                    ) { change, dragAmount ->
-                        change.consume()
-                        scope.launch {
-                            offsetX.snapTo(offsetX.value + dragAmount.x)
-                            offsetY.snapTo(offsetY.value + dragAmount.y)
-                        }
-                    }
-                },
-        ) {
+        val dragModifier = Modifier.pointerInput(minX, maxX, minY, maxY) {
+            val dock: () -> Unit = {
+                dockedToEnd = offsetX.value + cardWidthPx / 2f > containerWidthPx / 2f
+                scope.launch {
+                    offsetX.animateTo(if (dockedToEnd) maxX else minX, tween(durationMillis = 220))
+                }
+            }
+            detectDragGestures(
+                onDragEnd = dock,
+                onDragCancel = dock,
+            ) { change, dragAmount ->
+                change.consume()
+                scope.launch {
+                    offsetX.snapTo(offsetX.value + dragAmount.x)
+                    offsetY.snapTo(offsetY.value + dragAmount.y)
+                }
+            }
+        }
+        val cardOffset: () -> IntOffset = {
+            IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt())
+        }
+
+        if (mini) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(videoHeight)
-                    .background(Color.Black)
-                    .clickable(onClick = expand),
-            ) {
-                if (!surfaceEnabled && artwork != null) {
-                    AsyncImage(
-                        model = artwork,
-                        contentDescription = stringResource(Res.string.mini_player_expand),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize(),
-                    )
-                }
-                if (surfaceEnabled) {
-                    PlatformPlayerSurface(
-                        sourceUrl = session.playbackUrl,
-                        sourceAudioUrl = launch.sourceAudioUrl,
-                        sourceHeaders = launch.sourceHeaders,
-                        sourceResponseHeaders = launch.sourceResponseHeaders,
-                        streamType = launch.streamType,
-                        modifier = Modifier.matchParentSize(),
-                        playWhenReady = playing,
-                        initialPositionMs = startPositionMs.takeIf { it > 0L },
-                        initialPositionRequestKey = requestKey,
-                        resizeMode = PlayerResizeMode.Fit,
-                        onInitialPositionHandled = { key, handled ->
-                            if (key == requestKey && handled) initialSeekDone = true
-                        },
-                        onControllerReady = { controller = it },
-                        onSnapshot = { update ->
-                            snapshot = update
-                            if (initialSeekDone) MiniPlayerController.onSnapshot(session.id, update)
-                        },
-                        onError = { message -> failed = message != null },
-                    )
-                }
-                if (!failed && (!surfaceEnabled || snapshot.isLoading)) {
+                    .offset { cardOffset() }
+                    .size(width = cardWidth, height = cardHeight)
+                    .shadow(16.dp, MiniPlayerShape)
+                    .clip(MiniPlayerShape)
+                    .background(colors.surfaceElevated),
+            )
+        }
+
+        Box(
+            modifier = if (mini) {
+                Modifier
+                    .offset { cardOffset() }
+                    .size(width = cardWidth, height = videoHeight)
+                    .clip(MiniPlayerVideoShape)
+            } else {
+                Modifier.fillMaxSize()
+            },
+        ) {
+            CompositionLocalProvider(LocalPlayerMiniPresentation provides mini) {
+                content(route)
+            }
+            if (mini) {
+                if (runtime != null && runtime.playbackSnapshot.isLoading && runtime.errorMessage == null) {
                     CircularProgressIndicator(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -430,78 +298,116 @@ private fun MiniPlayerWindow(
                         strokeWidth = 2.dp,
                     )
                 }
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .then(dragModifier)
+                        .clickable(onClickLabel = stringResource(Res.string.mini_player_expand)) {
+                            onExpand(route)
+                        },
+                )
             }
-            val progressFraction = if (snapshot.durationMs > 0L) {
-                (snapshot.positionMs.toFloat() / snapshot.durationMs.toFloat()).coerceIn(0f, 1f)
+        }
+
+        if (mini) {
+            val snapshot = runtime?.playbackSnapshot
+            val durationMs = snapshot?.durationMs ?: 0L
+            val progressFraction = if (snapshot != null && durationMs > 0L) {
+                (snapshot.positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
             } else {
                 0f
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(MiniPlayerProgressHeight)
-                    .background(Color.White.copy(alpha = 0.12f)),
-            ) {
-                if (snapshot.durationMs > 0L) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progressFraction)
-                            .fillMaxHeight()
-                            .background(colors.accent),
-                    )
+            val title: String
+            val subtitle: String?
+            if (runtime == null) {
+                title = route.title
+                subtitle = null
+            } else {
+                val isLive = runtime.isLiveTvPlayback
+                val seasonNumber = runtime.activeSeasonNumber
+                val episodeNumber = runtime.activeEpisodeNumber
+                title = if (isLive) runtime.activeStreamTitle else runtime.title
+                subtitle = if (seasonNumber != null && episodeNumber != null) {
+                    listOfNotNull(
+                        "S$seasonNumber E$episodeNumber",
+                        runtime.activeEpisodeTitle?.takeIf { it.isNotBlank() },
+                    ).joinToString(" · ")
+                } else if (isLive) {
+                    runtime.activeStreamSubtitle?.takeIf { it.isNotBlank() }
+                } else {
+                    runtime.activeStreamTitle.takeIf { it.isNotBlank() }
                 }
             }
-            Row(
+            val playing = snapshot != null &&
+                (snapshot.isPlaying || (runtime?.shouldPlay == true && snapshot.isLoading))
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(MiniPlayerInfoHeight)
-                    .padding(start = 12.dp, end = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    .offset { cardOffset() + IntOffset(0, videoHeightPx.roundToInt()) }
+                    .width(cardWidth)
+                    .then(dragModifier),
             ) {
-                Column(
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .clickable(onClick = expand),
+                        .fillMaxWidth()
+                        .height(MiniPlayerProgressHeight)
+                        .background(Color.White.copy(alpha = 0.12f)),
                 ) {
-                    Text(
-                        text = title,
-                        color = colors.textPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            color = colors.textMuted,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                    if (durationMs > 0L) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progressFraction)
+                                .fillMaxHeight()
+                                .background(colors.accent),
                         )
                     }
                 }
-                IconButton(
-                    onClick = {
-                        playing = !playing
-                        if (playing) controller?.play() else controller?.pause()
-                    },
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(MiniPlayerInfoHeight)
+                        .padding(start = 12.dp, end = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Icon(
-                        imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(
-                            if (playing) Res.string.mini_player_pause else Res.string.mini_player_play,
-                        ),
-                        tint = colors.textPrimary,
-                    )
-                }
-                IconButton(onClick = { MiniPlayerController.close() }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(Res.string.mini_player_close),
-                        tint = colors.textPrimary,
-                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onExpand(route) },
+                    ) {
+                        Text(
+                            text = title,
+                            color = colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                color = colors.textMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    IconButton(onClick = { runtime?.togglePlayback() }) {
+                        Icon(
+                            imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = stringResource(
+                                if (playing) Res.string.mini_player_pause else Res.string.mini_player_play,
+                            ),
+                            tint = colors.textPrimary,
+                        )
+                    }
+                    IconButton(onClick = { MiniPlayerController.close() }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(Res.string.mini_player_close),
+                            tint = colors.textPrimary,
+                        )
+                    }
                 }
             }
         }
