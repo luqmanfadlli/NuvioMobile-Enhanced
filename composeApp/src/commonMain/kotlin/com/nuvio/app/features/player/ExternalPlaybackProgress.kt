@@ -34,6 +34,7 @@ internal suspend fun recordExternalPlaybackProgress(
     result: ExternalPlaybackResult,
     fallbackSession: WatchProgressPlaybackSession?,
 ) {
+    if (PlayerSettingsRepository.uiState.value.privateViewingEnabled) return
     val session = result.playbackSession ?: fallbackSession ?: return
     // A completed playback may carry no position at all (MX Player), so only drop position-less
     // results that were not reported as played to the end.
