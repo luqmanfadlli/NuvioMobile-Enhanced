@@ -170,6 +170,7 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
             isPlaying = pipIsPlaying,
             videoSize = pipVideoSize,
         )
+        runtime.BindMiniPlayerEffects()
         runtime.BindPlayerRuntimeEffects()
         runtime.RenderPlayerRuntimeUi()
     }
