@@ -141,6 +141,7 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.prepareExternalPlayerLaunch
 import com.nuvio.app.features.player.LockPlayerToLandscape
+import com.nuvio.app.features.player.MiniPlayerHost
 import com.nuvio.app.features.player.HidePlayerSystemBars
 import com.nuvio.app.features.player.rememberExternalPlayerLauncher
 import com.nuvio.app.features.profiles.ProfileEditScreen
@@ -2294,6 +2295,17 @@ internal fun MainAppContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .zIndex(15f),
+            )
+
+            MiniPlayerHost(
+                hidden = currentRoute is PlayerRoute,
+                onExpand = { launch ->
+                    val launchId = PlayerLaunchStore.put(launch)
+                    navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(14f),
             )
 
             NuvioToastHost(
