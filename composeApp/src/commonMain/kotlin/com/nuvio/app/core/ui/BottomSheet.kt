@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,12 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,8 +38,36 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 
 private val SheetShape = RoundedCornerShape(NuvioTokens.Space.s28)
+
+@Stable
+class NuvioSheetHaze(val state: HazeState) {
+    var activeSheets by mutableIntStateOf(0)
+}
+
+val LocalNuvioSheetHaze = staticCompositionLocalOf<NuvioSheetHaze?> { null }
+
+@Composable
+fun NuvioSheetHazeHost(
+    sheetHaze: NuvioSheetHaze,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(LocalNuvioSheetHaze provides sheetHaze) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (sheetHaze.activeSheets > 0) Modifier.hazeSource(state = sheetHaze.state) else Modifier),
+        ) {
+            content()
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +93,14 @@ fun NuvioModalBottomSheet(
         )
     } else {
         val tokens = MaterialTheme.nuvio
+        val sheetHaze = LocalNuvioSheetHaze.current
+        if (sheetHaze != null) {
+            DisposableEffect(sheetHaze) {
+                sheetHaze.activeSheets += 1
+                onDispose { sheetHaze.activeSheets -= 1 }
+            }
+        }
+        val sheetHazeReady = sheetHaze != null && sheetHaze.state.areas.isNotEmpty()
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
@@ -72,7 +115,19 @@ fun NuvioModalBottomSheet(
                     modifier = modifier
                         .padding(NuvioTokens.Space.s10)
                         .clip(SheetShape)
-                        .background(containerColor)
+                        .then(
+                            if (sheetHazeReady && sheetHaze != null) {
+                                Modifier.hazeEffect(state = sheetHaze.state) {
+                                    blurRadius = 24.dp
+                                    backgroundColor = containerColor
+                                    tints = listOf(HazeTint(containerColor.copy(alpha = containerColor.alpha * 0.65f)))
+                                    fallbackTint = HazeTint(containerColor)
+                                    noiseFactor = 0f
+                                }
+                            } else {
+                                Modifier.background(containerColor)
+                            },
+                        )
                         .border(tokens.borders.thin, SurfaceEdge, SheetShape),
                 ) {
                     if (showDragHandle) {
