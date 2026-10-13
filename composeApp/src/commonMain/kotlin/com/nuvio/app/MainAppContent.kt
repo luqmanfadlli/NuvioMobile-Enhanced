@@ -140,7 +140,9 @@ import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.prepareExternalPlayerLaunch
+import com.nuvio.app.features.player.HostedPlayerRoutePlaceholder
 import com.nuvio.app.features.player.LockPlayerToLandscape
+import com.nuvio.app.features.player.MiniPlayerController
 import com.nuvio.app.features.player.MiniPlayerHost
 import com.nuvio.app.features.player.HidePlayerSystemBars
 import com.nuvio.app.features.player.rememberExternalPlayerLauncher
@@ -330,6 +332,9 @@ internal fun MainAppContent(
         PlayerSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     var visiblePlayerEntries by remember { mutableIntStateOf(0) }
+    val miniPlayerHostEnabled = playerSettingsUiState.miniPlayerEnabled && !isIos
+    val topPlayerRoute = currentRoute as? PlayerRoute
+    val hostedPlayerRoute = MiniPlayerController.hostedRoute(topPlayerRoute, miniPlayerHostEnabled)
     var streamLandscapeLoadingVisible by remember(currentRoute) { mutableStateOf(false) }
     if (currentRoute is PlayerRoute || visiblePlayerEntries > 0 || streamLandscapeLoadingVisible) {
         LockPlayerToLandscape()
@@ -1747,6 +1752,15 @@ internal fun MainAppContent(
                             onDispose { visiblePlayerEntries -= 1 }
                         }
                     }
+                    if (
+                        MiniPlayerController.isHostedRoute(
+                            route = route,
+                            topPlayerRoute = navController.currentRoute as? PlayerRoute,
+                            enabled = miniPlayerHostEnabled,
+                        )
+                    ) {
+                        HostedPlayerRoutePlaceholder(route)
+                    } else {
                     PlayerDestination(
                         route = route,
                         navController = navController,
@@ -1757,6 +1771,7 @@ internal fun MainAppContent(
                         launchExternalPlayer = launchExternalPlayer,
                         openExternalStreamUrl = ::openExternalStreamUrl,
                     )
+                    }
                 }
                 entry<CatalogRoute> { route ->
                     CatalogDestination(
@@ -1911,6 +1926,30 @@ internal fun MainAppContent(
                     )
                 }
             }
+            }
+
+            MiniPlayerHost(
+                hostedRoute = hostedPlayerRoute,
+                topPlayerRoute = topPlayerRoute,
+                onExpand = { route -> navController.navigate(route) },
+            ) { route ->
+                PlayerDestination(
+                    route = route,
+                    navController = navController,
+                    externalPlayerId = playerSettingsUiState.externalPlayerId,
+                    externalPlayerNotConfiguredText = externalPlayerNotConfiguredText,
+                    externalPlayerFailedText = externalPlayerFailedText,
+                    onExternalPlayerLaunch = { launch -> lastExternalPlayerLaunch = launch },
+                    launchExternalPlayer = launchExternalPlayer,
+                    openExternalStreamUrl = ::openExternalStreamUrl,
+                    onBackOverride = {
+                        if (navController.currentRoute == route) {
+                            navController.popBackStack(expectedRoute = route)
+                        } else {
+                            MiniPlayerController.close()
+                        }
+                    },
+                )
             }
 
             selectedPosterActionTarget?.let { posterActionTarget ->
@@ -2295,17 +2334,6 @@ internal fun MainAppContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .zIndex(15f),
-            )
-
-            MiniPlayerHost(
-                hidden = currentRoute is PlayerRoute,
-                onExpand = { launch ->
-                    val launchId = PlayerLaunchStore.put(launch)
-                    navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(14f),
             )
 
             NuvioToastHost(
