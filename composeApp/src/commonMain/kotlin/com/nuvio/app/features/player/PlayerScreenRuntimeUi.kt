@@ -205,7 +205,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     // are open, so focus is re-requested whenever the last one closes.
     val keyboardFocusRequester = remember { FocusRequester() }
     val keyboardShortcutsEnabled = remember {
-        derivedStateOf { !isAnyOverlayVisible && !playerControlsLocked }
+        derivedStateOf { !isAnyOverlayVisible && !playerControlsLocked && !isMiniPresentation }
     }
     val onKeyboardShortcut = rememberUpdatedState(::handleKeyboardShortcut)
     LaunchedEffect(keyboardShortcutsEnabled.value) {
@@ -313,6 +313,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             }
         }
 
+        if (!isMiniPresentation) {
         AnimatedVisibility(
             visible = playerSettingsUiState.pauseOverlayEnabled && pausedOverlayVisible && !controlsVisible && !playerControlsLocked,
             enter = fadeIn(animationSpec = tween(durationMillis = 220)),
@@ -356,6 +357,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 .padding(top = 16.dp, start = horizontalSafePadding, end = horizontalSafePadding),
         )
         RenderPlayerModals()
+        }
     }
 }
 
@@ -440,8 +442,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(isEpisode: Boolean) {
                 if (playerControlsLocked) unlockPlayerControls() else lockPlayerControls()
             },
             onBack = {
-                flushWatchProgress()
-                handOffToMiniPlayer()
+                if (!handOffToMiniPlayer()) flushWatchProgress()
                 args.onBack()
             },
             onTogglePlayback = { togglePlayback() },
