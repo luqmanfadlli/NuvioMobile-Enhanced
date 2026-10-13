@@ -434,6 +434,23 @@ private fun PlaybackSettingsSection(
                     onCheckedChange = PlayerSettingsRepository::setMovieRecommendationsEnabled,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_mini_player),
+                    description = stringResource(Res.string.settings_playback_mini_player_description),
+                    checked = autoPlayPlayerSettings.miniPlayerEnabled,
+                    enabled = !autoPlayPlayerSettings.externalPlayerEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setMiniPlayerEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_private_viewing),
+                    description = stringResource(Res.string.settings_playback_private_viewing_description),
+                    checked = autoPlayPlayerSettings.privateViewingEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setPrivateViewingEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 // Player preference picker: Internal / External
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_player_preference),
