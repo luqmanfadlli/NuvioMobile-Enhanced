@@ -89,6 +89,7 @@ import com.nuvio.app.features.details.youtubePlaybackUrl
 import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.player.MiniPlayerController
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import kotlinx.coroutines.CoroutineScope
@@ -217,7 +218,8 @@ internal fun HomeHeroSection(
     val autoScrollPage = pagerState.settledPage
     val effectiveTrailerPlaybackEnabled = trailerPlaybackEnabled &&
         AppFeaturePolicy.heroTrailerPlaybackSupported &&
-        AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
+        AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP &&
+        !MiniPlayerController.isActive
 
     LaunchedEffect(pagerState) {
         pagerState.scrollToPage(pagerState.currentPage)
