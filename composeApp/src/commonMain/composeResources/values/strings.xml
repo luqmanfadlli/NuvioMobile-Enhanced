@@ -1303,6 +1303,14 @@
     <string name="settings_playback_reuse_binge_group_description">Remember and reuse the last binge group across sessions (Continue Watching, Details, etc.).</string>
     <string name="settings_playback_preload_next_episode">Preload Next Episode Sources</string>
     <string name="settings_playback_preload_next_episode_description">Start searching for sources in the background before the next episode button appears.</string>
+    <string name="settings_playback_mini_player">Mini Player</string>
+    <string name="settings_playback_mini_player_description">Leaving the player keeps playback going in a small floating window. Tap it to return to full screen.</string>
+    <string name="settings_playback_private_viewing">Private Viewing</string>
+    <string name="settings_playback_private_viewing_description">Don\'t save watch progress, Continue Watching or watched status, and don\'t sync playback to connected trackers.</string>
+    <string name="mini_player_play">Play</string>
+    <string name="mini_player_pause">Pause</string>
+    <string name="mini_player_close">Close mini player</string>
+    <string name="mini_player_expand">Open full screen player</string>
     <string name="settings_playback_preferred_audio_language">Preferred Audio Language</string>
     <string name="settings_playback_preferred_subtitle_language">Preferred Language</string>
     <string name="settings_playback_presets">Presets</string>
