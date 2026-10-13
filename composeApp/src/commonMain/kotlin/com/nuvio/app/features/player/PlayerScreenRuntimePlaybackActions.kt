@@ -54,7 +54,8 @@ internal val PlayerScreenRuntime.activePlaybackIdentity: String
         ?: activeSourceUrl
 
 internal val PlayerScreenRuntime.shouldTrackWatchProgress: Boolean
-    get() = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true)
+    get() = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true) &&
+        !playerSettingsUiState.privateViewingEnabled
 
 internal val PlayerScreenRuntime.activePlaybackKey: PlaybackKey
     get() = PlaybackKey(
