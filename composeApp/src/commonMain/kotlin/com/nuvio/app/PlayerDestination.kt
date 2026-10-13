@@ -27,8 +27,10 @@ internal fun PlayerDestination(
     onExternalPlayerLaunch: (PlayerLaunch) -> Unit,
     launchExternalPlayer: (ExternalPlayerIntentResult.Success) -> Boolean,
     openExternalStreamUrl: (String) -> Boolean,
+    onBackOverride: (() -> Unit)? = null,
 ) {
-    val onBack = rememberGuardedPopBackStack(navController, route)
+    val guardedOnBack = rememberGuardedPopBackStack(navController, route)
+    val onBack = onBackOverride ?: guardedOnBack
     val launch = remember(route.launchId) { PlayerLaunchStore.get(route.launchId) }
     if (launch == null) {
         LaunchedEffect(route.launchId) {
