@@ -441,6 +441,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(isEpisode: Boolean) {
             },
             onBack = {
                 flushWatchProgress()
+                handOffToMiniPlayer()
                 args.onBack()
             },
             onTogglePlayback = { togglePlayback() },
