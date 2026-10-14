@@ -32,6 +32,7 @@ import androidx.media3.effect.PassthroughShaderProgram
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.exoplayer.Renderer
@@ -55,6 +56,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 private const val FrameTimeoutSeconds = 20L
 private const val NetworkTimeoutMs = 10_000
+private const val SeekToleranceUs = 2_000_000L
+private const val GrabberMinBufferMs = 1_000
+private const val GrabberMaxBufferMs = 2_000
 
 internal object SeekPreviewAndroid {
     @Volatile
@@ -84,21 +88,31 @@ private class ExoSeekPreviewFrameSource(
     private var grabber: ExoFrameGrabber? = null
 
     override fun frameAt(positionMs: Long, maxWidthPx: Int): ImageBitmap? {
-        val activeGrabber = grabber ?: openGrabber(targetHeight = (maxWidthPx * 9 / 16).coerceAtLeast(16))
-            .also { grabber = it }
-        return activeGrabber.frameAt(positionMs.coerceAtLeast(0L)).asImageBitmap()
+        val targetMs = positionMs.coerceAtLeast(0L)
+        val activeGrabber = grabber
+        if (activeGrabber == null) {
+            val opened = openGrabber(
+                targetHeight = (maxWidthPx * 9 / 16).coerceAtLeast(16),
+                startPositionMs = targetMs,
+            )
+            grabber = opened
+            return opened.awaitFirstFrame().asImageBitmap()
+        }
+        return activeGrabber.frameAt(targetMs).asImageBitmap()
     }
 
-    private fun openGrabber(targetHeight: Int): ExoFrameGrabber = try {
-        openAndAwait(targetHeight, mimeType = null)
+    private fun openGrabber(targetHeight: Int, startPositionMs: Long): ExoFrameGrabber = try {
+        openAndAwait(targetHeight, mimeType = null, startPositionMs = startPositionMs)
     } catch (error: PlaybackException) {
         if (error.errorCode != PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) throw error
         InAppLogger.info("Player/SeekPreview", "container not recognised, retrying as HLS")
-        openAndAwait(targetHeight, mimeType = MimeTypes.APPLICATION_M3U8)
+        openAndAwait(targetHeight, mimeType = MimeTypes.APPLICATION_M3U8, startPositionMs = startPositionMs)
     }
 
-    private fun openAndAwait(targetHeight: Int, mimeType: String?): ExoFrameGrabber {
-        val created = onMainThread { ExoFrameGrabber(context, url, headers, targetHeight, mimeType) }
+    private fun openAndAwait(targetHeight: Int, mimeType: String?, startPositionMs: Long): ExoFrameGrabber {
+        val created = onMainThread {
+            ExoFrameGrabber(context, url, headers, targetHeight, mimeType, startPositionMs)
+        }
         try {
             created.awaitFirstFrame()
         } catch (error: Throwable) {
@@ -122,6 +136,7 @@ private class ExoFrameGrabber(
     headers: Map<String, String>,
     targetHeight: Int,
     mimeType: String?,
+    startPositionMs: Long,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val pending = AtomicReference<CompletableFuture<Bitmap>?>(null)
@@ -148,7 +163,12 @@ private class ExoFrameGrabber(
             arrayOf<Renderer>(GrabberVideoRenderer(context, videoListener))
         }
         player = ExoPlayer.Builder(context, renderersFactory, mediaSourceFactory)
-            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(GrabberMinBufferMs, GrabberMaxBufferMs, 0, 0)
+                    .build(),
+            )
+            .setSeekParameters(SeekParameters(SeekToleranceUs, SeekToleranceUs))
             .build()
         player.addAnalyticsListener(Listener())
         player.setVideoEffects(
@@ -159,14 +179,12 @@ private class ExoFrameGrabber(
             ),
         )
         pending.set(firstFrame)
-        player.setMediaItem(MediaItem.Builder().setUri(url).setMimeType(mimeType).build())
+        player.setMediaItem(MediaItem.Builder().setUri(url).setMimeType(mimeType).build(), startPositionMs)
         player.playWhenReady = false
         player.prepare()
     }
 
-    fun awaitFirstFrame() {
-        await(firstFrame)
-    }
+    fun awaitFirstFrame(): Bitmap = await(firstFrame)
 
     fun frameAt(positionMs: Long): Bitmap {
         val request = CompletableFuture<Bitmap>()
