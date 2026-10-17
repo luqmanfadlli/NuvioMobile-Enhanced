@@ -23,16 +23,15 @@ jobs:
   build:
     name: Build unsigned full ${{ inputs.configuration }} IPA
     runs-on: macos-26
-    timeout-minutes: ${{ inputs.configuration == 'Release' && 180 || 30 }}
+    timeout-minutes: ${{ inputs.configuration == 'Release' && 75 || 30 }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
       IOS_CONFIGURATION: ${{ inputs.configuration }}
-      KOTLIN_DAEMON_JVMARGS: -Xmx1024M
-      NUVIO_GRADLE_JVMARGS: -Xmx2048M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M -XX:+UseG1GC
-      NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M -XX:+UseG1GC
+      KOTLIN_DAEMON_JVMARGS: -Xmx2048M
+      NUVIO_GRADLE_JVMARGS: -Xmx4608M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M
+      NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx4608M
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
-      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
 
     steps:
       - name: Check out source
@@ -61,28 +60,20 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
 
       - name: Configure runtime properties
-        if: env.RELEASE_PROPERTIES_BASE64 != ''
         run: |
-          printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
-          sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          touch local.properties
+
+          if [[ -n "${RELEASE_PROPERTIES_BASE64}" ]]; then
+            printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
+          fi
+
           if [[ -n "${CONTRIBUTIONS_URL}" ]]; then
             printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}" >> local.properties
           fi
 
-      - name: Constrain Gradle memory for the hosted runner
-        run: |
-          gradle_user_home="${GRADLE_USER_HOME:-${HOME}/.gradle}"
-          mkdir -p "${gradle_user_home}"
-          {
-            echo "org.gradle.jvmargs=${NUVIO_GRADLE_JVMARGS}"
-            echo "kotlin.daemon.jvmargs=${KOTLIN_DAEMON_JVMARGS}"
-            echo "kotlin.native.jvmArgs=${NUVIO_KOTLIN_NATIVE_JVMARGS}"
-            echo "org.gradle.parallel=false"
-            echo "org.gradle.workers.max=1"
-            echo "kotlin.native.disableCompilerDaemon=true"
-          } >> "${gradle_user_home}/gradle.properties"
-          cat "${gradle_user_home}/gradle.properties"
-
+          test -f local.properties
+          echo "local.properties criado."
+      
       - name: Prepare iOS dependencies
         run: ./scripts/prepare-ios-dependencies.sh
 
@@ -104,7 +95,7 @@ jobs:
       - name: Summarize IPA
         run: |
           configuration_slug="$(printf '%s' "${IOS_CONFIGURATION}" | tr '[:upper:]' '[:lower:]')"
-          ipa_path="$(find build/ios-ipa -maxdepth 1 -type f -name "*-${configuration_slug}.ipa" -print -quit)"
+          ipa_path="$(find build/ios-ipa -maxdepth 1 -type f -name "*-full-${configuration_slug}.ipa" -print -quit)"
           if [[ -z "${ipa_path}" ]]; then
             echo "No IPA was produced." >&2
             exit 1
