@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="compose_settings_page_profile">Perfil</string>
+    <string name="compose_settings_root_profile_title">Perfil</string>
+    <string name="compose_settings_root_profile_description">Veja a atividade, a biblioteca e as preferências do perfil ativo</string>
+
+    <string name="profile_insights_title">%1$s</string>
+    <string name="profile_insights_subtitle">Um resumo da sua atividade de reprodução e do conteúdo salvo</string>
+    <string name="profile_insights_switch_profile">Trocar perfil</string>
+    <string name="profile_insights_edit_profile">Editar perfil</string>
+
+    <string name="profile_insights_section_overview">Visão geral</string>
+    <string name="profile_insights_section_taste">Preferências</string>
+
+    <string name="profile_insights_hero_continue">Em andamento</string>
+    <string name="profile_insights_hero_library">Salvos</string>
+    <string name="profile_insights_hero_upcoming">Em breve</string>
+    <string name="profile_insights_hero_watched">Assistidos</string>
+    <string name="profile_insights_hero_episodes">Episódios</string>
+
+    <string name="profile_insights_stat_continue">Continuar assistindo</string>
+    <string name="profile_insights_stat_continue_caption">Títulos que você começou e ainda não terminou</string>
+    <string name="profile_insights_stat_watched">Filmes assistidos</string>
+    <string name="profile_insights_stat_completed">Concluídas</string>
+    <string name="profile_insights_stat_completed_caption">Séries que você assistiu até o final</string>
+    <string name="profile_insights_stat_ongoing">Em andamento</string>
+    <string name="profile_insights_stat_ongoing_caption">Séries que você começou, mas ainda não terminou</string>
+    <string name="profile_insights_stat_library">Biblioteca</string>
+    <string name="profile_insights_stat_library_caption">Títulos salvos na sua biblioteca</string>
+    <string name="profile_insights_stat_time">Tempo assistido</string>
+    <string name="profile_insights_stat_time_caption">Tempo aproximado calculado a partir da duração dos títulos</string>
+    <string name="profile_insights_stat_upcoming">Em breve</string>
+    <string name="profile_insights_stat_upcoming_caption">Títulos salvos com lançamento previsto</string>
+
+    <string name="profile_insights_collection_count">%1$d títulos</string>
+    <string name="profile_insights_days_hours">%1$d d %2$d h</string>
+    <string name="profile_insights_days">%1$d d</string>
+    <string name="profile_insights_hours">%1$d h</string>
+    <string name="profile_insights_minutes">%1$d min</string>
+
+    <string name="profile_insights_taste_dna_title">Perfil de preferências</string>
+    <string name="profile_insights_taste_subtitle">Com base nos gêneros e tipos de conteúdo que você assistiu</string>
+    <string name="profile_insights_taste_empty">Aprendendo suas preferências</string>
+    <string name="profile_insights_taste_balance_title">Equilíbrio entre filmes e séries</string>
+    <string name="profile_insights_type_movie">Filmes</string>
+    <string name="profile_insights_type_series">Séries</string>
+    <string name="profile_insights_genre_others">Outros</string>
+    <string name="profile_insights_genre_chart_description">Distribuição por gênero: %1$s</string>
+    <string name="profile_insights_type_watch_time_split">Tempo assistido: %1$d%% filmes · %2$d%% séries</string>
+    <string name="profile_insights_genre_partial">Com base em %1$d de %2$d títulos até o momento</string>
+    <string name="profile_insights_details_progress">Carregando detalhes dos títulos · %1$d de %2$d</string>
+    <string name="profile_insights_genre_failures">Não foi possível carregar os gêneros de %1$d títulos</string>
+    <string name="profile_insights_genre_failures_single">Não foi possível carregar os gêneros de 1 título</string>
+
+    <string name="profile_insights_refresh">Atualizar</string>
+    <string name="profile_insights_refreshing">Atualizando…</string>
+    <string name="profile_insights_pull_to_refresh">Deslize para baixo para atualizar os dados da sua conta</string>
+    <string name="profile_insights_updated_just_now">Atualizado agora mesmo</string>
+    <string name="profile_insights_updated_minutes">Atualizado há %1$d min</string>
+    <string name="profile_insights_updated_hours">Atualizado há %1$d h</string>
+    <string name="profile_insights_updated_days">Atualizado há %1$d d</string>
+
+    <string name="profile_insights_taste_balance_learning">Analisando suas preferências</string>
+    <string name="profile_insights_taste_balance_movie">Preferência por filmes</string>
+    <string name="profile_insights_taste_balance_series">Preferência por séries</string>
+    <string name="profile_insights_taste_balance_balanced">Equilibrado</string>
+
+    <string name="profile_insights_taste_chip_learning">Em análise</string>
+    <string name="profile_insights_taste_chip_movie">Fã de filmes</string>
+    <string name="profile_insights_taste_chip_series">Fã de séries</string>
+    <string name="profile_insights_taste_chip_balanced">Espectador eclético</string>
+    <string name="profile_insights_taste_chip_binge">Maratonista</string>
+    <string name="profile_insights_taste_chip_active">Muito ativo</string>
+    <string name="profile_insights_taste_chip_collector">Colecionador</string>
+    <string name="profile_insights_taste_chip_radar">De olho nos lançamentos</string>
+    <string name="profile_insights_taste_chip_completionist">Complecionista</string>
+</resources>

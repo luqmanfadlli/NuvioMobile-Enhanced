@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="tracking_source_anilist">AniList</string>
+    <string name="settings_anilist_anime_section">Anime</string>
+    <string name="settings_anilist_library_description">Suas listas de anime no AniList: Assistindo, Planejados, Concluídos, Pausados, Abandonados e Reassistindo.</string>
+    <string name="settings_anilist_progress_description">Continue assistindo e Próximos episódios a partir da sua lista "Assistindo" do AniList.</string>
+    <string name="library_anilist_title">Biblioteca do AniList</string>
+    <string name="library_anilist_load_failed">Não foi possível carregar sua biblioteca do AniList</string>
+    <string name="library_anilist_empty_title">Sua biblioteca do AniList está vazia</string>
+    <string name="library_anilist_empty_message">Adicione animes às suas listas do AniList para vê-los aqui.</string>
+    <string name="settings_anilist_connect">Conectar ao AniList</string>
+    <string name="settings_anilist_connected_as">Conectado como %1$s</string>
+    <string name="settings_anilist_connected_description">Sincronize suas listas de anime, o progresso dos episódios, as notas e a seção Continuar assistindo com o AniList.</string>
+    <string name="settings_anilist_sign_in_description">Conecte ao AniList para sincronizar suas listas de anime, o progresso dos episódios, as notas e a seção Continuar assistindo.</string>
+    <string name="settings_anilist_finish_sign_in">Concluir login</string>
+    <string name="settings_anilist_approval_description">Autorize o Nuvio no navegador. Você voltará ao app automaticamente.</string>
+    <string name="settings_anilist_open_login">Abrir página de login</string>
+    <string name="settings_anilist_disconnect">Desconectar do AniList</string>
+    <string name="settings_anilist_missing_credentials">A conexão com o AniList não está disponível nesta versão do app.</string>
+    <string name="settings_anilist_sync_now">Sincronizar agora</string>
+    <string name="settings_anilist_visit">Acessar o AniList</string>
+    <string name="settings_anilist_disconnect_description">Parar de enviar atualizações de reprodução deste perfil. Suas listas do AniList serão mantidas.</string>
+    <string name="settings_anilist_account_fallback">Usuário do AniList</string>
+    <string name="settings_anilist_syncing">Sincronizando suas listas do AniList…</string>
+    <string name="settings_anilist_last_synced">Última sincronização: %1$s</string>
+    <string name="settings_anilist_auth_denied">A conexão foi recusada. Tente novamente para conectar sua conta.</string>
+    <string name="settings_anilist_auth_invalid">O AniList retornou uma resposta de login inválida. Tente novamente.</string>
+    <string name="settings_anilist_auth_revoked">Sua conexão com o AniList expirou ou foi revogada. Conecte-se novamente para retomar a sincronização.</string>
+    <string name="settings_anilist_unavailable">Não foi possível sincronizar com o AniList. Tente novamente.</string>
+    <string name="settings_anilist_rate_limited">O limite de solicitações do AniList foi atingido. A sincronização será retomada em breve.</string>
+</resources>
