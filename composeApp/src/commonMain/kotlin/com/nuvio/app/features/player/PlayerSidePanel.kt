@@ -54,6 +54,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.collections_tab_all
 import nuvio.composeapp.generated.resources.streams_refresh
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 internal fun PlayerSidePanel(
@@ -99,7 +100,14 @@ internal fun PlayerSidePanel(
                         .width(resolvedWidth)
                         .fillMaxHeight()
                         .clip(shape)
-                        .background(tokens.colors.surfaceElevated)
+                        .ambientLiquidGlass(
+                            shape = shape,
+                            tint = tokens.colors.surfaceElevated.copy(alpha = tokens.colors.surfaceElevated.alpha * 0.72f),
+                            fallback = tokens.colors.surfaceElevated,
+                            blurRadius = 28.dp,
+                            refractionHeight = 16.dp,
+                            refractionAmount = 32.dp,
+                        )
                         .clickable(
                             interactionSource = panelInteraction,
                             indication = null,
