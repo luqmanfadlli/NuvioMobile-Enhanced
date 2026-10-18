@@ -101,8 +101,8 @@ internal fun PlaybackInfoModal(
                             tint = Color(0xFF16161B).copy(alpha = 0.74f),
                             fallback = Color(0xFF1E1E24),
                             blurRadius = 28.dp,
-                            refractionHeight = 16.dp,
-                            refractionAmount = 32.dp,
+                            refractionHeight = 10.dp,
+                            refractionAmount = 18.dp,
                             fallbackBrush = Brush.verticalGradient(
                                 colors = listOf(
                                     Color(0xFF1E1E24),
