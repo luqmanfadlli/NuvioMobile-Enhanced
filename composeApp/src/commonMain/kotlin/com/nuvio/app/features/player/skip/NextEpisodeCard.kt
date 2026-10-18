@@ -118,8 +118,8 @@ fun NextEpisodeCard(
                     tint = Color(0xFF191919).copy(alpha = 0.64f),
                     fallback = Color(0xFF191919).copy(alpha = 0.89f),
                     blurRadius = 20.dp,
-                    refractionHeight = 12.dp,
-                    refractionAmount = 20.dp,
+                    refractionHeight = 10.dp,
+                    refractionAmount = 14.dp,
                 )
                 .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
                 .pointerInput(nextEpisode.videoId, visible, dismissThreshold) {
