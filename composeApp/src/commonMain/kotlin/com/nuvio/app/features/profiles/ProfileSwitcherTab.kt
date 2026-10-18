@@ -75,7 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.NuvioAsyncImage
-import dev.chrisbanes.haze.HazeState
+import com.kyant.backdrop.Backdrop
 import com.nuvio.app.isIos
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -93,7 +93,7 @@ fun ProfileSwitcherTab(
     onAddProfileRequested: () -> Unit,
     triggerContent: (@Composable (selected: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    hazeState: HazeState? = null,
+    backdrop: Backdrop? = null,
     popupBelowAnchor: Boolean = false,
 ) {
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
@@ -313,7 +313,7 @@ fun ProfileSwitcherTab(
                     activeProfileIndex = activeProfile?.profileIndex,
                     hoveredProfileIndex = dragTargetProfileIndex,
                     pinProfile = pinProfile,
-                    hazeState = hazeState,
+                    backdrop = backdrop,
                     opensBelow = opensBelow,
                     availableHeight = availableHeight,
                     modifier = Modifier.graphicsLayer {
