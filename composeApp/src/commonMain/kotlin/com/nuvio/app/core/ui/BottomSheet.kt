@@ -39,30 +39,30 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
+import com.nuvio.app.core.ui.glass.NuvioBackdrop
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.liquidGlassSurface
+import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 
 private val SheetShape = RoundedCornerShape(NuvioTokens.Space.s28)
 
 @Stable
-class NuvioSheetHaze(val state: HazeState) {
+class NuvioSheetBackdrop(val backdrop: NuvioBackdrop) {
     var activeSheets by mutableIntStateOf(0)
 }
 
-val LocalNuvioSheetHaze = staticCompositionLocalOf<NuvioSheetHaze?> { null }
+val LocalNuvioSheetBackdrop = staticCompositionLocalOf<NuvioSheetBackdrop?> { null }
 
 @Composable
-fun NuvioSheetHazeHost(
-    sheetHaze: NuvioSheetHaze,
+fun NuvioSheetBackdropHost(
+    sheetBackdrop: NuvioSheetBackdrop,
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalNuvioSheetHaze provides sheetHaze) {
+    CompositionLocalProvider(LocalNuvioSheetBackdrop provides sheetBackdrop) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (sheetHaze.activeSheets > 0) Modifier.hazeSource(state = sheetHaze.state) else Modifier),
+                .then(if (sheetBackdrop.activeSheets > 0) Modifier.nuvioBackdropSource(sheetBackdrop.backdrop) else Modifier),
         ) {
             content()
         }
@@ -93,14 +93,14 @@ fun NuvioModalBottomSheet(
         )
     } else {
         val tokens = MaterialTheme.nuvio
-        val sheetHaze = LocalNuvioSheetHaze.current
-        if (sheetHaze != null) {
-            DisposableEffect(sheetHaze) {
-                sheetHaze.activeSheets += 1
-                onDispose { sheetHaze.activeSheets -= 1 }
+        val sheetBackdrop = LocalNuvioSheetBackdrop.current
+        if (sheetBackdrop != null) {
+            DisposableEffect(sheetBackdrop) {
+                sheetBackdrop.activeSheets += 1
+                onDispose { sheetBackdrop.activeSheets -= 1 }
             }
         }
-        val sheetHazeReady = sheetHaze != null && sheetHaze.state.areas.isNotEmpty()
+        val sheetGlassReady = sheetBackdrop != null && sheetBackdrop.backdrop.isReady && isLiquidGlassSupported()
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
@@ -115,20 +115,16 @@ fun NuvioModalBottomSheet(
                     modifier = modifier
                         .padding(NuvioTokens.Space.s10)
                         .clip(SheetShape)
-                        .then(
-                            if (sheetHazeReady && sheetHaze != null) {
-                                Modifier.hazeEffect(state = sheetHaze.state) {
-                                    blurRadius = 24.dp
-                                    backgroundColor = containerColor
-                                    tints = listOf(HazeTint(containerColor.copy(alpha = containerColor.alpha * 0.65f)))
-                                    fallbackTint = HazeTint(containerColor)
-                                    noiseFactor = 0f
-                                }
-                            } else {
-                                Modifier.background(containerColor)
-                            },
+                        .liquidGlassSurface(
+                            backdrop = if (sheetGlassReady) sheetBackdrop?.backdrop else null,
+                            shape = SheetShape,
+                            tint = containerColor.copy(alpha = containerColor.alpha * 0.65f),
+                            fallback = containerColor,
+                            blurRadius = 24.dp,
+                            refractionHeight = 16.dp,
+                            refractionAmount = 32.dp,
                         )
-                        .border(tokens.borders.thin, SurfaceEdge, SheetShape),
+                        .then(if (sheetGlassReady) Modifier else Modifier.border(tokens.borders.thin, SurfaceEdge, SheetShape)),
                 ) {
                     if (showDragHandle) {
                         NuvioBottomSheetDragHandle(Modifier.align(Alignment.CenterHorizontally))
