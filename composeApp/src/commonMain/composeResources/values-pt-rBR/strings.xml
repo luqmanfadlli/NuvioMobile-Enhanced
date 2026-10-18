@@ -33,7 +33,7 @@
     <string name="action_remove">Remover</string>
     <string name="action_remove_anyway">Remover mesmo assim</string>
     <string name="action_reorder">Reordenar</string>
-    <string name="action_reset">Redefinir para o padrão</string>
+    <string name="action_reset">Redefinir</string>
     <string name="action_resume">Retomar</string>
     <string name="action_retry">Tentar novamente</string>
     <string name="action_save">Salvar</string>
@@ -464,7 +464,7 @@
     <string name="compose_player_go_back">Voltar</string>
     <string name="compose_player_reload">Recarregar</string>
     <string name="compose_player_reset">Redefinir</string>
-    <string name="compose_player_reset_defaults">Redefinir para os padrões</string>
+    <string name="compose_player_reset_defaults">Redefinir</string>
     <string name="compose_player_resize_fill">Preencher</string>
     <string name="compose_player_resize_fit">Ajustar</string>
     <string name="compose_player_resize_zoom">Zoom</string>
@@ -852,7 +852,7 @@
     <string name="settings_poster_hide_labels">Ocultar rótulos</string>
     <string name="settings_poster_always_show_landscape_clearlogo">Sempre usar a imagem de fundo com logotipo em pôsteres na horizontal</string>
     <string name="settings_poster_landscape_mode">Pôsteres em paisagem</string>
-    <string name="settings_poster_live_preview">Pré-visualização ao vivo</string>
+    <string name="settings_poster_live_preview">Pré-visualização</string>
     <string name="settings_poster_option_with_value">%1$s (%2$s)</string>
     <string name="settings_poster_preview_corner_radius">Raio dos cantos: %1$ddp</string>
     <string name="settings_poster_preview_height">Altura: %1$ddp</string>
@@ -2107,7 +2107,7 @@
     <string name="details_browse_rail_title">%1$s • %2$s</string>
     <string name="details_browse_rail_top_rated">Mais bem avaliados</string>
     <string name="details_certification">Classificação</string>
-    <string name="details_movie_details">Detalhes do filme</string>
+    <string name="details_movie_details">Detalhes</string>
     <string name="details_original_language">Idioma original</string>
     <string name="details_origin_country">País de origem</string>
     <string name="details_budget">Orçamento</string>
@@ -2116,7 +2116,7 @@
     <string name="details_runtime">Duração</string>
     <string name="details_season_view_posters">Pôsteres</string>
     <string name="details_season_view_text">Texto</string>
-    <string name="details_show_details">Mostrar detalhes</string>
+    <string name="details_show_details">Detalhes</string>
     <string name="details_status">Status</string>
     <string name="details_videos">Vídeos</string>
     <string name="details_episode_badge_file">ARQUIVO</string>
