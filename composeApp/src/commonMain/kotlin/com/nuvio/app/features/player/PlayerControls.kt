@@ -1,4 +1,3 @@
-
 package com.nuvio.app.features.player
 
 import androidx.compose.animation.core.animateFloatAsState
