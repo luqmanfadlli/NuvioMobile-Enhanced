@@ -117,8 +117,8 @@ internal fun GestureFeedbackPill(
                 tint = backgroundColor.copy(alpha = backgroundColor.alpha * 0.7f),
                 fallback = backgroundColor,
                 blurRadius = 16.dp,
-                refractionHeight = 12.dp,
-                refractionAmount = 20.dp,
+                refractionHeight = 10.dp,
+                refractionAmount = 14.dp,
             )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
