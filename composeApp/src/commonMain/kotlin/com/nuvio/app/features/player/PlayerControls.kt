@@ -101,6 +101,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import com.nuvio.app.core.i18n.localizedEpisodeTitle
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 internal fun PlayerControlsShell(
@@ -637,7 +638,13 @@ internal fun PlayerHeaderIconButton(
         modifier = Modifier
             .size(buttonSize)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.35f))
+            .ambientLiquidGlass(
+                shape = CircleShape,
+                tint = Color.Black.copy(alpha = 0.35f),
+                fallback = Color.Black.copy(alpha = 0.35f),
+                blurRadius = 12.dp,
+                refractionHeight = 8.dp,
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -695,6 +702,14 @@ private fun SideControlButton(
     Box(
         modifier = Modifier
             .clip(CircleShape)
+            .ambientLiquidGlass(
+                shape = CircleShape,
+                tint = Color.Black.copy(alpha = 0.18f),
+                fallback = Color.Transparent,
+                blurRadius = 14.dp,
+                refractionHeight = 14.dp,
+                refractionAmount = 24.dp,
+            )
             .clickable(onClick = onClick)
             .padding(metrics.sideButtonPadding),
         contentAlignment = Alignment.Center,
@@ -722,6 +737,14 @@ internal fun PlayPauseControlButton(
     Box(
         modifier = Modifier
             .clip(CircleShape)
+            .ambientLiquidGlass(
+                shape = CircleShape,
+                tint = Color.Black.copy(alpha = 0.18f),
+                fallback = Color.Transparent,
+                blurRadius = 16.dp,
+                refractionHeight = 18.dp,
+                refractionAmount = 30.dp,
+            )
             .clickable(onClick = onClick)
             .padding(metrics.playButtonPadding),
         contentAlignment = Alignment.Center,
@@ -798,13 +821,22 @@ private fun ProgressControls(
             horizontalArrangement = Arrangement.Center,
         ) {
             Surface(
-                color = Color.Black.copy(alpha = 0.5f),
+                color = Color.Transparent,
                 shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(24.dp),
-                ),
+                modifier = Modifier
+                    .ambientLiquidGlass(
+                        shape = RoundedCornerShape(24.dp),
+                        tint = Color.Black.copy(alpha = 0.4f),
+                        fallback = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 16.dp,
+                        refractionHeight = 14.dp,
+                        refractionAmount = 24.dp,
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(24.dp),
+                    ),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -1130,7 +1162,14 @@ internal fun LockedPlayerOverlay(
                 modifier = Modifier
                     .size(78.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.52f))
+                    .ambientLiquidGlass(
+                        shape = CircleShape,
+                        tint = Color.Black.copy(alpha = 0.4f),
+                        fallback = Color.Black.copy(alpha = 0.52f),
+                        blurRadius = 16.dp,
+                        refractionHeight = 16.dp,
+                        refractionAmount = 28.dp,
+                    )
                     .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
                     .clickable(onClick = onUnlock),
                 contentAlignment = Alignment.Center,
@@ -1235,7 +1274,13 @@ private fun TimePill(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.5f))
+            .ambientLiquidGlass(
+                shape = RoundedCornerShape(12.dp),
+                tint = Color.Black.copy(alpha = 0.4f),
+                fallback = Color.Black.copy(alpha = 0.5f),
+                blurRadius = 12.dp,
+                refractionHeight = 6.dp,
+            )
             .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
