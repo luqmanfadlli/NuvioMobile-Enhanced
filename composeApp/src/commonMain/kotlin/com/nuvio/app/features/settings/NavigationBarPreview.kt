@@ -34,9 +34,10 @@ import com.nuvio.app.AppScreenTab
 import com.nuvio.app.TabletFloatingTopBar
 import com.nuvio.app.core.ui.NuvioClassicNavigationBar
 import com.nuvio.app.core.ui.NuvioNavBarScrollState
+import com.nuvio.app.core.ui.glass.LiquidGlassStyle
+import com.nuvio.app.core.ui.glass.nuvioBackdropSource
+import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 import com.nuvio.app.core.ui.nuvio
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -47,9 +48,10 @@ internal fun NavigationBarPreview(
     glowEnabled: Boolean,
     position: NavBarPosition = NavBarPosition.BOTTOM,
     tabletLayout: Boolean = false,
+    glassStyle: LiquidGlassStyle = LiquidGlassStyle.Default,
 ) {
     val tokens = MaterialTheme.nuvio
-    val hazeState = rememberHazeState()
+    val previewBackdrop = rememberNuvioBackdrop()
     val tabletClassic = style == NavBarStyle.CLASSIC && (isTablet || tabletLayout)
     val topPill = isTablet
     val pillOnTop = topPill || (style != NavBarStyle.CLASSIC && position == NavBarPosition.TOP)
@@ -69,7 +71,7 @@ internal fun NavigationBarPreview(
         Box(Modifier.fillMaxWidth().height(156.dp).clip(tokens.shapes.card)) {
             Column(
                 Modifier.matchParentSize()
-                    .hazeSource(hazeState)
+                    .nuvioBackdropSource(previewBackdrop)
                     .then(if (!topPill && style == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(barScrollState.nestedScrollConnection) else Modifier)
                     .verticalScroll(rememberScrollState())
                     .background(tokens.colors.surfaceCard)
@@ -123,11 +125,12 @@ internal fun NavigationBarPreview(
                     modifier = Modifier.align(if (pillOnTop) Alignment.TopCenter else Alignment.BottomCenter)
                         .then(if (topPill) Modifier.widthIn(max = 416.dp) else Modifier),
                     scrollState = barScrollState,
-                    hazeState = hazeState,
+                    backdrop = previewBackdrop,
                     contentPadding = PaddingValues(vertical = 16.dp),
                     compactSize = topPill,
                     glowEnabled = glowEnabled,
                     inlineLabels = tabletLayout,
+                    glassStyle = glassStyle,
                 )
             }
         }
