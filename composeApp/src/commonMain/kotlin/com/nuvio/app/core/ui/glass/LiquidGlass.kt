@@ -51,7 +51,13 @@ import com.kyant.backdrop.isRenderEffectSupported
 import com.kyant.backdrop.isRuntimeShaderSupported
 import com.kyant.backdrop.shadow.Shadow
 
-fun isLiquidGlassSupported(): Boolean = isRenderEffectSupported()
+object LiquidGlassSettings {
+    var enabled: Boolean by mutableStateOf(true)
+}
+
+fun isLiquidGlassAvailable(): Boolean = isRenderEffectSupported()
+
+fun isLiquidGlassSupported(): Boolean = LiquidGlassSettings.enabled && isLiquidGlassAvailable()
 
 fun isLiquidRefractionSupported(): Boolean = isRuntimeShaderSupported()
 
@@ -306,7 +312,7 @@ internal fun Modifier.liquidGlassBlur(
     radius: Dp,
     alphaProvider: () -> Float = { 1f },
 ): Modifier =
-    if (backdrop == null || !isLiquidGlassSupported()) {
+    if (backdrop == null || !isLiquidGlassAvailable()) {
         this
     } else {
         graphicsLayer { alpha = alphaProvider() }
