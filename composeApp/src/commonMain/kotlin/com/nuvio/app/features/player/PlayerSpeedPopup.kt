@@ -27,6 +27,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.nuvio.app.core.ui.nuvio
 import kotlin.math.abs
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 internal val PlayerPlaybackSpeedOptions: List<Float> =
     listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
@@ -52,7 +53,14 @@ internal fun PlayerSpeedPopup(
             modifier = Modifier
                 .width(76.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
+                .ambientLiquidGlass(
+                    shape = RoundedCornerShape(14.dp),
+                    tint = Color.Black.copy(alpha = 0.45f),
+                    fallback = Color.Black.copy(alpha = 0.6f),
+                    blurRadius = 16.dp,
+                    refractionHeight = 10.dp,
+                    refractionAmount = 18.dp,
+                )
                 .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
