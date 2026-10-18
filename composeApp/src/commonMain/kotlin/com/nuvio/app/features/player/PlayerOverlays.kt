@@ -53,6 +53,7 @@ import nuvio.composeapp.generated.resources.compose_player_youre_watching
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.max
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 internal enum class GestureFeedbackIcon {
     Speed,
@@ -111,7 +112,14 @@ internal fun GestureFeedbackPill(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(backgroundColor)
+            .ambientLiquidGlass(
+                shape = RoundedCornerShape(24.dp),
+                tint = backgroundColor.copy(alpha = backgroundColor.alpha * 0.7f),
+                fallback = backgroundColor,
+                blurRadius = 16.dp,
+                refractionHeight = 12.dp,
+                refractionAmount = 20.dp,
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
