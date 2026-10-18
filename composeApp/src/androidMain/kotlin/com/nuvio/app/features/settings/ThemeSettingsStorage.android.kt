@@ -28,6 +28,7 @@ actual object ThemeSettingsStorage {
 
     private const val localNavBarStyleKey = "enhanced_local_nav_bar_style"
     private const val localNavBarPositionKey = "enhanced_local_nav_bar_position"
+    private const val localNavBarGlassKey = "enhanced_local_nav_bar_glass"
     private const val navBarGlowEnabledKey = "nav_bar_glow_enabled"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
@@ -180,6 +181,13 @@ actual object ThemeSettingsStorage {
 
     actual fun saveNavBarPosition(positionKey: String) {
         saveRawString(localNavBarPositionKey, positionKey)
+    }
+
+    actual fun loadNavBarGlass(): String? =
+        loadRawString(localNavBarGlassKey)
+
+    actual fun saveNavBarGlass(value: String) {
+        saveRawString(localNavBarGlassKey, value)
     }
 
     private fun loadRawString(key: String): String? =
