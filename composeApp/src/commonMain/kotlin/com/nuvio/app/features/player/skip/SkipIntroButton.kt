@@ -118,8 +118,8 @@ fun SkipIntroButton(
                     tint = Color(0xFF1E1E1E).copy(alpha = 0.6f),
                     fallback = Color(0xFF1E1E1E).copy(alpha = 0.85f),
                     blurRadius = 18.dp,
-                    refractionHeight = 12.dp,
-                    refractionAmount = 20.dp,
+                    refractionHeight = 10.dp,
+                    refractionAmount = 14.dp,
                 )
                 .clickable(enabled = canSkip) { onSkip() },
         ) {
