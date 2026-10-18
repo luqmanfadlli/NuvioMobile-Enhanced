@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -59,9 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
-import dev.chrisbanes.haze.HazeInputScale
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
+import com.kyant.backdrop.Backdrop
+import com.nuvio.app.core.ui.glass.liquidGlassBlur
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -150,7 +148,7 @@ fun NuvioPosterZoomActionOverlay(
     depthSurface: NuvioCardDepthSurface = NuvioCardDepthSurface.Posters,
     anchor: PosterZoomAnchor?,
     actions: List<PosterZoomOverlayAction>,
-    hazeState: HazeState,
+    backdrop: Backdrop,
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -254,15 +252,11 @@ fun NuvioPosterZoomActionOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .hazeEffect(state = hazeState) {
-                    blurRadius = 36.dp
-                    inputScale = HazeInputScale.Auto
-                    noiseFactor = 0f
-                    blurredEdgeTreatment = BlurredEdgeTreatment.Rectangle
-                    clipToAreasBounds = false
-                    expandLayerBounds = true
-                    alpha = scrim.value.coerceIn(0f, 1f)
-                },
+                .liquidGlassBlur(
+                    backdrop = backdrop,
+                    radius = 36.dp,
+                    alphaProvider = { scrim.value.coerceIn(0f, 1f) },
+                ),
         )
         Box(
             modifier = Modifier
