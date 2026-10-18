@@ -78,8 +78,8 @@ fun SubtitleSyncByEarCard(
                     tint = Color(0xFF17171A).copy(alpha = 0.72f),
                     fallback = Color(0xFF17171A).copy(alpha = 0.94f),
                     blurRadius = 24.dp,
-                    refractionHeight = 14.dp,
-                    refractionAmount = 24.dp,
+                    refractionHeight = 10.dp,
+                    refractionAmount = 14.dp,
                 )
                 .border(
                     width = 1.dp,
