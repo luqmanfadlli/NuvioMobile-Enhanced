@@ -62,7 +62,7 @@ fun NuvioSheetBackdropHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (sheetBackdrop.activeSheets > 0) Modifier.nuvioBackdropSource(sheetBackdrop.backdrop) else Modifier),
+                .then(if (sheetBackdrop.activeSheets > 0 && isLiquidGlassSupported()) Modifier.nuvioBackdropSource(sheetBackdrop.backdrop) else Modifier),
         ) {
             content()
         }
