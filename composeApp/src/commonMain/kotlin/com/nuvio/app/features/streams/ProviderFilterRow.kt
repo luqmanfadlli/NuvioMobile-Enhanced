@@ -64,6 +64,7 @@ import nuvio.composeapp.generated.resources.streams_pinned_source
 import nuvio.composeapp.generated.resources.streams_refresh
 import nuvio.composeapp.generated.resources.streams_unpin_source
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 internal fun ProviderFilterRow(
@@ -281,7 +282,13 @@ private fun FilterChip(
             }
             .height(36.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(containerColor)
+            .ambientLiquidGlass(
+                shape = RoundedCornerShape(16.dp),
+                tint = containerColor,
+                fallback = containerColor,
+                blurRadius = 14.dp,
+                refractionHeight = 8.dp,
+            )
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
