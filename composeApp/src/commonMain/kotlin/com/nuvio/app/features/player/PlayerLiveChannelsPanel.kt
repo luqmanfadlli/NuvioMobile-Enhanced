@@ -198,8 +198,8 @@ fun PlayerLiveChannelsPanel(
                             tint = colorScheme.surface.copy(alpha = colorScheme.surface.alpha * 0.74f),
                             fallback = colorScheme.surface,
                             blurRadius = 28.dp,
-                            refractionHeight = 16.dp,
-                            refractionAmount = 32.dp,
+                            refractionHeight = 10.dp,
+                            refractionAmount = 18.dp,
                         )
                         .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
                         .clickable(
