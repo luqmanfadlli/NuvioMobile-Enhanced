@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
@@ -25,6 +27,13 @@ import com.nuvio.app.core.ui.glass.LiquidGlassBackdropHost
 import kotlin.math.roundToInt
 
 internal val PlayerGlassTint = Color(0xFF101014).copy(alpha = 0.52f)
+
+private val VideoFrameColorFilter = ColorFilter.colorMatrix(
+    ColorMatrix().apply {
+        setToSaturation(0.2f)
+        timesAssign(ColorMatrix().apply { setToScale(0.6f, 0.6f, 0.6f, 1f) })
+    },
+)
 
 @Stable
 class VideoFrameBackdrop : Backdrop, LiquidGlassBackdropHost {
@@ -84,6 +93,7 @@ class VideoFrameBackdrop : Backdrop, LiquidGlassBackdropHost {
                 (bounds.top - origin.y).roundToInt(),
             ),
             dstSize = IntSize(bounds.width.roundToInt(), bounds.height.roundToInt()),
+            colorFilter = VideoFrameColorFilter,
             filterQuality = FilterQuality.Low,
         )
     }
