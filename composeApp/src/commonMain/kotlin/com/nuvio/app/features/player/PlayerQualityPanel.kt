@@ -38,6 +38,8 @@ import com.nuvio.app.core.ui.nuvio
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_close
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun PlayerQualityPanel(
@@ -80,7 +82,14 @@ internal fun PlayerQualityPanel(
                         .fillMaxWidth(0.92f)
                         .heightIn(max = tokens.components.dialogMaxWidth)
                         .clip(tokens.shapes.playerPanel)
-                        .background(tokens.colors.surfaceSheet)
+                        .ambientLiquidGlass(
+                            shape = tokens.shapes.playerPanel,
+                            tint = tokens.colors.surfaceSheet.copy(alpha = tokens.colors.surfaceSheet.alpha * 0.72f),
+                            fallback = tokens.colors.surfaceSheet,
+                            blurRadius = 28.dp,
+                            refractionHeight = 16.dp,
+                            refractionAmount = 32.dp,
+                        )
                         .border(tokens.borders.thin, tokens.colors.borderDefault, tokens.shapes.playerPanel)
                         .clickable(
                             indication = null,
