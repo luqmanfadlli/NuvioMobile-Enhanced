@@ -142,8 +142,6 @@ internal fun PlayerControlsShell(
     onCastClick: (() -> Unit)? = null,
     isCasting: Boolean = false,
     onPictureInPictureClick: (() -> Unit)? = null,
-    onOrientationToggleClick: (() -> Unit)? = null,
-    isPortraitPlayback: Boolean = false,
     onInfoClick: (() -> Unit)? = null,
     onRateClick: (() -> Unit)? = null,
     userRating: Int? = null,
@@ -230,8 +228,6 @@ internal fun PlayerControlsShell(
                     onCastClick = onCastClick,
                     isCasting = isCasting,
                     onPictureInPictureClick = onPictureInPictureClick,
-                    onOrientationToggleClick = onOrientationToggleClick,
-                    isPortraitPlayback = isPortraitPlayback,
                     onInfoClick = onInfoClick,
                     onRateClick = onRateClick,
                     userRating = userRating,
@@ -259,8 +255,6 @@ internal fun PlayerControlsShell(
                         isCasting = isCasting,
                         onPartyClick = onPartyClick,
                         partyActive = partyActive,
-                        onOrientationToggleClick = onOrientationToggleClick,
-                        isPortraitPlayback = isPortraitPlayback,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
@@ -433,8 +427,6 @@ private fun PlayerHeader(
     onCastClick: (() -> Unit)?,
     isCasting: Boolean,
     onPictureInPictureClick: (() -> Unit)?,
-    onOrientationToggleClick: (() -> Unit)? = null,
-    isPortraitPlayback: Boolean = false,
     onInfoClick: (() -> Unit)?,
     onRateClick: (() -> Unit)? = null,
     userRating: Int? = null,
@@ -598,15 +590,6 @@ private fun PlayerHeader(
                             onClick = onPictureInPictureClick,
                         )
                     }
-                    if (onOrientationToggleClick != null) {
-                        PlayerHeaderIconButton(
-                            icon = playerOrientationToggleIcon(isPortraitPlayback),
-                            contentDescription = stringResource(playerOrientationToggleLabel(isPortraitPlayback)),
-                            buttonSize = metrics.headerIconSize + 16.dp,
-                            iconSize = metrics.headerIconSize,
-                            onClick = onOrientationToggleClick,
-                        )
-                    }
                     if (onRateClick != null) {
                         PlayerHeaderIconButton(
                             icon = if (userRating != null) Icons.Rounded.Star else Icons.Rounded.StarBorder,
@@ -642,6 +625,8 @@ private fun PlayerHeader(
 }
 
 
+private const val PlayerControlGlassOpacity = 0.35f
+
 @Composable
 internal fun PlayerHeaderIconButton(
     icon: ImageVector,
@@ -657,9 +642,10 @@ internal fun PlayerHeaderIconButton(
             .clip(CircleShape)
             .ambientLiquidGlass(
                 shape = CircleShape,
-                tint = Color.Black.copy(alpha = 0.35f),
+                tint = Color.White.copy(alpha = 0.06f),
                 fallback = Color.Black.copy(alpha = 0.35f),
                 blurRadius = 12.dp,
+                backdropOpacity = PlayerControlGlassOpacity,
                 refractionHeight = 6.dp,
                 refractionAmount = 8.dp,
             )
@@ -722,9 +708,10 @@ private fun SideControlButton(
             .clip(CircleShape)
             .ambientLiquidGlass(
                 shape = CircleShape,
-                tint = Color.Black.copy(alpha = 0.18f),
+                tint = Color.White.copy(alpha = 0.06f),
                 fallback = Color.Transparent,
                 blurRadius = 14.dp,
+                backdropOpacity = PlayerControlGlassOpacity,
                 refractionHeight = 8.dp,
                 refractionAmount = 12.dp,
             )
@@ -757,9 +744,10 @@ internal fun PlayPauseControlButton(
             .clip(CircleShape)
             .ambientLiquidGlass(
                 shape = CircleShape,
-                tint = Color.Black.copy(alpha = 0.18f),
+                tint = Color.White.copy(alpha = 0.06f),
                 fallback = Color.Transparent,
                 blurRadius = 16.dp,
+                backdropOpacity = PlayerControlGlassOpacity,
                 refractionHeight = 10.dp,
                 refractionAmount = 14.dp,
             )
@@ -844,9 +832,10 @@ private fun ProgressControls(
                 modifier = Modifier
                     .ambientLiquidGlass(
                         shape = RoundedCornerShape(24.dp),
-                        tint = Color.Black.copy(alpha = 0.4f),
+                        tint = Color.White.copy(alpha = 0.05f),
                         fallback = Color.Black.copy(alpha = 0.5f),
                         blurRadius = 16.dp,
+                        backdropOpacity = PlayerControlGlassOpacity,
                         refractionHeight = 10.dp,
                         refractionAmount = 14.dp,
                     )
@@ -1182,9 +1171,10 @@ internal fun LockedPlayerOverlay(
                     .clip(CircleShape)
                     .ambientLiquidGlass(
                         shape = CircleShape,
-                        tint = Color.Black.copy(alpha = 0.4f),
+                        tint = Color.White.copy(alpha = 0.06f),
                         fallback = Color.Black.copy(alpha = 0.52f),
                         blurRadius = 16.dp,
+                        backdropOpacity = PlayerControlGlassOpacity,
                         refractionHeight = 10.dp,
                         refractionAmount = 14.dp,
                     )
@@ -1294,9 +1284,10 @@ private fun TimePill(
             .clip(RoundedCornerShape(12.dp))
             .ambientLiquidGlass(
                 shape = RoundedCornerShape(12.dp),
-                tint = Color.Black.copy(alpha = 0.4f),
+                tint = Color.White.copy(alpha = 0.05f),
                 fallback = Color.Black.copy(alpha = 0.5f),
                 blurRadius = 12.dp,
+                backdropOpacity = PlayerControlGlassOpacity,
                 refractionHeight = 4.dp,
                 refractionAmount = 6.dp,
             )
