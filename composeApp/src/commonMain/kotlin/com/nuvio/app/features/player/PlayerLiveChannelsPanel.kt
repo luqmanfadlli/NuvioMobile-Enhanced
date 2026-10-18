@@ -84,6 +84,7 @@ import nuvio.composeapp.generated.resources.live_tv_no_matching_channels_message
 import nuvio.composeapp.generated.resources.live_tv_no_matching_channels_title
 import nuvio.composeapp.generated.resources.live_tv_search_placeholder
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 fun PlayerLiveChannelsPanel(
@@ -192,7 +193,14 @@ fun PlayerLiveChannelsPanel(
                         .fillMaxWidth(0.92f)
                         .heightIn(max = 640.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(colorScheme.surface)
+                        .ambientLiquidGlass(
+                            shape = RoundedCornerShape(24.dp),
+                            tint = colorScheme.surface.copy(alpha = colorScheme.surface.alpha * 0.74f),
+                            fallback = colorScheme.surface,
+                            blurRadius = 28.dp,
+                            refractionHeight = 16.dp,
+                            refractionAmount = 32.dp,
+                        )
                         .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
                         .clickable(
                             indication = null,
