@@ -87,8 +87,8 @@ internal fun PlayerQualityPanel(
                             tint = tokens.colors.surfaceSheet.copy(alpha = tokens.colors.surfaceSheet.alpha * 0.72f),
                             fallback = tokens.colors.surfaceSheet,
                             blurRadius = 28.dp,
-                            refractionHeight = 16.dp,
-                            refractionAmount = 32.dp,
+                            refractionHeight = 10.dp,
+                            refractionAmount = 18.dp,
                         )
                         .border(tokens.borders.thin, tokens.colors.borderDefault, tokens.shapes.playerPanel)
                         .clickable(
