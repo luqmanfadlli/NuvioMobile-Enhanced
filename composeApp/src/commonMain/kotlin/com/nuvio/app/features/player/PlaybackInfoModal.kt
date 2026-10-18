@@ -51,6 +51,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_playback_info
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 internal fun PlaybackInfoModal(
@@ -95,8 +96,14 @@ internal fun PlaybackInfoModal(
                         .fillMaxWidth(0.9f)
                         .heightIn(max = 560.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            Brush.verticalGradient(
+                        .ambientLiquidGlass(
+                            shape = RoundedCornerShape(24.dp),
+                            tint = Color(0xFF16161B).copy(alpha = 0.74f),
+                            fallback = Color(0xFF1E1E24),
+                            blurRadius = 28.dp,
+                            refractionHeight = 16.dp,
+                            refractionAmount = 32.dp,
+                            fallbackBrush = Brush.verticalGradient(
                                 colors = listOf(
                                     Color(0xFF1E1E24),
                                     Color(0xFF0F0F12),
