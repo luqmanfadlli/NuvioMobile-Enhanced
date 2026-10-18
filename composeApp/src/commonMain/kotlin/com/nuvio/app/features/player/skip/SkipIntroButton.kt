@@ -45,6 +45,7 @@ import nuvio.composeapp.generated.resources.player_skip_recap
 import nuvio.composeapp.generated.resources.player_skip_movie_credits
 import nuvio.composeapp.generated.resources.player_skip_to_post_credits
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 fun SkipIntroButton(
@@ -112,7 +113,14 @@ fun SkipIntroButton(
             modifier = Modifier
                 .width(IntrinsicSize.Max)
                 .clip(shape)
-                .background(Color(0xFF1E1E1E).copy(alpha = 0.85f))
+                .ambientLiquidGlass(
+                    shape = shape,
+                    tint = Color(0xFF1E1E1E).copy(alpha = 0.6f),
+                    fallback = Color(0xFF1E1E1E).copy(alpha = 0.85f),
+                    blurRadius = 18.dp,
+                    refractionHeight = 12.dp,
+                    refractionAmount = 20.dp,
+                )
                 .clickable(enabled = canSkip) { onSkip() },
         ) {
             Row(
