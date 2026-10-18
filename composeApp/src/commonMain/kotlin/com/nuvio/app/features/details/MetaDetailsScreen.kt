@@ -1233,14 +1233,14 @@ fun MetaDetailsScreen(
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .blur(30.dp)
+                                                .blur(16.dp)
                                                 .nuvioBackdropSource(cinematicArtworkBackdrop),
                                             contentScale = ContentScale.Crop,
                                         )
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .background(colorScheme.background.copy(alpha = 0.92f)),
+                                                .background(colorScheme.background.copy(alpha = 0.72f)),
                                         )
                                     }
                                     MetaScreenBackgroundMode.DominantColor -> {
