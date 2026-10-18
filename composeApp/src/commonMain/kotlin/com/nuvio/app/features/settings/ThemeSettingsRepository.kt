@@ -4,6 +4,7 @@ import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.CustomThemeColors
 import com.nuvio.app.core.ui.NativeTabBridge
 import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.glass.LiquidGlassStyle
 import com.nuvio.app.core.ui.nativeAccentGradientHex
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.resolveCustomThemeColors
@@ -55,6 +56,9 @@ object ThemeSettingsRepository {
     private val _navBarGlowEnabled = MutableStateFlow(true)
     val navBarGlowEnabled: StateFlow<Boolean> = _navBarGlowEnabled.asStateFlow()
 
+    private val _navBarGlass = MutableStateFlow(LiquidGlassStyle.Default)
+    val navBarGlass: StateFlow<LiquidGlassStyle> = _navBarGlass.asStateFlow()
+
     private var hasLoaded = false
     private var observesMembership = false
 
@@ -89,6 +93,7 @@ object ThemeSettingsRepository {
         _navBarGlowEnabled.value = true
         _navBarStyle.value = NavBarStyle.ADAPTIVE
         _navBarPosition.value = NavBarPosition.BOTTOM
+        _navBarGlass.value = LiquidGlassStyle.Default
     }
 
     private fun loadFromDisk() {
@@ -122,6 +127,7 @@ object ThemeSettingsRepository {
         _navBarGlowEnabled.value = ThemeSettingsStorage.loadNavBarGlowEnabled() ?: true
         _navBarStyle.value = NavBarStyle.fromKey(ThemeSettingsStorage.loadNavBarStyle())
         _navBarPosition.value = NavBarPosition.fromKey(ThemeSettingsStorage.loadNavBarPosition())
+        _navBarGlass.value = LiquidGlassStyle.decode(ThemeSettingsStorage.loadNavBarGlass())
     }
 
     fun setCustomTheme(colors: CustomThemeColors) {
@@ -210,6 +216,13 @@ object ThemeSettingsRepository {
         if (_navBarGlowEnabled.value == enabled) return
         _navBarGlowEnabled.value = enabled
         ThemeSettingsStorage.saveNavBarGlowEnabled(enabled)
+    }
+
+    fun setNavBarGlass(style: LiquidGlassStyle) {
+        ensureLoaded()
+        if (_navBarGlass.value == style) return
+        _navBarGlass.value = style
+        ThemeSettingsStorage.saveNavBarGlass(style.encode())
     }
 
     private fun observeMembership() {
