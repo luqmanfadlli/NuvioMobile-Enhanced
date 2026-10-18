@@ -45,6 +45,7 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.opacity
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.isRenderEffectSupported
@@ -280,6 +281,7 @@ internal fun Modifier.liquidGlassSurface(
     withHighlight: Boolean = true,
     withShadow: Boolean = false,
     fallbackBrush: Brush? = null,
+    backdropOpacity: Float = 1f,
 ): Modifier =
     if (backdrop == null || !isLiquidGlassSupported()) {
         if (fallbackBrush != null) clip(shape).background(fallbackBrush) else clip(shape).background(fallback)
@@ -296,6 +298,7 @@ internal fun Modifier.liquidGlassSurface(
                         refractionAmount = refractionAmount.toPx(),
                     )
                 }
+                if (backdropOpacity < 1f) opacity(backdropOpacity.coerceIn(0f, 1f))
             },
             highlight = if (withHighlight) DefaultGlassHighlight else null,
             shadow = if (withShadow) DefaultGlassShadow else null,
@@ -342,6 +345,7 @@ internal fun Modifier.ambientLiquidGlass(
     withHighlight: Boolean = true,
     withShadow: Boolean = false,
     fallbackBrush: Brush? = null,
+    backdropOpacity: Float = 1f,
 ): Modifier {
     val backdrop = LocalLiquidGlassBackdrop.current
     val host = backdrop as? LiquidGlassBackdropHost
@@ -364,5 +368,6 @@ internal fun Modifier.ambientLiquidGlass(
         withHighlight = withHighlight,
         withShadow = withShadow,
         fallbackBrush = fallbackBrush,
+        backdropOpacity = backdropOpacity,
     )
 }
