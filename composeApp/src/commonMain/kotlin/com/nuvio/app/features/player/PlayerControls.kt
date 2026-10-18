@@ -142,6 +142,8 @@ internal fun PlayerControlsShell(
     onCastClick: (() -> Unit)? = null,
     isCasting: Boolean = false,
     onPictureInPictureClick: (() -> Unit)? = null,
+    onOrientationToggleClick: (() -> Unit)? = null,
+    isPortraitPlayback: Boolean = false,
     onInfoClick: (() -> Unit)? = null,
     onRateClick: (() -> Unit)? = null,
     userRating: Int? = null,
@@ -228,6 +230,8 @@ internal fun PlayerControlsShell(
                     onCastClick = onCastClick,
                     isCasting = isCasting,
                     onPictureInPictureClick = onPictureInPictureClick,
+                    onOrientationToggleClick = onOrientationToggleClick,
+                    isPortraitPlayback = isPortraitPlayback,
                     onInfoClick = onInfoClick,
                     onRateClick = onRateClick,
                     userRating = userRating,
@@ -255,6 +259,8 @@ internal fun PlayerControlsShell(
                         isCasting = isCasting,
                         onPartyClick = onPartyClick,
                         partyActive = partyActive,
+                        onOrientationToggleClick = onOrientationToggleClick,
+                        isPortraitPlayback = isPortraitPlayback,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
@@ -427,6 +433,8 @@ private fun PlayerHeader(
     onCastClick: (() -> Unit)?,
     isCasting: Boolean,
     onPictureInPictureClick: (() -> Unit)?,
+    onOrientationToggleClick: (() -> Unit)? = null,
+    isPortraitPlayback: Boolean = false,
     onInfoClick: (() -> Unit)?,
     onRateClick: (() -> Unit)? = null,
     userRating: Int? = null,
@@ -588,6 +596,15 @@ private fun PlayerHeader(
                             buttonSize = metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onPictureInPictureClick,
+                        )
+                    }
+                    if (onOrientationToggleClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = playerOrientationToggleIcon(isPortraitPlayback),
+                            contentDescription = stringResource(playerOrientationToggleLabel(isPortraitPlayback)),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onOrientationToggleClick,
                         )
                     }
                     if (onRateClick != null) {
