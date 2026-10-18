@@ -103,6 +103,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 private val log = Logger.withTag("SeriesContent")
 
@@ -586,7 +587,12 @@ private fun SeasonViewModeToggle(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .ambientLiquidGlass(
+                shape = RoundedCornerShape(8.dp),
+                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                fallback = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                refractionHeight = 6.dp,
+            )
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.2f),
@@ -649,11 +655,15 @@ private fun SeasonTextChipScrollRow(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(sizing.seasonChipRadius))
-                    .background(
+                    .then(
                         if (isSelected) {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            Modifier.ambientLiquidGlass(
+                                shape = RoundedCornerShape(sizing.seasonChipRadius),
+                                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                fallback = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            )
                         } else {
-                            Color.Transparent
+                            Modifier.background(Color.Transparent)
                         },
                     )
                     .combinedClickable(
@@ -958,7 +968,12 @@ private fun EpisodeHorizontalCard(
             .width(metrics.cardWidth)
             .height(metrics.cardHeight)
             .clip(cardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .ambientLiquidGlass(
+                shape = cardShape,
+                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                fallback = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                blurRadius = 18.dp,
+            )
             .nuvioCardDepth(
                 shape = cardShape,
                 surface = NuvioCardDepthSurface.EpisodeCards,
@@ -1409,7 +1424,12 @@ private fun EpisodeListCard(
             .fillMaxWidth()
             .height(sizing.cardHeight)
             .clip(cardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .ambientLiquidGlass(
+                shape = cardShape,
+                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                fallback = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                blurRadius = 18.dp,
+            )
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.1f),
