@@ -64,6 +64,7 @@ import nuvio.composeapp.generated.resources.player_next_episode_playing_via_coun
 import nuvio.composeapp.generated.resources.player_next_episode_thumbnail
 import nuvio.composeapp.generated.resources.player_next_episode_unaired
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 fun NextEpisodeCard(
@@ -112,7 +113,14 @@ fun NextEpisodeCard(
                 .widthIn(max = 292.dp)
                 .graphicsLayer { translationX = animatedOffsetX }
                 .clip(shape)
-                .background(Color(0xFF191919).copy(alpha = 0.89f))
+                .ambientLiquidGlass(
+                    shape = shape,
+                    tint = Color(0xFF191919).copy(alpha = 0.64f),
+                    fallback = Color(0xFF191919).copy(alpha = 0.89f),
+                    blurRadius = 20.dp,
+                    refractionHeight = 12.dp,
+                    refractionAmount = 20.dp,
+                )
                 .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
                 .pointerInput(nextEpisode.videoId, visible, dismissThreshold) {
                     if (!visible) return@pointerInput
