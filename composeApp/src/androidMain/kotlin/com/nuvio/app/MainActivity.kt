@@ -20,8 +20,9 @@ import com.nuvio.app.core.storage.PlatformLocalAccountDataCleaner
 import com.nuvio.app.core.startup.StartupPreloader
 import com.nuvio.app.core.sync.SyncClientIdentityStorage
 import com.nuvio.app.core.ui.CardDepthStyleStorage
-import com.nuvio.app.core.ui.NuvioSheetHaze
-import com.nuvio.app.core.ui.NuvioSheetHazeHost
+import com.nuvio.app.core.ui.NuvioSheetBackdrop
+import com.nuvio.app.core.ui.NuvioSheetBackdropHost
+import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.addons.AddonHttpClientProvider
 import com.nuvio.app.features.addons.AddonStorage
@@ -89,7 +90,6 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
 import com.nuvio.app.features.watchprogress.ResumePromptStorage
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -201,9 +201,9 @@ open class MainActivity : AppCompatActivity() {
     private fun showContent() {
         handleIncomingAppIntent(intent)
         setContent {
-            val sheetHazeState = rememberHazeState()
-            val sheetHaze = remember(sheetHazeState) { NuvioSheetHaze(sheetHazeState) }
-            NuvioSheetHazeHost(sheetHaze = sheetHaze) {
+            val sheetBackdropSource = rememberNuvioBackdrop()
+            val sheetBackdrop = remember(sheetBackdropSource) { NuvioSheetBackdrop(sheetBackdropSource) }
+            NuvioSheetBackdropHost(sheetBackdrop = sheetBackdrop) {
                 App()
             }
         }
