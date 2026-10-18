@@ -57,9 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvio
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import com.kyant.backdrop.Backdrop
+import com.nuvio.app.core.ui.glass.liquidGlassSurface
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -70,7 +69,7 @@ internal fun ProfilePopupContent(
     activeProfileIndex: Int?,
     hoveredProfileIndex: Int?,
     pinProfile: NuvioProfile?,
-    hazeState: HazeState?,
+    backdrop: Backdrop?,
     opensBelow: Boolean,
     availableHeight: Dp?,
     modifier: Modifier = Modifier,
@@ -108,18 +107,14 @@ internal fun ProfilePopupContent(
                     .onGloballyPositioned { panelBounds = it.boundsInParent() }
                     .shadow(12.dp, shape)
                     .clip(shape)
-                    .then(
-                        if (hazeState != null) {
-                            Modifier.hazeEffect(hazeState) {
-                                blurRadius = 24.dp
-                                backgroundColor = Color(0xFF1C1C1E)
-                                tints = listOf(HazeTint(Color(0xFF1C1C1E).copy(alpha = 0.55f)))
-                                fallbackTint = HazeTint(Color(0xFF1C1C1E).copy(alpha = 0.94f))
-                                noiseFactor = 0f
-                            }
-                        } else {
-                            Modifier.background(tokens.colors.background)
-                        },
+                    .liquidGlassSurface(
+                        backdrop = backdrop,
+                        shape = shape,
+                        tint = Color(0xFF1C1C1E).copy(alpha = 0.55f),
+                        fallback = if (backdrop != null) Color(0xFF1C1C1E).copy(alpha = 0.94f) else tokens.colors.background,
+                        blurRadius = 24.dp,
+                        refractionHeight = 12.dp,
+                        refractionAmount = 24.dp,
                     )
                     .border(0.5.dp, tokens.colors.borderDefault, shape)
                     .padding(12.dp),
