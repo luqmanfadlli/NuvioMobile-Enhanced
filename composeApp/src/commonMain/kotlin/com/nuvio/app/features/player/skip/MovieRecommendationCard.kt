@@ -52,6 +52,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_close
 import nuvio.composeapp.generated.resources.details_more_like_this
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 fun MovieRecommendationCard(
@@ -97,7 +98,14 @@ fun MovieRecommendationCard(
             modifier = Modifier
                 .widthIn(max = 320.dp)
                 .clip(shape)
-                .background(Color(0xFF191919).copy(alpha = 0.89f))
+                .ambientLiquidGlass(
+                    shape = shape,
+                    tint = Color(0xFF191919).copy(alpha = 0.64f),
+                    fallback = Color(0xFF191919).copy(alpha = 0.89f),
+                    blurRadius = 20.dp,
+                    refractionHeight = 12.dp,
+                    refractionAmount = 20.dp,
+                )
                 .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
                 .padding(vertical = 8.dp),
         ) {
