@@ -30,8 +30,8 @@ internal val PlayerGlassTint = Color(0xFF101014).copy(alpha = 0.52f)
 
 private val VideoFrameColorFilter = ColorFilter.colorMatrix(
     ColorMatrix().apply {
-        setToSaturation(0.2f)
-        timesAssign(ColorMatrix().apply { setToScale(0.6f, 0.6f, 0.6f, 1f) })
+        setToSaturation(0.3f)
+        timesAssign(ColorMatrix().apply { setToScale(0.95f, 0.95f, 0.95f, 1f) })
     },
 )
 
