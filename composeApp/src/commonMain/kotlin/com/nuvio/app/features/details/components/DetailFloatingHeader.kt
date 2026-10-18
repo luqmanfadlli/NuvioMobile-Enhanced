@@ -46,6 +46,8 @@ import com.nuvio.app.navigation.LocalUseNativeNavigation
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import com.kyant.backdrop.Backdrop
+import com.nuvio.app.core.ui.glass.liquidGlassSurface
 
 @Composable
 internal fun detailFloatingHeaderHeight(): Dp {
@@ -66,6 +68,7 @@ fun DetailFloatingHeader(
     onBack: () -> Unit,
     onToggleSaved: () -> Unit,
     modifier: Modifier = Modifier,
+    glassBackdrop: Backdrop? = null,
 ) {
     val useNativeNavigation = LocalUseNativeNavigation.current
     val safeAreaTop = if (useNativeNavigation) {
@@ -100,7 +103,14 @@ fun DetailFloatingHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .clipToBounds()
-                .background(surfaceColor),
+                .liquidGlassSurface(
+                    backdrop = glassBackdrop,
+                    shape = RectangleShape,
+                    tint = surfaceColor.copy(alpha = surfaceColor.alpha * 0.7f),
+                    fallback = surfaceColor,
+                    blurRadius = 24.dp,
+                    withHighlight = false,
+                ),
         ) {
             Row(
                 modifier = Modifier
