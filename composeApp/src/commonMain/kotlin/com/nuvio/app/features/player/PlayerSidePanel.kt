@@ -105,8 +105,8 @@ internal fun PlayerSidePanel(
                             tint = tokens.colors.surfaceElevated.copy(alpha = tokens.colors.surfaceElevated.alpha * 0.72f),
                             fallback = tokens.colors.surfaceElevated,
                             blurRadius = 28.dp,
-                            refractionHeight = 16.dp,
-                            refractionAmount = 32.dp,
+                            refractionHeight = 10.dp,
+                            refractionAmount = 18.dp,
                         )
                         .clickable(
                             interactionSource = panelInteraction,
