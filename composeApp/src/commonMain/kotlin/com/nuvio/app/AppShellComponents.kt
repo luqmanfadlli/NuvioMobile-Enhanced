@@ -67,6 +67,10 @@ import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.home.HomeCatalogSection
+import com.nuvio.app.features.home.HomeCategoryKind
+import com.nuvio.app.features.home.HomeCategoryRepository
+import com.nuvio.app.features.home.components.HomeCategoryBar
+import com.nuvio.app.features.home.components.HomeCategoryBarContentHeight
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryItem
@@ -193,19 +197,50 @@ internal fun AppTabHost(
     ) { tab ->
         when (tab) {
             AppScreenTab.Home -> {
-                key(state.homeContentGeneration) {
-                    HomeScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        animateCollectionGifs = state.animateHomeCollectionGifs,
-                        scrollToTopRequests = requests.homeScrollToTopRequests,
-                        onCatalogClick = actions.onCatalogClick,
-                        onPosterClick = actions.onPosterClick,
-                        onPosterLongClick = actions.onPosterLongClick,
-                        onContinueWatchingClick = actions.onContinueWatchingClick,
-                        onContinueWatchingLongPress = actions.onContinueWatchingLongPress,
-                        continueWatchingDisintegrationRequest = state.continueWatchingDisintegrationRequest,
-                        onFolderClick = actions.onFolderClick,
-                        onFirstCatalogRendered = actions.onInitialHomeContentRendered,
+                val categoryState by remember {
+                    HomeCategoryRepository.ensureLoaded()
+                    HomeCategoryRepository.state
+                }.collectAsStateWithLifecycle()
+                LaunchedEffect(state.profileId) { HomeCategoryRepository.ensureLoaded() }
+                val activeCategoryKind = categoryState.selected?.kind ?: HomeCategoryKind.Catalogs
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (activeCategoryKind) {
+                        HomeCategoryKind.Catalogs -> key(state.homeContentGeneration) {
+                            HomeScreen(
+                                modifier = Modifier.fillMaxSize(),
+                                animateCollectionGifs = state.animateHomeCollectionGifs,
+                                scrollToTopRequests = requests.homeScrollToTopRequests,
+                                onCatalogClick = actions.onCatalogClick,
+                                onPosterClick = actions.onPosterClick,
+                                onPosterLongClick = actions.onPosterLongClick,
+                                onContinueWatchingClick = actions.onContinueWatchingClick,
+                                onContinueWatchingLongPress = actions.onContinueWatchingLongPress,
+                                continueWatchingDisintegrationRequest = state.continueWatchingDisintegrationRequest,
+                                onFolderClick = actions.onFolderClick,
+                                onFirstCatalogRendered = actions.onInitialHomeContentRendered,
+                            )
+                        }
+
+                        HomeCategoryKind.LiveTv -> LiveTvScreen(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = HomeCategoryBarContentHeight),
+                            scrollToTopRequests = requests.liveTvScrollToTopRequests,
+                            onChannelClick = actions.onLiveTvChannelClick,
+                        )
+
+                        HomeCategoryKind.Discover -> SearchScreen(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = HomeCategoryBarContentHeight),
+                            onPosterClick = actions.onPosterClick,
+                            onPosterLongClick = actions.onPosterLongClick,
+                            scrollToTopRequests = requests.searchScrollToTopRequests,
+                        )
+                    }
+                    HomeCategoryBar(
+                        modifier = Modifier.align(Alignment.TopStart),
+                        transparentBackground = activeCategoryKind == HomeCategoryKind.Catalogs,
                     )
                 }
             }

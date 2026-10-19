@@ -263,7 +263,8 @@ object HomeRepository {
             .sortedBy { definition -> preferences[definition.key]?.order ?: Int.MAX_VALUE }
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
-                if (preference?.enabled == false) return@mapNotNull null
+                // Catalogs disabled in Homescreen settings are still published: a home category may
+                // explicitly include them, and HomeScreen filters rows per selected category.
 
                 val section = cachedSections[definition.cacheKey]
                     ?.withPosterOverlay()

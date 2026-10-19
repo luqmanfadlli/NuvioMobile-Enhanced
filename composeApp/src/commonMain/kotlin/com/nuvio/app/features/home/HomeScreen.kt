@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
@@ -20,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
+import kotlin.random.Random
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
@@ -49,6 +52,7 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
 import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
+import com.nuvio.app.features.home.components.HomeCategoryBarContentHeight
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
@@ -156,7 +160,20 @@ fun HomeScreen(
         }
     }
     val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
-    val continueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
+    val categoryState by remember {
+        HomeCategoryRepository.ensureLoaded()
+        HomeCategoryRepository.state
+    }.collectAsStateWithLifecycle()
+    val activeCategory = categoryState.selected
+    val categoryKeys = activeCategory?.catalogKeys
+    val categoryIsEmpty = categoryKeys != null && categoryKeys.isEmpty()
+    val storedContinueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
+    // Continue Watching only belongs on the Home category (or the "show everything" default).
+    val continueWatchingPreferences = if (categoryKeys == null) {
+        storedContinueWatchingPreferences
+    } else {
+        storedContinueWatchingPreferences.copy(isVisible = false)
+    }
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
@@ -911,8 +928,34 @@ fun HomeScreen(
     val sectionsMap = remember(homeUiState.sections) {
         homeUiState.sections.associateBy(HomeCatalogSection::key)
     }
-    val enabledHomeItems = remember(homeSettingsUiState.items) {
-        homeSettingsUiState.items.filter { it.enabled }
+    val enabledHomeItems = remember(homeSettingsUiState.items, categoryKeys) {
+        if (categoryKeys == null) {
+            homeSettingsUiState.items.filter { it.enabled }
+        } else {
+            val itemsByKey = homeSettingsUiState.items.associateBy { it.key }
+            categoryKeys.mapNotNull { key -> itemsByKey[key] }
+        }
+    }
+    val visibleSections = remember(homeUiState.sections, enabledHomeItems) {
+        val keys = enabledHomeItems.filterNot { it.isCollection }.mapTo(HashSet()) { it.key }
+        homeUiState.sections.filter { it.key in keys }
+    }
+    val heroItems = remember(
+        homeUiState.heroItems,
+        visibleSections,
+        categoryKeys,
+        activeCategory?.id,
+        homeSettingsUiState.heroEnabled,
+    ) {
+        when {
+            categoryKeys == null -> homeUiState.heroItems
+            !homeSettingsUiState.heroEnabled -> emptyList()
+            else -> visibleSections
+                .flatMap { section -> section.items }
+                .distinctBy { item -> "${item.type}:${item.id}" }
+                .shuffled(Random(activeCategory?.id.orEmpty().hashCode()))
+                .take(8)
+        }
     }
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)
@@ -944,15 +987,15 @@ fun HomeScreen(
             item.isCollection && collectionsMap[item.key] != null
         }
     }
-    val hasRenderableHomeRows = homeUiState.sections.isNotEmpty() || hasRenderableCollectionRows
-    val showHeroSlot = shouldShowHomeHeroSlot(
+    val hasRenderableHomeRows = visibleSections.isNotEmpty() || hasRenderableCollectionRows
+    val showHeroSlot = !categoryIsEmpty && shouldShowHomeHeroSlot(
         heroEnabled = homeSettingsUiState.heroEnabled,
-        hasHeroItems = homeUiState.heroItems.isNotEmpty(),
+        hasHeroItems = heroItems.isNotEmpty(),
         isResolvingHeroSources = isResolvingHeroSources,
         hasRenderableHomeRows = hasRenderableHomeRows,
     )
     val showHeroSkeleton = showHeroSlot &&
-        homeUiState.heroItems.isEmpty() &&
+        heroItems.isEmpty() &&
         isResolvingHeroSources
     val isInitialHomeContentLoading = shouldShowInitialHomeLoading(
         hasRenderableHomeRows = hasRenderableHomeRows,
@@ -1014,6 +1057,12 @@ fun HomeScreen(
                 listState = homeListState,
                 autoHidesNativeTabBar = true,
             ) {
+                if (!showHeroSlot) {
+                    item(key = "home_category_bar_spacer") {
+                        Spacer(modifier = Modifier.height(HomeCategoryBarContentHeight - 16.dp))
+                    }
+                }
+
                 if (showHeroSlot) {
                     item {
                         when {
@@ -1024,8 +1073,8 @@ fun HomeScreen(
                                 heroStyle = homeSettingsUiState.heroStyle,
                             )
 
-                            homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                                items = homeUiState.heroItems,
+                            heroItems.isNotEmpty() -> HomeHeroSection(
+                                items = heroItems,
                                 modifier = Modifier,
                                 viewportHeight = maxHeight,
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
@@ -1054,6 +1103,20 @@ fun HomeScreen(
                 }
 
                 when {
+                    categoryIsEmpty -> {
+                        item(key = "home_category_empty") {
+                            HomeEmptyStateCard(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                title = "No catalogs in ${activeCategory?.title.orEmpty()}",
+                                message = "Choose which catalogs should appear in this category.",
+                                actionLabel = "Choose catalogs",
+                                onActionClick = {
+                                    activeCategory?.let { HomeCategoryRepository.requestEditor(it.id) }
+                                },
+                            )
+                        }
+                    }
+
                     isInitialHomeContentLoading -> {
                         homeContinueWatchingSections(
                             preferences = continueWatchingPreferences,
@@ -1126,7 +1189,7 @@ fun HomeScreen(
                         }
                     }
 
-                    homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
+                    visibleSections.isEmpty() && heroItems.isEmpty() &&
                         (!continueWatchingPreferences.isVisible || !hasContinueWatchingRows) &&
                         !hasRenderableCollectionRows -> {
                         item {
