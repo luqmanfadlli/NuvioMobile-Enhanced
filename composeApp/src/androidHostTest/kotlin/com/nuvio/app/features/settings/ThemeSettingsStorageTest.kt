@@ -17,6 +17,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -53,6 +54,40 @@ class ThemeSettingsStorageTest {
 
         assertNull(ThemeSettingsStorage.loadNavBarGlowEnabled())
         assertEquals(false, preferences.getBoolean(otherProfileKey, true))
+    }
+
+
+    @Test
+    fun liquidGlassEffectSettingsSurviveReloadAndStayOutOfSync() {
+        val bar = """{"cornerRadiusPercent":44.0,"blurRadiusDp":12.0}"""
+        val lens = """{"cornerRadiusPercent":28.0,"refractionAmountDp":19.0}"""
+
+        ThemeSettingsStorage.saveNavBarLiquidGlassBarEffects(bar)
+        ThemeSettingsStorage.saveNavBarLiquidGlassSelectionEffects(lens)
+        ThemeSettingsStorage.initialize(RuntimeEnvironment.getApplication())
+
+        assertEquals(bar, ThemeSettingsStorage.loadNavBarLiquidGlassBarEffects())
+        assertEquals(lens, ThemeSettingsStorage.loadNavBarLiquidGlassSelectionEffects())
+        assertTrue(ThemeSettingsStorage.exportToSyncPayload().keys.none { "effects" in it })
+
+        ThemeSettingsStorage.replaceFromSyncPayload(buildJsonObject {})
+        assertEquals(bar, ThemeSettingsStorage.loadNavBarLiquidGlassBarEffects())
+        assertEquals(lens, ThemeSettingsStorage.loadNavBarLiquidGlassSelectionEffects())
+    }
+
+    @Test
+    fun defaultNavigationIconColorSurvivesReloadAndStaysOutOfSync() {
+        ThemeSettingsStorage.saveNavBarDefaultIconColorEnabled(true)
+        ThemeSettingsStorage.saveNavBarDefaultIconColor("#F141F5")
+        ThemeSettingsStorage.initialize(RuntimeEnvironment.getApplication())
+
+        assertTrue(ThemeSettingsStorage.exportToSyncPayload().keys.none { "icon_color" in it })
+
+        ThemeSettingsStorage.replaceFromSyncPayload(buildJsonObject {
+            put("nav_bar_default_icon_color", encodeSyncString("#123456"))
+        })
+        assertEquals(true, ThemeSettingsStorage.loadNavBarDefaultIconColorEnabled())
+        assertEquals("#F141F5", ThemeSettingsStorage.loadNavBarDefaultIconColor())
     }
 
     @Test

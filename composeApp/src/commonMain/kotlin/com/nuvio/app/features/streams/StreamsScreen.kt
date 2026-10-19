@@ -101,6 +101,9 @@ import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
 import com.nuvio.app.core.ui.NuvioTokens
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.nuvio.app.core.ui.NuvioTokens
+import androidx.compose.ui.graphics.compositeOver
+import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 
@@ -1502,6 +1505,35 @@ internal fun StreamSearchField(
                     contentDescription = stringResource(Res.string.streams_search_clear),
                     tint = MaterialTheme.nuvio.colors.textMuted,
                 )
+    val glassActive = isAmbientLiquidGlassActive()
+    val shape = RoundedCornerShape(NuvioTokens.Radius.lg)
+    NuvioInputField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = stringResource(Res.string.streams_search_placeholder),
+        modifier = if (glassActive) {
+            modifier
+                .clip(shape)
+                .ambientLiquidGlass(
+                    shape = shape,
+                    tint = Color.White.copy(alpha = 0.05f).compositeOver(Color.Black.copy(alpha = 0.55f)),
+                    fallback = MaterialTheme.nuvio.colors.surfaceCard,
+                    blurRadius = 14.dp,
+                    refractionHeight = 8.dp,
+                )
+        } else {
+            modifier
+        },
+        containerColor = if (glassActive) Color.Transparent else MaterialTheme.nuvio.colors.surfaceCard,
+        trailingContent = if (query.isEmpty()) null else {
+            {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(Res.string.streams_search_clear),
+                        tint = MaterialTheme.nuvio.colors.textMuted,
+                    )
+                }
             }
         }
     }

@@ -1262,4 +1262,8 @@
     <string name="stream_info_subtitle_source_addon">Addon</string>
     <string name="stream_info_subtitle_source_embedded">Eingebettet</string>
     <string name="stream_info_player_engine">Player Engine</string>
+<string name="settings_nav_bar_glass_lens_affect_tab_icons">Linse beeinflusst Tab-Symbole</string>
+<string name="settings_nav_bar_glass_lens_affect_tab_icons_description">Die Tab-Symbole und Beschriftungen werden beim Bewegen der Linse mit gebrochen und vergrößert.</string>
+<string name="settings_nav_bar_glass_lens_affect_floating_bar">Linse beeinflusst die schwebende Leiste</string>
+<string name="settings_nav_bar_glass_lens_affect_floating_bar_description">Die Linse bricht das Glas der schwebenden Leiste beim Bewegen.</string>
 </resources>

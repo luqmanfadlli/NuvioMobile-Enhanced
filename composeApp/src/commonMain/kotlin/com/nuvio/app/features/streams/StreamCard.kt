@@ -148,7 +148,7 @@ internal fun StreamCard(
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White,
                 )
             }
 
@@ -181,7 +181,7 @@ internal fun StreamCard(
                 Text(
                     text = stream.addonName,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -258,7 +258,7 @@ private fun StreamNameWithInstantService(
             text = stream.streamLabel,
             modifier = Modifier.weight(1f, fill = false),
             style = nameStyle,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.White,
         )
         AnimatedVisibility(
             visibleState = visibleState,
@@ -277,7 +277,7 @@ private fun StreamNameWithInstantService(
             Text(
                 text = " ${instantLabel.orEmpty()}",
                 style = nameStyle,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color.White,
             )
         }
         trailingContent()

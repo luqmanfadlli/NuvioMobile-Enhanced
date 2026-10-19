@@ -47,7 +47,7 @@ actual fun HeroTrailerPlayerSurface(
     LaunchedEffect(bridge, sourceUrl, sourceAudioUrl) {
         runCatching {
             bridge.setEmbeddedPreviewMode(true)
-            bridge.setResizeMode(1)
+            bridge.setResizeMode(2) // Zoom: crop to fill, keep aspect ratio
             bridge.setMuted(muted)
             bridge.loadFileWithAudio(
                 videoUrl = sourceUrl,

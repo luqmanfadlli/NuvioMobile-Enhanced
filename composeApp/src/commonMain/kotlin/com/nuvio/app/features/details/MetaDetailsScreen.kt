@@ -69,6 +69,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -1178,7 +1179,10 @@ fun MetaDetailsScreen(
                             !isLeavingDetails &&
                             !isHeroCollapsed.value
                     }
-                    val onBackdropLoaded: (Painter, ImageBitmap?) -> Unit = { _, _ -> }
+                    var heroBackdropPainter by remember(backdropUrl) { mutableStateOf<Painter?>(null) }
+                    val onBackdropLoaded: (Painter, ImageBitmap?) -> Unit = { painter, _ ->
+                        heroBackdropPainter = painter
+                    }
                     val onHeroTrailerReady: () -> Unit = {
                         if (!heroTrailerFinished) {
                             heroTrailerReady = true
@@ -1227,16 +1231,27 @@ fun MetaDetailsScreen(
                                     }
                                 } else when (backgroundMode) {
                                     MetaScreenBackgroundMode.Normal -> Unit
-                                    MetaScreenBackgroundMode.Cinematic -> if (deferredMetaWorkAllowed && backdropUrl != null) {
-                                        AsyncImage(
-                                            model = backdropUrl,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(16.dp)
-                                                .nuvioBackdropSource(cinematicArtworkBackdrop),
-                                            contentScale = ContentScale.Crop,
-                                        )
+                                    MetaScreenBackgroundMode.Cinematic -> if (backdropUrl != null) {
+                                        val cinematicModifier = Modifier
+                                            .fillMaxSize()
+                                            .blur(16.dp)
+                                            .nuvioBackdropSource(cinematicArtworkBackdrop)
+                                        val heroPainter = heroBackdropPainter
+                                        if (heroPainter != null) {
+                                            Image(
+                                                painter = heroPainter,
+                                                contentDescription = null,
+                                                modifier = cinematicModifier,
+                                                contentScale = ContentScale.Crop,
+                                            )
+                                        } else if (deferredMetaWorkAllowed) {
+                                            AsyncImage(
+                                                model = backdropUrl,
+                                                contentDescription = null,
+                                                modifier = cinematicModifier,
+                                                contentScale = ContentScale.Crop,
+                                            )
+                                        }
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
@@ -1425,7 +1440,7 @@ fun MetaDetailsScreen(
                                     }
                                 }
 
-                                if (!useTabletLayout && backgroundMode.usesBackdropBackground && deferredMetaWorkAllowed && heroHeightPx.intValue > 0) {
+                                if (!useTabletLayout && backgroundMode.usesBackdropBackground && heroHeightPx.intValue > 0) {
                                     val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
                                         ?: colorScheme.background
                                     Box(

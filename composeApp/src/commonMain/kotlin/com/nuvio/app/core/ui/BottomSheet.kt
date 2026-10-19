@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +46,26 @@ import com.nuvio.app.core.ui.glass.liquidGlassSurface
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 
 private val SheetShape = RoundedCornerShape(NuvioTokens.Space.s28)
+
+// Keep the sheet background treatment consistent between the sheet and pinned content inside it.
+internal fun Modifier.nuvioSheetSurface(
+    backdrop: NuvioBackdrop?,
+    shape: Shape,
+    containerColor: Color,
+    withHighlight: Boolean = true,
+): Modifier {
+    val readyBackdrop = backdrop?.takeIf { it.isReady && isLiquidGlassSupported() }
+    return liquidGlassSurface(
+        backdrop = readyBackdrop,
+        shape = shape,
+        tint = containerColor.copy(alpha = containerColor.alpha * 0.65f),
+        fallback = containerColor,
+        blurRadius = 24.dp,
+        refractionHeight = 16.dp,
+        refractionAmount = 32.dp,
+        withHighlight = withHighlight,
+    )
+}
 
 @Stable
 class NuvioSheetBackdrop(val backdrop: NuvioBackdrop) {
@@ -115,14 +136,10 @@ fun NuvioModalBottomSheet(
                     modifier = modifier
                         .padding(NuvioTokens.Space.s10)
                         .clip(SheetShape)
-                        .liquidGlassSurface(
-                            backdrop = if (sheetGlassReady) sheetBackdrop?.backdrop else null,
+                        .nuvioSheetSurface(
+                            backdrop = sheetBackdrop?.backdrop,
                             shape = SheetShape,
-                            tint = containerColor.copy(alpha = containerColor.alpha * 0.65f),
-                            fallback = containerColor,
-                            blurRadius = 24.dp,
-                            refractionHeight = 16.dp,
-                            refractionAmount = 32.dp,
+                            containerColor = containerColor,
                         )
                         .then(if (sheetGlassReady) Modifier else Modifier.border(tokens.borders.thin, SurfaceEdge, SheetShape)),
                 ) {

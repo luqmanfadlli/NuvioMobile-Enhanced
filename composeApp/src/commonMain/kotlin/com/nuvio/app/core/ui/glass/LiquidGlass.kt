@@ -196,11 +196,7 @@ enum class LiquidGlassMaterial(val key: String) {
 @Immutable
 data class LiquidGlassStyle(
     val material: LiquidGlassMaterial = LiquidGlassMaterial.LIQUID,
-    val blurRadius: Int = 10,
-    val refraction: Int = 20,
-    val tintPercent: Int = 40,
     val vibrancy: Boolean = true,
-    val chromaticAberration: Boolean = false,
     val edgeHighlight: Boolean = true,
     val shadow: Boolean = true,
     val selectionLens: Boolean = true,
@@ -217,11 +213,7 @@ data class LiquidGlassStyle(
     fun encode(): String = listOf(
         EncodingVersion,
         material.key,
-        blurRadius.toString(),
-        refraction.toString(),
-        tintPercent.toString(),
         vibrancy.encodeFlag(),
-        chromaticAberration.encodeFlag(),
         edgeHighlight.encodeFlag(),
         shadow.encodeFlag(),
         selectionLens.encodeFlag(),
@@ -229,19 +221,19 @@ data class LiquidGlassStyle(
 
     companion object {
         val Default = LiquidGlassStyle()
-        val BlurRange = 0..40
-        val RefractionRange = 0..40
-        val TintRange = 0..100
 
-        private const val EncodingVersion = "1"
-        private const val Separator = ";"
+        private const val EncodingVersion = "2"
+        private const val LegacyEncodingVersion = "1"
+        internal const val Separator = ";"
 
         fun decode(raw: String?): LiquidGlassStyle {
             if (raw.isNullOrBlank()) return Default
             val parts = raw.split(Separator)
-            if (parts.firstOrNull() != EncodingVersion) return Default
-            fun int(index: Int, fallback: Int, range: IntRange): Int =
-                parts.getOrNull(index)?.toIntOrNull()?.coerceIn(range) ?: fallback
+            val (vibrancyAt, highlightAt, shadowAt, lensAt) = when (parts.firstOrNull()) {
+                EncodingVersion -> listOf(2, 3, 4, 5)
+                LegacyEncodingVersion -> listOf(5, 7, 8, 9)
+                else -> return Default
+            }
             fun flag(index: Int, fallback: Boolean): Boolean =
                 when (parts.getOrNull(index)) {
                     "1" -> true
@@ -250,16 +242,15 @@ data class LiquidGlassStyle(
                 }
             return LiquidGlassStyle(
                 material = LiquidGlassMaterial.fromKey(parts.getOrNull(1)),
-                blurRadius = int(2, Default.blurRadius, BlurRange),
-                refraction = int(3, Default.refraction, RefractionRange),
-                tintPercent = int(4, Default.tintPercent, TintRange),
-                vibrancy = flag(5, Default.vibrancy),
-                chromaticAberration = flag(6, Default.chromaticAberration),
-                edgeHighlight = flag(7, Default.edgeHighlight),
-                shadow = flag(8, Default.shadow),
-                selectionLens = flag(9, Default.selectionLens),
+                vibrancy = flag(vibrancyAt, Default.vibrancy),
+                edgeHighlight = flag(highlightAt, Default.edgeHighlight),
+                shadow = flag(shadowAt, Default.shadow),
+                selectionLens = flag(lensAt, Default.selectionLens),
             )
         }
+
+        internal fun isLegacyEncoding(raw: String?): Boolean =
+            raw?.split(Separator)?.firstOrNull() == LegacyEncodingVersion
 
         private fun Boolean.encodeFlag(): String = if (this) "1" else "0"
     }

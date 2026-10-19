@@ -31,6 +31,10 @@ actual object ThemeSettingsStorage {
     private const val localTabletTabBarBehaviorKey = "enhanced_local_tablet_tab_bar_behavior"
     private const val tabletTabBarBehaviorDefault = "off"
     private const val navBarGlowEnabledKey = "nav_bar_glow_enabled"
+    private const val navBarDefaultIconColorEnabledKey = "enhanced_local_nav_bar_default_icon_color_enabled"
+    private const val navBarDefaultIconColorKey = "enhanced_local_nav_bar_default_icon_color"
+    private const val navBarLiquidGlassBarEffectsKey = "enhanced_local_nav_bar_liquid_glass_bar_effects"
+    private const val navBarLiquidGlassSelectionEffectsKey = "enhanced_local_nav_bar_liquid_glass_selection_effects"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         customThemeColorsKey,
@@ -79,8 +83,45 @@ actual object ThemeSettingsStorage {
         }
     }
 
+    actual fun loadNavBarDefaultIconColorEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(navBarDefaultIconColorEnabledKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
+    actual fun saveNavBarDefaultIconColorEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(
+            enabled,
+            forKey = ProfileScopedKey.of(navBarDefaultIconColorEnabledKey),
+        )
+    }
+
+    actual fun loadNavBarDefaultIconColor(): String? = loadRawString(navBarDefaultIconColorKey)
+
+    actual fun saveNavBarDefaultIconColor(color: String) {
+        saveRawString(navBarDefaultIconColorKey, color)
+    }
+
     actual fun saveNavBarGlowEnabled(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(navBarGlowEnabledKey))
+    }
+
+
+    actual fun loadNavBarLiquidGlassBarEffects(): String? = loadRawString(navBarLiquidGlassBarEffectsKey)
+
+    actual fun saveNavBarLiquidGlassBarEffects(settings: String) {
+        saveRawString(navBarLiquidGlassBarEffectsKey, settings)
+    }
+
+    actual fun loadNavBarLiquidGlassSelectionEffects(): String? =
+        loadRawString(navBarLiquidGlassSelectionEffectsKey)
+
+    actual fun saveNavBarLiquidGlassSelectionEffects(settings: String) {
+        saveRawString(navBarLiquidGlassSelectionEffectsKey, settings)
     }
 
     actual fun loadLiquidGlassNativeTabBarEnabled(): Boolean? {

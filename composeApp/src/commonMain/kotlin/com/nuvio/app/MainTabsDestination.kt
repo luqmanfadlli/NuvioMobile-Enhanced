@@ -42,6 +42,9 @@ import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.kyant.backdrop.Backdrop
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
+import com.nuvio.app.core.ui.glass.LiquidGlassEffectDefaults
+import com.nuvio.app.core.ui.glass.LiquidGlassEffectSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassStyle
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
 import nuvio.composeapp.generated.resources.compose_nav_library
@@ -90,12 +93,21 @@ internal fun MainTabsDestination(
         }
         val tabsRouteActive = rootRouteActive
         val navBarScrollState = rememberNuvioNavBarScrollState()
-        val navBarBackdrop = rememberNuvioBackdrop()
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
         val navBarGlowEnabled by ThemeSettingsRepository.navBarGlowEnabled.collectAsStateWithLifecycle()
         val navBarPosition by ThemeSettingsRepository.navBarPosition.collectAsStateWithLifecycle()
         val navBarGlass by ThemeSettingsRepository.navBarGlass.collectAsStateWithLifecycle()
+        val navBarDefaultIconColorEnabled by ThemeSettingsRepository.navBarDefaultIconColorEnabled.collectAsStateWithLifecycle()
+        val navBarDefaultIconColor by ThemeSettingsRepository.navBarDefaultIconColor.collectAsStateWithLifecycle()
+        val navBarDefaultIconColorOverride = if (navBarDefaultIconColorEnabled) {
+            Color(navBarDefaultIconColor or 0xFF000000.toInt())
+        } else {
+            null
+        }
         val floatingBarOnTop = navBarStyleSetting != NavBarStyle.CLASSIC && navBarPosition == NavBarPosition.TOP
+        // The backdrop source is only consumed by the custom floating bar, not native or CLASSIC navigation.
+        val floatingBarVisible = tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC
+        val navBarBackdrop = if (floatingBarVisible) rememberNuvioBackdrop() else null
         val floatingNavigationItems = mainFloatingNavigationItems(
             highlightedTab = highlightedTab,
             showLiveTv = showLiveTvInNavigation,
@@ -103,6 +115,7 @@ internal fun MainTabsDestination(
             onProfileSelected = onProfileSelected,
             onAddProfileRequested = onAddProfileRequested,
             backdrop = navBarBackdrop,
+            defaultIconColorOverride = navBarDefaultIconColorOverride,
         )
 
         Scaffold(
@@ -142,7 +155,13 @@ internal fun MainTabsDestination(
                         actions = tabActions,
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (tabsRouteActive && navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.nuvioBackdropSource(navBarBackdrop) else Modifier)
+                            .then(
+                                if (floatingBarVisible) {
+                                    navBarBackdrop?.let { Modifier.nuvioBackdropSource(it) } ?: Modifier
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                             .padding(innerPadding),
                     )
@@ -161,13 +180,13 @@ internal fun MainTabsDestination(
                     )
                 }
 
-                if (tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
+                if (floatingBarVisible) {
                     when (navBarStyleSetting) {
                         NavBarStyle.EXPANDED -> navBarScrollState.expand()
                         NavBarStyle.COMPACT -> navBarScrollState.collapse()
                         else -> {}
                     }
-                    FloatingNavigationBar(
+                    MainFloatingNavigationBar(
                         modifier = Modifier.align(if (floatingBarOnTop) Alignment.TopCenter else Alignment.BottomCenter),
                         scrollState = navBarScrollState,
                         backdrop = navBarBackdrop,
@@ -183,11 +202,46 @@ internal fun MainTabsDestination(
                         glowEnabled = navBarGlowEnabled,
                         inlineLabels = isTabletLayout,
                         glassStyle = navBarGlass,
+                        defaultIconColorOverride = navBarDefaultIconColorOverride,
                     )
                 }
             }
         }
     }
+}
+
+/**
+ * Keep the high-frequency glass-effect draft flows subscribed in the navigation-bar leaf.
+ * Dragging effect sliders then updates this bar without invalidating MainTabsDestination and its tab host.
+ */
+@Composable
+private fun MainFloatingNavigationBar(
+    modifier: Modifier,
+    scrollState: com.nuvio.app.core.ui.NuvioNavBarScrollState?,
+    backdrop: Backdrop?,
+    contentPadding: PaddingValues,
+    items: List<FloatingNavigationItem>,
+    glowEnabled: Boolean,
+    inlineLabels: Boolean,
+    glassStyle: LiquidGlassStyle,
+    defaultIconColorOverride: Color?,
+) {
+    val liquidGlassBarEffects by ThemeSettingsRepository.navBarLiquidGlassBarEffects.collectAsStateWithLifecycle()
+    val liquidGlassSelectionEffects by ThemeSettingsRepository.navBarLiquidGlassSelectionEffects.collectAsStateWithLifecycle()
+
+    FloatingNavigationBar(
+        items = items,
+        modifier = modifier,
+        scrollState = scrollState,
+        backdrop = backdrop,
+        glassStyle = glassStyle,
+        contentPadding = contentPadding,
+        glowEnabled = glowEnabled,
+        liquidGlassBarEffects = liquidGlassBarEffects,
+        liquidGlassSelectionEffects = liquidGlassSelectionEffects,
+        inlineLabels = inlineLabels,
+        defaultIconColorOverride = defaultIconColorOverride,
+    )
 }
 
 @Composable
@@ -198,6 +252,7 @@ internal fun mainFloatingNavigationItems(
     onProfileSelected: (NuvioProfile) -> Unit,
     onAddProfileRequested: () -> Unit,
     backdrop: Backdrop?,
+    defaultIconColorOverride: Color? = null,
 ): List<FloatingNavigationItem> = buildList {
     add(
         FloatingNavigationItem(
@@ -238,7 +293,7 @@ internal fun mainFloatingNavigationItems(
             selected = highlightedTab == AppScreenTab.Settings,
             onClick = { onTabSelected(AppScreenTab.Settings) },
             label = stringResource(Res.string.compose_nav_profile),
-            content = { onClick ->
+            content = { onClick, iconColorOverride ->
                 ProfileSwitcherTab(
                     selected = highlightedTab == AppScreenTab.Settings,
                     onClick = onClick,
@@ -246,6 +301,7 @@ internal fun mainFloatingNavigationItems(
                     onAddProfileRequested = onAddProfileRequested,
                     backdrop = backdrop,
                     popupBelowAnchor = false,
+                    defaultIconColorOverride = iconColorOverride ?: defaultIconColorOverride,
                 )
             },
         ),
@@ -316,6 +372,15 @@ internal fun BoxScope.SettingsRouteNavigationBar(
     val glowEnabled by ThemeSettingsRepository.navBarGlowEnabled.collectAsStateWithLifecycle()
     val position by ThemeSettingsRepository.navBarPosition.collectAsStateWithLifecycle()
     val glass by ThemeSettingsRepository.navBarGlass.collectAsStateWithLifecycle()
+    val liquidGlassBarEffects by ThemeSettingsRepository.navBarLiquidGlassBarEffects.collectAsStateWithLifecycle()
+    val liquidGlassSelectionEffects by ThemeSettingsRepository.navBarLiquidGlassSelectionEffects.collectAsStateWithLifecycle()
+    val defaultIconColorEnabled by ThemeSettingsRepository.navBarDefaultIconColorEnabled.collectAsStateWithLifecycle()
+    val defaultIconColor by ThemeSettingsRepository.navBarDefaultIconColor.collectAsStateWithLifecycle()
+    val defaultIconColorOverride = if (defaultIconColorEnabled) {
+        Color(defaultIconColor or 0xFF000000.toInt())
+    } else {
+        null
+    }
     val density = LocalDensity.current
     val highlightedTab = AppScreenTab.Settings
 
@@ -357,6 +422,7 @@ internal fun BoxScope.SettingsRouteNavigationBar(
                     onProfileSelected = onProfileSelected,
                     onAddProfileRequested = onAddProfileRequested,
                     backdrop = backdrop,
+                    defaultIconColorOverride = defaultIconColorOverride,
                 ),
                 modifier = Modifier.align(if (onTop) Alignment.TopCenter else Alignment.BottomCenter),
                 scrollState = if (style == NavBarStyle.COMPACT) {
@@ -376,6 +442,9 @@ internal fun BoxScope.SettingsRouteNavigationBar(
                 glowEnabled = glowEnabled,
                 inlineLabels = isTabletLayout,
                 glassStyle = glass,
+                liquidGlassBarEffects = liquidGlassBarEffects,
+                liquidGlassSelectionEffects = liquidGlassSelectionEffects,
+                defaultIconColorOverride = defaultIconColorOverride,
             )
         }
     }

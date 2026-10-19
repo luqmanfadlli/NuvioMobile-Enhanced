@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,6 +55,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -95,6 +97,7 @@ fun ProfileSwitcherTab(
     modifier: Modifier = Modifier,
     backdrop: Backdrop? = null,
     popupBelowAnchor: Boolean = false,
+    defaultIconColorOverride: Color? = null,
 ) {
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -284,6 +287,7 @@ fun ProfileSwitcherTab(
                 avatars = avatars,
                 selected = selected,
                 size = 28,
+                iconColorOverride = defaultIconColorOverride,
             )
         }
 
@@ -834,12 +838,14 @@ fun ActiveProfileMiniAvatar(
     avatars: List<AvatarCatalogItem>,
     selected: Boolean,
     size: Int = 24,
+    iconColorOverride: Color? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     if (profile == null) {
         Icon(
             imageVector = Icons.Rounded.Person,
             contentDescription = stringResource(Res.string.compose_nav_profile),
+            tint = iconColorOverride ?: LocalContentColor.current,
             modifier = Modifier.size(size.dp),
         )
         return

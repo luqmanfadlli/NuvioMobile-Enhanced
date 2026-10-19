@@ -2351,4 +2351,8 @@ Utilizas esta función bajo tu propia responsabilidad. P2P se puede desactivar e
     <string name="stream_info_subtitle_source_addon">Complemento</string>
     <string name="stream_info_subtitle_source_embedded">Integrado</string>
     <string name="stream_info_player_engine">Motor de reproducción</string>
+<string name="settings_nav_bar_glass_lens_affect_tab_icons">La lente afecta a los iconos de las pestañas</string>
+<string name="settings_nav_bar_glass_lens_affect_tab_icons_description">Refracta y amplía los iconos y las etiquetas al mover la lente.</string>
+<string name="settings_nav_bar_glass_lens_affect_floating_bar">La lente afecta a la barra flotante</string>
+<string name="settings_nav_bar_glass_lens_affect_floating_bar_description">Refracta la superficie de cristal de la barra flotante al mover la lente.</string>
 </resources>

@@ -55,10 +55,12 @@ internal fun JellyTabRow(
     compactSize: Boolean,
     modifier: Modifier,
     inlineLabels: Boolean = false,
+    inactiveColorOverride: Color? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     val palette = MaterialTheme.themePalette
-    val color = if (active) tokens.colors.accent else tokens.colors.textMuted
+    // The override applies to both inactive icon glyphs and their labels; selected styling stays themed.
+    val color = if (active) tokens.colors.accent else inactiveColorOverride ?: tokens.colors.textMuted
     val iconSize = if (compactSize) 24.dp else 28.dp
     val labelHeight = if (compactSize) 14.dp else 16.dp
     val iconModifier = Modifier.size(iconSize)
@@ -125,6 +127,7 @@ internal fun JellyTabTargets(
     compactSize: Boolean,
     modifier: Modifier,
     inlineLabels: Boolean = false,
+    defaultIconColorOverride: Color? = null,
 ) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(modifier.padding(horizontal = 4.dp).selectableGroup()) {
@@ -164,7 +167,7 @@ internal fun JellyTabTargets(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(if (compactSize) Modifier.size(24.dp) else Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                            item.content(onClick)
+                            item.content(onClick, defaultIconColorOverride)
                         }
                         Box(Modifier.alpha(0f)) {
                             InlineJellyLabel(item.label, labelFraction, Color.Transparent, active = false)
@@ -186,7 +189,7 @@ internal fun JellyTabTargets(
                                 .then(if (compactSize) Modifier.size(24.dp) else Modifier)
                                 .graphicsLayer { translationY = 2.dp.toPx() * labelFraction },
                         ) {
-                            item.content(onClick)
+                            item.content(onClick, defaultIconColorOverride)
                         }
                         Spacer(Modifier.height((if (compactSize) 14.dp else 16.dp) * labelFraction))
                     }

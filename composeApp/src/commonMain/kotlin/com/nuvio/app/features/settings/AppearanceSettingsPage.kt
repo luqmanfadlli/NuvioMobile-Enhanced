@@ -131,6 +131,8 @@ internal fun LazyListScope.appearanceSettingsContent(
         val navBarPosition by ThemeSettingsRepository.navBarPosition.collectAsStateWithLifecycle()
         val navBarGlass by ThemeSettingsRepository.navBarGlass.collectAsStateWithLifecycle()
         val liquidGlassEffectsEnabled by ThemeSettingsRepository.liquidGlassEffectsEnabled.collectAsStateWithLifecycle()
+        val navBarDefaultIconColorEnabled by ThemeSettingsRepository.navBarDefaultIconColorEnabled.collectAsStateWithLifecycle()
+        val navBarDefaultIconColor by ThemeSettingsRepository.navBarDefaultIconColor.collectAsStateWithLifecycle()
         // Upstream pins tablets to COMPACT because there the bar is a top rail. This fork puts
         // the floating pill at the bottom on every size, so the chosen style still applies.
         val effectiveNavBarStyle = selectedNavBarStyle
@@ -272,21 +274,33 @@ internal fun LazyListScope.appearanceSettingsContent(
         }
 
         if (showNavBarStyleSheet) {
-            NavigationBarSettingsSheet(
-                // Passing false keeps the style list visible on tablets: the sheet hides it when
-                // isTablet is true, which only fits upstream's tablet top rail.
-                isTablet = false,
-                tabletLayout = LocalNuvioTabletNavLayout.current,
-                selectedStyle = effectiveNavBarStyle,
-                onStyleSelected = onNavBarStyleSelected,
-                glowEnabled = glowEnabled,
-                onGlowChanged = ThemeSettingsRepository::setNavBarGlowEnabled,
-                selectedPosition = navBarPosition,
-                onPositionSelected = ThemeSettingsRepository::setNavBarPosition,
-                glassStyle = navBarGlass,
-                onGlassStyleChanged = ThemeSettingsRepository::setNavBarGlass,
-                onDismiss = { showNavBarStyleSheet = false },
-            )
+            NavigationBarLiquidGlassEffectDrafts { barEffects, selectionEffects ->
+                NavigationBarSettingsSheet(
+                    // Passing false keeps the style list visible on tablets: the sheet hides it when
+                    // isTablet is true, which only fits upstream's tablet top rail.
+                    isTablet = false,
+                    tabletLayout = LocalNuvioTabletNavLayout.current,
+                    selectedStyle = effectiveNavBarStyle,
+                    onStyleSelected = onNavBarStyleSelected,
+                    glowEnabled = glowEnabled,
+                    onGlowChanged = ThemeSettingsRepository::setNavBarGlowEnabled,
+                    selectedPosition = navBarPosition,
+                    onPositionSelected = ThemeSettingsRepository::setNavBarPosition,
+                    glassStyle = navBarGlass,
+                    onGlassStyleChanged = ThemeSettingsRepository::setNavBarGlass,
+                    defaultIconColorEnabled = navBarDefaultIconColorEnabled,
+                    onDefaultIconColorEnabledChanged = ThemeSettingsRepository::setNavBarDefaultIconColorEnabled,
+                    defaultIconColor = navBarDefaultIconColor,
+                    onDefaultIconColorChanged = ThemeSettingsRepository::updateNavBarDefaultIconColor,
+                    onSaveDefaultIconColor = ThemeSettingsRepository::saveNavBarDefaultIconColorSettings,
+                    floatingBarEffects = barEffects,
+                    onFloatingBarEffectsChanged = ThemeSettingsRepository::updateNavBarLiquidGlassBarEffects,
+                    selectionLensEffects = selectionEffects,
+                    onSelectionLensEffectsChanged = ThemeSettingsRepository::updateNavBarLiquidGlassSelectionEffects,
+                    onSaveLiquidGlassEffectSettings = ThemeSettingsRepository::saveNavBarLiquidGlassEffectSettings,
+                    onDismiss = { showNavBarStyleSheet = false },
+                )
+            }
         }
     }
 

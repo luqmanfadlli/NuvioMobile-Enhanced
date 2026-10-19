@@ -99,6 +99,63 @@ class JellyMotionTest {
     }
 
     @Test
+    fun `scroll threshold bounce uses jelly track springs and settles without moving selected tab`() {
+        val motion = JellyMotion(1, 4)
+        motion.resize(320f, 64f, 4)
+
+        // The impulse begins at the current frame, not at a snapped displaced position.
+        motion.bounce(1f)
+        assertEquals(1f, motion.frame.position)
+        assertEquals(0f, motion.frame.trackOffsetY)
+        motion.advance(1.0 / 60)
+        assertTrue(motion.frame.trackOffsetY > 0f)
+        assertTrue(motion.frame.trackScaleX < 1f)
+        assertTrue(motion.frame.trackScale > 1f)
+
+        settle(motion)
+        assertEquals(1f, motion.frame.position)
+        assertEquals(0f, motion.frame.trackOffsetY, 0.0001f)
+        assertEquals(1f, motion.frame.trackScaleX, 0.0001f)
+        assertEquals(1f, motion.frame.trackScale, 0.0001f)
+
+        motion.bounce(-1f)
+        assertEquals(0f, motion.frame.trackOffsetY, 0.0001f)
+        motion.advance(1.0 / 60)
+        assertTrue(motion.frame.trackOffsetY < 0f)
+        settle(motion)
+        assertEquals(1f, motion.frame.position)
+    }
+
+    @Test
+    fun `tab icon refraction activates only after horizontal lens movement`() {
+        val motion = JellyMotion(0, 4)
+        motion.resize(320f, 64f, 4)
+
+        // Touching the pill or moving vertically as the settings list scrolls must not
+        // refract icons. A direct horizontal lens drag is the trigger.
+        motion.begin(20f, 32f)
+        assertFalse(motion.tabIconRefractionActive)
+        motion.drag(0f, 14f)
+        assertFalse(motion.tabIconRefractionActive)
+        motion.cancel(0)
+        settle(motion)
+        assertFalse(motion.tabIconRefractionActive)
+
+        motion.begin(20f, 32f)
+        motion.drag(3.9f, 0f)
+        assertFalse(motion.tabIconRefractionActive)
+        motion.drag(4f, 0f)
+        assertTrue(motion.tabIconRefractionActive)
+        motion.drag(4f, 12f)
+        assertTrue(motion.tabIconRefractionActive)
+
+        motion.finish()
+        assertFalse(motion.tabIconRefractionActive)
+        motion.select(2)
+        assertFalse(motion.tabIconRefractionActive)
+    }
+
+    @Test
     fun `single tab and stalled frames stay finite`() {
         val motion = JellyMotion(0, 1)
         motion.resize(200f, 48f, 1)

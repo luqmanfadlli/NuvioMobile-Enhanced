@@ -1,9 +1,13 @@
 package com.nuvio.app.core.ui
 
 import com.nuvio.app.core.ui.jelly.JellyMotion
+import com.nuvio.app.core.ui.glass.LiquidGlassEffectDefaults
+import com.nuvio.app.core.ui.glass.LiquidGlassMaterial
+import com.nuvio.app.core.ui.glass.LiquidGlassStyle
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class FloatingNavigationBarRtlTest {
@@ -13,6 +17,37 @@ class FloatingNavigationBarRtlTest {
             motion.advance(1.0 / 60)
         }
     }
+
+    @Test
+    fun `material decides navigation glass and devices fall back by capability`() {
+        val liquid = LiquidGlassStyle.Default
+        assertEquals(NavigationGlassMode(bar = true, barRefraction = true, selectionLens = true), mode(liquid))
+        assertEquals(NavigationGlassMode(bar = true, barRefraction = false, selectionLens = false), mode(liquid, refraction = false))
+        val off = NavigationGlassMode(bar = false, barRefraction = false, selectionLens = false)
+        assertEquals(off, mode(liquid, glass = false))
+        assertEquals(off, mode(liquid, backdrop = false))
+        assertEquals(off, mode(liquid.copy(material = LiquidGlassMaterial.SOLID)))
+        assertEquals(NavigationGlassMode(bar = true, barRefraction = false, selectionLens = true), mode(liquid.copy(material = LiquidGlassMaterial.FROSTED)))
+        assertFalse(mode(liquid.copy(selectionLens = false)).selectionLens)
+    }
+
+    @Test
+    fun `material filters bar effects`() {
+        val bar = LiquidGlassEffectDefaults.floatingBar
+        val clear = bar.forNavigationMaterial(LiquidGlassStyle(material = LiquidGlassMaterial.CLEAR), refraction = true)
+        assertEquals(0f, clear.blurRadiusDp)
+        assertEquals(bar.refractionHeightDp, clear.refractionHeightDp)
+        val frosted = bar.forNavigationMaterial(LiquidGlassStyle(material = LiquidGlassMaterial.FROSTED), refraction = false)
+        assertEquals(bar.blurRadiusDp, frosted.blurRadiusDp)
+        assertEquals(0f, frosted.refractionAmountDp)
+    }
+
+    private fun mode(
+        style: LiquidGlassStyle,
+        backdrop: Boolean = true,
+        glass: Boolean = true,
+        refraction: Boolean = true,
+    ) = resolveNavigationGlass(style, backdrop, hasSelection = true, glassSupported = glass, refractionSupported = refraction)
 
     @Test
     fun `visualNavIndex maps LTR destinations to identity positions`() {
@@ -184,4 +219,79 @@ class FloatingNavigationBarRtlTest {
         assertEquals(3, rightVisual)
         assertEquals(3, logicalNavIndex(rightVisual, count, isRtl))
     }
+    @Test
+    fun `selection lens offset follows visual slots in LTR and mirrored RTL`() {
+        val count = 4
+        val tabWidth = 78f
+        val inset = 4f
+
+        for (position in 0 until count) {
+            assertEquals(
+                inset + tabWidth * position,
+                liquidGlassSelectionTranslationX(
+                    position = position.toFloat(),
+                    count = count,
+                    tabWidthPx = tabWidth,
+                    insetPx = inset,
+                    isRtl = false,
+                ),
+                0.001f,
+                "LTR visual slot $position",
+            )
+            assertEquals(
+                -inset - tabWidth * (count - 1 - position),
+                liquidGlassSelectionTranslationX(
+                    position = position.toFloat(),
+                    count = count,
+                    tabWidthPx = tabWidth,
+                    insetPx = inset,
+                    isRtl = true,
+                ),
+                0.001f,
+                "RTL visual slot $position",
+            )
+        }
+
+        assertEquals(
+            -inset - tabWidth * 0.5f,
+            liquidGlassSelectionTranslationX(
+                position = 2.5f,
+                count = count,
+                tabWidthPx = tabWidth,
+                insetPx = inset,
+                isRtl = true,
+            ),
+            0.001f,
+            "RTL lens should interpolate between visual slots",
+        )
+
+        // The selected lens remains inside the same parent graphics layer as the bar,
+        // which applies motion.frame.panelOffset to both. Keep this helper local to the slot
+        // so the parent offset is inherited once rather than added a second time.
+        assertEquals(
+            inset + tabWidth * 1.5f,
+            liquidGlassSelectionTranslationX(
+                position = 1.5f,
+                count = count,
+                tabWidthPx = tabWidth,
+                insetPx = inset,
+                isRtl = false,
+            ),
+            0.001f,
+            "LTR lens slot offset must not duplicate the parent panel offset",
+        )
+        assertEquals(
+            -inset - tabWidth * (count - 1 - 1.5f),
+            liquidGlassSelectionTranslationX(
+                position = 1.5f,
+                count = count,
+                tabWidthPx = tabWidth,
+                insetPx = inset,
+                isRtl = true,
+            ),
+            0.001f,
+            "RTL lens slot offset must not duplicate the parent panel offset",
+        )
+    }
+
 }
