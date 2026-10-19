@@ -477,7 +477,7 @@ private fun MobileStreamsLayout(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = if (isEpisode) 0.72f else 0.62f)),
+                    .background(Color.Black.copy(alpha = if (isEpisode) 0.8f else 0.9f)),
             )
         }
 
