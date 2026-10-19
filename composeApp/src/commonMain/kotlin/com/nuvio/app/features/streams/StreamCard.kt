@@ -92,7 +92,7 @@ internal fun StreamCard(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 } else {
                     Color.White.copy(alpha = 0.05f)
-                }.compositeOver(Color.Black.copy(alpha = 0.55f)),
+                }.compositeOver(Color.Black.copy(alpha = 0.75f)),
                 fallback = if (marked) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 } else {
