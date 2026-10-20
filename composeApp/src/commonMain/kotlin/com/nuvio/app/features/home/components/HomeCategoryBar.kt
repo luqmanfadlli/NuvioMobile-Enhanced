@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -105,6 +107,8 @@ internal fun HomeCategoryPanel(
 
     Box(
         modifier = modifier
+            // Same compact width as in portrait, even on a wide landscape screen.
+            .widthIn(max = 400.dp)
             .fillMaxWidth()
             .padding(horizontal = 12.dp),
     ) {
@@ -155,6 +159,35 @@ internal fun HomeCategoryPanel(
                 )
             }
         }
+    }
+}
+
+/**
+ * Small, non-interactive label that shows which category is open. It sits just under the
+ * status bar and lets touches pass through to the content below.
+ */
+@Composable
+fun HomeCategoryTitleBadge(modifier: Modifier = Modifier) {
+    val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
+    val title = state.selected?.title ?: return
+
+    Box(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(top = 2.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = Color.White.copy(alpha = 0.85f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        )
     }
 }
 

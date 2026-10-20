@@ -148,10 +148,13 @@ fun NuvioPosterCard(
     // Optional big "Top 10" style number drawn behind the left edge of the poster.
     val rankLabel = rankNumber?.takeIf { it in 1..99 }
     val rankTwoDigits = rankLabel != null && rankLabel >= 10
+    // The number is sized from the poster height, so its spacing is too. This keeps the number
+    // snug against the poster on wide (landscape) cards as well as on portrait posters.
+    val rankFontHeight = baseCardWidth / shape.aspectRatio * 0.62f
     val rankAreaWidth = when {
         rankLabel == null -> 0.dp
-        rankTwoDigits -> baseCardWidth * 0.78f
-        else -> baseCardWidth * 0.34f
+        rankTwoDigits -> rankFontHeight * 0.84f
+        else -> rankFontHeight * 0.366f
     }
     val cardWidth = baseCardWidth + rankAreaWidth
     val cardShape = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
