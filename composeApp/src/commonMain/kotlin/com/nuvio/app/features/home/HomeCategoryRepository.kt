@@ -54,6 +54,8 @@ data class HomeCategoryUiState(
     val selectedId: String = HOME_CATEGORY_HOME_ID,
     /** Last non-Home category the user opened; the "Categories" button returns to it. */
     val lastCategoryId: String? = null,
+    /** Catalog keys whose rows show big 1-10 numbers behind the posters. */
+    val rankedKeys: List<String> = emptyList(),
 ) {
     /** Categories shown in the top bar, in the user's order. */
     val visibleCategories: List<HomeCategory>
@@ -69,6 +71,7 @@ private data class StoredHomeCategoriesPayload(
     val version: Int = 1,
     val selectedId: String = HOME_CATEGORY_HOME_ID,
     val lastCategoryId: String? = null,
+    val rankedKeys: List<String> = emptyList(),
     val categories: List<HomeCategory> = emptyList(),
 )
 
@@ -144,6 +147,7 @@ object HomeCategoryRepository {
             categories = parsed.categories,
             selectedId = parsed.selectedId,
             lastCategoryId = parsed.lastCategoryId,
+            rankedKeys = parsed.rankedKeys,
         )
     }
 
@@ -246,6 +250,14 @@ object HomeCategoryRepository {
         }
     }
 
+    fun setRanked(catalogKey: String, ranked: Boolean) {
+        ensureLoaded()
+        update { state ->
+            val next = if (ranked) (state.rankedKeys + catalogKey).distinct() else state.rankedKeys - catalogKey
+            state.copy(rankedKeys = next)
+        }
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
         update { HomeCategoryUiState() }
@@ -275,6 +287,7 @@ object HomeCategoryRepository {
                 StoredHomeCategoriesPayload(
                     selectedId = state.selectedId,
                     lastCategoryId = state.lastCategoryId,
+                    rankedKeys = state.rankedKeys,
                     categories = state.categories,
                 ),
             ),

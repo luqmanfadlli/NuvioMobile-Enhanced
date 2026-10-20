@@ -185,10 +185,14 @@ internal fun MainTabsDestination(
                         floatingBarOnTop -> floatingNavigationBarPadding().calculateBottomPadding()
                         else -> floatingNavigationBarPadding().calculateBottomPadding() + 68.dp
                     }
+                    val panelGlassEffects by ThemeSettingsRepository.navBarLiquidGlassBarEffects.collectAsStateWithLifecycle()
                     HomeCategoryPanel(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = panelBottomPadding),
+                        backdrop = navBarBackdrop,
+                        glassStyle = navBarGlass,
+                        glassEffects = panelGlassEffects,
                     )
                 }
 
@@ -263,8 +267,8 @@ private fun goToHome(onTabSelected: (AppScreenTab) -> Unit) {
 }
 
 /**
- * The Categories button returns to the last category the user opened (when currently on Home)
- * and opens the category panel; tapping it again closes the panel.
+ * Categories button. From the Home category, the first tap jumps to the last category opened
+ * (panel stays closed); once inside a category, tapping it opens or closes the category panel.
  */
 private fun toggleCategoriesPanel(
     highlightedTab: AppScreenTab,
@@ -275,13 +279,20 @@ private fun toggleCategoriesPanel(
     if (!onHomeTab) onTabSelected(AppScreenTab.Home)
 
     val current = HomeCategoryRepository.state.value.selected
-    if (current == null || current.id == HOME_CATEGORY_HOME_ID) {
-        HomeCategoryRepository.restoreLastCategory()
-        HomeCategoryRepository.setPanelOpen(true)
-    } else if (!onHomeTab) {
-        HomeCategoryRepository.setPanelOpen(true)
-    } else {
-        HomeCategoryRepository.togglePanel()
+    when {
+        // First tap from Home: jump to the last category opened, panel stays closed.
+        current == null || current.id == HOME_CATEGORY_HOME_ID -> {
+            HomeCategoryRepository.restoreLastCategory()
+            val after = HomeCategoryRepository.state.value.selected
+            // Nothing to jump to (no other category yet): open the panel so one can be picked.
+            if (after == null || after.id == HOME_CATEGORY_HOME_ID) {
+                HomeCategoryRepository.setPanelOpen(true)
+            }
+        }
+        // Coming from another tab while a category is already selected: just land there.
+        !onHomeTab -> Unit
+        // Already inside a category: the next tap opens / closes the panel.
+        else -> HomeCategoryRepository.togglePanel()
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.nuvio.app.core.ui.NuvioShelfSection
@@ -22,6 +23,7 @@ fun HomeCatalogRowSection(
     watchedKeys: Set<String> = emptySet(),
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     sectionPadding: Dp? = null,
+    showRankNumbers: Boolean = false,
     onViewAllClick: (() -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -34,6 +36,7 @@ fun HomeCatalogRowSection(
             fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
             modifier = modifier.fillMaxWidth(),
             sectionPadding = sectionPadding,
+            showRankNumbers = showRankNumbers,
             onViewAllClick = onViewAllClick,
             onPosterClick = onPosterClick,
             onPosterLongClick = onPosterLongClick,
@@ -47,6 +50,7 @@ fun HomeCatalogRowSection(
                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                 modifier = Modifier.fillMaxWidth(),
                 sectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value),
+                showRankNumbers = showRankNumbers,
                 onViewAllClick = onViewAllClick,
                 onPosterClick = onPosterClick,
                 onPosterLongClick = onPosterLongClick,
@@ -63,11 +67,19 @@ private fun HomeCatalogRowSectionContent(
     fullyWatchedSeriesKeys: Set<String>,
     modifier: Modifier,
     sectionPadding: Dp,
+    showRankNumbers: Boolean,
     onViewAllClick: (() -> Unit)?,
     onPosterClick: ((MetaPreview) -> Unit)?,
     onPosterLongClick: ((MetaPreview) -> Unit)?,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
+    val rankByKey = remember(entries, showRankNumbers) {
+        if (showRankNumbers) {
+            entries.withIndex().associate { (index, entry) -> entry.stableKey() to index + 1 }
+        } else {
+            emptyMap()
+        }
+    }
 
     NuvioShelfSection(
         title = section.title,
@@ -89,6 +101,7 @@ private fun HomeCatalogRowSectionContent(
             ),
             onClick = onPosterClick?.let { { it(item) } },
             onLongClick = onPosterLongClick?.let { { it(item) } },
+            rankNumber = rankByKey[item.stableKey()]?.takeIf { it <= 10 },
         )
     }
 }

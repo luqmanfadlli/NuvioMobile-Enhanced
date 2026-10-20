@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.home_view_all
@@ -136,10 +138,20 @@ fun NuvioPosterCard(
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    rankNumber: Int? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val tokens = MaterialTheme.nuvio
-    val cardWidth = shape.cardWidth(basePosterWidthDp = posterCardStyle.widthDp)
+    val baseCardWidth = shape.cardWidth(basePosterWidthDp = posterCardStyle.widthDp)
+    // Optional big "Top 10" style number drawn behind the left edge of the poster.
+    val rankLabel = rankNumber?.takeIf { it in 1..99 }
+    val rankTwoDigits = rankLabel != null && rankLabel >= 10
+    val rankAreaWidth = when {
+        rankLabel == null -> 0.dp
+        rankTwoDigits -> baseCardWidth * 0.55f
+        else -> baseCardWidth * 0.34f
+    }
+    val cardWidth = baseCardWidth + rankAreaWidth
     val cardShape = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
     val catalogLogoOverlaySize = catalogLogoOverlaySize(
         basePosterWidthDp = posterCardStyle.widthDp,
@@ -151,9 +163,35 @@ fun NuvioPosterCard(
         modifier = modifier.width(cardWidth),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
     ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+        if (rankLabel != null) {
+            val rankFontSize = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (baseCardWidth / shape.aspectRatio * (if (rankTwoDigits) 0.5f else 0.62f)).toSp()
+            }
+            Box(
+                modifier = Modifier.matchParentSize(),
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                Text(
+                    text = rankLabel.toString(),
+                    color = tokens.colors.textPrimary.copy(alpha = 0.75f),
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontSize = rankFontSize,
+                        lineHeight = rankFontSize,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+                        letterSpacing = (-6).sp,
+                        drawStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f),
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.wrapContentSize(Alignment.BottomStart, unbounded = true),
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(start = rankAreaWidth)
                 .aspectRatio(shape.aspectRatio)
                 .clip(cardShape)
                 .background(tokens.colors.surface)
@@ -248,9 +286,11 @@ fun NuvioPosterCard(
 
             NuvioPosterWatchedOverlay(isWatched = isWatched)
         }
+        }
         if (shouldShowTitleBelow) {
             Text(
                 text = title,
+                modifier = Modifier.padding(start = rankAreaWidth),
                 style = MaterialTheme.typography.bodyMedium,
                 color = tokens.colors.textPrimary,
                 maxLines = 1,
@@ -259,6 +299,7 @@ fun NuvioPosterCard(
             if (!detailLine.isNullOrBlank()) {
                 Text(
                     text = detailLine,
+                    modifier = Modifier.padding(start = rankAreaWidth),
                     style = MaterialTheme.typography.labelSmall,
                     color = tokens.colors.textMuted,
                     maxLines = 1,

@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,6 +53,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.Chip
+import com.nuvio.app.core.ui.glass.isLiquidRefractionSupported
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.SolidGlassBar
+import com.nuvio.app.core.ui.glass.LiquidGlassStyle
+import com.nuvio.app.core.ui.glass.LiquidGlassFrostedBar
+import com.nuvio.app.core.ui.glass.LiquidGlassEffectSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassEffectDefaults
+import com.nuvio.app.core.ui.resolveNavigationGlass
+import com.nuvio.app.core.ui.forNavigationMaterial
+import com.kyant.backdrop.Backdrop
+import androidx.compose.ui.draw.clip
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.home.HOME_CATEGORY_ANIME_ID
@@ -66,24 +76,56 @@ import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
 
 /**
- * Panel that opens just above the bottom navigation bar when the "Categories" item is tapped.
- * Shows every visible category plus a settings icon, all condensed behind that single item.
+ * Panel that opens just above the bottom navigation bar. It reuses the navigation bar's glass
+ * look: with a floating/liquid-glass bar it draws the same frosted/refracting surface from the
+ * same backdrop and settings; with the classic bar it falls back to a plain rounded surface.
  */
 @Composable
-fun HomeCategoryPanel(modifier: Modifier = Modifier) {
+fun HomeCategoryPanel(
+    modifier: Modifier = Modifier,
+    backdrop: Backdrop? = null,
+    glassStyle: LiquidGlassStyle = LiquidGlassStyle.Default,
+    glassEffects: LiquidGlassEffectSettings = LiquidGlassEffectDefaults.floatingBar,
+) {
     LaunchedEffect(Unit) { HomeCategoryRepository.ensureLoaded() }
     val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
     val tokens = MaterialTheme.nuvio
 
-    Surface(
+    val glassMode = resolveNavigationGlass(
+        style = glassStyle,
+        hasBackdrop = backdrop != null,
+        hasSelection = false,
+        glassSupported = isLiquidGlassSupported(),
+        refractionSupported = isLiquidRefractionSupported(),
+    )
+    val barEffects = glassEffects.sanitized(
+        LiquidGlassEffectDefaults.floatingBar,
+        LiquidGlassEffectDefaults.floatingBarLimits,
+    ).forNavigationMaterial(glassStyle, glassMode.barRefraction)
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = tokens.colors.surfaceSheet.copy(alpha = 0.96f),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
     ) {
+        when {
+            glassMode.bar && backdrop != null -> LiquidGlassFrostedBar(
+                backdrop = backdrop,
+                modifier = Modifier.matchParentSize(),
+                glowStrength = 1f,
+                settings = barEffects,
+                style = glassStyle,
+            )
+
+            backdrop != null -> SolidGlassBar(Modifier.matchParentSize(), glassStyle.edgeHighlight)
+
+            else -> Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(tokens.colors.surfaceSheet.copy(alpha = 0.96f)),
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -322,6 +364,7 @@ private fun HomeCategoryCatalogPicker(
     onBack: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val rankedKeys = HomeCategoryRepository.state.collectAsStateWithLifecycle().value.rankedKeys
     val settingsState by remember {
         HomeCatalogSettingsRepository.snapshot()
         HomeCatalogSettingsRepository.uiState
@@ -369,6 +412,11 @@ private fun HomeCategoryCatalogPicker(
         }
 
         SectionLabel("Shown in this category (${selectedItems.size})")
+        Text(
+            text = "Tap # on a catalog to show big 1–10 numbers behind its posters.",
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted,
+        )
         if (selectedItems.isEmpty()) {
             Text(
                 text = "Nothing selected yet. Tap a catalog below to add it.",
@@ -383,6 +431,15 @@ private fun HomeCategoryCatalogPicker(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CatalogLabel(item, Modifier.weight(1f))
+                val ranked = item.key in rankedKeys
+                IconButton(onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) }) {
+                    Text(
+                        text = "#",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (ranked) tokens.colors.accent else tokens.colors.textMuted,
+                    )
+                }
                 IconButton(
                     onClick = { save(selectedKeys.swap(index, index - 1)) },
                     enabled = index > 0,
