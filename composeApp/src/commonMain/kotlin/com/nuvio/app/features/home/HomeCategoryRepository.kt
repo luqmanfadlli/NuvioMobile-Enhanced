@@ -49,6 +49,14 @@ data class HomeCategory(
 
 data class HomeCategoryEditorRequest(val categoryId: String?)
 
+/** How the optional big numbers behind posters look. */
+data class HomeRankSettings(
+    /** How many items per row get a number: 5, 10 or 20. */
+    val count: Int = 10,
+    val accent: Boolean = false,
+    val filled: Boolean = false,
+)
+
 data class HomeCategoryUiState(
     val categories: List<HomeCategory> = defaultHomeCategories(),
     val selectedId: String = HOME_CATEGORY_HOME_ID,
@@ -56,6 +64,7 @@ data class HomeCategoryUiState(
     val lastCategoryId: String? = null,
     /** Catalog keys whose rows show big 1-10 numbers behind the posters. */
     val rankedKeys: List<String> = emptyList(),
+    val rank: HomeRankSettings = HomeRankSettings(),
 ) {
     /** Categories shown in the top bar, in the user's order. */
     val visibleCategories: List<HomeCategory>
@@ -72,6 +81,9 @@ private data class StoredHomeCategoriesPayload(
     val selectedId: String = HOME_CATEGORY_HOME_ID,
     val lastCategoryId: String? = null,
     val rankedKeys: List<String> = emptyList(),
+    val rankCount: Int = 10,
+    val rankAccent: Boolean = false,
+    val rankFilled: Boolean = false,
     val categories: List<HomeCategory> = emptyList(),
 )
 
@@ -148,6 +160,11 @@ object HomeCategoryRepository {
             selectedId = parsed.selectedId,
             lastCategoryId = parsed.lastCategoryId,
             rankedKeys = parsed.rankedKeys,
+            rank = HomeRankSettings(
+                count = parsed.rankCount.takeIf { it in setOf(5, 10, 20) } ?: 10,
+                accent = parsed.rankAccent,
+                filled = parsed.rankFilled,
+            ),
         )
     }
 
@@ -258,6 +275,21 @@ object HomeCategoryRepository {
         }
     }
 
+    fun setRankCount(count: Int) {
+        ensureLoaded()
+        update { state -> state.copy(rank = state.rank.copy(count = count)) }
+    }
+
+    fun setRankAccent(accent: Boolean) {
+        ensureLoaded()
+        update { state -> state.copy(rank = state.rank.copy(accent = accent)) }
+    }
+
+    fun setRankFilled(filled: Boolean) {
+        ensureLoaded()
+        update { state -> state.copy(rank = state.rank.copy(filled = filled)) }
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
         update { HomeCategoryUiState() }
@@ -288,6 +320,9 @@ object HomeCategoryRepository {
                     selectedId = state.selectedId,
                     lastCategoryId = state.lastCategoryId,
                     rankedKeys = state.rankedKeys,
+                    rankCount = state.rank.count,
+                    rankAccent = state.rank.accent,
+                    rankFilled = state.rank.filled,
                     categories = state.categories,
                 ),
             ),

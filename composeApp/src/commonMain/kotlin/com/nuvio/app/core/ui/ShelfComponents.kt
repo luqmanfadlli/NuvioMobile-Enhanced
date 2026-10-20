@@ -139,6 +139,8 @@ fun NuvioPosterCard(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     rankNumber: Int? = null,
+    rankAccent: Boolean = false,
+    rankFilled: Boolean = false,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val tokens = MaterialTheme.nuvio
@@ -148,7 +150,7 @@ fun NuvioPosterCard(
     val rankTwoDigits = rankLabel != null && rankLabel >= 10
     val rankAreaWidth = when {
         rankLabel == null -> 0.dp
-        rankTwoDigits -> baseCardWidth * 0.55f
+        rankTwoDigits -> baseCardWidth * 0.78f
         else -> baseCardWidth * 0.34f
     }
     val cardWidth = baseCardWidth + rankAreaWidth
@@ -166,7 +168,8 @@ fun NuvioPosterCard(
         Box(modifier = Modifier.fillMaxWidth()) {
         if (rankLabel != null) {
             val rankFontSize = with(androidx.compose.ui.platform.LocalDensity.current) {
-                (baseCardWidth / shape.aspectRatio * (if (rankTwoDigits) 0.5f else 0.62f)).toSp()
+                // Same size for every number, one or two digits.
+                (baseCardWidth / shape.aspectRatio * 0.62f).toSp()
             }
             Box(
                 modifier = Modifier.matchParentSize(),
@@ -174,13 +177,14 @@ fun NuvioPosterCard(
             ) {
                 Text(
                     text = rankLabel.toString(),
-                    color = tokens.colors.textPrimary.copy(alpha = 0.75f),
+                    color = (if (rankAccent) tokens.colors.accent else tokens.colors.textPrimary)
+                        .copy(alpha = if (rankFilled) 0.85f else 0.75f),
                     style = androidx.compose.ui.text.TextStyle(
                         fontSize = rankFontSize,
                         lineHeight = rankFontSize,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
                         letterSpacing = (-6).sp,
-                        drawStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f),
+                        drawStyle = if (rankFilled) null else androidx.compose.ui.graphics.drawscope.Stroke(width = 4f),
                     ),
                     maxLines = 1,
                     softWrap = false,

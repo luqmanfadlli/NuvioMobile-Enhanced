@@ -11,6 +11,7 @@ import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.HomeCatalogSection
+import com.nuvio.app.features.home.HomeRankSettings
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.watching.application.WatchingState
@@ -24,6 +25,7 @@ fun HomeCatalogRowSection(
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     sectionPadding: Dp? = null,
     showRankNumbers: Boolean = false,
+    rankSettings: HomeRankSettings = HomeRankSettings(),
     onViewAllClick: (() -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -37,6 +39,7 @@ fun HomeCatalogRowSection(
             modifier = modifier.fillMaxWidth(),
             sectionPadding = sectionPadding,
             showRankNumbers = showRankNumbers,
+            rankSettings = rankSettings,
             onViewAllClick = onViewAllClick,
             onPosterClick = onPosterClick,
             onPosterLongClick = onPosterLongClick,
@@ -51,6 +54,7 @@ fun HomeCatalogRowSection(
                 modifier = Modifier.fillMaxWidth(),
                 sectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value),
                 showRankNumbers = showRankNumbers,
+                rankSettings = rankSettings,
                 onViewAllClick = onViewAllClick,
                 onPosterClick = onPosterClick,
                 onPosterLongClick = onPosterLongClick,
@@ -68,6 +72,7 @@ private fun HomeCatalogRowSectionContent(
     modifier: Modifier,
     sectionPadding: Dp,
     showRankNumbers: Boolean,
+    rankSettings: HomeRankSettings,
     onViewAllClick: (() -> Unit)?,
     onPosterClick: ((MetaPreview) -> Unit)?,
     onPosterLongClick: ((MetaPreview) -> Unit)?,
@@ -101,7 +106,9 @@ private fun HomeCatalogRowSectionContent(
             ),
             onClick = onPosterClick?.let { { it(item) } },
             onLongClick = onPosterLongClick?.let { { it(item) } },
-            rankNumber = rankByKey[item.stableKey()]?.takeIf { it <= 10 },
+            rankNumber = rankByKey[item.stableKey()]?.takeIf { it <= rankSettings.count },
+            rankAccent = rankSettings.accent,
+            rankFilled = rankSettings.filled,
         )
     }
 }

@@ -1262,6 +1262,7 @@ fun HomeScreen(
                                             modifier = Modifier.padding(bottom = 12.dp),
                                             sectionPadding = homeSectionPadding,
                                             showRankNumbers = section.key in categoryState.rankedKeys,
+                                            rankSettings = categoryState.rank,
                                             onViewAllClick = if (section.canOpenCatalog(HOME_CATALOG_PREVIEW_LIMIT)) {
                                                 onCatalogClick?.let { { it(section) } }
                                             } else {

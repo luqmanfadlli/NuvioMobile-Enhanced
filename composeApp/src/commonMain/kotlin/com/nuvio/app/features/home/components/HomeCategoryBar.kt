@@ -287,13 +287,13 @@ private fun HomeCategoryList(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    IconButton(onClick = {
+                        renamingId = category.id
+                        renameText = category.title
+                    }) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = tokens.colors.textMuted)
+                    }
                     if (!category.builtIn) {
-                        IconButton(onClick = {
-                            renamingId = category.id
-                            renameText = category.title
-                        }) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = tokens.colors.textMuted)
-                        }
                         IconButton(onClick = { HomeCategoryRepository.delete(category.id) }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = tokens.colors.textMuted)
                         }
@@ -346,6 +346,43 @@ private fun HomeCategoryList(
                 enabled = newTitle.isNotBlank(),
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = "Add", tint = tokens.colors.textPrimary)
+            }
+        }
+
+        val rank = HomeCategoryRepository.state.collectAsStateWithLifecycle().value.rank
+        Text(
+            text = "Numbers behind posters",
+            style = MaterialTheme.typography.titleSmall,
+            color = tokens.colors.textPrimary,
+            modifier = Modifier.padding(top = 20.dp, bottom = 2.dp),
+        )
+        Text(
+            text = "Turn numbers on per catalog with the # button in Choose catalogs.",
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
+        ) {
+            Chip(label = "White", selected = !rank.accent, onClick = { HomeCategoryRepository.setRankAccent(false) })
+            Chip(label = "Accent color", selected = rank.accent, onClick = { HomeCategoryRepository.setRankAccent(true) })
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
+        ) {
+            Chip(label = "Outline", selected = !rank.filled, onClick = { HomeCategoryRepository.setRankFilled(false) })
+            Chip(label = "Filled", selected = rank.filled, onClick = { HomeCategoryRepository.setRankFilled(true) })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(5, 10, 20).forEach { count ->
+                Chip(
+                    label = "Top $count",
+                    selected = rank.count == count,
+                    onClick = { HomeCategoryRepository.setRankCount(count) },
+                )
             }
         }
 

@@ -19,6 +19,8 @@ fun HomePosterCard(
     onLongClick: (() -> Unit)? = null,
     showLandscapeOverlay: Boolean = true,
     rankNumber: Int? = null,
+    rankAccent: Boolean = false,
+    rankFilled: Boolean = false,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
@@ -47,6 +49,8 @@ fun HomePosterCard(
         onClick = onClick,
         onLongClick = onLongClick,
         rankNumber = rankNumber,
+        rankAccent = rankAccent,
+        rankFilled = rankFilled,
     )
 }
 
