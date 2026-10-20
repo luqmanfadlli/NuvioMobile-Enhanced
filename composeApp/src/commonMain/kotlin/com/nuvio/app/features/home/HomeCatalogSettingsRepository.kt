@@ -29,6 +29,7 @@ data class HomeCatalogSettingsItem(
     val isCollection: Boolean = false,
     val collectionId: String? = null,
     val isPinnedToTop: Boolean = false,
+    val rowShape: HomeRowShapeMode = HomeRowShapeMode.DEFAULT,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
@@ -62,7 +63,7 @@ internal data class HomeCatalogSettingsUiState(
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
-                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}"
+                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}:${item.rowShape.storageValue}"
                 }
             )
         }
@@ -105,11 +106,39 @@ internal enum class HomeHeroStyle(
     }
 }
 
+/**
+ * Per-row card shape for a home catalog row. [DEFAULT] follows the global landscape mode from
+ * Poster Customization; [POSTER] and [LANDSCAPE] force that shape for this row only.
+ * Stored locally only (it is not part of the synced home catalog payload).
+ */
+enum class HomeRowShapeMode(
+    val storageValue: String,
+) {
+    DEFAULT("default"),
+    POSTER("poster"),
+    LANDSCAPE("landscape"),
+    ;
+
+    /** null = follow the global setting, true = force landscape, false = force poster. */
+    val landscapeOverride: Boolean?
+        get() = when (this) {
+            DEFAULT -> null
+            POSTER -> false
+            LANDSCAPE -> true
+        }
+
+    companion object {
+        fun fromStorageValue(value: String?): HomeRowShapeMode =
+            entries.firstOrNull { it.storageValue == value } ?: DEFAULT
+    }
+}
+
 internal data class HomeCatalogPreference(
     val customTitle: String,
     val enabled: Boolean,
     val heroSourceEnabled: Boolean,
     val order: Int,
+    val rowShape: HomeRowShapeMode = HomeRowShapeMode.DEFAULT,
 )
 
 internal data class HomeCatalogSettingsSnapshot(
@@ -127,6 +156,7 @@ private data class StoredHomeCatalogPreference(
     val enabled: Boolean = true,
     val heroSourceEnabled: Boolean = true,
     val order: Int = 0,
+    val rowShape: String = HomeRowShapeMode.DEFAULT.storageValue,
 )
 
 @Serializable
@@ -260,6 +290,7 @@ object HomeCatalogSettingsRepository {
                     enabled = value.enabled,
                     heroSourceEnabled = value.heroSourceEnabled,
                     order = value.order,
+                    rowShape = HomeRowShapeMode.fromStorageValue(value.rowShape),
                 )
             },
         )
@@ -350,6 +381,13 @@ object HomeCatalogSettingsRepository {
     fun setEnabled(key: String, enabled: Boolean) {
         updatePreference(key) { preference ->
             preference.copy(enabled = enabled)
+        }
+    }
+
+    /** Local-only: not pushed to the synced home catalog payload. */
+    fun setRowShape(key: String, mode: HomeRowShapeMode) {
+        updatePreference(key, pushRemote = false) { preference ->
+            preference.copy(rowShape = mode.storageValue)
         }
     }
 
@@ -482,6 +520,7 @@ object HomeCatalogSettingsRepository {
                 enabled = stored?.enabled ?: true,
                 heroSourceEnabled = heroSourceEnabled,
                 order = stored?.order ?: nextOrder++,
+                rowShape = stored?.rowShape ?: HomeRowShapeMode.DEFAULT.storageValue,
             )
         }
         preferences = normalized.toMap()
@@ -500,6 +539,7 @@ object HomeCatalogSettingsRepository {
                     enabled = preference?.enabled ?: true,
                     heroSourceEnabled = preference?.heroSourceEnabled ?: true,
                     order = preference?.order ?: 0,
+                    rowShape = HomeRowShapeMode.fromStorageValue(preference?.rowShape),
                 )
             }
 
@@ -653,6 +693,8 @@ object HomeCatalogSettingsRepository {
         hideUnreleasedContent = payload.hideUnreleasedContent
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
+            // Row shape is a local-only preference; the remote payload does not carry it.
+            val existingRowShapes = preferences.mapValues { it.value.rowShape }
             val remotePreferences = payload.items.associate { item ->
                 val key = item.preferenceKey()
                 key to StoredHomeCatalogPreference(
@@ -661,6 +703,7 @@ object HomeCatalogSettingsRepository {
                     enabled = item.enabled,
                     heroSourceEnabled = existingHeroState[key] ?: true,
                     order = item.order,
+                    rowShape = existingRowShapes[key] ?: HomeRowShapeMode.DEFAULT.storageValue,
                 )
             }
             val remoteKeys = remotePreferences.keys

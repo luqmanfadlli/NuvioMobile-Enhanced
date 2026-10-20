@@ -40,6 +40,8 @@ data class HomeCatalogSection(
     val items: List<MetaPreview>,
     val availableItemCount: Int = items.size,
     val hasMore: Boolean = false,
+    /** Per-row card shape: null follows the global landscape mode, true = landscape, false = poster. */
+    val landscapeModeOverride: Boolean? = null,
 )
 
 fun HomeCatalogSection.canOpenCatalog(previewLimit: Int): Boolean =

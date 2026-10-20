@@ -483,6 +483,7 @@ private fun HomescreenCatalogList(
                                     expandedKey = if (shouldExpand) item.key else null
                                 },
                                 onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
+                                onRowShapeChange = { HomeCatalogSettingsRepository.setRowShape(item.key, it) },
                                 onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,

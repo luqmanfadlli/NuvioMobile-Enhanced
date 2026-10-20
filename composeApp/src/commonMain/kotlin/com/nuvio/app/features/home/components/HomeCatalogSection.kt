@@ -98,7 +98,9 @@ private fun HomeCatalogRowSectionContent(
     ) { item ->
         HomePosterCard(
             item = item,
-            useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
+            useLandscapeBackdropMode = section.landscapeModeOverride
+                ?: posterCardStyle.catalogLandscapeModeEnabled,
+            landscapeModeOverride = section.landscapeModeOverride,
             isWatched = WatchingState.isPosterWatched(
                 watchedKeys = watchedKeys,
                 item = item,

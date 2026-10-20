@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBackButton
@@ -59,6 +60,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
+import com.nuvio.app.features.home.HomeRowShapeMode
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_addon
 import nuvio.composeapp.generated.resources.settings_homescreen_display_name
@@ -68,6 +70,11 @@ import nuvio.composeapp.generated.resources.settings_homescreen_not_in_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned_to_top
 import nuvio.composeapp.generated.resources.settings_homescreen_reorder
+import nuvio.composeapp.generated.resources.settings_homescreen_row_layout
+import nuvio.composeapp.generated.resources.settings_homescreen_row_layout_default
+import nuvio.composeapp.generated.resources.settings_homescreen_row_layout_hint
+import nuvio.composeapp.generated.resources.settings_homescreen_row_layout_landscape
+import nuvio.composeapp.generated.resources.settings_homescreen_row_layout_poster
 import nuvio.composeapp.generated.resources.settings_homescreen_visible
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -456,6 +463,7 @@ internal fun SettingsChipRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HomescreenCatalogRow(
     item: HomeCatalogSettingsItem,
@@ -463,6 +471,7 @@ internal fun HomescreenCatalogRow(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onTitleChange: (String) -> Unit,
+    onRowShapeChange: (HomeRowShapeMode) -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     dragHandleScope: ReorderableCollectionItemScope,
     onPinnedDragAttempt: () -> Unit = {},
@@ -604,6 +613,37 @@ internal fun HomescreenCatalogRow(
                         disabledContainerColor = tokens.colors.surface,
                     ),
                 )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(Res.string.settings_homescreen_row_layout),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = tokens.colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        HomeRowShapeMode.entries.forEach { mode ->
+                            Chip(
+                                label = stringResource(
+                                    when (mode) {
+                                        HomeRowShapeMode.DEFAULT -> Res.string.settings_homescreen_row_layout_default
+                                        HomeRowShapeMode.POSTER -> Res.string.settings_homescreen_row_layout_poster
+                                        HomeRowShapeMode.LANDSCAPE -> Res.string.settings_homescreen_row_layout_landscape
+                                    },
+                                ),
+                                selected = item.rowShape == mode,
+                                onClick = { onRowShapeChange(mode) },
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(Res.string.settings_homescreen_row_layout_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.colors.textMuted,
+                    )
+                }
             }
         }
     }

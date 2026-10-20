@@ -228,6 +228,53 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(settings, HomeCatalogSettingsRepository.uiState.value)
     }
 
+    @Test
+    fun rowShapeDefaultsToFollowingTheGlobalSetting() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
+
+        assertEquals(HomeRowShapeMode.DEFAULT, HomeCatalogSettingsRepository.uiState.value.items.single().rowShape)
+        assertEquals(null, HomeRowShapeMode.DEFAULT.landscapeOverride)
+        assertEquals(false, HomeRowShapeMode.POSTER.landscapeOverride)
+        assertEquals(true, HomeRowShapeMode.LANDSCAPE.landscapeOverride)
+    }
+
+    @Test
+    fun rowShapeIsStoredPerRowAndSurvivesReload() {
+        val addons = listOf(addon())
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+
+        HomeCatalogSettingsRepository.setRowShape("test:movie:popular", HomeRowShapeMode.LANDSCAPE)
+        assertEquals(HomeRowShapeMode.LANDSCAPE, HomeCatalogSettingsRepository.uiState.value.items.single().rowShape)
+
+        // Drop in-memory state; the value must come back from storage.
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+
+        assertEquals(HomeRowShapeMode.LANDSCAPE, HomeCatalogSettingsRepository.uiState.value.items.single().rowShape)
+    }
+
+    @Test
+    fun rowShapeSurvivesRemoteSettingsApply() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
+        HomeCatalogSettingsRepository.setRowShape("test:movie:popular", HomeRowShapeMode.POSTER)
+
+        HomeCatalogSettingsRepository.applyFromRemote(
+            SyncHomeCatalogPayload(
+                items = listOf(
+                    SyncCatalogItem(
+                        addonId = "test",
+                        type = "movie",
+                        catalogId = "popular",
+                        order = 0,
+                        key = "test:movie:popular",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(HomeRowShapeMode.POSTER, HomeCatalogSettingsRepository.uiState.value.items.single().rowShape)
+    }
+
     private fun addon() = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(

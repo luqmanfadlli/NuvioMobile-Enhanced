@@ -14,6 +14,8 @@ fun HomePosterCard(
     item: MetaPreview,
     modifier: Modifier = Modifier,
     useLandscapeBackdropMode: Boolean = false,
+    /** When non-null this wins over the global landscape setting (true = landscape, false = poster). */
+    landscapeModeOverride: Boolean? = null,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -23,7 +25,8 @@ fun HomePosterCard(
     rankFilled: Boolean = false,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
-    val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
+    val isLandscapeMode = landscapeModeOverride
+        ?: (useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled)
     val effectiveLandscapePoster = if (posterCardStyle.alwaysShowLandscapeClearlogo) null else item.landscapePoster
     val imageUrl = if (isLandscapeMode) {
         effectiveLandscapePoster ?: item.banner ?: item.poster

@@ -274,6 +274,7 @@ object HomeRepository {
                 val customTitle = preference?.customTitle.orEmpty()
                 definition.cacheKey to section.copy(
                     title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
+                    landscapeModeOverride = preference?.rowShape?.landscapeOverride,
                 )
             }
         if (entries.isNotEmpty() || currentDefinitions.isNotEmpty()) {
