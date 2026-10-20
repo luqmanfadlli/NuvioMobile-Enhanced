@@ -81,7 +81,7 @@ import com.nuvio.app.features.home.HomeCategoryRepository
  * same backdrop and settings; with the classic bar it falls back to a plain rounded surface.
  */
 @Composable
-fun HomeCategoryPanel(
+internal fun HomeCategoryPanel(
     modifier: Modifier = Modifier,
     backdrop: Backdrop? = null,
     glassStyle: LiquidGlassStyle = LiquidGlassStyle.Default,
