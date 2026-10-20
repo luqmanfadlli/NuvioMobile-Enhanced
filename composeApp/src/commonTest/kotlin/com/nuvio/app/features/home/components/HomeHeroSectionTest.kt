@@ -92,27 +92,28 @@ class HomeHeroSectionTest {
     }
 
     @Test
-    fun `netflix phone portrait uses poster artwork and full width buttons`() {
+    fun `netflix phone portrait stacks full width pill buttons`() {
         val layout = netflixHeroLayout(maxWidthDp = 390f, viewportHeightDp = 844f)
 
         assertFalse(layout.isTablet)
         assertFalse(layout.isLandscape)
-        assertFalse(layout.usesWideArtwork)
         assertFalse(layout.sideContent)
         assertTrue(layout.buttonsFillWidth)
+        assertTrue(layout.buttonsStacked)
+        assertEquals(layout.buttonHeight.value / 2f, layout.buttonCornerRadius.value, 0.001f)
         assertEquals(390f * 1.5f, layout.heroHeight.value, 0.001f)
     }
 
     @Test
-    fun `netflix phone landscape uses backdrop artwork and a start aligned column`() {
+    fun `netflix phone landscape uses a start aligned column`() {
         val layout = netflixHeroLayout(maxWidthDp = 844f, viewportHeightDp = 390f)
 
         // 844dp wide is "tablet" for homeHeroLayout, but a 390dp short side is still a phone.
         assertFalse(layout.isTablet)
         assertTrue(layout.isLandscape)
-        assertTrue(layout.usesWideArtwork)
         assertTrue(layout.sideContent)
         assertFalse(layout.buttonsFillWidth)
+        assertFalse(layout.buttonsStacked)
         assertTrue(layout.heroHeight.value <= 390f)
     }
 
@@ -138,7 +139,6 @@ class HomeHeroSectionTest {
 
         assertTrue(layout.isTablet)
         assertFalse(layout.isLandscape)
-        assertTrue(layout.usesWideArtwork)
         assertTrue(layout.heroHeight.value >= base.heroHeight.value)
         assertTrue(layout.heroHeight.value <= 1280f * 0.62f + 0.001f)
     }

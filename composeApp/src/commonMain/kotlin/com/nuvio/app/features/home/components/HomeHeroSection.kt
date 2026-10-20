@@ -207,16 +207,17 @@ internal data class HomeHeroLayout(
  *
  * "Tablet" means the shortest viewport side is at least 600dp, so a 844x390 phone in landscape is a phone.
  *
- * - phone portrait : poster artwork, text + full-width buttons pinned to the bottom
- * - phone landscape: backdrop artwork, text column on the start side, compact buttons
- * - tablet portrait: backdrop artwork, start-aligned column, taller hero
- * - tablet landscape: backdrop artwork, start-aligned column, hero capped to the viewport
+ * Artwork is always the backdrop (posters carry the title, which would double up with the logo).
+ *
+ * - phone portrait : text + full-width pill buttons pinned to the bottom
+ * - phone landscape: text column on the start side, compact buttons
+ * - tablet portrait: start-aligned column, taller hero
+ * - tablet landscape: start-aligned column, hero capped to the viewport
  */
 internal data class NetflixHeroLayout(
     val isTablet: Boolean,
     val isLandscape: Boolean,
     val heroHeight: Dp,
-    val usesWideArtwork: Boolean,
     /** True when the text column sits on the start side and the scrim is drawn left-to-right. */
     val sideContent: Boolean,
     val contentWidthFraction: Float,
@@ -227,7 +228,10 @@ internal data class NetflixHeroLayout(
     /** 0 hides the synopsis (very short landscape heroes). */
     val synopsisMaxLines: Int,
     val buttonHeight: Dp,
+    val buttonCornerRadius: Dp,
     val buttonsFillWidth: Boolean,
+    /** Buttons are laid out one above the other instead of side by side (phone portrait). */
+    val buttonsStacked: Boolean,
     val bottomFadeHeight: Dp,
 )
 
@@ -269,16 +273,17 @@ internal fun netflixHeroLayout(
                 isTablet = false,
                 isLandscape = false,
                 heroHeight = phoneHeroHeight,
-                usesWideArtwork = false,
                 sideContent = false,
                 contentWidthFraction = 1f,
                 contentMaxWidth = 480.dp,
                 contentHorizontalPadding = hPad.dp,
                 contentVerticalPadding = 20.dp,
                 logoWidth = logoWidth(column, 0.7f, 84f),
-                synopsisMaxLines = 3,
-                buttonHeight = 46.dp,
+                synopsisMaxLines = 2,
+                buttonHeight = 48.dp,
+                buttonCornerRadius = 24.dp, // fully rounded pill
                 buttonsFillWidth = true,
+                buttonsStacked = true,
                 bottomFadeHeight = 120.dp,
             )
         }
@@ -292,7 +297,6 @@ internal fun netflixHeroLayout(
                 isTablet = false,
                 isLandscape = true,
                 heroHeight = heroHeight,
-                usesWideArtwork = true,
                 sideContent = true,
                 contentWidthFraction = 0.52f,
                 contentMaxWidth = 480.dp,
@@ -305,7 +309,9 @@ internal fun netflixHeroLayout(
                     else -> 0
                 },
                 buttonHeight = 40.dp,
+                buttonCornerRadius = 8.dp,
                 buttonsFillWidth = false,
+                buttonsStacked = false,
                 bottomFadeHeight = 90.dp,
             )
         }
@@ -322,7 +328,6 @@ internal fun netflixHeroLayout(
                 isTablet = true,
                 isLandscape = false,
                 heroHeight = heroHeight.dp,
-                usesWideArtwork = true,
                 sideContent = true,
                 contentWidthFraction = 0.66f,
                 contentMaxWidth = 560.dp,
@@ -331,7 +336,9 @@ internal fun netflixHeroLayout(
                 logoWidth = logoWidth(column, 0.6f, 110f),
                 synopsisMaxLines = 3,
                 buttonHeight = 48.dp,
+                buttonCornerRadius = 8.dp,
                 buttonsFillWidth = false,
+                buttonsStacked = false,
                 bottomFadeHeight = 140.dp,
             )
         }
@@ -349,7 +356,6 @@ internal fun netflixHeroLayout(
                 isTablet = true,
                 isLandscape = true,
                 heroHeight = heroHeight.dp,
-                usesWideArtwork = true,
                 sideContent = true,
                 contentWidthFraction = 0.48f,
                 contentMaxWidth = 600.dp,
@@ -358,7 +364,9 @@ internal fun netflixHeroLayout(
                 logoWidth = logoWidth(column, 0.6f, 130f),
                 synopsisMaxLines = if (heroHeight >= 420f) 3 else 2,
                 buttonHeight = 48.dp,
+                buttonCornerRadius = 8.dp,
                 buttonsFillWidth = false,
+                buttonsStacked = false,
                 bottomFadeHeight = 160.dp,
             )
         }
@@ -487,8 +495,8 @@ internal fun HomeHeroSection(
                 else -> baseLayout
             }
             val effectiveArtworkSource = when {
-                netflixLayout != null ->
-                    if (netflixLayout.usesWideArtwork) HomeHeroArtworkSource.BACKDROP else HomeHeroArtworkSource.POSTER
+                // Always the backdrop: posters have the title printed on them, which doubles up with our logo.
+                netflixLayout != null -> HomeHeroArtworkSource.BACKDROP
                 !isCardStyle -> HomeHeroArtworkSource.BACKDROP
                 heroUsesWideArtwork(maxWidth, viewportHeight, baseLayout.isTablet) ->
                     HomeHeroArtworkSource.BACKDROP
@@ -826,7 +834,9 @@ internal fun HomeHeroSection(
                                                         // they must never swallow taps meant for the visible title.
                                                         enabled = isCurrentLayer,
                                                         fillWidth = netflixLayout.buttonsFillWidth,
+                                                        stacked = netflixLayout.buttonsStacked,
                                                         buttonHeight = netflixLayout.buttonHeight,
+                                                        cornerRadius = netflixLayout.buttonCornerRadius,
                                                         onViewDetails = onItemClick,
                                                         onToggleSaved = onToggleSaved,
                                                     )
@@ -1266,45 +1276,69 @@ private fun HeroActionButtons(
     isSaved: Boolean,
     enabled: Boolean,
     fillWidth: Boolean,
+    stacked: Boolean,
     buttonHeight: Dp,
+    cornerRadius: Dp,
     onViewDetails: ((MetaPreview) -> Unit)?,
     onToggleSaved: ((MetaPreview) -> Unit)?,
 ) {
-    Row(
-        modifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val buttonModifier = if (fillWidth) Modifier.weight(1f) else Modifier
+    val viewDetailsLabel = stringResource(Res.string.home_view_details)
+    val saveLabel = stringResource(
+        if (isSaved) Res.string.home_hero_saved_to_library else Res.string.home_hero_save_to_library,
+    )
+    val saveDescription = stringResource(
+        if (isSaved) Res.string.hero_remove_from_library else Res.string.hero_add_to_library,
+    )
 
+    @Composable
+    fun ViewDetailsButton(modifier: Modifier) {
         HeroActionButton(
-            modifier = buttonModifier,
-            label = stringResource(Res.string.home_view_details),
+            modifier = modifier,
+            label = viewDetailsLabel,
             icon = Icons.Rounded.Info,
             containerColor = Color.White,
             contentColor = Color.Black,
             height = buttonHeight,
+            cornerRadius = cornerRadius,
             enabled = enabled && onViewDetails != null,
             onClick = { onViewDetails?.invoke(item) },
         )
+    }
 
-        if (onToggleSaved != null) {
-            val toggleDescription = stringResource(
-                if (isSaved) Res.string.hero_remove_from_library else Res.string.hero_add_to_library,
-            )
-            HeroActionButton(
-                modifier = buttonModifier,
-                label = stringResource(
-                    if (isSaved) Res.string.home_hero_saved_to_library else Res.string.home_hero_save_to_library,
-                ),
-                icon = if (isSaved) Icons.Rounded.Check else Icons.Rounded.Add,
-                containerColor = HeroSecondaryButtonColor,
-                contentColor = Color.White,
-                height = buttonHeight,
-                enabled = enabled,
-                semanticsDescription = toggleDescription,
-                onClick = { onToggleSaved(item) },
-            )
+    @Composable
+    fun SaveButton(modifier: Modifier) {
+        if (onToggleSaved == null) return
+        HeroActionButton(
+            modifier = modifier,
+            label = saveLabel,
+            icon = if (isSaved) Icons.Rounded.Check else Icons.Rounded.Add,
+            containerColor = HeroSecondaryButtonColor,
+            contentColor = Color.White,
+            height = buttonHeight,
+            cornerRadius = cornerRadius,
+            enabled = enabled,
+            semanticsDescription = saveDescription,
+            onClick = { onToggleSaved(item) },
+        )
+    }
+
+    if (stacked) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ViewDetailsButton(Modifier.fillMaxWidth())
+            SaveButton(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val buttonModifier = if (fillWidth) Modifier.weight(1f) else Modifier
+            ViewDetailsButton(buttonModifier)
+            SaveButton(buttonModifier)
         }
     }
 }
@@ -1318,6 +1352,7 @@ private fun HeroActionButton(
     containerColor: Color,
     contentColor: Color,
     height: Dp,
+    cornerRadius: Dp,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1326,7 +1361,7 @@ private fun HeroActionButton(
     Row(
         modifier = modifier
             .height(height)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(cornerRadius))
             .background(containerColor)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .then(
