@@ -47,6 +47,8 @@ data class HomeCategory(
     val catalogKeys: List<String>? = emptyList(),
 )
 
+data class HomeCategoryEditorRequest(val categoryId: String?)
+
 data class HomeCategoryUiState(
     val categories: List<HomeCategory> = defaultHomeCategories(),
     val selectedId: String = HOME_CATEGORY_HOME_ID,
@@ -102,9 +104,21 @@ object HomeCategoryRepository {
     private val _state = MutableStateFlow(HomeCategoryUiState())
     val state: StateFlow<HomeCategoryUiState> = _state.asStateFlow()
 
-    /** Set to a category id to ask the top bar to open its catalog picker. */
-    private val _editorRequest = MutableStateFlow<String?>(null)
-    val editorRequest: StateFlow<String?> = _editorRequest.asStateFlow()
+    /** Asks the editor sheet to open. [HomeCategoryEditorRequest.categoryId] null = category list. */
+    private val _editorRequest = MutableStateFlow<HomeCategoryEditorRequest?>(null)
+    val editorRequest: StateFlow<HomeCategoryEditorRequest?> = _editorRequest.asStateFlow()
+
+    /** Whether the category panel above the bottom navigation bar is open. */
+    private val _panelOpen = MutableStateFlow(false)
+    val panelOpen: StateFlow<Boolean> = _panelOpen.asStateFlow()
+
+    fun setPanelOpen(open: Boolean) {
+        _panelOpen.value = open
+    }
+
+    fun togglePanel() {
+        _panelOpen.value = !_panelOpen.value
+    }
 
     private var loadedProfileId: Int? = null
 
@@ -207,8 +221,8 @@ object HomeCategoryRepository {
         update { HomeCategoryUiState() }
     }
 
-    fun requestEditor(categoryId: String) {
-        _editorRequest.value = categoryId
+    fun requestEditor(categoryId: String? = null) {
+        _editorRequest.value = HomeCategoryEditorRequest(categoryId)
     }
 
     fun consumeEditorRequest() {

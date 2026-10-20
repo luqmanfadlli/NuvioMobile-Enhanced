@@ -52,7 +52,6 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
 import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
-import com.nuvio.app.features.home.components.HomeCategoryBarContentHeight
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
@@ -1057,12 +1056,6 @@ fun HomeScreen(
                 listState = homeListState,
                 autoHidesNativeTabBar = true,
             ) {
-                if (!showHeroSlot) {
-                    item(key = "home_category_bar_spacer") {
-                        Spacer(modifier = Modifier.height(HomeCategoryBarContentHeight - 16.dp))
-                    }
-                }
-
                 if (showHeroSlot) {
                     item {
                         when {

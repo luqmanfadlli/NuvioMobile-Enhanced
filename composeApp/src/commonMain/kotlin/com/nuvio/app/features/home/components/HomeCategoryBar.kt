@@ -5,7 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,67 +65,32 @@ import com.nuvio.app.features.home.HomeCategory
 import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
 
-val HomeCategoryBarContentHeight = 52.dp
-
-/** Height the bar occupies (status bar inset + chip row). */
-@Composable
-fun homeCategoryBarHeight(): Dp =
-    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HomeCategoryBarContentHeight
-
 /**
- * Top navigation bar that switches between the user's categories.
- * Also hosts the customization sheet (opened from the trailing icon or from an empty category).
+ * Panel that opens just above the bottom navigation bar when the "Categories" item is tapped.
+ * Shows every visible category plus a settings icon, all condensed behind that single item.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeCategoryBar(
-    modifier: Modifier = Modifier,
-    transparentBackground: Boolean = true,
-) {
+fun HomeCategoryPanel(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { HomeCategoryRepository.ensureLoaded() }
     val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
-    val editorRequest by HomeCategoryRepository.editorRequest.collectAsStateWithLifecycle()
     val tokens = MaterialTheme.nuvio
 
-    var showManager by remember { mutableStateOf(false) }
-    var pickerCategoryId by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(editorRequest) {
-        val request = editorRequest ?: return@LaunchedEffect
-        pickerCategoryId = request
-        showManager = true
-        HomeCategoryRepository.consumeEditorRequest()
-    }
-
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundModifier = if (transparentBackground) {
-        Modifier.background(
-            Brush.verticalGradient(
-                colors = listOf(
-                    tokens.colors.background.copy(alpha = 0.85f),
-                    tokens.colors.background.copy(alpha = 0.55f),
-                    Color.Transparent,
-                ),
-            ),
-        )
-    } else {
-        Modifier.background(tokens.colors.background)
-    }
-
-    Box(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(backgroundModifier)
-            .padding(top = statusBarTop)
-            .height(HomeCategoryBarContentHeight),
+            .padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = tokens.colors.surfaceSheet.copy(alpha = 0.96f),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LazyRow(
                 modifier = Modifier.weight(1f),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -130,14 +98,14 @@ fun HomeCategoryBar(
                     Chip(
                         label = category.title,
                         selected = category.id == state.selected?.id,
-                        onClick = { HomeCategoryRepository.select(category.id) },
+                        onClick = {
+                            HomeCategoryRepository.select(category.id)
+                            HomeCategoryRepository.setPanelOpen(false)
+                        },
                     )
                 }
             }
-            IconButton(onClick = {
-                pickerCategoryId = null
-                showManager = true
-            }) {
+            IconButton(onClick = { HomeCategoryRepository.requestEditor() }) {
                 Icon(
                     imageVector = Icons.Rounded.Tune,
                     contentDescription = "Customize categories",
@@ -145,6 +113,21 @@ fun HomeCategoryBar(
                 )
             }
         }
+    }
+}
+
+/** Always-composed host that shows the customization sheet when something requests it. */
+@Composable
+fun HomeCategoryEditorHost() {
+    val request by HomeCategoryRepository.editorRequest.collectAsStateWithLifecycle()
+    var showManager by remember { mutableStateOf(false) }
+    var pickerCategoryId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(request) {
+        val current = request ?: return@LaunchedEffect
+        pickerCategoryId = current.categoryId
+        showManager = true
+        HomeCategoryRepository.consumeEditorRequest()
     }
 
     if (showManager) {

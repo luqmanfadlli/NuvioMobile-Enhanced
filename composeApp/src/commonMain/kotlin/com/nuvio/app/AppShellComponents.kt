@@ -69,8 +69,7 @@ import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
-import com.nuvio.app.features.home.components.HomeCategoryBar
-import com.nuvio.app.features.home.components.HomeCategoryBarContentHeight
+import com.nuvio.app.features.home.components.HomeCategoryEditorHost
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryItem
@@ -222,26 +221,19 @@ internal fun AppTabHost(
                         }
 
                         HomeCategoryKind.LiveTv -> LiveTvScreen(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = HomeCategoryBarContentHeight),
+                            modifier = Modifier.fillMaxSize(),
                             scrollToTopRequests = requests.liveTvScrollToTopRequests,
                             onChannelClick = actions.onLiveTvChannelClick,
                         )
 
                         HomeCategoryKind.Discover -> SearchScreen(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = HomeCategoryBarContentHeight),
+                            modifier = Modifier.fillMaxSize(),
                             onPosterClick = actions.onPosterClick,
                             onPosterLongClick = actions.onPosterLongClick,
                             scrollToTopRequests = requests.searchScrollToTopRequests,
                         )
                     }
-                    HomeCategoryBar(
-                        modifier = Modifier.align(Alignment.TopStart),
-                        transparentBackground = activeCategoryKind == HomeCategoryKind.Catalogs,
-                    )
+                    HomeCategoryEditorHost()
                 }
             }
 

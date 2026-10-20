@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -59,6 +61,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import com.nuvio.app.features.home.HomeCategoryRepository
+import com.nuvio.app.features.home.components.HomeCategoryPanel
 
 @Composable
 internal fun MainTabsDestination(
@@ -169,6 +173,24 @@ internal fun MainTabsDestination(
 
                 // The classic bar always stays at the bottom, in portrait and landscape.
 
+                val categoriesPanelOpen by HomeCategoryRepository.panelOpen.collectAsStateWithLifecycle()
+                LaunchedEffect(highlightedTab) {
+                    if (highlightedTab != AppScreenTab.Home) HomeCategoryRepository.setPanelOpen(false)
+                }
+                if (tabsRouteActive && categoriesPanelOpen && highlightedTab == AppScreenTab.Home) {
+                    val panelBottomPadding = when {
+                        useNativeBottomTabs -> 57.dp
+                        navBarStyleSetting == NavBarStyle.CLASSIC -> innerPadding.calculateBottomPadding() + 8.dp
+                        floatingBarOnTop -> floatingNavigationBarPadding().calculateBottomPadding()
+                        else -> floatingNavigationBarPadding().calculateBottomPadding() + 68.dp
+                    }
+                    HomeCategoryPanel(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = panelBottomPadding),
+                    )
+                }
+
                 if (floatingBarVisible) {
                     when (navBarStyleSetting) {
                         NavBarStyle.EXPANDED -> navBarScrollState.expand()
@@ -233,6 +255,19 @@ private fun MainFloatingNavigationBar(
     )
 }
 
+/** Tapping "Categories" opens (or closes) the panel; from another tab it jumps to Home first. */
+private fun toggleCategoriesPanel(
+    highlightedTab: AppScreenTab,
+    onTabSelected: (AppScreenTab) -> Unit,
+) {
+    if (highlightedTab != AppScreenTab.Home) {
+        onTabSelected(AppScreenTab.Home)
+        HomeCategoryRepository.setPanelOpen(true)
+    } else {
+        HomeCategoryRepository.togglePanel()
+    }
+}
+
 @Composable
 internal fun mainFloatingNavigationItems(
     highlightedTab: AppScreenTab,
@@ -243,12 +278,22 @@ internal fun mainFloatingNavigationItems(
     backdrop: Backdrop?,
     defaultIconColorOverride: Color? = null,
 ): List<FloatingNavigationItem> = buildList {
+    val categoriesPanelOpen by HomeCategoryRepository.panelOpen.collectAsStateWithLifecycle()
+    val onCategoriesClick = { toggleCategoriesPanel(highlightedTab, onTabSelected) }
     add(
         FloatingNavigationItem(
             selected = highlightedTab == AppScreenTab.Home,
             onClick = { onTabSelected(AppScreenTab.Home) },
             icon = Icons.Filled.Home,
             label = stringResource(Res.string.compose_nav_home),
+        ),
+    )
+    add(
+        FloatingNavigationItem(
+            selected = categoriesPanelOpen && highlightedTab == AppScreenTab.Home,
+            onClick = onCategoriesClick,
+            icon = Icons.Filled.Apps,
+            label = "Categories",
         ),
     )
     add(
@@ -306,12 +351,19 @@ internal fun MainClassicNavigationBar(
     onAddProfileRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val categoriesPanelOpen by HomeCategoryRepository.panelOpen.collectAsStateWithLifecycle()
     NuvioClassicNavigationBar(modifier) {
         NavItem(
             selected = highlightedTab == AppScreenTab.Home,
             onClick = { onTabSelected(AppScreenTab.Home) },
             icon = Icons.Filled.Home,
             contentDescription = stringResource(Res.string.compose_nav_home),
+        )
+        NavItem(
+            selected = categoriesPanelOpen && highlightedTab == AppScreenTab.Home,
+            onClick = { toggleCategoriesPanel(highlightedTab, onTabSelected) },
+            icon = Icons.Filled.Apps,
+            contentDescription = "Categories",
         )
         NavItem(
             selected = highlightedTab == AppScreenTab.Search,
