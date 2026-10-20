@@ -275,6 +275,26 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(HomeRowShapeMode.POSTER, HomeCatalogSettingsRepository.uiState.value.items.single().rowShape)
     }
 
+    @Test
+    fun rowShapeCycleVisitsEveryModeAndReturnsToDefault() {
+        // Global poster mode: default -> landscape -> poster (forced) -> default.
+        var mode = HomeRowShapeMode.DEFAULT
+        mode = nextRowShapeMode(mode, globalLandscape = false)
+        assertEquals(HomeRowShapeMode.LANDSCAPE, mode)
+        mode = nextRowShapeMode(mode, globalLandscape = false)
+        assertEquals(HomeRowShapeMode.POSTER, mode)
+        mode = nextRowShapeMode(mode, globalLandscape = false)
+        assertEquals(HomeRowShapeMode.DEFAULT, mode)
+
+        // Global landscape mode: default -> poster -> landscape (forced) -> default.
+        mode = nextRowShapeMode(mode, globalLandscape = true)
+        assertEquals(HomeRowShapeMode.POSTER, mode)
+        mode = nextRowShapeMode(mode, globalLandscape = true)
+        assertEquals(HomeRowShapeMode.LANDSCAPE, mode)
+        mode = nextRowShapeMode(mode, globalLandscape = true)
+        assertEquals(HomeRowShapeMode.DEFAULT, mode)
+    }
+
     private fun addon() = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(

@@ -1,7 +1,10 @@
 package com.nuvio.app.features.home.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +28,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CropLandscape
+import androidx.compose.material.icons.rounded.CropPortrait
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -99,6 +104,9 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCategory
 import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
+import com.nuvio.app.features.home.HomeRowShapeMode
+import com.nuvio.app.features.home.nextRowShapeMode
+import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 
 /**
  * Panel that opens just above the bottom navigation bar. It reuses the navigation bar's glass
@@ -564,6 +572,7 @@ private fun HomeCategoryCatalogPicker(
 ) {
     val tokens = MaterialTheme.nuvio
     val rankedKeys = HomeCategoryRepository.state.collectAsStateWithLifecycle().value.rankedKeys
+    val globalLandscape = rememberPosterCardStyleUiState().catalogLandscapeModeEnabled
     val settingsState by remember {
         HomeCatalogSettingsRepository.snapshot()
         HomeCatalogSettingsRepository.uiState
@@ -612,7 +621,7 @@ private fun HomeCategoryCatalogPicker(
 
         SectionLabel("Shown in this category (${selectedItems.size})")
         Text(
-            text = "★ = this catalog feeds the hero banner of this category. # = show big numbers behind its posters.",
+            text = "★ = this catalog feeds the hero banner of this category. # = show big numbers behind its posters. Tap the card icon under a title to switch its cards between default, poster and landscape.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
         )
@@ -629,7 +638,22 @@ private fun HomeCategoryCatalogPicker(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CatalogLabel(item, Modifier.weight(1f))
+                CatalogLabel(
+                    item = item,
+                    modifier = Modifier.weight(1f),
+                    trailing = {
+                        RowShapeTag(
+                            mode = item.rowShape,
+                            globalLandscape = globalLandscape,
+                            onClick = {
+                                HomeCatalogSettingsRepository.setRowShape(
+                                    item.key,
+                                    nextRowShapeMode(item.rowShape, globalLandscape),
+                                )
+                            },
+                        )
+                    },
+                )
                 val feedsHero = item.key !in category.heroExcludedKeys
                 IconButton(onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) }) {
                     Text(
@@ -705,7 +729,11 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun CatalogLabel(item: HomeCatalogSettingsItem, modifier: Modifier = Modifier) {
+private fun CatalogLabel(
+    item: HomeCatalogSettingsItem,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     val tokens = MaterialTheme.nuvio
     Column(modifier = modifier.padding(vertical = 4.dp)) {
         Text(
@@ -715,12 +743,70 @@ private fun CatalogLabel(item: HomeCatalogSettingsItem, modifier: Modifier = Mod
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = item.addonName,
-            style = MaterialTheme.typography.bodySmall,
-            color = tokens.colors.textMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        if (trailing == null) {
+            Text(
+                text = item.addonName,
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.addonName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                trailing()
+            }
+        }
+    }
+}
+
+/**
+ * Small per-row card shape button. Muted when the row follows the global setting (shows the shape
+ * it currently gets), accent with a border when this row is forced to poster or landscape.
+ */
+@Composable
+private fun RowShapeTag(
+    mode: HomeRowShapeMode,
+    globalLandscape: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val forced = mode != HomeRowShapeMode.DEFAULT
+    val showsLandscape = mode.landscapeOverride ?: globalLandscape
+    val tint = if (forced) tokens.colors.accent else tokens.colors.textMuted
+    val description = when (mode) {
+        HomeRowShapeMode.DEFAULT -> "Card shape: default. Tap to change."
+        HomeRowShapeMode.POSTER -> "Card shape: poster. Tap to change."
+        HomeRowShapeMode.LANDSCAPE -> "Card shape: landscape. Tap to change."
+    }
+    Box(
+        modifier = Modifier
+            .padding(start = 6.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .then(
+                if (forced) {
+                    Modifier.border(BorderStroke(1.dp, tint), RoundedCornerShape(6.dp))
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(14.dp),
         )
     }
 }

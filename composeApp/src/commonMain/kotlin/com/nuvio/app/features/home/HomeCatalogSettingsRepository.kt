@@ -133,6 +133,21 @@ enum class HomeRowShapeMode(
     }
 }
 
+/**
+ * Tap-to-cycle order for a row's shape: Default -> the shape opposite to the global setting ->
+ * the shape that matches the global setting (forced) -> Default. [globalLandscape] is the current
+ * Poster Card Style landscape switch.
+ */
+fun nextRowShapeMode(current: HomeRowShapeMode, globalLandscape: Boolean): HomeRowShapeMode {
+    val same = if (globalLandscape) HomeRowShapeMode.LANDSCAPE else HomeRowShapeMode.POSTER
+    val opposite = if (globalLandscape) HomeRowShapeMode.POSTER else HomeRowShapeMode.LANDSCAPE
+    return when (current) {
+        HomeRowShapeMode.DEFAULT -> opposite
+        opposite -> same
+        else -> HomeRowShapeMode.DEFAULT
+    }
+}
+
 internal data class HomeCatalogPreference(
     val customTitle: String,
     val enabled: Boolean,
