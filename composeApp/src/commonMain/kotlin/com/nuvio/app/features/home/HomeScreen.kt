@@ -939,22 +939,47 @@ fun HomeScreen(
         val keys = enabledHomeItems.filterNot { it.isCollection }.mapTo(HashSet()) { it.key }
         homeUiState.sections.filter { it.key in keys }
     }
+    val heroExcludedKeys = activeCategory?.heroExcludedKeys.orEmpty()
     val heroItems = remember(
         homeUiState.heroItems,
+        homeUiState.isLoading,
         visibleSections,
         categoryKeys,
+        heroExcludedKeys,
         activeCategory?.id,
         homeSettingsUiState.heroEnabled,
     ) {
-        when {
-            categoryKeys == null -> homeUiState.heroItems
-            !homeSettingsUiState.heroEnabled -> emptyList()
-            else -> visibleSections
+        if (!homeSettingsUiState.heroEnabled) {
+            emptyList()
+        } else {
+            // The hero is fed by the catalogs of the active category (see the star toggles in the
+            // category manager), so every category has its own hero.
+            val derived = visibleSections
+                .filter { section -> section.key !in heroExcludedKeys }
                 .flatMap { section -> section.items }
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(Random(activeCategory?.id.orEmpty().hashCode()))
                 .take(8)
+            if (categoryKeys == null && heroExcludedKeys.isEmpty() &&
+                (derived.isEmpty() || homeUiState.isLoading)
+            ) {
+                // Default Home: keep the existing hero (including collection heroes) until ready.
+                homeUiState.heroItems
+            } else {
+                derived
+            }
         }
+    }
+
+    // Remember the scroll position of every category.
+    val scrollCategoryId = activeCategory?.id ?: HOME_CATEGORY_HOME_ID
+    LaunchedEffect(scrollCategoryId) {
+        val saved = HomeCategoryScrollMemory.get(scrollCategoryId)
+        homeListState.scrollToItem(saved?.first ?: 0, saved?.second ?: 0)
+    }
+    LaunchedEffect(scrollCategoryId) {
+        snapshotFlow { homeListState.firstVisibleItemIndex to homeListState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> HomeCategoryScrollMemory.put(scrollCategoryId, index, offset) }
     }
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)

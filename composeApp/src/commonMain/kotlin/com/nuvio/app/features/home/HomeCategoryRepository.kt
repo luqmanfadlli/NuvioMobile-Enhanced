@@ -45,6 +45,8 @@ data class HomeCategory(
     val enabled: Boolean = true,
     val builtIn: Boolean = false,
     val catalogKeys: List<String>? = emptyList(),
+    /** Catalogs of this category that do NOT feed its hero banner (default: all of them do). */
+    val heroExcludedKeys: List<String> = emptyList(),
 )
 
 data class HomeCategoryEditorRequest(val categoryId: String?)
@@ -112,6 +114,17 @@ fun defaultHomeCategories(): List<HomeCategory> = listOf(
         catalogKeys = emptyList(),
     ),
 )
+
+/** Remembers the Home scroll position of each category while the app is running. */
+object HomeCategoryScrollMemory {
+    private val positions = mutableMapOf<String, Pair<Int, Int>>()
+
+    fun get(categoryId: String): Pair<Int, Int>? = positions[categoryId]
+
+    fun put(categoryId: String, index: Int, offset: Int) {
+        positions[categoryId] = index to offset
+    }
+}
 
 object HomeCategoryRepository {
     private val json = Json {
@@ -262,6 +275,26 @@ object HomeCategoryRepository {
             state.copy(
                 categories = state.categories.map {
                     if (it.id == id) it.copy(catalogKeys = keys.distinct()) else it
+                },
+            )
+        }
+    }
+
+    fun setHeroSource(categoryId: String, catalogKey: String, feedsHero: Boolean) {
+        ensureLoaded()
+        update { state ->
+            state.copy(
+                categories = state.categories.map { category ->
+                    if (category.id != categoryId) {
+                        category
+                    } else {
+                        val excluded = if (feedsHero) {
+                            category.heroExcludedKeys - catalogKey
+                        } else {
+                            (category.heroExcludedKeys + catalogKey).distinct()
+                        }
+                        category.copy(heroExcludedKeys = excluded)
+                    }
                 },
             )
         }

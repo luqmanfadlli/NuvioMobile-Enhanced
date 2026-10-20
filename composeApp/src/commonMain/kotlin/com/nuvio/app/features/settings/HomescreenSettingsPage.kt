@@ -191,7 +191,6 @@ internal fun LazyListScope.homescreenSettingsContent(
             val settingsUiState by remember {
                 HomeCatalogSettingsRepository.uiState
             }.collectAsStateWithLifecycle()
-            var heroSourcesExpanded by remember { mutableStateOf(false) }
             SettingsSection(
                 title = stringResource(Res.string.settings_homescreen_section_hero_sources),
                 isTablet = isTablet,
@@ -200,13 +199,6 @@ internal fun LazyListScope.homescreenSettingsContent(
                     HeroStyleOptions(
                         isTablet = isTablet,
                         selectedStyle = settingsUiState.heroStyle,
-                    )
-                    HeroSourcesDropdown(
-                        isTablet = isTablet,
-                        items = catalogOnlyItems,
-                        selectedHeroSourceCount = selectedHeroSourceCount,
-                        expanded = heroSourcesExpanded,
-                        onExpandedChange = { heroSourcesExpanded = it },
                     )
                 }
             }

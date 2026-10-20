@@ -223,6 +223,7 @@ private fun HomeCategoryList(
     var newTitle by remember { mutableStateOf("") }
     var renamingId by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var confirmDeleteId by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -294,7 +295,7 @@ private fun HomeCategoryList(
                         Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = tokens.colors.textMuted)
                     }
                     if (!category.builtIn) {
-                        IconButton(onClick = { HomeCategoryRepository.delete(category.id) }) {
+                        IconButton(onClick = { confirmDeleteId = category.id }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = tokens.colors.textMuted)
                         }
                     }
@@ -302,6 +303,21 @@ private fun HomeCategoryList(
                         TextButton(onClick = { onEditCatalogs(category.id) }) {
                             Text("Choose catalogs")
                         }
+                    }
+                }
+                if (confirmDeleteId == category.id) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Delete \"${category.title}\"?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = tokens.colors.textPrimary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { confirmDeleteId = null }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            HomeCategoryRepository.delete(category.id)
+                            confirmDeleteId = null
+                        }) { Text("Delete") }
                     }
                 }
                 if (renamingId == category.id) {
@@ -450,7 +466,7 @@ private fun HomeCategoryCatalogPicker(
 
         SectionLabel("Shown in this category (${selectedItems.size})")
         Text(
-            text = "Tap # on a catalog to show big 1–10 numbers behind its posters.",
+            text = "★ = this catalog feeds the hero banner of this category. # = show big numbers behind its posters.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
         )
@@ -468,6 +484,14 @@ private fun HomeCategoryCatalogPicker(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CatalogLabel(item, Modifier.weight(1f))
+                val feedsHero = item.key !in category.heroExcludedKeys
+                IconButton(onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) }) {
+                    Text(
+                        text = if (feedsHero) "★" else "☆",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (feedsHero) tokens.colors.accent else tokens.colors.textMuted,
+                    )
+                }
                 val ranked = item.key in rankedKeys
                 IconButton(onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) }) {
                     Text(
