@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
@@ -73,6 +74,7 @@ internal fun HomeSkeletonHero(
 ) {
     val brush = rememberHomeSkeletonBrush()
     val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val isNetflixStyle = heroStyle == HomeHeroStyle.NETFLIX
     val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     BoxWithConstraints(
@@ -90,10 +92,10 @@ internal fun HomeSkeletonHero(
                 },
             )
             .clip(
-                if (isCardStyle) {
-                    RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
-                } else {
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                when {
+                    isCardStyle -> RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+                    isNetflixStyle -> RectangleShape
+                    else -> RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
                 },
             ),
     ) {
@@ -103,14 +105,18 @@ internal fun HomeSkeletonHero(
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
         val containerWidth = maxWidth
-        val heroHeight = if (isCardStyle) {
-            cardHeroHeight(
+        val heroHeight = when {
+            isCardStyle -> cardHeroHeight(
                 maxWidth = maxWidth,
                 viewportHeight = viewportHeight,
                 isTablet = layout.isTablet,
             )
-        } else {
-            layout.heroHeight
+            isNetflixStyle -> netflixHeroLayout(
+                maxWidthDp = maxWidth.value,
+                viewportHeightDp = viewportHeight?.value,
+                mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+            ).heroHeight
+            else -> layout.heroHeight
         }
 
         Box(

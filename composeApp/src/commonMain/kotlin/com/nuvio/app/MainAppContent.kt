@@ -108,6 +108,7 @@ import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeRepository
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
 import com.nuvio.app.features.home.components.HomeHeroTrailerPlaybackController
 import com.nuvio.app.features.home.components.shouldBlurContinueWatchingArtwork
@@ -332,6 +333,46 @@ internal fun MainAppContent(
                 withFrameNanos { }
                 selectedPosterActionTarget = target
             }
+        }
+        // "Save to Library" on the Netflix-style home hero. Mirrors the Details screen toggle so
+        // remote tracking libraries (Trakt, Simkl, ...) still get their removal confirmation.
+        val toggleHeroSaved: (MetaPreview) -> Unit = { preview ->
+            val item = preview.toLibraryItem(savedAtEpochMs = 0L)
+            coroutineScope.launch {
+                val toggleMembership: suspend (Set<TrackingProviderId>) ->
+                    TrackingMembershipApplyResult = { confirmedProviders ->
+                    LibraryRepository.toggleSaved(
+                        item = item,
+                        confirmedRemovalProviders = confirmedProviders,
+                    )
+                }
+                executeTrackingMembershipOperation(
+                    operation = { toggleMembership(emptySet()) },
+                    onSuccess = { result ->
+                        if (result.requiresRemovalConfirmation) {
+                            pendingTrackingRemoval = PendingTrackingMembershipRemoval(
+                                itemTitle = item.name,
+                                confirmations = result.requiredRemovalConfirmations,
+                                retry = toggleMembership,
+                                onApplied = ::showTrackingMembershipRewriteFeedback,
+                                onFailure = { error ->
+                                    NuvioToastController.show(
+                                        error.message ?: trackingListsUpdateFailedMessage,
+                                    )
+                                },
+                            )
+                        } else {
+                            showTrackingMembershipRewriteFeedback(result)
+                        }
+                    },
+                    onFailure = { error ->
+                        NuvioToastController.show(
+                            error.message ?: trackingListsUpdateFailedMessage,
+                        )
+                    },
+                )
+            }
+            Unit
         }
         val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
         val launchOverlayProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
@@ -1633,6 +1674,7 @@ internal fun MainAppContent(
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },
+                                onHeroSaveClick = toggleHeroSaved,
                                 onLibraryPosterClick = openLibraryItem,
                                 onLibraryCalendarEpisodeClick = openLibraryCalendarEpisode,
                                 onLibraryPosterLongClick = { item, section ->

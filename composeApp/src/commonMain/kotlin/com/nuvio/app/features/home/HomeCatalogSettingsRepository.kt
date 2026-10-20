@@ -88,12 +88,15 @@ internal enum class HomeHeroArtworkSource(
 /**
  * Full-bleed keeps the original edge-to-edge hero. Card renders the artwork inside a rounded
  * TMDB-poster-ratio card inset from the screen edges, below the status bar.
+ * Netflix is an edge-to-edge hero with start-aligned text, a left/bottom scrim and
+ * "View Details" + "Save to Library" buttons (no play button).
  */
 internal enum class HomeHeroStyle(
     val storageValue: String,
 ) {
     FULL_BLEED("full_bleed"),
     CARD("card"),
+    NETFLIX("netflix"),
     ;
 
     companion object {

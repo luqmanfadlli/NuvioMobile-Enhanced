@@ -51,6 +51,7 @@ import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
 import com.nuvio.app.features.details.seriesPrimaryAction
+import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
@@ -124,6 +125,7 @@ fun HomeScreen(
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    onHeroSaveClick: ((MetaPreview) -> Unit)? = null,
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     continueWatchingDisintegrationRequest: DisintegrationRequest<String>? = null,
@@ -971,6 +973,13 @@ fun HomeScreen(
         }
     }
 
+    // Library membership is only observed for the Netflix hero, so other styles never recompose on library changes.
+    val heroSavedItemKeys = if (homeSettingsUiState.heroStyle == HomeHeroStyle.NETFLIX && onHeroSaveClick != null) {
+        rememberHeroSavedItemKeys(heroItems)
+    } else {
+        emptySet()
+    }
+
     // Remember the scroll position of every category.
     val scrollCategoryId = activeCategory?.id ?: HOME_CATEGORY_HOME_ID
     LaunchedEffect(scrollCategoryId) {
@@ -1108,6 +1117,8 @@ fun HomeScreen(
                                 trailerStartUnmuted = homeSettingsUiState.heroTrailerStartUnmuted,
                                 onItemClick = onPosterClick,
                                 onActiveArtworkChange = onActiveHeroArtworkChange,
+                                savedItemKeys = heroSavedItemKeys,
+                                onToggleSaved = onHeroSaveClick,
                             )
 
                             else -> HomeHeroReservedSpace(
@@ -2156,3 +2167,16 @@ private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
 private fun WatchProgressEntry.isCloudLibraryProgressEntry(): Boolean =
     contentType.equals(CloudLibraryContentType, ignoreCase = true) ||
         parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+
+@Composable
+private fun rememberHeroSavedItemKeys(items: List<MetaPreview>): Set<String> {
+    val libraryUiState by remember {
+        LibraryRepository.ensureLoaded()
+        LibraryRepository.uiState
+    }.collectAsStateWithLifecycle()
+    return remember(items, libraryUiState.items, libraryUiState.sections, libraryUiState.sourceMode) {
+        items
+            .filter { item -> LibraryRepository.isSaved(item.id, item.type) }
+            .mapTo(HashSet()) { item -> item.stableKey() }
+    }
+}

@@ -16,14 +16,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
@@ -33,6 +37,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
@@ -56,12 +63,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,6 +102,7 @@ import com.nuvio.app.features.details.youtubePlaybackUrl
 import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.player.MiniPlayerController
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
@@ -189,6 +201,170 @@ internal data class HomeHeroLayout(
     val logoWidthFraction: Float,
 )
 
+/**
+ * Layout for [HomeHeroStyle.NETFLIX]. Derived purely from the available width and viewport height so the
+ * four Android form factors (phone / tablet x portrait / landscape) are covered by one tested function.
+ *
+ * "Tablet" means the shortest viewport side is at least 600dp, so a 844x390 phone in landscape is a phone.
+ *
+ * - phone portrait : poster artwork, text + full-width buttons pinned to the bottom
+ * - phone landscape: backdrop artwork, text column on the start side, compact buttons
+ * - tablet portrait: backdrop artwork, start-aligned column, taller hero
+ * - tablet landscape: backdrop artwork, start-aligned column, hero capped to the viewport
+ */
+internal data class NetflixHeroLayout(
+    val isTablet: Boolean,
+    val isLandscape: Boolean,
+    val heroHeight: Dp,
+    val usesWideArtwork: Boolean,
+    /** True when the text column sits on the start side and the scrim is drawn left-to-right. */
+    val sideContent: Boolean,
+    val contentWidthFraction: Float,
+    val contentMaxWidth: Dp,
+    val contentHorizontalPadding: Dp,
+    val contentVerticalPadding: Dp,
+    val logoWidth: Dp,
+    /** 0 hides the synopsis (very short landscape heroes). */
+    val synopsisMaxLines: Int,
+    val buttonHeight: Dp,
+    val buttonsFillWidth: Boolean,
+    val bottomFadeHeight: Dp,
+)
+
+private const val NETFLIX_LOGO_ASPECT_RATIO = 2.6f
+
+internal fun netflixHeroLayout(
+    maxWidthDp: Float,
+    viewportHeightDp: Float? = null,
+    mobileBelowSectionHeightHintDp: Float? = null,
+): NetflixHeroLayout {
+    val base = homeHeroLayout(
+        maxWidthDp = maxWidthDp,
+        viewportHeightDp = viewportHeightDp,
+        mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
+    )
+    val isLandscape = viewportHeightDp?.let { maxWidthDp > it } == true
+    // homeHeroLayout keys "tablet" off width alone, which would make every phone in landscape a tablet.
+    // Use the shortest side (the standard 600dp sw threshold) so phones stay phones when rotated.
+    val shortestSideDp = viewportHeightDp?.let { minOf(maxWidthDp, it) } ?: maxWidthDp
+    val isTablet = shortestSideDp >= 600f
+    val phoneHeroHeight = mobileHeroHeight(
+        maxWidthDp = maxWidthDp,
+        viewportHeightDp = viewportHeightDp,
+        mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
+    )
+
+    fun columnWidth(horizontalPaddingDp: Float, fraction: Float, maxDp: Float): Float =
+        minOf((maxWidthDp - horizontalPaddingDp * 2f).coerceAtLeast(0f) * fraction, maxDp)
+
+    fun logoWidth(columnWidthDp: Float, logoFraction: Float, logoMaxHeightDp: Float): Dp =
+        minOf(columnWidthDp * logoFraction, logoMaxHeightDp * NETFLIX_LOGO_ASPECT_RATIO).dp
+
+    return when {
+        // Phone, portrait.
+        !isTablet && !isLandscape -> {
+            val hPad = 20f
+            val column = columnWidth(hPad, 1f, 480f)
+            NetflixHeroLayout(
+                isTablet = false,
+                isLandscape = false,
+                heroHeight = phoneHeroHeight,
+                usesWideArtwork = false,
+                sideContent = false,
+                contentWidthFraction = 1f,
+                contentMaxWidth = 480.dp,
+                contentHorizontalPadding = hPad.dp,
+                contentVerticalPadding = 20.dp,
+                logoWidth = logoWidth(column, 0.7f, 84f),
+                synopsisMaxLines = 3,
+                buttonHeight = 46.dp,
+                buttonsFillWidth = true,
+                bottomFadeHeight = 120.dp,
+            )
+        }
+
+        // Phone, landscape: height is the scarce resource, so shrink the logo and drop the synopsis if needed.
+        !isTablet -> {
+            val hPad = 32f
+            val column = columnWidth(hPad, 0.52f, 480f)
+            val heroHeight = phoneHeroHeight
+            NetflixHeroLayout(
+                isTablet = false,
+                isLandscape = true,
+                heroHeight = heroHeight,
+                usesWideArtwork = true,
+                sideContent = true,
+                contentWidthFraction = 0.52f,
+                contentMaxWidth = 480.dp,
+                contentHorizontalPadding = hPad.dp,
+                contentVerticalPadding = 16.dp,
+                logoWidth = logoWidth(column, 0.7f, 60f),
+                synopsisMaxLines = when {
+                    heroHeight.value >= 340f -> 3
+                    heroHeight.value >= 290f -> 2
+                    else -> 0
+                },
+                buttonHeight = 40.dp,
+                buttonsFillWidth = false,
+                bottomFadeHeight = 90.dp,
+            )
+        }
+
+        // Tablet, portrait.
+        !isLandscape -> {
+            val hPad = 40f
+            val column = columnWidth(hPad, 0.66f, 560f)
+            val wanted = (maxWidthDp * 0.62f).coerceIn(420f, 640f)
+            val heroHeight = maxOf(base.heroHeight.value, wanted).let { height ->
+                if (viewportHeightDp != null) minOf(height, viewportHeightDp * 0.62f) else height
+            }
+            NetflixHeroLayout(
+                isTablet = true,
+                isLandscape = false,
+                heroHeight = heroHeight.dp,
+                usesWideArtwork = true,
+                sideContent = true,
+                contentWidthFraction = 0.66f,
+                contentMaxWidth = 560.dp,
+                contentHorizontalPadding = hPad.dp,
+                contentVerticalPadding = 28.dp,
+                logoWidth = logoWidth(column, 0.6f, 110f),
+                synopsisMaxLines = 3,
+                buttonHeight = 48.dp,
+                buttonsFillWidth = false,
+                bottomFadeHeight = 140.dp,
+            )
+        }
+
+        // Tablet, landscape.
+        else -> {
+            val hPad = if (maxWidthDp >= 1200f) 56f else 44f
+            val column = columnWidth(hPad, 0.48f, 600f)
+            val heroHeight = if (viewportHeightDp != null) {
+                minOf(base.heroHeight.value, viewportHeightDp * 0.8f)
+            } else {
+                base.heroHeight.value
+            }
+            NetflixHeroLayout(
+                isTablet = true,
+                isLandscape = true,
+                heroHeight = heroHeight.dp,
+                usesWideArtwork = true,
+                sideContent = true,
+                contentWidthFraction = 0.48f,
+                contentMaxWidth = 600.dp,
+                contentHorizontalPadding = hPad.dp,
+                contentVerticalPadding = 32.dp,
+                logoWidth = logoWidth(column, 0.6f, 130f),
+                synopsisMaxLines = if (heroHeight >= 420f) 3 else 2,
+                buttonHeight = 48.dp,
+                buttonsFillWidth = false,
+                bottomFadeHeight = 160.dp,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun HomeHeroSection(
     items: List<MetaPreview>,
@@ -203,6 +379,10 @@ internal fun HomeHeroSection(
     trailerStartUnmuted: Boolean = false,
     onItemClick: ((MetaPreview) -> Unit)? = null,
     onActiveArtworkChange: ((String?) -> Unit)? = null,
+    /** [MetaPreview.stableKey]s of hero items that are in the library. Only used by the Netflix style. */
+    savedItemKeys: Set<String> = emptySet(),
+    /** Toggles library membership. When null the Netflix style hides its "Save to Library" button. */
+    onToggleSaved: ((MetaPreview) -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
 
@@ -246,6 +426,7 @@ internal fun HomeHeroSection(
     }
 
     val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val isNetflixStyle = heroStyle == HomeHeroStyle.NETFLIX
     val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val cardInsetModifier = if (isCardStyle) {
         Modifier.padding(
@@ -256,10 +437,10 @@ internal fun HomeHeroSection(
     } else {
         Modifier
     }
-    val heroShape = if (isCardStyle) {
-        RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
-    } else {
-        RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    val heroShape = when {
+        isCardStyle -> RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+        isNetflixStyle -> RectangleShape
+        else -> RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
     }
 
     Column(
@@ -282,18 +463,32 @@ internal fun HomeHeroSection(
                 viewportHeightDp = viewportHeight?.value,
                 mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
             )
-            val layout = if (isCardStyle) {
-                baseLayout.copy(
+            val netflixLayout = if (isNetflixStyle) {
+                netflixHeroLayout(
+                    maxWidthDp = maxWidth.value,
+                    viewportHeightDp = viewportHeight?.value,
+                    mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+                )
+            } else {
+                null
+            }
+            val layout = when {
+                isCardStyle -> baseLayout.copy(
                     heroHeight = cardHeroHeight(
                         maxWidth = maxWidth,
                         viewportHeight = viewportHeight,
                         isTablet = baseLayout.isTablet,
                     ),
                 )
-            } else {
-                baseLayout
+                netflixLayout != null -> baseLayout.copy(
+                    heroHeight = netflixLayout.heroHeight,
+                    bottomFadeHeight = netflixLayout.bottomFadeHeight,
+                )
+                else -> baseLayout
             }
             val effectiveArtworkSource = when {
+                netflixLayout != null ->
+                    if (netflixLayout.usesWideArtwork) HomeHeroArtworkSource.BACKDROP else HomeHeroArtworkSource.POSTER
                 !isCardStyle -> HomeHeroArtworkSource.BACKDROP
                 heroUsesWideArtwork(maxWidth, viewportHeight, baseLayout.isTablet) ->
                     HomeHeroArtworkSource.BACKDROP
@@ -518,7 +713,141 @@ internal fun HomeHeroSection(
                         }
                     }
 
-                    if (!isCardStyle) {
+                    if (netflixLayout != null) {
+                        val heroFadeColorState = LocalDynamicArtworkBackgroundColor.current
+                        val themeBackground = MaterialTheme.colorScheme.background
+                        // Legibility scrim: left-to-right when the text sits on the start side, otherwise bottom-heavy.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .drawBehind {
+                                    if (netflixLayout.sideContent) {
+                                        drawRect(
+                                            Brush.horizontalGradient(
+                                                0f to Color.Black.copy(alpha = 0.84f),
+                                                0.45f to Color.Black.copy(alpha = 0.55f),
+                                                0.8f to Color.Black.copy(alpha = 0.10f),
+                                                1f to Color.Transparent,
+                                            ),
+                                        )
+                                        drawRect(
+                                            Brush.verticalGradient(
+                                                0f to Color.Transparent,
+                                                0.55f to Color.Transparent,
+                                                1f to Color.Black.copy(alpha = 0.55f),
+                                            ),
+                                        )
+                                    } else {
+                                        drawRect(
+                                            Brush.verticalGradient(
+                                                0f to Color.Black.copy(alpha = 0.18f),
+                                                0.4f to Color.Transparent,
+                                                0.72f to Color.Black.copy(alpha = 0.55f),
+                                                1f to Color.Black.copy(alpha = 0.88f),
+                                            ),
+                                        )
+                                    }
+                                },
+                        )
+                        // Blend the bottom edge into the screen background so catalog rows sit flush under the hero.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(netflixLayout.bottomFadeHeight)
+                                .align(Alignment.BottomCenter)
+                                .drawBehind {
+                                    val fade = heroFadeColorState?.value ?: themeBackground
+                                    drawRect(Brush.verticalGradient(colors = listOf(fade.copy(alpha = 0f), fade)))
+                                },
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(enabled = onItemClick != null) {
+                                    onItemClick?.invoke(currentItem)
+                                },
+                        )
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .then(
+                                    if (netflixLayout.isLandscape) {
+                                        // Keep text clear of camera cut-outs / side navigation bars when rotated.
+                                        Modifier.windowInsetsPadding(
+                                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .padding(
+                                    horizontal = netflixLayout.contentHorizontalPadding,
+                                    vertical = netflixLayout.contentVerticalPadding,
+                                ),
+                            horizontalAlignment = if (netflixLayout.sideContent) {
+                                Alignment.Start
+                            } else {
+                                Alignment.CenterHorizontally
+                            },
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(netflixLayout.contentWidthFraction)
+                                    .widthIn(max = netflixLayout.contentMaxWidth),
+                                contentAlignment = Alignment.BottomStart,
+                            ) {
+                                visiblePages.forEach { layer ->
+                                    val layerItem = items[layer.itemIndex]
+                                    val isCurrentLayer = layer.page == currentPage
+                                    key(layerItem.type, layerItem.id) {
+                                        Box(
+                                            modifier = Modifier.graphicsLayer {
+                                                val offset = heroPageOffset(pagerState, layer.page)
+                                                val visibility = (1f - abs(offset)).coerceIn(0f, 1f)
+                                                alpha = ((visibility - 0.5f) * 2f).coerceIn(0f, 1f)
+                                                translationX = -offset * heroWidthPx * HERO_CONTENT_PARALLAX
+                                            },
+                                        ) {
+                                            HeroContentBlock(
+                                                item = layerItem,
+                                                layout = layout,
+                                                onItemClick = onItemClick,
+                                                startAligned = true,
+                                                contentColor = Color.White,
+                                                logoWidth = netflixLayout.logoWidth,
+                                                synopsisMaxLines = netflixLayout.synopsisMaxLines,
+                                                actions = {
+                                                    HeroActionButtons(
+                                                        item = layerItem,
+                                                        isSaved = layerItem.stableKey() in savedItemKeys,
+                                                        // Neighbour layers sit invisibly underneath during a swipe;
+                                                        // they must never swallow taps meant for the visible title.
+                                                        enabled = isCurrentLayer,
+                                                        fillWidth = netflixLayout.buttonsFillWidth,
+                                                        buttonHeight = netflixLayout.buttonHeight,
+                                                        onViewDetails = onItemClick,
+                                                        onToggleSaved = onToggleSaved,
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (items.size > 1) {
+                                Spacer(modifier = Modifier.height(if (netflixLayout.isTablet) 18.dp else 14.dp))
+                                HeroPageIndicator(
+                                    itemCount = items.size,
+                                    pagerState = pagerState,
+                                    coroutineScope = coroutineScope,
+                                    color = Color.White,
+                                )
+                            }
+                        }
+                    } else if (!isCardStyle) {
                         val heroFadeColorState = LocalDynamicArtworkBackgroundColor.current
                         val themeBackground = MaterialTheme.colorScheme.background
                         Box(
@@ -559,7 +888,7 @@ internal fun HomeHeroSection(
                                     onItemClick?.invoke(currentItem)
                                 },
                         )
-                    } else {
+                    } else if (netflixLayout == null) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -662,6 +991,7 @@ private fun HeroPageIndicator(
     itemCount: Int,
     pagerState: PagerState,
     coroutineScope: CoroutineScope,
+    color: Color = MaterialTheme.colorScheme.onBackground,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -679,7 +1009,7 @@ private fun HeroPageIndicator(
                         }
                     }
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onBackground)
+                    .background(color)
                     .graphicsLayer {
                         alpha = 0.35f + (0.57f * activeFraction)
                     }
@@ -726,6 +1056,7 @@ internal fun HomeHeroReservedSpace(
     heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
 ) {
     val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val isNetflixStyle = heroStyle == HomeHeroStyle.NETFLIX
     val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     BoxWithConstraints(
@@ -743,10 +1074,10 @@ internal fun HomeHeroReservedSpace(
                 },
             )
             .clip(
-                if (isCardStyle) {
-                    RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
-                } else {
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                when {
+                    isCardStyle -> RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+                    isNetflixStyle -> RectangleShape
+                    else -> RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
                 },
             ),
     ) {
@@ -755,14 +1086,18 @@ internal fun HomeHeroReservedSpace(
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
-        val heroHeight = if (isCardStyle) {
-            cardHeroHeight(
+        val heroHeight = when {
+            isCardStyle -> cardHeroHeight(
                 maxWidth = maxWidth,
                 viewportHeight = viewportHeight,
                 isTablet = baseLayout.isTablet,
             )
-        } else {
-            baseLayout.heroHeight
+            isNetflixStyle -> netflixHeroLayout(
+                maxWidthDp = maxWidth.value,
+                viewportHeightDp = viewportHeight?.value,
+                mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+            ).heroHeight
+            else -> baseLayout.heroHeight
         }
 
         Spacer(
@@ -778,6 +1113,13 @@ private fun HeroContentBlock(
     item: MetaPreview,
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
+    startAligned: Boolean = layout.isTablet,
+    contentColor: Color = MaterialTheme.colorScheme.onBackground,
+    /** Fixed logo width (Netflix style). Null keeps the original fraction-of-width sizing. */
+    logoWidth: Dp? = null,
+    synopsisMaxLines: Int = 2,
+    /** Rendered under the synopsis (Netflix style action buttons). */
+    actions: (@Composable () -> Unit)? = null,
 ) {
     var logoLoadError by remember(item.type, item.id, item.logo) {
         mutableStateOf(false)
@@ -786,19 +1128,24 @@ private fun HeroContentBlock(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
+        horizontalAlignment = if (startAligned) Alignment.Start else Alignment.CenterHorizontally,
     ) {
         if (logoUrl != null && !logoLoadError) {
             AsyncImage(
                 model = logoUrl,
                 contentDescription = item.name,
-                modifier = Modifier
-                    .fillMaxWidth(layout.logoWidthFraction)
+                modifier = (
+                    if (logoWidth != null) {
+                        Modifier.width(logoWidth)
+                    } else {
+                        Modifier.fillMaxWidth(layout.logoWidthFraction)
+                    }
+                    )
                     .aspectRatio(2.6f)
                     .clickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
                     },
-                alignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
+                alignment = if (startAligned) Alignment.CenterStart else Alignment.Center,
                 contentScale = ContentScale.Fit,
                 onError = { logoLoadError = true },
             )
@@ -815,9 +1162,9 @@ private fun HeroContentBlock(
                 } else {
                     MaterialTheme.typography.displaySmall
                 },
-                color = MaterialTheme.colorScheme.onBackground,
+                color = contentColor,
                 fontWeight = FontWeight.Black,
-                textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center,
+                textAlign = if (startAligned) TextAlign.Start else TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -847,12 +1194,12 @@ private fun HeroContentBlock(
             "series", "tv", "show" -> stringResource(Res.string.media_series)
             else -> item.type.replaceFirstChar(Char::uppercase)
         }
-        val textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center
+        val textAlign = if (startAligned) TextAlign.Start else TextAlign.Center
 
         Spacer(modifier = Modifier.height(14.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = if (layout.isTablet) {
+            horizontalArrangement = if (startAligned) {
                 Arrangement.spacedBy(8.dp, Alignment.Start)
             } else {
                 Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
@@ -867,56 +1214,166 @@ private fun HeroContentBlock(
                     tint = HeroRatingStar,
                     modifier = Modifier.size(18.dp),
                 )
-                HeroMetaText(text = rating)
+                HeroMetaText(text = rating, color = contentColor)
                 needsDot = true
             }
             year?.let {
-                if (needsDot) HeroMetaDot()
-                HeroMetaText(text = it)
+                if (needsDot) HeroMetaDot(color = contentColor)
+                HeroMetaText(text = it, color = contentColor)
                 needsDot = true
             }
             genre?.let {
-                if (needsDot) HeroMetaDot()
-                HeroMetaText(text = it, modifier = Modifier.weight(1f, fill = false))
+                if (needsDot) HeroMetaDot(color = contentColor)
+                HeroMetaText(text = it, color = contentColor, modifier = Modifier.weight(1f, fill = false))
                 needsDot = true
             }
             ageRating?.let {
-                if (needsDot) HeroMetaDot()
-                DetailHeroMetaBadge(text = it, contentColor = MaterialTheme.colorScheme.onBackground)
+                if (needsDot) HeroMetaDot(color = contentColor)
+                DetailHeroMetaBadge(text = it, contentColor = contentColor)
                 needsDot = true
             }
-            if (needsDot) HeroMetaDot()
-            HeroTypePill(text = typeLabel)
+            if (needsDot) HeroMetaDot(color = contentColor)
+            HeroTypePill(text = typeLabel, color = contentColor)
         }
 
-        if (synopsis != null) {
+        if (synopsis != null && synopsisMaxLines > 0) {
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = synopsis,
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                color = contentColor.copy(alpha = 0.72f),
                 textAlign = textAlign,
-                maxLines = 2,
+                maxLines = synopsisMaxLines,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        if (actions != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            actions()
+        }
+    }
+}
+
+/**
+ * Netflix-style hero buttons: a white primary "View Details" button and a translucent grey
+ * "Save to Library" toggle. There is intentionally no play button.
+ */
+@Composable
+private fun HeroActionButtons(
+    item: MetaPreview,
+    isSaved: Boolean,
+    enabled: Boolean,
+    fillWidth: Boolean,
+    buttonHeight: Dp,
+    onViewDetails: ((MetaPreview) -> Unit)?,
+    onToggleSaved: ((MetaPreview) -> Unit)?,
+) {
+    Row(
+        modifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val buttonModifier = if (fillWidth) Modifier.weight(1f) else Modifier
+
+        HeroActionButton(
+            modifier = buttonModifier,
+            label = stringResource(Res.string.home_view_details),
+            icon = Icons.Rounded.Info,
+            containerColor = Color.White,
+            contentColor = Color.Black,
+            height = buttonHeight,
+            enabled = enabled && onViewDetails != null,
+            onClick = { onViewDetails?.invoke(item) },
+        )
+
+        if (onToggleSaved != null) {
+            val toggleDescription = stringResource(
+                if (isSaved) Res.string.hero_remove_from_library else Res.string.hero_add_to_library,
+            )
+            HeroActionButton(
+                modifier = buttonModifier,
+                label = stringResource(
+                    if (isSaved) Res.string.home_hero_saved_to_library else Res.string.home_hero_save_to_library,
+                ),
+                icon = if (isSaved) Icons.Rounded.Check else Icons.Rounded.Add,
+                containerColor = HeroSecondaryButtonColor,
+                contentColor = Color.White,
+                height = buttonHeight,
+                enabled = enabled,
+                semanticsDescription = toggleDescription,
+                onClick = { onToggleSaved(item) },
             )
         }
     }
 }
 
+private val HeroSecondaryButtonColor = Color(0xFF6D6D6E).copy(alpha = 0.7f)
+
 @Composable
-private fun HeroTypePill(text: String) {
+private fun HeroActionButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    containerColor: Color,
+    contentColor: Color,
+    height: Dp,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    semanticsDescription: String? = null,
+) {
+    Row(
+        modifier = modifier
+            .height(height)
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .then(
+                if (semanticsDescription != null) {
+                    Modifier.semantics(mergeDescendants = true) { contentDescription = semanticsDescription }
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun HeroTypePill(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onBackground,
+) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.16f))
+            .background(color.copy(alpha = 0.16f))
             .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = color,
             maxLines = 1,
         )
     }
@@ -925,12 +1382,16 @@ private fun HeroTypePill(text: String) {
 private val HeroRatingStar = Color(0xFFF5C518)
 
 @Composable
-private fun HeroMetaText(text: String, modifier: Modifier = Modifier) {
+private fun HeroMetaText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onBackground,
+) {
     Text(
         text = text,
         modifier = modifier,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onBackground,
+        color = color,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -1048,12 +1509,12 @@ private fun mobileHeroHeight(
 }
 
 @Composable
-private fun HeroMetaDot() {
+private fun HeroMetaDot(color: Color = MaterialTheme.colorScheme.onBackground) {
     Box(
         modifier = Modifier
             .size(4.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)),
+            .background(color.copy(alpha = 0.7f)),
     )
 }
 

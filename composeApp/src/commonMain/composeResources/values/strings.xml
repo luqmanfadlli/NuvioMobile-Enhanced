@@ -689,6 +689,8 @@
     <string name="hero_mark_unwatched">Mark as unwatched</string>
     <string name="hero_mark_watched">Mark as watched</string>
     <string name="hero_remove_from_library">Remove from library</string>
+    <string name="home_hero_save_to_library">Save to Library</string>
+    <string name="home_hero_saved_to_library">Saved</string>
     <string name="home_view_all">View All</string>
     <string name="play_manually">Play manually</string>
     <string name="poster_logo_content_description">%1$s logo</string>
@@ -795,6 +797,8 @@
     <string name="settings_homescreen_hero_style_full_bleed_description">Nuvio Default. Artwork fills the width of the screen.</string>
     <string name="settings_homescreen_hero_style_card">Card</string>
     <string name="settings_homescreen_hero_style_card_description">A clean rounded shaped card.</string>
+    <string name="settings_homescreen_hero_style_netflix">Netflix</string>
+    <string name="settings_homescreen_hero_style_netflix_description">Edge-to-edge artwork with the title, details and View Details / Save to Library buttons on the left. Adapts to phones and tablets in portrait and landscape.</string>
     <string name="settings_homescreen_catalogs_source">Catalogs Source</string>
     <string name="settings_homescreen_selected_count">%1$d of %2$d selected</string>
     <string name="settings_homescreen_show_hero">Show Hero Section</string>

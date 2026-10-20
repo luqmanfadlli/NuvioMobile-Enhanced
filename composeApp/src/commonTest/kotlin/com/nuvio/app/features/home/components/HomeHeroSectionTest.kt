@@ -2,7 +2,10 @@ package com.nuvio.app.features.home.components
 
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import kotlin.test.Test
+import com.nuvio.app.features.home.HomeHeroStyle
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class HomeHeroSectionTest {
 
@@ -78,5 +81,89 @@ class HomeHeroSectionTest {
 
         assertEquals(false, layout.isTablet)
         assertEquals(268f, layout.heroHeight.value, 0.001f)
+    }
+
+    @Test
+    fun `netflix hero style round trips through storage and falls back to full bleed`() {
+        assertEquals(HomeHeroStyle.NETFLIX, HomeHeroStyle.fromStorageValue("netflix"))
+        assertEquals(HomeHeroStyle.NETFLIX, HomeHeroStyle.fromStorageValue(HomeHeroStyle.NETFLIX.storageValue))
+        assertEquals(HomeHeroStyle.FULL_BLEED, HomeHeroStyle.fromStorageValue("something_else"))
+        assertEquals(HomeHeroStyle.FULL_BLEED, HomeHeroStyle.fromStorageValue(null))
+    }
+
+    @Test
+    fun `netflix phone portrait uses poster artwork and full width buttons`() {
+        val layout = netflixHeroLayout(maxWidthDp = 390f, viewportHeightDp = 844f)
+
+        assertFalse(layout.isTablet)
+        assertFalse(layout.isLandscape)
+        assertFalse(layout.usesWideArtwork)
+        assertFalse(layout.sideContent)
+        assertTrue(layout.buttonsFillWidth)
+        assertEquals(390f * 1.5f, layout.heroHeight.value, 0.001f)
+    }
+
+    @Test
+    fun `netflix phone landscape uses backdrop artwork and a start aligned column`() {
+        val layout = netflixHeroLayout(maxWidthDp = 844f, viewportHeightDp = 390f)
+
+        // 844dp wide is "tablet" for homeHeroLayout, but a 390dp short side is still a phone.
+        assertFalse(layout.isTablet)
+        assertTrue(layout.isLandscape)
+        assertTrue(layout.usesWideArtwork)
+        assertTrue(layout.sideContent)
+        assertFalse(layout.buttonsFillWidth)
+        assertTrue(layout.heroHeight.value <= 390f)
+    }
+
+    @Test
+    fun `netflix phone landscape drops the synopsis when the hero is very short`() {
+        // The continue watching hint squeezes the hero below the comfortable height.
+        val squeezed = netflixHeroLayout(
+            maxWidthDp = 844f,
+            viewportHeightDp = 360f,
+            mobileBelowSectionHeightHintDp = 100f,
+        )
+        val roomy = netflixHeroLayout(maxWidthDp = 844f, viewportHeightDp = 420f)
+
+        assertTrue(squeezed.heroHeight.value < 290f)
+        assertEquals(0, squeezed.synopsisMaxLines)
+        assertTrue(roomy.synopsisMaxLines > 0)
+    }
+
+    @Test
+    fun `netflix tablet portrait is taller than the default tablet hero but capped to the viewport`() {
+        val layout = netflixHeroLayout(maxWidthDp = 800f, viewportHeightDp = 1280f)
+        val base = homeHeroLayout(maxWidthDp = 800f, viewportHeightDp = 1280f)
+
+        assertTrue(layout.isTablet)
+        assertFalse(layout.isLandscape)
+        assertTrue(layout.usesWideArtwork)
+        assertTrue(layout.heroHeight.value >= base.heroHeight.value)
+        assertTrue(layout.heroHeight.value <= 1280f * 0.62f + 0.001f)
+    }
+
+    @Test
+    fun `netflix tablet landscape never fills more than most of the viewport`() {
+        val layout = netflixHeroLayout(maxWidthDp = 1280f, viewportHeightDp = 800f)
+
+        assertTrue(layout.isTablet)
+        assertTrue(layout.isLandscape)
+        assertTrue(layout.sideContent)
+        assertTrue(layout.heroHeight.value <= 800f * 0.8f + 0.001f)
+    }
+
+    @Test
+    fun `netflix logo never grows past its height budget`() {
+        listOf(
+            390f to 844f,
+            844f to 390f,
+            800f to 1280f,
+            1280f to 800f,
+        ).forEach { (width, height) ->
+            val layout = netflixHeroLayout(maxWidthDp = width, viewportHeightDp = height)
+            assertTrue(layout.logoWidth.value > 0f, "logo width for ${width}x$height")
+            assertTrue(layout.logoWidth.value / 2.6f <= 130.001f, "logo height for ${width}x$height")
+        }
     }
 }
