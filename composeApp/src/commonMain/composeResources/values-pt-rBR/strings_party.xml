@@ -73,4 +73,12 @@
     <string name="party_share_description">Amigos podem reproduzir seu link em vez de escolher o deles. Pode incluir sua chave Debrid.</string>
     <string name="party_share_unavailable">Esta stream não pode ser compartilhada.</string>
     <string name="party_shared_by">Compartilhado por %1$s</string>
+    <string name="party_tab_party">Sessão</string>
+    <string name="party_tab_chat">Chat</string>
+    <string name="party_chat_empty_title">Nenhuma mensagem ainda</string>
+    <string name="party_chat_empty_message">Apenas pessoas nesta sessão podem ver o chat.</string>
+    <string name="party_chat_placeholder">Mensagem</string>
+    <string name="party_chat_send">Enviar</string>
+    <string name="party_chat_not_sent">Não enviada. Toque para tentar novamente</string>
+    <string name="party_chat_new_messages">Novas mensagens</string>
 </resources>
