@@ -84,6 +84,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.isIos
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.LocalDynamicArtworkBackgroundColor
@@ -209,7 +210,7 @@ internal data class HomeHeroLayout(
  *
  * Artwork is always the backdrop (posters carry the title, which would double up with the logo).
  *
- * - phone portrait : text + full-width pill buttons pinned to the bottom
+ * - phone portrait : text + full-width buttons pinned to the bottom (side by side on Android, stacked pills on iOS)
  * - phone landscape: text column on the start side, compact buttons
  * - tablet portrait: start-aligned column, taller hero
  * - tablet landscape: start-aligned column, hero capped to the viewport
@@ -241,6 +242,8 @@ internal fun netflixHeroLayout(
     maxWidthDp: Float,
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
+    /** iOS keeps the stacked full-width pill buttons in phone portrait; Android uses side-by-side buttons. */
+    stackPhonePortraitButtons: Boolean = false,
 ): NetflixHeroLayout {
     val base = homeHeroLayout(
         maxWidthDp = maxWidthDp,
@@ -280,10 +283,11 @@ internal fun netflixHeroLayout(
                 contentVerticalPadding = 20.dp,
                 logoWidth = logoWidth(column, 0.7f, 84f),
                 synopsisMaxLines = 2,
-                buttonHeight = 48.dp,
-                buttonCornerRadius = 24.dp, // fully rounded pill
+                buttonHeight = if (stackPhonePortraitButtons) 48.dp else 44.dp,
+                // Stacked: fully rounded pill. Side by side: slightly rounded rectangles.
+                buttonCornerRadius = if (stackPhonePortraitButtons) 24.dp else 6.dp,
                 buttonsFillWidth = true,
-                buttonsStacked = true,
+                buttonsStacked = stackPhonePortraitButtons,
                 bottomFadeHeight = 120.dp,
             )
         }
@@ -476,6 +480,7 @@ internal fun HomeHeroSection(
                     maxWidthDp = maxWidth.value,
                     viewportHeightDp = viewportHeight?.value,
                     mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+                    stackPhonePortraitButtons = isIos,
                 )
             } else {
                 null
@@ -1106,6 +1111,7 @@ internal fun HomeHeroReservedSpace(
                 maxWidthDp = maxWidth.value,
                 viewportHeightDp = viewportHeight?.value,
                 mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+                stackPhonePortraitButtons = isIos,
             ).heroHeight
             else -> baseLayout.heroHeight
         }

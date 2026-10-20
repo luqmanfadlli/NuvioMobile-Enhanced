@@ -92,12 +92,26 @@ class HomeHeroSectionTest {
     }
 
     @Test
-    fun `netflix phone portrait stacks full width pill buttons`() {
+    fun `netflix phone portrait lays out two full width buttons side by side`() {
         val layout = netflixHeroLayout(maxWidthDp = 390f, viewportHeightDp = 844f)
 
         assertFalse(layout.isTablet)
         assertFalse(layout.isLandscape)
         assertFalse(layout.sideContent)
+        assertTrue(layout.buttonsFillWidth)
+        assertFalse(layout.buttonsStacked)
+        assertTrue(layout.buttonCornerRadius.value < layout.buttonHeight.value / 2f)
+        assertEquals(390f * 1.5f, layout.heroHeight.value, 0.001f)
+    }
+
+    @Test
+    fun `netflix phone portrait keeps stacked pill buttons when requested`() {
+        val layout = netflixHeroLayout(
+            maxWidthDp = 390f,
+            viewportHeightDp = 844f,
+            stackPhonePortraitButtons = true,
+        )
+
         assertTrue(layout.buttonsFillWidth)
         assertTrue(layout.buttonsStacked)
         assertEquals(layout.buttonHeight.value / 2f, layout.buttonCornerRadius.value, 0.001f)
