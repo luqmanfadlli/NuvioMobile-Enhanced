@@ -61,6 +61,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import com.nuvio.app.features.home.HOME_CATEGORY_HOME_ID
 import com.nuvio.app.features.home.HomeCategoryRepository
 import com.nuvio.app.features.home.components.HomeCategoryPanel
 
@@ -255,13 +256,29 @@ private fun MainFloatingNavigationBar(
     )
 }
 
-/** Tapping "Categories" opens (or closes) the panel; from another tab it jumps to Home first. */
+/** The Home button always shows the real Home category, whatever category was open before. */
+private fun goToHome(onTabSelected: (AppScreenTab) -> Unit) {
+    HomeCategoryRepository.goHome()
+    onTabSelected(AppScreenTab.Home)
+}
+
+/**
+ * The Categories button returns to the last category the user opened (when currently on Home)
+ * and opens the category panel; tapping it again closes the panel.
+ */
 private fun toggleCategoriesPanel(
     highlightedTab: AppScreenTab,
     onTabSelected: (AppScreenTab) -> Unit,
 ) {
-    if (highlightedTab != AppScreenTab.Home) {
-        onTabSelected(AppScreenTab.Home)
+    HomeCategoryRepository.ensureLoaded()
+    val onHomeTab = highlightedTab == AppScreenTab.Home
+    if (!onHomeTab) onTabSelected(AppScreenTab.Home)
+
+    val current = HomeCategoryRepository.state.value.selected
+    if (current == null || current.id == HOME_CATEGORY_HOME_ID) {
+        HomeCategoryRepository.restoreLastCategory()
+        HomeCategoryRepository.setPanelOpen(true)
+    } else if (!onHomeTab) {
         HomeCategoryRepository.setPanelOpen(true)
     } else {
         HomeCategoryRepository.togglePanel()
@@ -283,7 +300,7 @@ internal fun mainFloatingNavigationItems(
     add(
         FloatingNavigationItem(
             selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
+            onClick = { goToHome(onTabSelected) },
             icon = Icons.Filled.Home,
             label = stringResource(Res.string.compose_nav_home),
         ),
@@ -355,7 +372,7 @@ internal fun MainClassicNavigationBar(
     NuvioClassicNavigationBar(modifier) {
         NavItem(
             selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
+            onClick = { goToHome(onTabSelected) },
             icon = Icons.Filled.Home,
             contentDescription = stringResource(Res.string.compose_nav_home),
         )

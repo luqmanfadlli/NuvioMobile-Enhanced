@@ -52,6 +52,8 @@ data class HomeCategoryEditorRequest(val categoryId: String?)
 data class HomeCategoryUiState(
     val categories: List<HomeCategory> = defaultHomeCategories(),
     val selectedId: String = HOME_CATEGORY_HOME_ID,
+    /** Last non-Home category the user opened; the "Categories" button returns to it. */
+    val lastCategoryId: String? = null,
 ) {
     /** Categories shown in the top bar, in the user's order. */
     val visibleCategories: List<HomeCategory>
@@ -66,6 +68,7 @@ data class HomeCategoryUiState(
 private data class StoredHomeCategoriesPayload(
     val version: Int = 1,
     val selectedId: String = HOME_CATEGORY_HOME_ID,
+    val lastCategoryId: String? = null,
     val categories: List<HomeCategory> = emptyList(),
 )
 
@@ -140,13 +143,40 @@ object HomeCategoryRepository {
         _state.value = HomeCategoryUiState(
             categories = parsed.categories,
             selectedId = parsed.selectedId,
+            lastCategoryId = parsed.lastCategoryId,
         )
     }
 
     fun select(id: String) {
         ensureLoaded()
         if (_state.value.selectedId == id) return
-        update(persist = true) { it.copy(selectedId = id) }
+        update(persist = true) { state ->
+            state.copy(
+                selectedId = id,
+                lastCategoryId = if (id == HOME_CATEGORY_HOME_ID) state.lastCategoryId else id,
+            )
+        }
+    }
+
+    /** Switch to the real Home category (or the first visible one if Home is hidden). */
+    fun goHome() {
+        ensureLoaded()
+        val state = _state.value
+        val home = state.visibleCategories.firstOrNull { it.id == HOME_CATEGORY_HOME_ID }
+            ?: state.visibleCategories.firstOrNull()
+            ?: return
+        select(home.id)
+        _panelOpen.value = false
+    }
+
+    /** Switch to the last non-Home category opened, or the first visible non-Home one. */
+    fun restoreLastCategory() {
+        ensureLoaded()
+        val state = _state.value
+        val target = state.visibleCategories.firstOrNull { it.id == state.lastCategoryId && it.id != HOME_CATEGORY_HOME_ID }
+            ?: state.visibleCategories.firstOrNull { it.id != HOME_CATEGORY_HOME_ID }
+            ?: return
+        select(target.id)
     }
 
     fun setEnabled(id: String, enabled: Boolean) {
@@ -244,6 +274,7 @@ object HomeCategoryRepository {
             json.encodeToString(
                 StoredHomeCategoriesPayload(
                     selectedId = state.selectedId,
+                    lastCategoryId = state.lastCategoryId,
                     categories = state.categories,
                 ),
             ),
