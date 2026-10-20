@@ -70,7 +70,6 @@ import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
 import com.nuvio.app.features.home.components.HomeCategoryEditorHost
-import com.nuvio.app.features.home.components.HomeCategoryTitleBadge
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryItem
@@ -235,7 +234,6 @@ internal fun AppTabHost(
                         )
                     }
                     HomeCategoryEditorHost()
-                    HomeCategoryTitleBadge(modifier = Modifier.align(Alignment.TopCenter))
                 }
             }
 

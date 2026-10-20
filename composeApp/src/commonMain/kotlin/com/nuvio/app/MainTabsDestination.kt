@@ -193,6 +193,7 @@ internal fun MainTabsDestination(
                         backdrop = navBarBackdrop,
                         glassStyle = navBarGlass,
                         glassEffects = panelGlassEffects,
+                        showLabels = navBarScrollState.labelVisibility > 0.5f,
                     )
                 }
 

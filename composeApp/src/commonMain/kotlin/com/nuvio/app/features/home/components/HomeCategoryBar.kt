@@ -55,6 +55,29 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.Chip
+import com.nuvio.app.features.home.HOME_CATEGORY_HOME_ID
+import com.nuvio.app.core.ui.NuvioTokens
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Surface
+import androidx.compose.material.icons.rounded.Whatshot
+import androidx.compose.material.icons.rounded.VideoLibrary
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.Theaters
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.ChildCare
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateContentSize
 import com.nuvio.app.core.ui.glass.isLiquidRefractionSupported
 import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
 import com.nuvio.app.core.ui.glass.SolidGlassBar
@@ -88,6 +111,7 @@ internal fun HomeCategoryPanel(
     backdrop: Backdrop? = null,
     glassStyle: LiquidGlassStyle = LiquidGlassStyle.Default,
     glassEffects: LiquidGlassEffectSettings = LiquidGlassEffectDefaults.floatingBar,
+    showLabels: Boolean = true,
 ) {
     LaunchedEffect(Unit) { HomeCategoryRepository.ensureLoaded() }
     val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
@@ -107,10 +131,10 @@ internal fun HomeCategoryPanel(
 
     Box(
         modifier = modifier
+            .padding(horizontal = 12.dp)
             // Same compact width as in portrait, even on a wide landscape screen.
             .widthIn(max = 400.dp)
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .animateContentSize(),
     ) {
         when {
             glassMode.bar && backdrop != null -> LiquidGlassFrostedBar(
@@ -130,66 +154,108 @@ internal fun HomeCategoryPanel(
                     .background(tokens.colors.surfaceSheet.copy(alpha = 0.96f)),
             )
         }
+        // Like the bottom bar: icon + name when expanded, icons only when compact.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(state.visibleCategories, key = { it.id }) { category ->
-                    Chip(
-                        label = category.title,
-                        selected = category.id == state.selected?.id,
-                        onClick = {
-                            HomeCategoryRepository.select(category.id)
-                            HomeCategoryRepository.setPanelOpen(false)
-                        },
-                    )
-                }
-            }
-            IconButton(onClick = { HomeCategoryRepository.requestEditor() }) {
-                Icon(
-                    imageVector = Icons.Rounded.Tune,
-                    contentDescription = "Customize categories",
-                    tint = tokens.colors.textPrimary,
+            state.visibleCategories.forEach { category ->
+                CategoryChip(
+                    category = category,
+                    selected = category.id == state.selected?.id,
+                    showLabel = showLabels,
+                    onClick = {
+                        HomeCategoryRepository.select(category.id)
+                        HomeCategoryRepository.setPanelOpen(false)
+                    },
                 )
             }
         }
     }
 }
 
-/**
- * Small, non-interactive label that shows which category is open. It sits just under the
- * status bar and lets touches pass through to the content below.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeCategoryTitleBadge(modifier: Modifier = Modifier) {
-    val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
-    val title = state.selected?.title ?: return
-
-    Box(
-        modifier = modifier
-            .statusBarsPadding()
-            .padding(top = 2.dp),
+private fun CategoryChip(
+    category: HomeCategory,
+    selected: Boolean,
+    showLabel: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        selected = selected,
+        onClick = onClick,
+        shape = RoundedCornerShape(NuvioTokens.Radius.md),
+        color = if (selected) tokens.colors.overlaySelected else Color.Transparent,
+        contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted,
+        border = BorderStroke(
+            width = tokens.borders.thin,
+            color = if (selected) tokens.colors.borderSelected else tokens.colors.borderStrong,
+        ),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            color = Color.White.copy(alpha = 0.85f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 10.dp, vertical = 3.dp),
-        )
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = tokens.components.chipVerticalPadding,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = category.resolvedIcon(),
+                contentDescription = category.title,
+                modifier = Modifier.size(20.dp),
+            )
+            if (showLabel) {
+                Text(
+                    text = category.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
+
+private val HomeCategoryIconKeys = listOf(
+    "home", "movie", "tv", "live", "sparkle", "star", "favorite", "folder",
+    "explore", "theaters", "library", "fire", "kids", "music", "games", "globe",
+)
+
+private fun homeCategoryIconFor(key: String?): ImageVector? = when (key) {
+    "home" -> Icons.Rounded.Home
+    "movie" -> Icons.Rounded.Movie
+    "tv" -> Icons.Rounded.Tv
+    "live" -> Icons.Rounded.LiveTv
+    "sparkle" -> Icons.Rounded.AutoAwesome
+    "star" -> Icons.Rounded.Star
+    "favorite" -> Icons.Rounded.Favorite
+    "folder" -> Icons.Rounded.Folder
+    "explore" -> Icons.Rounded.Explore
+    "theaters" -> Icons.Rounded.Theaters
+    "library" -> Icons.Rounded.VideoLibrary
+    "fire" -> Icons.Rounded.Whatshot
+    "kids" -> Icons.Rounded.ChildCare
+    "music" -> Icons.Rounded.MusicNote
+    "games" -> Icons.Rounded.SportsEsports
+    "globe" -> Icons.Rounded.Public
+    else -> null
+}
+
+private fun HomeCategory.resolvedIcon(): ImageVector =
+    homeCategoryIconFor(icon) ?: when {
+        id == HOME_CATEGORY_HOME_ID -> Icons.Rounded.Home
+        id == HOME_CATEGORY_MOVIES_ID -> Icons.Rounded.Movie
+        id == HOME_CATEGORY_TV_ID -> Icons.Rounded.Tv
+        id == HOME_CATEGORY_ANIME_ID -> Icons.Rounded.AutoAwesome
+        kind == HomeCategoryKind.LiveTv -> Icons.Rounded.LiveTv
+        else -> Icons.Rounded.Folder
+    }
 
 /** Always-composed host that shows the customization sheet when something requests it. */
 @Composable
@@ -208,6 +274,7 @@ fun HomeCategoryEditorHost() {
     if (showManager) {
         HomeCategoryManagerSheet(
             initialPickerCategoryId = pickerCategoryId,
+            pickerOnly = pickerCategoryId != null,
             onDismiss = {
                 showManager = false
                 pickerCategoryId = null
@@ -216,10 +283,35 @@ fun HomeCategoryEditorHost() {
     }
 }
 
+/**
+ * The full category manager, embedded in a settings page (no sheet around it). "Choose catalogs"
+ * opens the catalog picker in a sheet.
+ */
+@Composable
+fun HomeCategoryManagerEmbedded() {
+    LaunchedEffect(Unit) { HomeCategoryRepository.ensureLoaded() }
+    val state by HomeCategoryRepository.state.collectAsStateWithLifecycle()
+    var pickerId by remember { mutableStateOf<String?>(null) }
+
+    HomeCategoryList(
+        categories = state.categories,
+        onEditCatalogs = { pickerId = it },
+        embedded = true,
+    )
+    if (pickerId != null) {
+        HomeCategoryManagerSheet(
+            initialPickerCategoryId = pickerId,
+            pickerOnly = true,
+            onDismiss = { pickerId = null },
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeCategoryManagerSheet(
     initialPickerCategoryId: String?,
+    pickerOnly: Boolean = false,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -236,7 +328,7 @@ private fun HomeCategoryManagerSheet(
         if (pickerCategory != null) {
             HomeCategoryCatalogPicker(
                 category = pickerCategory,
-                onBack = { pickerCategoryId = null },
+                onBack = { if (pickerOnly) onDismiss() else pickerCategoryId = null },
             )
         } else {
             HomeCategoryList(
@@ -251,6 +343,7 @@ private fun HomeCategoryManagerSheet(
 private fun HomeCategoryList(
     categories: List<HomeCategory>,
     onEditCatalogs: (String) -> Unit,
+    embedded: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
     var newTitle by remember { mutableStateOf("") }
@@ -259,19 +352,25 @@ private fun HomeCategoryList(
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp),
+        modifier = if (embedded) {
+            Modifier.fillMaxWidth()
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+        },
     ) {
-        Text(
-            text = "Navigation bar",
-            style = MaterialTheme.typography.titleLarge,
-            color = tokens.colors.textPrimary,
-            fontWeight = FontWeight.SemiBold,
-        )
+        if (!embedded) {
+            Text(
+                text = "Navigation bar",
+                style = MaterialTheme.typography.titleLarge,
+                color = tokens.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         Text(
             text = "Choose which categories appear, their order, and which catalogs each one shows.",
             style = MaterialTheme.typography.bodyMedium,
@@ -354,6 +453,20 @@ private fun HomeCategoryList(
                     }
                 }
                 if (renamingId == category.id) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        HomeCategoryIconKeys.forEach { key ->
+                            IconButton(onClick = { HomeCategoryRepository.setIcon(category.id, key) }) {
+                                Icon(
+                                    imageVector = homeCategoryIconFor(key) ?: Icons.Rounded.Folder,
+                                    contentDescription = key,
+                                    tint = if (category.icon == key) tokens.colors.accent else tokens.colors.textMuted,
+                                )
+                            }
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = renameText,

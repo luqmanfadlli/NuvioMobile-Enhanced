@@ -86,6 +86,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_descri
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.home.components.HomeCategoryManagerEmbedded
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -103,18 +104,8 @@ internal fun LazyListScope.homescreenSettingsContent(
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
 ) {
-    val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
-    val enabledCatalogCount = items.count { it.enabled }
     val showHeroTrailerPlaybackSetting = AppFeaturePolicy.heroTrailerPlaybackSupported &&
         AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
-    item {
-        HomescreenSummaryCard(
-            isTablet = isTablet,
-            enabledCatalogCount = enabledCatalogCount,
-            totalCatalogCount = items.size,
-            selectedHeroSourceCount = selectedHeroSourceCount,
-        )
-    }
     item {
         SettingsSection(
             title = stringResource(Res.string.settings_homescreen_section_hero),
@@ -205,58 +196,14 @@ internal fun LazyListScope.homescreenSettingsContent(
         }
     }
     item {
-        if (isCatalogLoading && items.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                NuvioLoadingIndicator(
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        } else if (catalogErrorMessage != null && items.isEmpty()) {
-            HomeEmptyStateCard(
-                modifier = Modifier.fillMaxWidth(),
-                title = stringResource(Res.string.settings_homescreen_load_failed_title),
-                message = catalogErrorMessage,
-                actionLabel = stringResource(Res.string.action_retry),
-                onActionClick = AddonRepository::refreshAll,
-            )
-        } else if (items.isEmpty()) {
-            HomeEmptyStateCard(
-                modifier = Modifier.fillMaxWidth(),
-                title = stringResource(Res.string.settings_homescreen_empty_title),
-                message = stringResource(Res.string.settings_homescreen_empty_message),
-            )
-        } else {
-            val catalogCount = items.count { !it.isCollection }
-            val collectionCount = items.count { it.isCollection }
-            val sectionTitle = when {
-                collectionCount > 0 && catalogCount > 0 -> stringResource(Res.string.settings_homescreen_section_catalogs_collections)
-                collectionCount > 0 -> stringResource(Res.string.settings_homescreen_section_collections)
-                else -> stringResource(Res.string.settings_homescreen_section_catalogs)
-            }
-            SettingsSection(
-                title = sectionTitle,
-                isTablet = isTablet,
-                actions = {
-                    NuvioActionLabel(
-                        text = stringResource(Res.string.action_reset),
-                        onClick = HomeCatalogSettingsRepository::resetToDefaults,
-                    )
-                },
-            ) {
-                val hapticFeedback = LocalHapticFeedback.current
-                val pinToMoveToast = stringResource(Res.string.settings_homescreen_pin_to_move_toast)
-
-                HomescreenCatalogList(
-                    isTablet = isTablet,
-                    items = items,
-                    onPinnedDragAttempt = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        NuvioToastController.show(pinToMoveToast)
-                    },
-                )
+        SettingsSection(
+            title = "Categories & catalogs",
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    HomeCategoryManagerEmbedded()
+                }
             }
         }
     }
@@ -446,7 +393,6 @@ private fun HomescreenSummaryCard(
     isTablet: Boolean,
     enabledCatalogCount: Int,
     totalCatalogCount: Int,
-    selectedHeroSourceCount: Int,
 ) {
     SettingsGroup(isTablet = isTablet) {
         Column(
@@ -464,7 +410,6 @@ private fun HomescreenSummaryCard(
                     Res.string.settings_homescreen_summary,
                     enabledCatalogCount,
                     totalCatalogCount,
-                    selectedHeroSourceCount,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

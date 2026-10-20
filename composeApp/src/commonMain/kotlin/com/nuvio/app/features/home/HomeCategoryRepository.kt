@@ -47,6 +47,8 @@ data class HomeCategory(
     val catalogKeys: List<String>? = emptyList(),
     /** Catalogs of this category that do NOT feed its hero banner (default: all of them do). */
     val heroExcludedKeys: List<String> = emptyList(),
+    /** Icon key shown in the compact category panel; null = default for the category. */
+    val icon: String? = null,
 )
 
 data class HomeCategoryEditorRequest(val categoryId: String?)
@@ -106,13 +108,6 @@ fun defaultHomeCategories(): List<HomeCategory> = listOf(
         catalogKeys = emptyList(),
     ),
     HomeCategory(id = HOME_CATEGORY_ANIME_ID, title = "Anime", builtIn = true),
-    HomeCategory(
-        id = HOME_CATEGORY_DISCOVER_ID,
-        title = "Discover",
-        kind = HomeCategoryKind.Discover,
-        builtIn = true,
-        catalogKeys = emptyList(),
-    ),
 )
 
 /** Remembers the Home scroll position of each category while the app is running. */
@@ -169,7 +164,8 @@ object HomeCategoryRepository {
             return
         }
         _state.value = HomeCategoryUiState(
-            categories = parsed.categories,
+            // Discover is no longer a built-in category; drop it from older saved setups.
+            categories = parsed.categories.filterNot { it.builtIn && it.id == HOME_CATEGORY_DISCOVER_ID },
             selectedId = parsed.selectedId,
             lastCategoryId = parsed.lastCategoryId,
             rankedKeys = parsed.rankedKeys,
@@ -297,6 +293,13 @@ object HomeCategoryRepository {
                     }
                 },
             )
+        }
+    }
+
+    fun setIcon(categoryId: String, icon: String?) {
+        ensureLoaded()
+        update { state ->
+            state.copy(categories = state.categories.map { if (it.id == categoryId) it.copy(icon = icon) else it })
         }
     }
 
