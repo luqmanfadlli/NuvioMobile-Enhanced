@@ -1,0 +1,63 @@
+name: Build Fast Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build optimized release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Keep the same signing key between runs so new builds install over old ones.
+      - name: Restore signing key
+        id: keycache
+        uses: actions/cache@v4
+        with:
+          path: signing/nuvio-release.jks
+          key: nuvio-personal-release-keystore-v1
+
+      - name: Create signing key (first run only)
+        if: steps.keycache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p signing
+          keytool -genkeypair -keystore signing/nuvio-release.jks -storetype JKS \
+            -alias nuvio -keyalg RSA -keysize 2048 -validity 36500 \
+            -storepass nuvio-personal -keypass nuvio-personal \
+            -dname "CN=Nuvio Personal Build"
+
+      - name: Prepare local properties
+        run: |
+          {
+            echo "NUVIO_RELEASE_STORE_FILE=signing/nuvio-release.jks"
+            echo "NUVIO_RELEASE_STORE_PASSWORD=nuvio-personal"
+            echo "NUVIO_RELEASE_KEY_ALIAS=nuvio"
+            echo "NUVIO_RELEASE_KEY_PASSWORD=nuvio-personal"
+          } > local.properties
+
+      - name: Build full release APKs
+        run: ./gradlew :androidApp:assembleFullRelease -Pnuvio.android.distribution=full -Pnuvio.ios.distribution=appstore --stacktrace
+
+      - name: Upload release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuvio-release-apks
+          path: androidApp/build/outputs/apk/full/release/*.apk
+          if-no-files-found: error
+          retention-days: 14

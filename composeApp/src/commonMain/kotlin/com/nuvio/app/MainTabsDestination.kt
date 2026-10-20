@@ -125,7 +125,7 @@ internal fun MainTabsDestination(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                if (tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                     MainClassicNavigationBar(
                         highlightedTab = highlightedTab,
                         showLiveTv = showLiveTvInNavigation,
@@ -167,18 +167,7 @@ internal fun MainTabsDestination(
                     )
                 }
 
-                // CLASSIC keeps the previous per-form-factor chrome: a top rail on
-                // tablet/landscape and the solid bottom bar on phones. Every other
-                // style now uses the floating pill at the bottom on all sizes.
-                if (isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
-                    TabletFloatingTopBar(
-                        selectedTab = highlightedTab,
-                        showLiveTv = showLiveTvInNavigation,
-                        onTabSelected = onTabSelected,
-                        onProfileSelected = onProfileSelected,
-                        onAddProfileRequested = onAddProfileRequested,
-                    )
-                }
+                // The classic bar always stays at the bottom, in portrait and landscape.
 
                 if (floatingBarVisible) {
                     when (navBarStyleSetting) {
@@ -385,17 +374,6 @@ internal fun BoxScope.SettingsRouteNavigationBar(
     val highlightedTab = AppScreenTab.Settings
 
     when {
-        style == NavBarStyle.CLASSIC && isTabletLayout -> {
-            SideEffect { onBottomOverlayChanged(0.dp) }
-            TabletFloatingTopBar(
-                selectedTab = highlightedTab,
-                showLiveTv = showLiveTv,
-                onTabSelected = onTabSelected,
-                onProfileSelected = onProfileSelected,
-                onAddProfileRequested = onAddProfileRequested,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-        }
         style == NavBarStyle.CLASSIC -> {
             Box(
                 Modifier.align(Alignment.BottomCenter).onSizeChanged {

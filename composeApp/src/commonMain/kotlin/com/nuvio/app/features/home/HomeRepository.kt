@@ -554,7 +554,7 @@ object HomeRepository {
 private const val HOME_HERO_ITEM_LIMIT = 8
 private const val HOME_COLLECTION_HERO_SOURCE_LIMIT = 6
 private const val HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT = 8
-private const val HOME_CATALOG_MAX_CONCURRENT_FETCHES = 6
+private const val HOME_CATALOG_MAX_CONCURRENT_FETCHES = 10
 private const val HOME_CATALOG_FETCH_TIMEOUT_MS = 30_000L
 private const val HOME_CATALOG_PREVIEW_FETCH_LIMIT = 18
 private const val HOME_CATALOG_PUBLISH_THROTTLE_MS = 200L
@@ -575,5 +575,13 @@ private fun prioritizeDefinitions(
             preference.enabled || (snapshot.heroEnabled && preference.heroSourceEnabled)
         }
     }
-    return priority + remainder
+    val ordered = priority + remainder
+
+    // Fetch the catalogs of the category the user is looking at first, so it fills in quickly;
+    // everything else still loads right behind it and is cached for instant tab switches.
+    HomeCategoryRepository.ensureLoaded()
+    val selectedKeys = HomeCategoryRepository.state.value.selected?.catalogKeys?.toSet()
+    if (selectedKeys.isNullOrEmpty()) return ordered
+    val (selectedFirst, others) = ordered.partition { definition -> definition.key in selectedKeys }
+    return selectedFirst + others
 }
