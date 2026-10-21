@@ -80,6 +80,7 @@ import com.nuvio.app.features.wetrakr.PlatformWeTrakrAuthPersistence
 import com.nuvio.app.features.wetrakr.PlatformWeTrakrSyncStorage
 import com.nuvio.app.features.simkl.SimklAuthStorage
 import com.nuvio.app.features.simkl.SimklSyncStorage
+import com.nuvio.app.features.ai.AiSettingsStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
 import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
 import com.nuvio.app.features.watched.WatchedStorage
@@ -147,6 +148,7 @@ open class MainActivity : AppCompatActivity() {
         CardDepthStyleStorage.initialize(applicationContext)
         DebridSettingsStorage.initialize(applicationContext)
         TmdbSettingsStorage.initialize(applicationContext)
+        AiSettingsStorage.initialize(applicationContext)
         OmdbEpisodeRatingsStorage.initialize(applicationContext)
         OmdbSettingsStorage.initialize(applicationContext)
         UserRatingsStorage.initialize(applicationContext)

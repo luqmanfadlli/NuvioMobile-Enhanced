@@ -19,8 +19,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +45,8 @@ import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.ai.AiRecommendationsRepository
+import com.nuvio.app.features.ai.AiSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeHeroStyle
@@ -195,6 +200,14 @@ internal fun LazyListScope.homescreenSettingsContent(
                     )
                 }
             }
+        }
+    }
+    item {
+        SettingsSection(
+            title = "AI recommendations",
+            isTablet = isTablet,
+        ) {
+            AiRecommendationsSettingsGroup(isTablet = isTablet)
         }
     }
     item {
@@ -491,6 +504,69 @@ private fun HomescreenCatalogList(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun AiRecommendationsSettingsGroup(isTablet: Boolean) {
+    val settings by remember {
+        AiSettingsRepository.ensureLoaded()
+        AiSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val aiState by remember { AiRecommendationsRepository.uiState }.collectAsStateWithLifecycle()
+    var apiKey by remember(settings.apiKey) { mutableStateOf(settings.apiKey) }
+    var model by remember(settings.model) { mutableStateOf(settings.model) }
+    val hasChanges = apiKey.trim() != settings.apiKey || model.trim() != settings.model
+
+    SettingsGroup(isTablet = isTablet) {
+        SettingsSwitchRow(
+            title = "Gemini recommendations",
+            description = "Adds themed rows to Home based on what you watch and save. " +
+                "Titles you watched or saved are sent to Google's Gemini API using your own key.",
+            checked = settings.enabled,
+            isTablet = isTablet,
+            onCheckedChange = AiSettingsRepository::setEnabled,
+        )
+        SettingsGroupDivider(isTablet = isTablet)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SettingsSecretTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = "Gemini API key",
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                label = { Text("Model") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = { AiSettingsRepository.saveCredentials(apiKey, model) },
+                    enabled = apiKey.isNotBlank() && hasChanges,
+                ) { Text("Save") }
+                OutlinedButton(
+                    onClick = { AiRecommendationsRepository.refresh(force = true) },
+                    enabled = settings.isUsable && !aiState.isLoading,
+                ) { Text(if (aiState.isLoading) "Generating\u2026" else "Refresh now") }
+            }
+            aiState.errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

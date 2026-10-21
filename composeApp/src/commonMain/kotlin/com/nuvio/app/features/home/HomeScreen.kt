@@ -52,6 +52,8 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
 import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.ai.AiRecommendationsRepository
+import com.nuvio.app.features.ai.AiSettingsRepository
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
@@ -920,6 +922,12 @@ fun HomeScreen(
         onFirstCatalogRendered?.invoke()
     }
 
+    val aiRecommendationsUiState by remember {
+        AiSettingsRepository.ensureLoaded()
+        AiRecommendationsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { AiRecommendationsRepository.refresh() }
+
     val visibleCollections = remember(collections) {
         collections.filter { it.folders.isNotEmpty() }
     }
@@ -1304,6 +1312,27 @@ fun HomeScreen(
                                             } else {
                                                 null
                                             },
+                                            watchedKeys = watchedUiState.watchedKeys,
+                                            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                            onPosterClick = onPosterClick,
+                                            onPosterLongClick = onPosterLongClick,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // AI rows (Gemini) only appear on the Home category.
+                        if (activeCategory == null || activeCategory.id == HOME_CATEGORY_HOME_ID) {
+                            aiRecommendationsUiState.sections.forEach { section ->
+                                if (section.items.isNotEmpty()) {
+                                    item(key = "ai_recommendation_${section.key}") {
+                                        HomeCatalogRowSection(
+                                            section = section,
+                                            entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
+                                            modifier = Modifier.padding(bottom = 12.dp),
+                                            sectionPadding = homeSectionPadding,
+                                            onViewAllClick = null,
                                             watchedKeys = watchedUiState.watchedKeys,
                                             fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                             onPosterClick = onPosterClick,

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.size
@@ -46,21 +45,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.key
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -371,27 +355,10 @@ private fun HomeCategoryList(
     embedded: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
-    val haptics = LocalHapticFeedback.current
-    var addingNew by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
     var renamingId by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
-    var menuId by remember { mutableStateOf<String?>(null) }
-
-    // Drag-to-reorder state: `localOrder` is shown while dragging and until the saved order catches up.
-    val currentCategories by rememberUpdatedState(categories)
-    var localOrder by remember { mutableStateOf<List<String>?>(null) }
-    var dragId by remember { mutableStateOf<String?>(null) }
-    var dragStartIndex by remember { mutableStateOf(0) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val rowHeights = remember { mutableMapOf<String, Int>() }
-    LaunchedEffect(categories) {
-        if (dragId == null) localOrder = null
-    }
-    val byId = categories.associateBy { it.id }
-    val displayCategories = (localOrder?.takeIf { it.toSet() == byId.keys } ?: categories.map { it.id })
-        .mapNotNull { byId[it] }
 
     Column(
         modifier = if (embedded) {
@@ -414,108 +381,23 @@ private fun HomeCategoryList(
             )
         }
         Text(
-            text = "Drag to reorder. Tap a category to choose its catalogs.",
+            text = "Choose which categories appear, their order, and which catalogs each one shows.",
             style = MaterialTheme.typography.bodyMedium,
             color = tokens.colors.textMuted,
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
 
-        displayCategories.forEachIndexed { index, category ->
-          key(category.id) {
-            val isDragging = dragId == category.id
-            val opensCatalogs = category.kind == HomeCategoryKind.Catalogs
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { rowHeights[category.id] = it.height }
-                    .zIndex(if (isDragging) 1f else 0f)
-                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
-                    .then(
-                        if (isDragging) {
-                            Modifier.background(tokens.colors.surfaceSheet, RoundedCornerShape(10.dp))
-                        } else {
-                            Modifier
-                        },
-                    ),
-            ) {
-                if (index > 0 && !isDragging) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(tokens.colors.textMuted.copy(alpha = 0.15f)),
-                    )
-                }
+        categories.forEachIndexed { index, category ->
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CompactAction(
-                        description = "Drag to reorder",
-                        modifier = Modifier.pointerInput(category.id) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    val order = currentCategories.map { it.id }
-                                    localOrder = order
-                                    dragStartIndex = order.indexOf(category.id)
-                                    dragId = category.id
-                                    dragOffset = 0f
-                                    menuId = null
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    dragOffset += amount.y
-                                    var order = localOrder ?: currentCategories.map { it.id }
-                                    while (true) {
-                                        val idx = order.indexOf(category.id)
-                                        if (idx < 0) break
-                                        if (dragOffset > 0f && idx < order.lastIndex) {
-                                            val h = (rowHeights[order[idx + 1]] ?: break).toFloat()
-                                            if (dragOffset > h / 2f) {
-                                                order = order.swap(idx, idx + 1)
-                                                dragOffset -= h
-                                            } else break
-                                        } else if (dragOffset < 0f && idx > 0) {
-                                            val h = (rowHeights[order[idx - 1]] ?: break).toFloat()
-                                            if (-dragOffset > h / 2f) {
-                                                order = order.swap(idx, idx - 1)
-                                                dragOffset += h
-                                            } else break
-                                        } else break
-                                    }
-                                    localOrder = order
-                                },
-                                onDragEnd = {
-                                    val order = localOrder
-                                    dragId = null
-                                    dragOffset = 0f
-                                    if (order != null) {
-                                        val delta = order.indexOf(category.id) - dragStartIndex
-                                        if (delta != 0) HomeCategoryRepository.move(category.id, delta)
-                                    }
-                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                },
-                                onDragCancel = {
-                                    dragId = null
-                                    dragOffset = 0f
-                                    localOrder = null
-                                },
-                            )
-                        },
-                        onClick = {},
-                    ) {
-                        Icon(Icons.Rounded.Menu, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .then(if (opensCatalogs) Modifier.clickable { onEditCatalogs(category.id) } else Modifier)
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                    ) {
+                    Switch(
+                        checked = category.enabled,
+                        onCheckedChange = { HomeCategoryRepository.setEnabled(category.id, it) },
+                    )
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(
                             text = category.title,
                             style = MaterialTheme.typography.titleMedium,
@@ -524,46 +406,45 @@ private fun HomeCategoryList(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = if (opensCatalogs) "${category.summaryLabel()}  ›" else category.summaryLabel(),
+                            text = category.summaryLabel(),
                             style = MaterialTheme.typography.bodySmall,
                             color = tokens.colors.textMuted,
                         )
                     }
-                    Box {
-                        CompactAction(
-                            description = "More options",
-                            onClick = { menuId = category.id },
-                        ) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
-                        }
-                        DropdownMenu(
-                            expanded = menuId == category.id,
-                            onDismissRequest = { menuId = null },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Rename") },
-                                onClick = {
-                                    menuId = null
-                                    renamingId = category.id
-                                    renameText = category.title
-                                },
-                            )
-                            if (!category.builtIn) {
-                                DropdownMenuItem(
-                                    text = { Text("Delete") },
-                                    onClick = {
-                                        menuId = null
-                                        confirmDeleteId = category.id
-                                    },
-                                )
-                            }
+                    IconButton(
+                        onClick = { HomeCategoryRepository.move(category.id, -1) },
+                        enabled = index > 0,
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move up", tint = tokens.colors.textPrimary)
+                    }
+                    IconButton(
+                        onClick = { HomeCategoryRepository.move(category.id, 1) },
+                        enabled = index < categories.lastIndex,
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move down", tint = tokens.colors.textPrimary)
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = {
+                        renamingId = category.id
+                        renameText = category.title
+                    }) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = tokens.colors.textMuted)
+                    }
+                    if (!category.builtIn) {
+                        IconButton(onClick = { confirmDeleteId = category.id }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = tokens.colors.textMuted)
                         }
                     }
-                    Switch(
-                        checked = category.enabled,
-                        onCheckedChange = { HomeCategoryRepository.setEnabled(category.id, it) },
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
+                    if (category.kind == HomeCategoryKind.Catalogs) {
+                        TextButton(onClick = { onEditCatalogs(category.id) }) {
+                            Text("Choose catalogs")
+                        }
+                    }
                 }
                 if (confirmDeleteId == category.id) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -609,46 +490,33 @@ private fun HomeCategoryList(
                     }
                 }
             }
-          }
         }
 
-        // Add category: one quiet row that opens a field on tap.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { addingNew = !addingNew }
-                .padding(vertical = 12.dp, horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.colors.accent, modifier = Modifier.size(20.dp))
-            Text(
-                text = "Add category",
-                style = MaterialTheme.typography.bodyLarge,
-                color = tokens.colors.accent,
+        Text(
+            text = "Add category",
+            style = MaterialTheme.typography.titleSmall,
+            color = tokens.colors.textPrimary,
+            modifier = Modifier.padding(top = 16.dp, bottom = 6.dp),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = newTitle,
+                onValueChange = { newTitle = it },
+                singleLine = true,
+                placeholder = { Text("e.g. Documentaries") },
+                modifier = Modifier.weight(1f),
             )
-        }
-        if (addingNew) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = newTitle,
-                    onValueChange = { newTitle = it },
-                    singleLine = true,
-                    placeholder = { Text("e.g. Documentaries") },
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    onClick = {
-                        val id = HomeCategoryRepository.addCustom(newTitle)
-                        if (id != null) {
-                            newTitle = ""
-                            addingNew = false
-                            onEditCatalogs(id)
-                        }
-                    },
-                    enabled = newTitle.isNotBlank(),
-                ) { Text("Add") }
+            IconButton(
+                onClick = {
+                    val id = HomeCategoryRepository.addCustom(newTitle)
+                    if (id != null) {
+                        newTitle = ""
+                        onEditCatalogs(id)
+                    }
+                },
+                enabled = newTitle.isNotBlank(),
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = "Add", tint = tokens.colors.textPrimary)
             }
         }
 
@@ -660,53 +528,38 @@ private fun HomeCategoryList(
             modifier = Modifier.padding(top = 20.dp, bottom = 2.dp),
         )
         Text(
-            text = "Turn numbers on per catalog in Choose catalogs.",
+            text = "Turn numbers on per catalog with the # button in Choose catalogs.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
-            modifier = Modifier.padding(bottom = 6.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
         )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
         ) {
-            Text("Color", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip(label = "White", selected = !rank.accent, onClick = { HomeCategoryRepository.setRankAccent(false) })
-                Chip(label = "Accent", selected = rank.accent, onClick = { HomeCategoryRepository.setRankAccent(true) })
-            }
+            Chip(label = "White", selected = !rank.accent, onClick = { HomeCategoryRepository.setRankAccent(false) })
+            Chip(label = "Accent color", selected = rank.accent, onClick = { HomeCategoryRepository.setRankAccent(true) })
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
         ) {
-            Text("Style", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip(label = "Outline", selected = !rank.filled, onClick = { HomeCategoryRepository.setRankFilled(false) })
-                Chip(label = "Filled", selected = rank.filled, onClick = { HomeCategoryRepository.setRankFilled(true) })
-            }
+            Chip(label = "Outline", selected = !rank.filled, onClick = { HomeCategoryRepository.setRankFilled(false) })
+            Chip(label = "Filled", selected = rank.filled, onClick = { HomeCategoryRepository.setRankFilled(true) })
         }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Count", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(5, 10, 20).forEach { count ->
-                    Chip(
-                        label = "Top $count",
-                        selected = rank.count == count,
-                        onClick = { HomeCategoryRepository.setRankCount(count) },
-                    )
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(5, 10, 20).forEach { count ->
+                Chip(
+                    label = "Top $count",
+                    selected = rank.count == count,
+                    onClick = { HomeCategoryRepository.setRankCount(count) },
+                )
             }
         }
 
         TextButton(
             onClick = { HomeCategoryRepository.resetToDefaults() },
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 12.dp),
         ) {
             Text("Reset to defaults")
         }
@@ -739,21 +592,6 @@ private fun HomeCategoryCatalogPicker(
 
     fun save(keys: List<String>) = HomeCategoryRepository.setCatalogKeys(category.id, keys)
 
-    // Drag-to-reorder state. `localOrder` is shown while dragging (and until the saved order catches up).
-    val haptics = LocalHapticFeedback.current
-    val currentKeys by rememberUpdatedState(selectedKeys)
-    var localOrder by remember { mutableStateOf<List<String>?>(null) }
-    var dragKey by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val rowHeights = remember { mutableMapOf<String, Int>() }
-    var showLegend by remember { mutableStateOf(false) }
-    var expandedKey by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(selectedKeys) {
-        if (dragKey == null) localOrder = null
-    }
-    val displayItems = (localOrder?.takeIf { it.toSet() == selectedSet } ?: selectedKeys)
-        .mapNotNull { itemsByKey[it] }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -782,30 +620,12 @@ private fun HomeCategoryCatalogPicker(
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.weight(1f)) {
-                SectionLabel("Shown in this category (${selectedItems.size})")
-            }
-            CompactAction(
-                description = if (showLegend) "Hide help" else "Show help",
-                onClick = { showLegend = !showLegend },
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Info,
-                    contentDescription = null,
-                    tint = if (showLegend) tokens.colors.accent else tokens.colors.textMuted,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-        if (showLegend) {
-            Text(
-                text = "Drag ☰ to reorder. Tap a row's title for options: card shape (tap to cycle default / poster / landscape), ★ Hero feeds the hero banner, # Numbers shows big numbers behind posters.",
-                style = MaterialTheme.typography.bodySmall,
-                color = tokens.colors.textMuted,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-        }
+        SectionLabel("Shown in this category (${selectedItems.size})")
+        Text(
+            text = "★ = this catalog feeds the hero banner of this category. # = show big numbers behind its posters. Tap the card icon under a title to switch its cards between default, poster and landscape.",
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted,
+        )
         if (selectedItems.isEmpty()) {
             Text(
                 text = "Nothing selected yet. Tap a catalog below to add it.",
@@ -814,205 +634,88 @@ private fun HomeCategoryCatalogPicker(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
-        displayItems.forEach { item ->
-          key(item.key) {
-            val isDragging = dragKey == item.key
-            val expanded = expandedKey == item.key && !isDragging
+        selectedItems.forEachIndexed { index, item ->
             val feedsHero = item.key !in category.heroExcludedKeys
             val ranked = item.key in rankedKeys
-            val showsLandscape = item.rowShape.landscapeOverride ?: globalLandscape
-            val shapeLabel = when (item.rowShape) {
-                HomeRowShapeMode.DEFAULT -> "Default"
-                HomeRowShapeMode.POSTER -> "Poster"
-                HomeRowShapeMode.LANDSCAPE -> "Landscape"
-            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onSizeChanged { rowHeights[item.key] = it.height }
-                    .zIndex(if (isDragging) 1f else 0f)
-                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
-                    .then(
-                        if (isDragging) {
-                            Modifier.background(tokens.colors.surfaceSheet, RoundedCornerShape(10.dp))
-                        } else {
-                            Modifier
-                        },
-                    )
                     .padding(vertical = 6.dp),
             ) {
-                // Collapsed line: drag handle, title + status chips, expand chevron.
+                // Line 1: full-width title so it is no longer truncated by the controls.
+                Text(
+                    text = item.displayTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // Line 2: addon name on the left, every control in ONE compact line on the right.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CompactAction(
-                        description = "Drag to reorder",
-                        modifier = Modifier.pointerInput(item.key) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    localOrder = currentKeys
-                                    expandedKey = null
-                                    dragKey = item.key
-                                    dragOffset = 0f
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    dragOffset += amount.y
-                                    var order = localOrder ?: currentKeys
-                                    while (true) {
-                                        val idx = order.indexOf(item.key)
-                                        if (idx < 0) break
-                                        if (dragOffset > 0f && idx < order.lastIndex) {
-                                            val h = (rowHeights[order[idx + 1]] ?: break).toFloat()
-                                            if (dragOffset > h / 2f) {
-                                                order = order.swap(idx, idx + 1)
-                                                dragOffset -= h
-                                            } else break
-                                        } else if (dragOffset < 0f && idx > 0) {
-                                            val h = (rowHeights[order[idx - 1]] ?: break).toFloat()
-                                            if (-dragOffset > h / 2f) {
-                                                order = order.swap(idx, idx - 1)
-                                                dragOffset += h
-                                            } else break
-                                        } else break
-                                    }
-                                    localOrder = order
-                                },
-                                onDragEnd = {
-                                    val finalOrder = localOrder
-                                    dragKey = null
-                                    dragOffset = 0f
-                                    if (finalOrder != null && finalOrder != currentKeys) save(finalOrder)
-                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                },
-                                onDragCancel = {
-                                    dragKey = null
-                                    dragOffset = 0f
-                                    localOrder = null
-                                },
+                    Text(
+                        text = item.addonName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    )
+                    RowShapeTag(
+                        mode = item.rowShape,
+                        globalLandscape = globalLandscape,
+                        onClick = {
+                            HomeCatalogSettingsRepository.setRowShape(
+                                item.key,
+                                nextRowShapeMode(item.rowShape, globalLandscape),
                             )
                         },
-                        onClick = {},
-                    ) {
-                        Icon(Icons.Rounded.Menu, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { expandedKey = if (expanded) null else item.key }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                    CompactAction(
+                        description = if (feedsHero) "Remove from hero banner" else "Use for hero banner",
+                        onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) },
                     ) {
                         Text(
-                            text = item.displayTitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = tokens.colors.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            text = if (feedsHero) "★" else "☆",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (feedsHero) tokens.colors.accent else tokens.colors.textMuted,
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = item.addonName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = tokens.colors.textMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            if (feedsHero) {
-                                Text(
-                                    text = "  ·  ★ Hero",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = tokens.colors.accent,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                )
-                            }
-                            if (ranked) {
-                                Text(
-                                    text = "  ·  # Numbers",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = tokens.colors.accent,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                )
-                            }
-                            if (item.rowShape != HomeRowShapeMode.DEFAULT) {
-                                Text(
-                                    text = "  ·  $shapeLabel",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = tokens.colors.accent,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                )
-                            }
-                        }
                     }
-                }
-                // Expanded: labelled controls.
-                if (expanded) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp, bottom = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    CompactAction(
+                        description = "Toggle big numbers",
+                        onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) },
                     ) {
-                        ControlPill(
-                            label = shapeLabel,
-                            active = item.rowShape != HomeRowShapeMode.DEFAULT,
-                            modifier = Modifier.weight(1.5f),
-                            onClick = {
-                                HomeCatalogSettingsRepository.setRowShape(
-                                    item.key,
-                                    nextRowShapeMode(item.rowShape, globalLandscape),
-                                )
-                            },
-                        ) { tint ->
-                            Icon(
-                                imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
-                                contentDescription = null,
-                                tint = tint,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                        ControlPill(
-                            label = "Hero",
-                            active = feedsHero,
-                            modifier = Modifier.weight(1f),
-                            onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) },
-                        ) { tint ->
-                            Text(text = if (feedsHero) "★" else "☆", color = tint, style = MaterialTheme.typography.labelLarge)
-                        }
-                        ControlPill(
-                            label = "Numbers",
-                            active = ranked,
-                            modifier = Modifier.weight(1.3f),
-                            onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) },
-                        ) { tint ->
-                            Text(text = "#", color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        }
-                        ControlPill(
-                            label = null,
-                            active = false,
-                            modifier = Modifier.width(44.dp),
-                            onClick = {
-                                expandedKey = null
-                                save(selectedKeys - item.key)
-                            },
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Remove",
-                                tint = tint,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
+                        Text(
+                            text = "#",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (ranked) tokens.colors.accent else tokens.colors.textMuted,
+                        )
+                    }
+                    CompactAction(
+                        description = "Move up",
+                        enabled = index > 0,
+                        onClick = { save(selectedKeys.swap(index, index - 1)) },
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    CompactAction(
+                        description = "Move down",
+                        enabled = index < selectedItems.lastIndex,
+                        onClick = { save(selectedKeys.swap(index, index + 1)) },
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    CompactAction(
+                        description = "Remove",
+                        onClick = { save(selectedKeys - item.key) },
+                    ) {
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
                     }
                 }
             }
-          }
         }
 
         SectionLabel("Available catalogs")
@@ -1049,12 +752,11 @@ private fun HomeCategoryCatalogPicker(
 private fun CompactAction(
     description: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(34.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, onClick = onClick)
@@ -1115,39 +817,46 @@ private fun CatalogLabel(
     }
 }
 
-/** Labelled toggle used in an expanded catalog row. Accent border/text when active, muted otherwise. */
+/**
+ * Small per-row card shape button. Muted when the row follows the global setting (shows the shape
+ * it currently gets), accent with a border when this row is forced to poster or landscape.
+ */
 @Composable
-private fun ControlPill(
-    label: String?,
-    active: Boolean,
+private fun RowShapeTag(
+    mode: HomeRowShapeMode,
+    globalLandscape: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    leading: @Composable (Color) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val tint = if (active) tokens.colors.accent else tokens.colors.textMuted
-    val shape = RoundedCornerShape(10.dp)
-    Row(
-        modifier = modifier
-            .clip(shape)
-            .border(BorderStroke(1.dp, tint.copy(alpha = if (active) 1f else 0.45f)), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        leading(tint)
-        if (label != null) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = tint,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 5.dp),
+    val forced = mode != HomeRowShapeMode.DEFAULT
+    val showsLandscape = mode.landscapeOverride ?: globalLandscape
+    val tint = if (forced) tokens.colors.accent else tokens.colors.textMuted
+    val description = when (mode) {
+        HomeRowShapeMode.DEFAULT -> "Card shape: default. Tap to change."
+        HomeRowShapeMode.POSTER -> "Card shape: poster. Tap to change."
+        HomeRowShapeMode.LANDSCAPE -> "Card shape: landscape. Tap to change."
+    }
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .then(
+                if (forced) {
+                    Modifier.border(BorderStroke(1.dp, tint), RoundedCornerShape(8.dp))
+                } else {
+                    Modifier
+                },
             )
-        }
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

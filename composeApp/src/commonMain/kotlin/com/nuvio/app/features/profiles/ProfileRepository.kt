@@ -200,6 +200,7 @@ object ProfileRepository {
         com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache.onProfileChanged()
         EpisodeReleaseNotificationsRepository.onProfileChanged()
         TmdbSettingsRepository.onProfileChanged()
+        com.nuvio.app.features.ai.AiSettingsRepository.onProfileChanged()
         MdbListSettingsRepository.onProfileChanged()
         SearchHistoryRepository.onProfileChanged()
         SearchRepository.reset()
