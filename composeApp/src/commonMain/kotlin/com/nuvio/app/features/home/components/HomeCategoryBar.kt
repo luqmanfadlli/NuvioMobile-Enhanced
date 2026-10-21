@@ -34,8 +34,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ChildCare
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
@@ -47,6 +50,8 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.Theaters
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.VideoLibrary
@@ -119,6 +124,7 @@ import com.nuvio.app.features.home.HomeCategory
 import com.nuvio.app.features.home.HomeCategoryKind
 import com.nuvio.app.features.home.HomeCategoryRepository
 import com.nuvio.app.features.home.HomeRowShapeMode
+import com.nuvio.app.features.home.nextRowShapeMode
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -1015,7 +1021,7 @@ private fun HomeCategoryCatalogPicker(
 
         SectionLabel("In this category")
         Text(
-            text = "Drag the handle to reorder. Tap a title to adjust it.",
+            text = "Drag to reorder. Tap a title to change it.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
         )
@@ -1045,12 +1051,23 @@ private fun HomeCategoryCatalogPicker(
                     onToggle = { expandedKey = if (expanded) null else item.key },
                     onHeroChange = { HomeCategoryRepository.setHeroSource(category.id, item.key, it) },
                     onRankedChange = { HomeCategoryRepository.setRanked(item.key, it) },
-                    onShapeChange = { HomeCatalogSettingsRepository.setRowShape(item.key, it) },
+                    onShapeCycle = {
+                        HomeCatalogSettingsRepository.setRowShape(item.key, nextRowShapeMode(item.rowShape, globalLandscape))
+                    },
                     onRename = { renamingKey = item.key },
                     onRemove = { save(selectedKeys - item.key) },
                 )
             },
         )
+
+        if (selectedItems.isNotEmpty()) {
+            Text(
+                text = "Accent means on. Gray means off.",
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
 
         renamingKey?.let { key ->
             itemsByKey[key]?.let { item ->
@@ -1117,23 +1134,16 @@ private fun CatalogRow(
     onToggle: () -> Unit,
     onHeroChange: (Boolean) -> Unit,
     onRankedChange: (Boolean) -> Unit,
-    onShapeChange: (HomeRowShapeMode) -> Unit,
+    onShapeCycle: () -> Unit,
     onRename: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val badges = buildList {
-        if (feedsHero) add("Hero")
-        if (ranked) add("Numbers")
-        when (shape) {
-            HomeRowShapeMode.DEFAULT -> Unit
-            HomeRowShapeMode.POSTER -> add("Poster")
-            HomeRowShapeMode.LANDSCAPE -> add("Landscape")
-        }
+    val shapeLabel = when (shape) {
+        HomeRowShapeMode.DEFAULT -> if (globalLandscape) "Default, landscape" else "Default, poster"
+        HomeRowShapeMode.POSTER -> "Poster"
+        HomeRowShapeMode.LANDSCAPE -> "Landscape"
     }
-    val subtitle = (listOf(item.addonName) + badges)
-        .filter { it.isNotBlank() }
-        .joinToString("  ·  ")
 
     Column(
         modifier = Modifier
@@ -1149,7 +1159,7 @@ private fun CatalogRow(
                 modifier = Modifier
                     .weight(1f)
                     .clickable(onClick = onToggle)
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 12.dp),
             ) {
                 Text(
                     text = item.displayTitle,
@@ -1159,107 +1169,93 @@ private fun CatalogRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = subtitle,
+                    text = item.addonName,
                     style = MaterialTheme.typography.bodySmall,
                     color = tokens.colors.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            CatalogOverflowMenu(title = item.displayTitle, onRename = onRename, onRemove = onRemove)
         }
 
         if (expanded) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 36.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(start = 36.dp, bottom = 12.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(tokens.colors.surfaceElevated)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                CatalogSettingLine(
-                    title = "Hero banner",
-                    description = "Use this catalog for the hero banner in this category",
-                    checked = feedsHero,
-                    onCheckedChange = onHeroChange,
+                CatalogActionButton(
+                    icon = if (feedsHero) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    description = if (feedsHero) "Remove from hero banner" else "Use for hero banner",
+                    on = feedsHero,
+                    onClick = { onHeroChange(!feedsHero) },
                 )
-                CatalogSettingLine(
-                    title = "Big numbers",
-                    description = "Show rank numbers behind posters",
-                    checked = ranked,
-                    onCheckedChange = onRankedChange,
+                CatalogActionButton(
+                    icon = Icons.Rounded.Tag,
+                    description = if (ranked) "Hide rank numbers" else "Show rank numbers",
+                    on = ranked,
+                    onClick = { onRankedChange(!ranked) },
                 )
-
-                Text(
-                    text = "Card shape",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = tokens.colors.textPrimary,
+                CatalogActionButton(
+                    icon = Icons.Rounded.Badge,
+                    description = "Card shape: $shapeLabel. Tap to change.",
+                    on = shape != HomeRowShapeMode.DEFAULT,
+                    onClick = onShapeCycle,
                 )
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Chip(
-                        label = if (globalLandscape) "Default (landscape)" else "Default (poster)",
-                        selected = shape == HomeRowShapeMode.DEFAULT,
-                        onClick = { onShapeChange(HomeRowShapeMode.DEFAULT) },
-                    )
-                    Chip(
-                        label = "Poster",
-                        selected = shape == HomeRowShapeMode.POSTER,
-                        onClick = { onShapeChange(HomeRowShapeMode.POSTER) },
-                    )
-                    Chip(
-                        label = "Landscape",
-                        selected = shape == HomeRowShapeMode.LANDSCAPE,
-                        onClick = { onShapeChange(HomeRowShapeMode.LANDSCAPE) },
-                    )
-                }
-
+                CatalogActionButton(
+                    icon = Icons.Rounded.Edit,
+                    description = "Rename ${item.displayTitle}",
+                    onClick = onRename,
+                )
+                CatalogActionButton(
+                    icon = Icons.Rounded.Delete,
+                    description = "Remove ${item.displayTitle} from category",
+                    tint = tokens.colors.danger,
+                    onClick = onRemove,
+                )
             }
         }
     }
 }
 
+/**
+ * One icon in a catalog's action bar. Toggles pass [on]: accent when on, muted gray when off.
+ * Plain actions (rename, remove) leave [on] null and use [tint] or the primary text color.
+ */
 @Composable
-private fun CatalogOverflowMenu(
-    title: String,
-    onRename: () -> Unit,
-    onRemove: () -> Unit,
+private fun CatalogActionButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    on: Boolean? = null,
+    tint: Color = MaterialTheme.nuvio.colors.textPrimary,
 ) {
     val tokens = MaterialTheme.nuvio
-    var menuOpen by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { menuOpen = true }) {
-            Icon(
-                imageVector = Icons.Rounded.MoreVert,
-                contentDescription = "More options for $title",
-                tint = tokens.colors.textPrimary,
-            )
-        }
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-        ) {
-            DropdownMenuItem(
-                text = { Text("Rename") },
-                onClick = {
-                    menuOpen = false
-                    onRename()
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = "Remove from category",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                },
-                onClick = {
-                    menuOpen = false
-                    onRemove()
-                },
-            )
-        }
+    val color = when (on) {
+        true -> tokens.colors.accent
+        false -> tokens.colors.textMuted
+        null -> tint
+    }
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (on == true) Modifier.background(color.copy(alpha = 0.14f)) else Modifier)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
 
@@ -1300,34 +1296,6 @@ private fun CatalogRenameDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
-}
-
-@Composable
-private fun CatalogSettingLine(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = tokens.colors.textPrimary,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = tokens.colors.textMuted,
-            )
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
 }
 
 @Composable
