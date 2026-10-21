@@ -57,6 +57,8 @@ import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card_description
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_netflix
+import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_netflix_description
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_description
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed_description
@@ -256,6 +258,15 @@ private fun HeroStyleOptions(
                     ),
                 )
             }
+            HeroStyleOption(
+                modifier = Modifier.fillMaxWidth(),
+                style = HomeHeroStyle.NETFLIX,
+                selectedStyle = selectedStyle,
+                title = stringResource(Res.string.settings_homescreen_hero_style_netflix),
+                description = stringResource(
+                    Res.string.settings_homescreen_hero_style_netflix_description,
+                ),
+            )
         }
     }
 }
@@ -472,6 +483,7 @@ private fun HomescreenCatalogList(
                                     expandedKey = if (shouldExpand) item.key else null
                                 },
                                 onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
+                                onRowShapeChange = { HomeCatalogSettingsRepository.setRowShape(item.key, it) },
                                 onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
