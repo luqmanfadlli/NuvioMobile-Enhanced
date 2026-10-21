@@ -46,6 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
@@ -368,10 +371,27 @@ private fun HomeCategoryList(
     embedded: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
+    val haptics = LocalHapticFeedback.current
+    var addingNew by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
     var renamingId by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
+    var menuId by remember { mutableStateOf<String?>(null) }
+
+    // Drag-to-reorder state: `localOrder` is shown while dragging and until the saved order catches up.
+    val currentCategories by rememberUpdatedState(categories)
+    var localOrder by remember { mutableStateOf<List<String>?>(null) }
+    var dragId by remember { mutableStateOf<String?>(null) }
+    var dragStartIndex by remember { mutableStateOf(0) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val rowHeights = remember { mutableMapOf<String, Int>() }
+    LaunchedEffect(categories) {
+        if (dragId == null) localOrder = null
+    }
+    val byId = categories.associateBy { it.id }
+    val displayCategories = (localOrder?.takeIf { it.toSet() == byId.keys } ?: categories.map { it.id })
+        .mapNotNull { byId[it] }
 
     Column(
         modifier = if (embedded) {
@@ -394,23 +414,108 @@ private fun HomeCategoryList(
             )
         }
         Text(
-            text = "Choose which categories appear, their order, and which catalogs each one shows.",
+            text = "Drag to reorder. Tap a category to choose its catalogs.",
             style = MaterialTheme.typography.bodyMedium,
             color = tokens.colors.textMuted,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
 
-        categories.forEachIndexed { index, category ->
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        displayCategories.forEachIndexed { index, category ->
+          key(category.id) {
+            val isDragging = dragId == category.id
+            val opensCatalogs = category.kind == HomeCategoryKind.Catalogs
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { rowHeights[category.id] = it.height }
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
+                    .then(
+                        if (isDragging) {
+                            Modifier.background(tokens.colors.surfaceSheet, RoundedCornerShape(10.dp))
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                if (index > 0 && !isDragging) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(tokens.colors.textMuted.copy(alpha = 0.15f)),
+                    )
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Switch(
-                        checked = category.enabled,
-                        onCheckedChange = { HomeCategoryRepository.setEnabled(category.id, it) },
-                    )
-                    Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    CompactAction(
+                        description = "Drag to reorder",
+                        modifier = Modifier.pointerInput(category.id) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    val order = currentCategories.map { it.id }
+                                    localOrder = order
+                                    dragStartIndex = order.indexOf(category.id)
+                                    dragId = category.id
+                                    dragOffset = 0f
+                                    menuId = null
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.y
+                                    var order = localOrder ?: currentCategories.map { it.id }
+                                    while (true) {
+                                        val idx = order.indexOf(category.id)
+                                        if (idx < 0) break
+                                        if (dragOffset > 0f && idx < order.lastIndex) {
+                                            val h = (rowHeights[order[idx + 1]] ?: break).toFloat()
+                                            if (dragOffset > h / 2f) {
+                                                order = order.swap(idx, idx + 1)
+                                                dragOffset -= h
+                                            } else break
+                                        } else if (dragOffset < 0f && idx > 0) {
+                                            val h = (rowHeights[order[idx - 1]] ?: break).toFloat()
+                                            if (-dragOffset > h / 2f) {
+                                                order = order.swap(idx, idx - 1)
+                                                dragOffset += h
+                                            } else break
+                                        } else break
+                                    }
+                                    localOrder = order
+                                },
+                                onDragEnd = {
+                                    val order = localOrder
+                                    dragId = null
+                                    dragOffset = 0f
+                                    if (order != null) {
+                                        val delta = order.indexOf(category.id) - dragStartIndex
+                                        if (delta != 0) HomeCategoryRepository.move(category.id, delta)
+                                    }
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                },
+                                onDragCancel = {
+                                    dragId = null
+                                    dragOffset = 0f
+                                    localOrder = null
+                                },
+                            )
+                        },
+                        onClick = {},
+                    ) {
+                        Icon(Icons.Rounded.Menu, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .then(if (opensCatalogs) Modifier.clickable { onEditCatalogs(category.id) } else Modifier)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
                         Text(
                             text = category.title,
                             style = MaterialTheme.typography.titleMedium,
@@ -419,45 +524,46 @@ private fun HomeCategoryList(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = category.summaryLabel(),
+                            text = if (opensCatalogs) "${category.summaryLabel()}  ›" else category.summaryLabel(),
                             style = MaterialTheme.typography.bodySmall,
                             color = tokens.colors.textMuted,
                         )
                     }
-                    IconButton(
-                        onClick = { HomeCategoryRepository.move(category.id, -1) },
-                        enabled = index > 0,
-                    ) {
-                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move up", tint = tokens.colors.textPrimary)
-                    }
-                    IconButton(
-                        onClick = { HomeCategoryRepository.move(category.id, 1) },
-                        enabled = index < categories.lastIndex,
-                    ) {
-                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move down", tint = tokens.colors.textPrimary)
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = {
-                        renamingId = category.id
-                        renameText = category.title
-                    }) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Rename", tint = tokens.colors.textMuted)
-                    }
-                    if (!category.builtIn) {
-                        IconButton(onClick = { confirmDeleteId = category.id }) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = tokens.colors.textMuted)
+                    Box {
+                        CompactAction(
+                            description = "More options",
+                            onClick = { menuId = category.id },
+                        ) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
+                        }
+                        DropdownMenu(
+                            expanded = menuId == category.id,
+                            onDismissRequest = { menuId = null },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                onClick = {
+                                    menuId = null
+                                    renamingId = category.id
+                                    renameText = category.title
+                                },
+                            )
+                            if (!category.builtIn) {
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        menuId = null
+                                        confirmDeleteId = category.id
+                                    },
+                                )
+                            }
                         }
                     }
-                    if (category.kind == HomeCategoryKind.Catalogs) {
-                        TextButton(onClick = { onEditCatalogs(category.id) }) {
-                            Text("Choose catalogs")
-                        }
-                    }
+                    Switch(
+                        checked = category.enabled,
+                        onCheckedChange = { HomeCategoryRepository.setEnabled(category.id, it) },
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
                 }
                 if (confirmDeleteId == category.id) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -503,33 +609,46 @@ private fun HomeCategoryList(
                     }
                 }
             }
+          }
         }
 
-        Text(
-            text = "Add category",
-            style = MaterialTheme.typography.titleSmall,
-            color = tokens.colors.textPrimary,
-            modifier = Modifier.padding(top = 16.dp, bottom = 6.dp),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = newTitle,
-                onValueChange = { newTitle = it },
-                singleLine = true,
-                placeholder = { Text("e.g. Documentaries") },
-                modifier = Modifier.weight(1f),
+        // Add category: one quiet row that opens a field on tap.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { addingNew = !addingNew }
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.colors.accent, modifier = Modifier.size(20.dp))
+            Text(
+                text = "Add category",
+                style = MaterialTheme.typography.bodyLarge,
+                color = tokens.colors.accent,
             )
-            IconButton(
-                onClick = {
-                    val id = HomeCategoryRepository.addCustom(newTitle)
-                    if (id != null) {
-                        newTitle = ""
-                        onEditCatalogs(id)
-                    }
-                },
-                enabled = newTitle.isNotBlank(),
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = "Add", tint = tokens.colors.textPrimary)
+        }
+        if (addingNew) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    singleLine = true,
+                    placeholder = { Text("e.g. Documentaries") },
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = {
+                        val id = HomeCategoryRepository.addCustom(newTitle)
+                        if (id != null) {
+                            newTitle = ""
+                            addingNew = false
+                            onEditCatalogs(id)
+                        }
+                    },
+                    enabled = newTitle.isNotBlank(),
+                ) { Text("Add") }
             }
         }
 
@@ -541,38 +660,53 @@ private fun HomeCategoryList(
             modifier = Modifier.padding(top = 20.dp, bottom = 2.dp),
         )
         Text(
-            text = "Turn numbers on per catalog with the # button in Choose catalogs.",
+            text = "Turn numbers on per catalog in Choose catalogs.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 6.dp),
         )
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Chip(label = "White", selected = !rank.accent, onClick = { HomeCategoryRepository.setRankAccent(false) })
-            Chip(label = "Accent color", selected = rank.accent, onClick = { HomeCategoryRepository.setRankAccent(true) })
+            Text("Color", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(label = "White", selected = !rank.accent, onClick = { HomeCategoryRepository.setRankAccent(false) })
+                Chip(label = "Accent", selected = rank.accent, onClick = { HomeCategoryRepository.setRankAccent(true) })
+            }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Chip(label = "Outline", selected = !rank.filled, onClick = { HomeCategoryRepository.setRankFilled(false) })
-            Chip(label = "Filled", selected = rank.filled, onClick = { HomeCategoryRepository.setRankFilled(true) })
+            Text("Style", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(label = "Outline", selected = !rank.filled, onClick = { HomeCategoryRepository.setRankFilled(false) })
+                Chip(label = "Filled", selected = rank.filled, onClick = { HomeCategoryRepository.setRankFilled(true) })
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(5, 10, 20).forEach { count ->
-                Chip(
-                    label = "Top $count",
-                    selected = rank.count == count,
-                    onClick = { HomeCategoryRepository.setRankCount(count) },
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Count", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(5, 10, 20).forEach { count ->
+                    Chip(
+                        label = "Top $count",
+                        selected = rank.count == count,
+                        onClick = { HomeCategoryRepository.setRankCount(count) },
+                    )
+                }
             }
         }
 
         TextButton(
             onClick = { HomeCategoryRepository.resetToDefaults() },
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = 8.dp),
         ) {
             Text("Reset to defaults")
         }
