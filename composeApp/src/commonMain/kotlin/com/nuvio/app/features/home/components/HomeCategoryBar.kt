@@ -10,22 +10,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +29,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ChildCare
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
@@ -48,6 +42,7 @@ import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
@@ -82,7 +77,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -94,7 +88,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -457,163 +450,6 @@ private fun DragHandleIcon(title: String, dragHandle: Modifier) {
 }
 
 // ---------------------------------------------------------------------------
-// Visualizer
-// ---------------------------------------------------------------------------
-
-/** One catalog row as it will appear on Home. */
-private data class PreviewRowSpec(
-    val title: String,
-    val landscape: Boolean,
-    val hero: Boolean,
-    val ranked: Boolean,
-)
-
-/** The navigation bar as it will look, with the enabled categories in their order. */
-@Composable
-private fun NavigationPreview(enabledCategories: List<HomeCategory>) {
-    val tokens = MaterialTheme.nuvio
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(
-            text = "Preview",
-            style = MaterialTheme.typography.titleSmall,
-            color = tokens.colors.textPrimary,
-        )
-        Text(
-            text = if (enabledCategories.isEmpty()) {
-                "No categories are on. Turn one on to see it here."
-            } else {
-                "This is the navigation bar, in this order."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = tokens.colors.textMuted,
-            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            enabledCategories.forEachIndexed { index, category ->
-                CategoryChip(
-                    category = category,
-                    selected = index == 0,
-                    showLabel = true,
-                    onClick = {},
-                )
-            }
-        }
-    }
-}
-
-/** A category's rows as they will appear on Home: one strip per catalog, in order. */
-@Composable
-private fun CategoryLayoutPreview(categoryTitle: String, rows: List<PreviewRowSpec>) {
-    val tokens = MaterialTheme.nuvio
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(
-            text = "Preview",
-            style = MaterialTheme.typography.titleSmall,
-            color = tokens.colors.textPrimary,
-        )
-        Text(
-            text = if (rows.isEmpty()) {
-                "Add catalogs to see how this category will look."
-            } else {
-                "Each catalog is a row on Home, in this order."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = tokens.colors.textMuted,
-            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = categoryTitle,
-                style = MaterialTheme.typography.titleSmall,
-                color = tokens.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            rows.forEach { spec -> PreviewRowStrip(spec) }
-        }
-    }
-}
-
-@Composable
-private fun PreviewRowStrip(spec: PreviewRowSpec) {
-    val tokens = MaterialTheme.nuvio
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = spec.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = tokens.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            if (spec.hero) {
-                Text(text = "★", color = tokens.colors.accent, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            repeat(PREVIEW_CARD_COUNT) { index ->
-                PreviewCard(
-                    landscape = spec.landscape,
-                    rank = if (spec.ranked) index + 1 else null,
-                    highlight = spec.hero && index == 0,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PreviewCard(landscape: Boolean, rank: Int?, highlight: Boolean) {
-    val tokens = MaterialTheme.nuvio
-    val shape = RoundedCornerShape(8.dp)
-    val width = if (landscape) 112.dp else 72.dp
-    val height = if (landscape) 63.dp else 108.dp
-    Box(
-        modifier = Modifier
-            .size(width, height)
-            .clip(shape)
-            .background(tokens.colors.overlaySelected)
-            .border(
-                BorderStroke(1.dp, if (highlight) tokens.colors.accent else tokens.colors.borderStrong),
-                shape,
-            ),
-        contentAlignment = Alignment.BottomStart,
-    ) {
-        if (rank != null) {
-            Text(
-                text = rank.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = tokens.colors.textPrimary,
-                modifier = Modifier.padding(6.dp),
-            )
-        }
-    }
-}
-
-private const val PREVIEW_CARD_COUNT = 4
-
-// ---------------------------------------------------------------------------
 // Category manager
 // ---------------------------------------------------------------------------
 
@@ -654,8 +490,6 @@ private fun HomeCategoryList(
             color = tokens.colors.textMuted,
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
         )
-
-        NavigationPreview(enabledCategories = categories.filter { it.enabled })
 
         DragReorderColumn(
             items = categories,
@@ -956,10 +790,21 @@ private fun HomeCategoryCatalogPicker(
     val visibleKeys = selectedItems.map { it.key }
     val selectedSet = selectedKeys.toSet()
     val availableItems = allItems.filter { it.key !in selectedSet }
+    val trimmedQuery = searchQuery.trim()
+    val shownAvailable = if (trimmedQuery.isEmpty()) {
+        availableItems
+    } else {
+        availableItems.filter {
+            it.displayTitle.contains(trimmedQuery, ignoreCase = true) ||
+                it.defaultTitle.contains(trimmedQuery, ignoreCase = true) ||
+                it.addonName.contains(trimmedQuery, ignoreCase = true)
+        }
+    }
 
     // Only one catalog row is open at a time.
     var expandedKey by remember { mutableStateOf<String?>(null) }
     var renamingKey by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
 
     fun save(keys: List<String>) = HomeCategoryRepository.setCatalogKeys(category.id, keys)
 
@@ -967,15 +812,6 @@ private fun HomeCategoryCatalogPicker(
     fun saveOrder(orderedVisible: List<String>) {
         val hidden = selectedKeys.filterNot { it in visibleKeys.toSet() }
         save(orderedVisible + hidden)
-    }
-
-    val previewRows = selectedItems.map { item ->
-        PreviewRowSpec(
-            title = item.displayTitle,
-            landscape = item.rowShape.landscapeOverride ?: globalLandscape,
-            hero = item.key !in category.heroExcludedKeys,
-            ranked = item.key in rankedKeys,
-        )
     }
 
     Column(
@@ -1016,8 +852,6 @@ private fun HomeCategoryCatalogPicker(
                 Text("Auto-fill suggestions")
             }
         }
-
-        CategoryLayoutPreview(categoryTitle = category.title, rows = previewRows)
 
         SectionLabel("In this category")
         Text(
@@ -1076,6 +910,36 @@ private fun HomeCategoryCatalogPicker(
         }
 
         SectionLabel("Available")
+        if (availableItems.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                singleLine = true,
+                placeholder = { Text("Search catalogs") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = tokens.colors.textMuted,
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Clear search",
+                                tint = tokens.colors.textMuted,
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 4.dp),
+            )
+        }
         if (availableItems.isEmpty()) {
             Text(
                 text = "No more catalogs. Install addons to get more.",
@@ -1083,8 +947,15 @@ private fun HomeCategoryCatalogPicker(
                 color = tokens.colors.textMuted,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
+        } else if (shownAvailable.isEmpty()) {
+            Text(
+                text = "No catalogs match \"$trimmedQuery\".",
+                style = MaterialTheme.typography.bodyMedium,
+                color = tokens.colors.textMuted,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
         }
-        availableItems.forEachIndexed { index, item ->
+        shownAvailable.forEachIndexed { index, item ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1115,7 +986,7 @@ private fun HomeCategoryCatalogPicker(
                     modifier = Modifier.size(24.dp),
                 )
             }
-            if (index != availableItems.lastIndex) {
+            if (index != shownAvailable.lastIndex) {
                 HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
             }
         }
