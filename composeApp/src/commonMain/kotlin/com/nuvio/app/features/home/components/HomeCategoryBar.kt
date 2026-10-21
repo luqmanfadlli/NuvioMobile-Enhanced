@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -634,57 +635,85 @@ private fun HomeCategoryCatalogPicker(
             )
         }
         selectedItems.forEachIndexed { index, item ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            val feedsHero = item.key !in category.heroExcludedKeys
+            val ranked = item.key in rankedKeys
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
             ) {
-                CatalogLabel(
-                    item = item,
-                    modifier = Modifier.weight(1f),
-                    trailing = {
-                        RowShapeTag(
-                            mode = item.rowShape,
-                            globalLandscape = globalLandscape,
-                            onClick = {
-                                HomeCatalogSettingsRepository.setRowShape(
-                                    item.key,
-                                    nextRowShapeMode(item.rowShape, globalLandscape),
-                                )
-                            },
-                        )
-                    },
+                // Line 1: full-width title so it is no longer truncated by the controls.
+                Text(
+                    text = item.displayTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                val feedsHero = item.key !in category.heroExcludedKeys
-                IconButton(onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) }) {
-                    Text(
-                        text = if (feedsHero) "★" else "☆",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (feedsHero) tokens.colors.accent else tokens.colors.textMuted,
-                    )
-                }
-                val ranked = item.key in rankedKeys
-                IconButton(onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) }) {
-                    Text(
-                        text = "#",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (ranked) tokens.colors.accent else tokens.colors.textMuted,
-                    )
-                }
-                IconButton(
-                    onClick = { save(selectedKeys.swap(index, index - 1)) },
-                    enabled = index > 0,
+                // Line 2: addon name on the left, every control in ONE compact line on the right.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move up", tint = tokens.colors.textPrimary)
-                }
-                IconButton(
-                    onClick = { save(selectedKeys.swap(index, index + 1)) },
-                    enabled = index < selectedItems.lastIndex,
-                ) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move down", tint = tokens.colors.textPrimary)
-                }
-                IconButton(onClick = { save(selectedKeys - item.key) }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Remove", tint = tokens.colors.textMuted)
+                    Text(
+                        text = item.addonName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    )
+                    RowShapeTag(
+                        mode = item.rowShape,
+                        globalLandscape = globalLandscape,
+                        onClick = {
+                            HomeCatalogSettingsRepository.setRowShape(
+                                item.key,
+                                nextRowShapeMode(item.rowShape, globalLandscape),
+                            )
+                        },
+                    )
+                    CompactAction(
+                        description = if (feedsHero) "Remove from hero banner" else "Use for hero banner",
+                        onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) },
+                    ) {
+                        Text(
+                            text = if (feedsHero) "★" else "☆",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (feedsHero) tokens.colors.accent else tokens.colors.textMuted,
+                        )
+                    }
+                    CompactAction(
+                        description = "Toggle big numbers",
+                        onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) },
+                    ) {
+                        Text(
+                            text = "#",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (ranked) tokens.colors.accent else tokens.colors.textMuted,
+                        )
+                    }
+                    CompactAction(
+                        description = "Move up",
+                        enabled = index > 0,
+                        onClick = { save(selectedKeys.swap(index, index - 1)) },
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    CompactAction(
+                        description = "Move down",
+                        enabled = index < selectedItems.lastIndex,
+                        onClick = { save(selectedKeys.swap(index, index + 1)) },
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    CompactAction(
+                        description = "Remove",
+                        onClick = { save(selectedKeys - item.key) },
+                    ) {
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
@@ -715,6 +744,27 @@ private fun HomeCategoryCatalogPicker(
                 )
             }
         }
+    }
+}
+
+/** Tight 34dp tap target (instead of IconButton's 48dp) so all row controls fit on one line. */
+@Composable
+private fun CompactAction(
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = description }
+            .alpha(if (enabled) 1f else 0.35f),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
@@ -788,25 +838,24 @@ private fun RowShapeTag(
     }
     Box(
         modifier = Modifier
-            .padding(start = 6.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .size(34.dp)
+            .clip(RoundedCornerShape(8.dp))
             .then(
                 if (forced) {
-                    Modifier.border(BorderStroke(1.dp, tint), RoundedCornerShape(6.dp))
+                    Modifier.border(BorderStroke(1.dp, tint), RoundedCornerShape(8.dp))
                 } else {
                     Modifier
                 },
             )
             .clickable(onClick = onClick)
-            .semantics { contentDescription = description }
-            .padding(horizontal = 6.dp, vertical = 5.dp),
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(18.dp),
         )
     }
 }
