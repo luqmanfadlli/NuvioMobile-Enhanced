@@ -30,6 +30,8 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ChildCare
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CropLandscape
+import androidx.compose.material.icons.rounded.CropPortrait
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
@@ -789,6 +791,7 @@ private fun HomeCategoryCatalogPicker(
     val selectedItems = selectedKeys.mapNotNull { itemsByKey[it] }
     val visibleKeys = selectedItems.map { it.key }
     val selectedSet = selectedKeys.toSet()
+    var searchQuery by remember { mutableStateOf("") }
     val availableItems = allItems.filter { it.key !in selectedSet }
     val trimmedQuery = searchQuery.trim()
     val shownAvailable = if (trimmedQuery.isEmpty()) {
@@ -804,7 +807,6 @@ private fun HomeCategoryCatalogPicker(
     // Only one catalog row is open at a time.
     var expandedKey by remember { mutableStateOf<String?>(null) }
     var renamingKey by remember { mutableStateOf<String?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
 
     fun save(keys: List<String>) = HomeCategoryRepository.setCatalogKeys(category.id, keys)
 
@@ -1073,7 +1075,11 @@ private fun CatalogRow(
                     onClick = { onRankedChange(!ranked) },
                 )
                 CatalogActionButton(
-                    icon = Icons.Rounded.Badge,
+                    icon = when (shape) {
+                        HomeRowShapeMode.DEFAULT -> Icons.Rounded.Badge
+                        HomeRowShapeMode.POSTER -> Icons.Rounded.CropPortrait
+                        HomeRowShapeMode.LANDSCAPE -> Icons.Rounded.CropLandscape
+                    },
                     description = "Card shape: $shapeLabel. Tap to change.",
                     on = shape != HomeRowShapeMode.DEFAULT,
                     onClick = onShapeCycle,
