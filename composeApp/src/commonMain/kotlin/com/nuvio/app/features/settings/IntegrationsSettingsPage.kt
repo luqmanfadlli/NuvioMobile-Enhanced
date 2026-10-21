@@ -72,6 +72,8 @@ internal fun LazyListScope.integrationsContent(
                     isTablet = isTablet,
                     onClick = onLiveTvClick,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                GeminiRecommendationsCollapsibleRow(isTablet = isTablet)
             }
         }
     }

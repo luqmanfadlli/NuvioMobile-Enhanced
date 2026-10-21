@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.MoreVert
@@ -792,6 +793,7 @@ private fun HomeCategoryCatalogPicker(
     val visibleKeys = selectedItems.map { it.key }
     val selectedSet = selectedKeys.toSet()
     var searchQuery by remember { mutableStateOf("") }
+    var legendOpen by remember { mutableStateOf(false) }
     val availableItems = allItems.filter { it.key !in selectedSet }
     val trimmedQuery = searchQuery.trim()
     val shownAvailable = if (trimmedQuery.isEmpty()) {
@@ -843,6 +845,16 @@ private fun HomeCategoryCatalogPicker(
                     color = tokens.colors.textMuted,
                 )
             }
+            IconButton(onClick = { legendOpen = true }) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = "What the icons mean",
+                    tint = tokens.colors.textMuted,
+                )
+            }
+        }
+        if (legendOpen) {
+            CatalogLegendDialog(onDismiss = { legendOpen = false })
         }
 
         val canSuggest = category.id in setOf(HOME_CATEGORY_MOVIES_ID, HOME_CATEGORY_TV_ID, HOME_CATEGORY_ANIME_ID)
@@ -1133,6 +1145,106 @@ private fun CatalogActionButton(
             tint = color,
             modifier = Modifier.size(24.dp),
         )
+    }
+}
+
+@Composable
+private fun CatalogLegendDialog(onDismiss: () -> Unit) {
+    val tokens = MaterialTheme.nuvio
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Catalog icons") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text = "Tap a catalog title to show these icons. Accent means on. Gray means off.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textMuted,
+                )
+                LegendRow(
+                    icon = Icons.Rounded.Star,
+                    tint = tokens.colors.accent,
+                    title = "Hero banner",
+                    description = "Use this catalog for the hero banner in this category.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.Tag,
+                    tint = tokens.colors.accent,
+                    title = "Rank numbers",
+                    description = "Show big numbers behind the posters.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.Badge,
+                    tint = tokens.colors.textMuted,
+                    title = "Card shape: default",
+                    description = "Follows your Poster Card Style setting. Tap to change the shape.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.CropPortrait,
+                    tint = tokens.colors.accent,
+                    title = "Card shape: poster",
+                    description = "Always show tall posters in this row.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.CropLandscape,
+                    tint = tokens.colors.accent,
+                    title = "Card shape: landscape",
+                    description = "Always show wide cards in this row.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.Edit,
+                    tint = tokens.colors.textPrimary,
+                    title = "Rename",
+                    description = "Change the catalog's name. Clear it to use the original name.",
+                )
+                LegendRow(
+                    icon = Icons.Rounded.Delete,
+                    tint = tokens.colors.danger,
+                    title = "Remove",
+                    description = "Take the catalog out of this category. You can add it back from Available.",
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Got it") }
+        },
+    )
+}
+
+@Composable
+private fun LegendRow(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    description: String,
+) {
+    val tokens = MaterialTheme.nuvio
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = tokens.colors.textPrimary,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+            )
+        }
     }
 }
 

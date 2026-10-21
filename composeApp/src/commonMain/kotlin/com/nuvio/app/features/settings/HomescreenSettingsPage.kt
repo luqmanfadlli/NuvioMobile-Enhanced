@@ -207,14 +207,6 @@ internal fun LazyListScope.homescreenSettingsContent(
     }
     item {
         SettingsSection(
-            title = "AI recommendations",
-            isTablet = isTablet,
-        ) {
-            AiRecommendationsSettingsGroup(isTablet = isTablet)
-        }
-    }
-    item {
-        SettingsSection(
             title = "Categories & catalogs",
             isTablet = isTablet,
         ) {
@@ -509,104 +501,5 @@ private fun HomescreenCatalogList(
                 }
             }
         }
-    }
-}
-
-
-@Composable
-private fun AiRecommendationsSettingsGroup(isTablet: Boolean) {
-    val settings by remember {
-        AiSettingsRepository.ensureLoaded()
-        AiSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
-    val aiState by remember { AiRecommendationsRepository.uiState }.collectAsStateWithLifecycle()
-    var apiKey by remember(settings.apiKey) { mutableStateOf(settings.apiKey) }
-    var model by remember(settings.model) { mutableStateOf(settings.model) }
-    val hasChanges = apiKey.trim() != settings.apiKey || model.trim() != settings.model
-
-    SettingsGroup(isTablet = isTablet) {
-        SettingsSwitchRow(
-            title = "Gemini recommendations",
-            description = "Adds themed rows to Home based on what you watch and save. " +
-                "Titles you watched or saved are sent to Google's Gemini API using your own key.",
-            checked = settings.enabled,
-            isTablet = isTablet,
-            onCheckedChange = AiSettingsRepository::setEnabled,
-        )
-        SettingsGroupDivider(isTablet = isTablet)
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            SettingsSecretTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = "Gemini API key",
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("Model") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Button(
-                    onClick = { AiSettingsRepository.saveCredentials(apiKey, model) },
-                    enabled = apiKey.isNotBlank() && hasChanges,
-                ) { Text("Save") }
-                OutlinedButton(
-                    onClick = { AiRecommendationsRepository.refresh(force = true) },
-                    enabled = settings.isUsable && !aiState.isLoading,
-                ) { Text(if (aiState.isLoading) "Generating\u2026" else "Refresh now") }
-            }
-            aiState.errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-        SettingsGroupDivider(isTablet = isTablet)
-        SettingsSliderRow(
-            title = "Themed rows",
-            description = "How many themed rows to show",
-            value = settings.rowCount,
-            valueRange = AI_ROW_COUNT_RANGE,
-            step = 1,
-            isTablet = isTablet,
-            onValueChange = AiSettingsRepository::setRowCount,
-        )
-        SettingsGroupDivider(isTablet = isTablet)
-        SettingsSliderRow(
-            title = "Titles per row",
-            description = "Most titles shown in each row",
-            value = settings.itemsPerRow,
-            valueRange = AI_ITEMS_PER_ROW_RANGE,
-            step = 5,
-            isTablet = isTablet,
-            onValueChange = AiSettingsRepository::setItemsPerRow,
-        )
-        AiRowKind.values().forEach { kind ->
-            SettingsGroupDivider(isTablet = isTablet)
-            SettingsSwitchRow(
-                title = kind.label,
-                checked = kind in settings.enabledRowKinds,
-                isTablet = isTablet,
-                onCheckedChange = { AiSettingsRepository.setRowKindEnabled(kind, it) },
-            )
-        }
-        SettingsGroupDivider(isTablet = isTablet)
-        Text(
-            text = "Row types take effect right away. Row count and titles per row take effect " +
-                "after Refresh now.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
     }
 }
