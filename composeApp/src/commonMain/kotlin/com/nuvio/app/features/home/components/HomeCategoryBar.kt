@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.size
@@ -45,6 +46,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -592,6 +605,21 @@ private fun HomeCategoryCatalogPicker(
 
     fun save(keys: List<String>) = HomeCategoryRepository.setCatalogKeys(category.id, keys)
 
+    // Drag-to-reorder state. `localOrder` is shown while dragging (and until the saved order catches up).
+    val haptics = LocalHapticFeedback.current
+    val currentKeys by rememberUpdatedState(selectedKeys)
+    var localOrder by remember { mutableStateOf<List<String>?>(null) }
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val rowHeights = remember { mutableMapOf<String, Int>() }
+    var showLegend by remember { mutableStateOf(false) }
+    var expandedKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(selectedKeys) {
+        if (dragKey == null) localOrder = null
+    }
+    val displayItems = (localOrder?.takeIf { it.toSet() == selectedSet } ?: selectedKeys)
+        .mapNotNull { itemsByKey[it] }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -620,12 +648,30 @@ private fun HomeCategoryCatalogPicker(
             }
         }
 
-        SectionLabel("Shown in this category (${selectedItems.size})")
-        Text(
-            text = "★ = this catalog feeds the hero banner of this category. # = show big numbers behind its posters. Tap the card icon under a title to switch its cards between default, poster and landscape.",
-            style = MaterialTheme.typography.bodySmall,
-            color = tokens.colors.textMuted,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.weight(1f)) {
+                SectionLabel("Shown in this category (${selectedItems.size})")
+            }
+            CompactAction(
+                description = if (showLegend) "Hide help" else "Show help",
+                onClick = { showLegend = !showLegend },
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = if (showLegend) tokens.colors.accent else tokens.colors.textMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        if (showLegend) {
+            Text(
+                text = "Drag ☰ to reorder. Tap a row's title for options: card shape (tap to cycle default / poster / landscape), ★ Hero feeds the hero banner, # Numbers shows big numbers behind posters.",
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
         if (selectedItems.isEmpty()) {
             Text(
                 text = "Nothing selected yet. Tap a catalog below to add it.",
@@ -634,88 +680,205 @@ private fun HomeCategoryCatalogPicker(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
-        selectedItems.forEachIndexed { index, item ->
+        displayItems.forEach { item ->
+          key(item.key) {
+            val isDragging = dragKey == item.key
+            val expanded = expandedKey == item.key && !isDragging
             val feedsHero = item.key !in category.heroExcludedKeys
             val ranked = item.key in rankedKeys
+            val showsLandscape = item.rowShape.landscapeOverride ?: globalLandscape
+            val shapeLabel = when (item.rowShape) {
+                HomeRowShapeMode.DEFAULT -> "Default"
+                HomeRowShapeMode.POSTER -> "Poster"
+                HomeRowShapeMode.LANDSCAPE -> "Landscape"
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { rowHeights[item.key] = it.height }
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
+                    .then(
+                        if (isDragging) {
+                            Modifier.background(tokens.colors.surfaceSheet, RoundedCornerShape(10.dp))
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(vertical = 6.dp),
             ) {
-                // Line 1: full-width title so it is no longer truncated by the controls.
-                Text(
-                    text = item.displayTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = tokens.colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // Line 2: addon name on the left, every control in ONE compact line on the right.
+                // Collapsed line: drag handle, title + status chips, expand chevron.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = item.addonName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = tokens.colors.textMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
-                    )
-                    RowShapeTag(
-                        mode = item.rowShape,
-                        globalLandscape = globalLandscape,
-                        onClick = {
-                            HomeCatalogSettingsRepository.setRowShape(
-                                item.key,
-                                nextRowShapeMode(item.rowShape, globalLandscape),
+                    CompactAction(
+                        description = "Drag to reorder",
+                        modifier = Modifier.pointerInput(item.key) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    localOrder = currentKeys
+                                    expandedKey = null
+                                    dragKey = item.key
+                                    dragOffset = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.y
+                                    var order = localOrder ?: currentKeys
+                                    while (true) {
+                                        val idx = order.indexOf(item.key)
+                                        if (idx < 0) break
+                                        if (dragOffset > 0f && idx < order.lastIndex) {
+                                            val h = (rowHeights[order[idx + 1]] ?: break).toFloat()
+                                            if (dragOffset > h / 2f) {
+                                                order = order.swap(idx, idx + 1)
+                                                dragOffset -= h
+                                            } else break
+                                        } else if (dragOffset < 0f && idx > 0) {
+                                            val h = (rowHeights[order[idx - 1]] ?: break).toFloat()
+                                            if (-dragOffset > h / 2f) {
+                                                order = order.swap(idx, idx - 1)
+                                                dragOffset += h
+                                            } else break
+                                        } else break
+                                    }
+                                    localOrder = order
+                                },
+                                onDragEnd = {
+                                    val finalOrder = localOrder
+                                    dragKey = null
+                                    dragOffset = 0f
+                                    if (finalOrder != null && finalOrder != currentKeys) save(finalOrder)
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                },
+                                onDragCancel = {
+                                    dragKey = null
+                                    dragOffset = 0f
+                                    localOrder = null
+                                },
                             )
                         },
-                    )
-                    CompactAction(
-                        description = if (feedsHero) "Remove from hero banner" else "Use for hero banner",
-                        onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) },
+                        onClick = {},
+                    ) {
+                        Icon(Icons.Rounded.Menu, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { expandedKey = if (expanded) null else item.key }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                     ) {
                         Text(
-                            text = if (feedsHero) "★" else "☆",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (feedsHero) tokens.colors.accent else tokens.colors.textMuted,
+                            text = item.displayTitle,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = tokens.colors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.addonName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.colors.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (feedsHero) {
+                                Text(
+                                    text = "  ·  ★ Hero",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tokens.colors.accent,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                            if (ranked) {
+                                Text(
+                                    text = "  ·  # Numbers",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tokens.colors.accent,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                            if (item.rowShape != HomeRowShapeMode.DEFAULT) {
+                                Text(
+                                    text = "  ·  $shapeLabel",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tokens.colors.accent,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
                     }
-                    CompactAction(
-                        description = "Toggle big numbers",
-                        onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) },
+                }
+                // Expanded: labelled controls.
+                if (expanded) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp, bottom = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = "#",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (ranked) tokens.colors.accent else tokens.colors.textMuted,
-                        )
-                    }
-                    CompactAction(
-                        description = "Move up",
-                        enabled = index > 0,
-                        onClick = { save(selectedKeys.swap(index, index - 1)) },
-                    ) {
-                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
-                    }
-                    CompactAction(
-                        description = "Move down",
-                        enabled = index < selectedItems.lastIndex,
-                        onClick = { save(selectedKeys.swap(index, index + 1)) },
-                    ) {
-                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(22.dp))
-                    }
-                    CompactAction(
-                        description = "Remove",
-                        onClick = { save(selectedKeys - item.key) },
-                    ) {
-                        Icon(Icons.Rounded.Close, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(20.dp))
+                        ControlPill(
+                            label = shapeLabel,
+                            active = item.rowShape != HomeRowShapeMode.DEFAULT,
+                            modifier = Modifier.weight(1.5f),
+                            onClick = {
+                                HomeCatalogSettingsRepository.setRowShape(
+                                    item.key,
+                                    nextRowShapeMode(item.rowShape, globalLandscape),
+                                )
+                            },
+                        ) { tint ->
+                            Icon(
+                                imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
+                                contentDescription = null,
+                                tint = tint,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        ControlPill(
+                            label = "Hero",
+                            active = feedsHero,
+                            modifier = Modifier.weight(1f),
+                            onClick = { HomeCategoryRepository.setHeroSource(category.id, item.key, !feedsHero) },
+                        ) { tint ->
+                            Text(text = if (feedsHero) "★" else "☆", color = tint, style = MaterialTheme.typography.labelLarge)
+                        }
+                        ControlPill(
+                            label = "Numbers",
+                            active = ranked,
+                            modifier = Modifier.weight(1.3f),
+                            onClick = { HomeCategoryRepository.setRanked(item.key, !ranked) },
+                        ) { tint ->
+                            Text(text = "#", color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
+                        ControlPill(
+                            label = null,
+                            active = false,
+                            modifier = Modifier.width(44.dp),
+                            onClick = {
+                                expandedKey = null
+                                save(selectedKeys - item.key)
+                            },
+                        ) { tint ->
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "Remove",
+                                tint = tint,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
             }
+          }
         }
 
         SectionLabel("Available catalogs")
@@ -752,11 +915,12 @@ private fun HomeCategoryCatalogPicker(
 private fun CompactAction(
     description: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(34.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, onClick = onClick)
@@ -817,46 +981,39 @@ private fun CatalogLabel(
     }
 }
 
-/**
- * Small per-row card shape button. Muted when the row follows the global setting (shows the shape
- * it currently gets), accent with a border when this row is forced to poster or landscape.
- */
+/** Labelled toggle used in an expanded catalog row. Accent border/text when active, muted otherwise. */
 @Composable
-private fun RowShapeTag(
-    mode: HomeRowShapeMode,
-    globalLandscape: Boolean,
+private fun ControlPill(
+    label: String?,
+    active: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leading: @Composable (Color) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val forced = mode != HomeRowShapeMode.DEFAULT
-    val showsLandscape = mode.landscapeOverride ?: globalLandscape
-    val tint = if (forced) tokens.colors.accent else tokens.colors.textMuted
-    val description = when (mode) {
-        HomeRowShapeMode.DEFAULT -> "Card shape: default. Tap to change."
-        HomeRowShapeMode.POSTER -> "Card shape: poster. Tap to change."
-        HomeRowShapeMode.LANDSCAPE -> "Card shape: landscape. Tap to change."
-    }
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .then(
-                if (forced) {
-                    Modifier.border(BorderStroke(1.dp, tint), RoundedCornerShape(8.dp))
-                } else {
-                    Modifier
-                },
-            )
+    val tint = if (active) tokens.colors.accent else tokens.colors.textMuted
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .border(BorderStroke(1.dp, tint.copy(alpha = if (active) 1f else 0.45f)), shape)
             .clickable(onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = if (showsLandscape) Icons.Rounded.CropLandscape else Icons.Rounded.CropPortrait,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(18.dp),
-        )
+        leading(tint)
+        if (label != null) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = tint,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 5.dp),
+            )
+        }
     }
 }
 
