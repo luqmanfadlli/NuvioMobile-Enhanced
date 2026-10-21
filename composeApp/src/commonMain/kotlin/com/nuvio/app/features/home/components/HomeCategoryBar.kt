@@ -362,6 +362,252 @@ private fun HomeCategoryManagerSheet(
 }
 
 // ---------------------------------------------------------------------------
+// Drag-to-reorder list (drag handle on the left of every row)
+// ---------------------------------------------------------------------------
+
+/**
+ * A column whose rows can be reordered by dragging the handle on the left of each row.
+ * [row] receives the handle modifier and must attach it to its drag handle. [onReorder] is
+ * called once when a drag ends, with the index the row came from and the index it moved to.
+ */
+@Composable
+private fun <T> DragReorderColumn(
+    items: List<T>,
+    keyOf: (T) -> String,
+    onReorder: (from: Int, to: Int) -> Unit,
+    row: @Composable (item: T, index: Int, dragHandle: Modifier) -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val latestItems by rememberUpdatedState(items)
+    val latestReorder by rememberUpdatedState(onReorder)
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragPx by remember { mutableStateOf(0f) }
+    var rowHeightPx by remember { mutableStateOf(1f) }
+
+    fun finishDrag() {
+        val key = dragKey ?: return
+        val distance = dragPx
+        dragKey = null
+        dragPx = 0f
+        val list = latestItems
+        val from = list.indexOfFirst { keyOf(it) == key }
+        if (from < 0) return
+        val steps = (distance / rowHeightPx.coerceAtLeast(1f)).roundToInt()
+        val to = (from + steps).coerceIn(0, list.lastIndex)
+        if (to != from) latestReorder(from, to)
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        items.forEachIndexed { index, item ->
+            val key = keyOf(item)
+            val dragging = dragKey == key
+            val handle = Modifier.pointerInput(key) {
+                detectDragGestures(
+                    onDragStart = {
+                        dragKey = key
+                        dragPx = 0f
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        dragPx += amount.y
+                    },
+                    onDragEnd = { finishDrag() },
+                    onDragCancel = { finishDrag() },
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(if (dragging) 1f else 0f)
+                    .offset { IntOffset(0, if (dragging) dragPx.roundToInt() else 0) }
+                    .onGloballyPositioned { rowHeightPx = it.size.height.toFloat() }
+                    .background(if (dragging) tokens.colors.surfaceSheet else Color.Transparent),
+            ) {
+                row(item, index, handle)
+            }
+            if (index != items.lastIndex) {
+                HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DragHandleIcon(title: String, dragHandle: Modifier) {
+    val tokens = MaterialTheme.nuvio
+    Box(
+        modifier = dragHandle
+            .size(36.dp)
+            .semantics { contentDescription = "Drag to reorder $title" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.DragHandle,
+            contentDescription = null,
+            tint = tokens.colors.textMuted,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Visualizer
+// ---------------------------------------------------------------------------
+
+/** One catalog row as it will appear on Home. */
+private data class PreviewRowSpec(
+    val title: String,
+    val landscape: Boolean,
+    val hero: Boolean,
+    val ranked: Boolean,
+)
+
+/** The navigation bar as it will look, with the enabled categories in their order. */
+@Composable
+private fun NavigationPreview(enabledCategories: List<HomeCategory>) {
+    val tokens = MaterialTheme.nuvio
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(
+            text = "Preview",
+            style = MaterialTheme.typography.titleSmall,
+            color = tokens.colors.textPrimary,
+        )
+        Text(
+            text = if (enabledCategories.isEmpty()) {
+                "No categories are on. Turn one on to see it here."
+            } else {
+                "This is the navigation bar, in this order."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted,
+            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            enabledCategories.forEachIndexed { index, category ->
+                CategoryChip(
+                    category = category,
+                    selected = index == 0,
+                    showLabel = true,
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+/** A category's rows as they will appear on Home: one strip per catalog, in order. */
+@Composable
+private fun CategoryLayoutPreview(categoryTitle: String, rows: List<PreviewRowSpec>) {
+    val tokens = MaterialTheme.nuvio
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(
+            text = "Preview",
+            style = MaterialTheme.typography.titleSmall,
+            color = tokens.colors.textPrimary,
+        )
+        Text(
+            text = if (rows.isEmpty()) {
+                "Add catalogs to see how this category will look."
+            } else {
+                "Each catalog is a row on Home, in this order."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted,
+            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = categoryTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = tokens.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            rows.forEach { spec -> PreviewRowStrip(spec) }
+        }
+    }
+}
+
+@Composable
+private fun PreviewRowStrip(spec: PreviewRowSpec) {
+    val tokens = MaterialTheme.nuvio
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = spec.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (spec.hero) {
+                Text(text = "★", color = tokens.colors.accent, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            repeat(PREVIEW_CARD_COUNT) { index ->
+                PreviewCard(
+                    landscape = spec.landscape,
+                    rank = if (spec.ranked) index + 1 else null,
+                    highlight = spec.hero && index == 0,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewCard(landscape: Boolean, rank: Int?, highlight: Boolean) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(8.dp)
+    val width = if (landscape) 112.dp else 72.dp
+    val height = if (landscape) 63.dp else 108.dp
+    Box(
+        modifier = Modifier
+            .size(width, height)
+            .clip(shape)
+            .background(tokens.colors.overlaySelected)
+            .border(
+                BorderStroke(1.dp, if (highlight) tokens.colors.accent else tokens.colors.borderStrong),
+                shape,
+            ),
+        contentAlignment = Alignment.BottomStart,
+    ) {
+        if (rank != null) {
+            Text(
+                text = rank.toString(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = tokens.colors.textPrimary,
+                modifier = Modifier.padding(6.dp),
+            )
+        }
+    }
+}
+
+private const val PREVIEW_CARD_COUNT = 4
+
+// ---------------------------------------------------------------------------
 // Category manager
 // ---------------------------------------------------------------------------
 
@@ -372,33 +618,9 @@ private fun HomeCategoryList(
     embedded: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
-    val latestCategories by rememberUpdatedState(categories)
     var newTitle by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<HomeCategory?>(null) }
     var confirmDelete by remember { mutableStateOf<HomeCategory?>(null) }
-
-    // Drag state: which row is being dragged, how far it has moved, and the row height used to
-    // turn that distance into a number of positions.
-    var dragKey by remember { mutableStateOf<String?>(null) }
-    var dragPx by remember { mutableStateOf(0f) }
-    var rowHeightPx by remember { mutableStateOf(1f) }
-
-    fun finishDrag() {
-        val key = dragKey ?: return
-        val distance = dragPx
-        dragKey = null
-        dragPx = 0f
-        val list = latestCategories
-        val from = list.indexOfFirst { it.id == key }
-        if (from < 0) return
-        val steps = (distance / rowHeightPx.coerceAtLeast(1f)).roundToInt()
-        val to = (from + steps).coerceIn(0, list.lastIndex)
-        val delta = to - from
-        // The repository moves one position at a time.
-        repeat(abs(delta)) {
-            HomeCategoryRepository.move(key, if (delta > 0) 1 else -1)
-        }
-    }
 
     Column(
         modifier = if (embedded) {
@@ -421,34 +643,28 @@ private fun HomeCategoryList(
             )
         }
         Text(
-            text = "Turn categories on or off, drag to reorder, and pick the catalogs each one shows.",
+            text = "Turn categories on or off, drag the handle to reorder, and pick the catalogs each one shows.",
             style = MaterialTheme.typography.bodyMedium,
             color = tokens.colors.textMuted,
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
         )
 
-        categories.forEachIndexed { index, category ->
-            val dragging = dragKey == category.id
-            CategoryRow(
-                category = category,
-                index = index,
-                lastIndex = categories.lastIndex,
-                dragging = dragging,
-                dragOffsetPx = if (dragging) dragPx else 0f,
-                onRowHeight = { rowHeightPx = it },
-                onDragStart = {
-                    dragKey = category.id
-                    dragPx = 0f
-                },
-                onDrag = { dy -> dragPx += dy },
-                onDragEnd = { finishDrag() },
-                onMove = { delta -> HomeCategoryRepository.move(category.id, delta) },
-                onEditCatalogs = { onEditCatalogs(category.id) },
-                onEdit = { editing = category },
-                onDelete = { confirmDelete = category },
-            )
-            HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
-        }
+        NavigationPreview(enabledCategories = categories.filter { it.enabled })
+
+        DragReorderColumn(
+            items = categories,
+            keyOf = { it.id },
+            onReorder = { from, to -> moveCategory(categories, from, to) },
+            row = { category, index, dragHandle ->
+                CategoryRow(
+                    category = category,
+                    dragHandle = dragHandle,
+                    onEditCatalogs = { onEditCatalogs(category.id) },
+                    onEdit = { editing = category },
+                    onDelete = { confirmDelete = category },
+                )
+            },
+        )
 
         Text(
             text = "Add category",
@@ -509,69 +725,38 @@ private fun HomeCategoryList(
     }
 }
 
+/** Moves a category from [from] to [to] using the repository's one-step move. */
+private fun moveCategory(categories: List<HomeCategory>, from: Int, to: Int) {
+    val category = categories.getOrNull(from) ?: return
+    val delta = to - from
+    repeat(abs(delta)) {
+        HomeCategoryRepository.move(category.id, if (delta > 0) 1 else -1)
+    }
+}
+
 @Composable
 private fun CategoryRow(
     category: HomeCategory,
-    index: Int,
-    lastIndex: Int,
-    dragging: Boolean,
-    dragOffsetPx: Float,
-    onRowHeight: (Float) -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onMove: (Int) -> Unit,
+    dragHandle: Modifier,
     onEditCatalogs: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     var menuOpen by remember { mutableStateOf(false) }
-    val currentDragStart by rememberUpdatedState(onDragStart)
-    val currentDrag by rememberUpdatedState(onDrag)
-    val currentDragEnd by rememberUpdatedState(onDragEnd)
     val summary = category.summaryLabel()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .zIndex(if (dragging) 1f else 0f)
-            .offset { IntOffset(0, dragOffsetPx.roundToInt()) }
-            .onGloballyPositioned { onRowHeight(it.size.height.toFloat()) }
-            .background(if (dragging) tokens.colors.surfaceSheet else Color.Transparent)
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { currentDragStart() },
-                        onDrag = { change, amount ->
-                            change.consume()
-                            currentDrag(amount.y)
-                        },
-                        onDragEnd = { currentDragEnd() },
-                        onDragCancel = { currentDragEnd() },
-                    )
-                }
-                .semantics { contentDescription = "Drag to reorder ${category.title}" },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.DragHandle,
-                contentDescription = null,
-                tint = tokens.colors.textMuted,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-
+        DragHandleIcon(title = category.title, dragHandle = dragHandle)
         Switch(
             checked = category.enabled,
             onCheckedChange = { HomeCategoryRepository.setEnabled(category.id, it) },
         )
-
         Text(
             text = buildAnnotatedString {
                 withStyle(SpanStyle(color = tokens.colors.textPrimary)) {
@@ -617,22 +802,6 @@ private fun CategoryRow(
                         },
                     )
                 }
-                DropdownMenuItem(
-                    text = { Text("Move up") },
-                    enabled = index > 0,
-                    onClick = {
-                        menuOpen = false
-                        onMove(-1)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Move down") },
-                    enabled = index < lastIndex,
-                    onClick = {
-                        menuOpen = false
-                        onMove(1)
-                    },
-                )
                 if (!category.builtIn) {
                     DropdownMenuItem(
                         text = {
@@ -778,13 +947,30 @@ private fun HomeCategoryCatalogPicker(
         category.catalogKeys ?: allItems.filter { it.enabled }.map { it.key }
     }
     val selectedItems = selectedKeys.mapNotNull { itemsByKey[it] }
+    val visibleKeys = selectedItems.map { it.key }
     val selectedSet = selectedKeys.toSet()
     val availableItems = allItems.filter { it.key !in selectedSet }
 
     // Only one catalog row is open at a time.
     var expandedKey by remember { mutableStateOf<String?>(null) }
+    var renamingKey by remember { mutableStateOf<String?>(null) }
 
     fun save(keys: List<String>) = HomeCategoryRepository.setCatalogKeys(category.id, keys)
+
+    // Keys that are saved but not in the catalog list stay at the end, untouched.
+    fun saveOrder(orderedVisible: List<String>) {
+        val hidden = selectedKeys.filterNot { it in visibleKeys.toSet() }
+        save(orderedVisible + hidden)
+    }
+
+    val previewRows = selectedItems.map { item ->
+        PreviewRowSpec(
+            title = item.displayTitle,
+            landscape = item.rowShape.landscapeOverride ?: globalLandscape,
+            hero = item.key !in category.heroExcludedKeys,
+            ranked = item.key in rankedKeys,
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -825,9 +1011,11 @@ private fun HomeCategoryCatalogPicker(
             }
         }
 
+        CategoryLayoutPreview(categoryTitle = category.title, rows = previewRows)
+
         SectionLabel("In this category")
         Text(
-            text = "Tap a catalog title to adjust it.",
+            text = "Drag the handle to reorder. Tap a title to adjust it.",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.colors.textMuted,
         )
@@ -839,26 +1027,35 @@ private fun HomeCategoryCatalogPicker(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
-        selectedItems.forEachIndexed { index, item ->
-            val expanded = expandedKey == item.key
-            CatalogRow(
-                item = item,
-                expanded = expanded,
-                feedsHero = item.key !in category.heroExcludedKeys,
-                ranked = item.key in rankedKeys,
-                shape = item.rowShape,
-                globalLandscape = globalLandscape,
-                canMoveUp = index > 0,
-                canMoveDown = index < selectedItems.lastIndex,
-                onToggle = { expandedKey = if (expanded) null else item.key },
-                onHeroChange = { HomeCategoryRepository.setHeroSource(category.id, item.key, it) },
-                onRankedChange = { HomeCategoryRepository.setRanked(item.key, it) },
-                onShapeChange = { HomeCatalogSettingsRepository.setRowShape(item.key, it) },
-                onMoveUp = { save(selectedKeys.swap(index, index - 1)) },
-                onMoveDown = { save(selectedKeys.swap(index, index + 1)) },
-                onRemove = { save(selectedKeys - item.key) },
-            )
-            HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
+
+        DragReorderColumn(
+            items = selectedItems,
+            keyOf = { it.key },
+            onReorder = { from, to -> saveOrder(visibleKeys.moved(from, to)) },
+            row = { item, _, dragHandle ->
+                val expanded = expandedKey == item.key
+                CatalogRow(
+                    item = item,
+                    expanded = expanded,
+                    feedsHero = item.key !in category.heroExcludedKeys,
+                    ranked = item.key in rankedKeys,
+                    shape = item.rowShape,
+                    globalLandscape = globalLandscape,
+                    dragHandle = dragHandle,
+                    onToggle = { expandedKey = if (expanded) null else item.key },
+                    onHeroChange = { HomeCategoryRepository.setHeroSource(category.id, item.key, it) },
+                    onRankedChange = { HomeCategoryRepository.setRanked(item.key, it) },
+                    onShapeChange = { HomeCatalogSettingsRepository.setRowShape(item.key, it) },
+                    onRename = { renamingKey = item.key },
+                    onRemove = { save(selectedKeys - item.key) },
+                )
+            },
+        )
+
+        renamingKey?.let { key ->
+            itemsByKey[key]?.let { item ->
+                CatalogRenameDialog(item = item, onDismiss = { renamingKey = null })
+            }
         }
 
         SectionLabel("Available")
@@ -870,7 +1067,7 @@ private fun HomeCategoryCatalogPicker(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
-        availableItems.forEach { item ->
+        availableItems.forEachIndexed { index, item ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -901,7 +1098,9 @@ private fun HomeCategoryCatalogPicker(
                     modifier = Modifier.size(24.dp),
                 )
             }
-            HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
+            if (index != availableItems.lastIndex) {
+                HorizontalDivider(color = tokens.colors.borderStrong.copy(alpha = 0.3f))
+            }
         }
     }
 }
@@ -914,14 +1113,12 @@ private fun CatalogRow(
     ranked: Boolean,
     shape: HomeRowShapeMode,
     globalLandscape: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
+    dragHandle: Modifier,
     onToggle: () -> Unit,
     onHeroChange: (Boolean) -> Unit,
     onRankedChange: (Boolean) -> Unit,
     onShapeChange: (HomeRowShapeMode) -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    onRename: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -943,33 +1140,40 @@ private fun CatalogRow(
             .fillMaxWidth()
             .animateContentSize(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(vertical = 10.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = item.displayTitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = tokens.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = tokens.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            DragHandleIcon(title = item.displayTitle, dragHandle = dragHandle)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onToggle)
+                    .padding(vertical = 10.dp),
+            ) {
+                Text(
+                    text = item.displayTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = tokens.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            CatalogOverflowMenu(title = item.displayTitle, onRename = onRename, onRemove = onRemove)
         }
 
         if (expanded) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(start = 36.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 CatalogSettingLine(
@@ -1011,20 +1215,91 @@ private fun CatalogRow(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = onMoveUp, enabled = canMoveUp) { Text("Move up") }
-                    TextButton(onClick = onMoveDown, enabled = canMoveDown) { Text("Move down") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = onRemove) {
-                        Text("Remove", color = MaterialTheme.colorScheme.error)
-                    }
-                }
             }
         }
     }
+}
+
+@Composable
+private fun CatalogOverflowMenu(
+    title: String,
+    onRename: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menuOpen = true }) {
+            Icon(
+                imageVector = Icons.Rounded.MoreVert,
+                contentDescription = "More options for $title",
+                tint = tokens.colors.textPrimary,
+            )
+        }
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                onClick = {
+                    menuOpen = false
+                    onRename()
+                },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = "Remove from category",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = {
+                    menuOpen = false
+                    onRemove()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CatalogRenameDialog(
+    item: HomeCatalogSettingsItem,
+    onDismiss: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    var name by remember(item.key) { mutableStateOf(item.displayTitle) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename catalog") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "Clear the name to use \"${item.defaultTitle}\" again.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textMuted,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                HomeCatalogSettingsRepository.setCustomTitle(item.key, name.trim())
+                onDismiss()
+            }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
@@ -1074,7 +1349,8 @@ private fun HomeCategory.summaryLabel(): String = when (kind) {
     }
 }
 
-private fun List<String>.swap(from: Int, to: Int): List<String> {
+/** Returns a copy with the item at [from] moved to [to]. Out-of-range indices return the list as is. */
+private fun <T> List<T>.moved(from: Int, to: Int): List<T> {
     if (from !in indices || to !in indices) return this
     val mutable = toMutableList()
     val item = mutable.removeAt(from)
