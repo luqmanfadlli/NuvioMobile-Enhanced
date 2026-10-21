@@ -1,0 +1,617 @@
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiRecommendationsRepository.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiRecommendationsRepository.kt
+index 9a7acb0..362e44a 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiRecommendationsRepository.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiRecommendationsRepository.kt
+@@ -6,6 +6,8 @@ import com.nuvio.app.features.catalog.CatalogTarget
+ import com.nuvio.app.features.home.HomeCatalogSection
+ import com.nuvio.app.features.home.MetaPreview
+ import com.nuvio.app.features.home.PosterShape
++import com.nuvio.app.features.tmdb.TmdbMetadataService
++import com.nuvio.app.features.tmdb.TmdbSettingsRepository
+ import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+@@ -29,11 +31,13 @@ data class AiRecommendationsUiState(
+ )
+ 
+ /**
+- * Generates themed home rows from the user's watch history with Gemini.
++ * Generates home rows from the user's watch history: one Gemini call for the For you, themed,
++ * mood and hidden-gem rows, plus TMDB "more like this" rows for recently watched titles.
+  *
+  * Gemini is only called when the cache is older than [CACHE_TTL_MS], when the user has watched
+- * [NEW_TITLES_THRESHOLD]+ new titles since the last run, when the model changed, or on a manual
+- * refresh. Every other [refresh] call just restores the cached rows.
++ * [NEW_TITLES_THRESHOLD]+ new titles since the last run, when the model or row plan changed, or on
++ * a manual refresh. Row types, row count and titles per row are applied to the cached rows
++ * without calling Gemini.
+  */
+ object AiRecommendationsRepository {
+     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+@@ -45,20 +49,32 @@ object AiRecommendationsRepository {
+     private var job: Job? = null
+     private var lastTasteCount: Int = 0
+     private var lastModel: String? = null
++    private var lastPlan: String? = null
++    /** Every row generated so far, before row types, row count and titles per row are applied. */
++    private var allRows: List<CachedRow> = emptyList()
+ 
+     fun onProfileChanged() {
+         job?.cancel()
+         job = null
+         lastTasteCount = 0
+         lastModel = null
++        lastPlan = null
++        allRows = emptyList()
+         _uiState.value = AiRecommendationsUiState()
+     }
+ 
++    /** Re-applies the row settings to the rows already generated. Makes no Gemini call. */
++    fun applySettings() {
++        if (allRows.isEmpty()) return
++        publish(generatedAtMs = _uiState.value.lastGeneratedAtMs)
++    }
++
+     fun refresh(force: Boolean = false) {
+         val settings = AiSettingsRepository.snapshot()
+         if (!settings.isUsable) {
+             job?.cancel()
+             job = null
++            allRows = emptyList()
+             _uiState.value = AiRecommendationsUiState()
+             return
+         }
+@@ -66,24 +82,27 @@ object AiRecommendationsRepository {
+         job?.cancel()
+ 
+         job = scope.launch {
+-            if (_uiState.value.sections.isEmpty()) {
++            if (allRows.isEmpty()) {
+                 readCache()?.let { cached ->
+                     lastTasteCount = cached.tasteCount
+                     lastModel = cached.model
+-                    _uiState.value = AiRecommendationsUiState(
+-                        sections = cached.rows.toSections(),
+-                        lastGeneratedAtMs = cached.generatedAtMs,
+-                    )
++                    lastPlan = cached.plan
++                    allRows = cached.rows
++                    _uiState.update { it.copy(lastGeneratedAtMs = cached.generatedAtMs) }
+                 }
+             }
++            // Reshuffle what is shown on every visit, even when nothing is regenerated.
++            if (allRows.isNotEmpty()) publish(generatedAtMs = _uiState.value.lastGeneratedAtMs)
+ 
+             val profile = AiTasteProfileBuilder.build()
+             val now = Clock.System.now().toEpochMilliseconds()
+             val lastAt = _uiState.value.lastGeneratedAtMs
++            val plan = rowPlan(settings)
+             val stale = lastAt == null ||
+                 now - lastAt > CACHE_TTL_MS ||
+                 (profile.count - lastTasteCount).absoluteValue >= NEW_TITLES_THRESHOLD ||
+-                lastModel != settings.model
++                lastModel != settings.model ||
++                lastPlan != plan
+             if (!force && !stale) return@launch
+ 
+             if (!profile.isMeaningful) {
+@@ -113,15 +132,16 @@ object AiRecommendationsRepository {
+                     generatedAtMs = now,
+                     tasteCount = profile.count,
+                     model = settings.model,
++                    plan = plan,
+                     rows = rows,
+                 )
+                 lastTasteCount = profile.count
+                 lastModel = settings.model
++                lastPlan = plan
+                 writeCache(cached)
+-                _uiState.value = AiRecommendationsUiState(
+-                    sections = rows.toSections(),
+-                    lastGeneratedAtMs = now,
+-                )
++                allRows = rows
++                publish(generatedAtMs = now)
++                _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+             } catch (cancellation: CancellationException) {
+                 throw cancellation
+             } catch (error: Throwable) {
+@@ -140,56 +160,189 @@ object AiRecommendationsRepository {
+             apiKey = settings.apiKey,
+             model = settings.model,
+             systemPrompt = SYSTEM_PROMPT,
+-            userPrompt = profile.toPrompt(rowCount = ROW_COUNT, itemsPerRow = ITEMS_PER_ROW),
++            userPrompt = profile.toPrompt() + "\n\n" + rowPlanPrompt(settings.rowCount, poolSize(settings.itemsPerRow)),
+         )
+ 
+         val seen = HashSet<String>()
+-        return payload.rows
++        val geminiRows = payload.rows
+             .filter { it.title.isNotBlank() }
+-            .take(ROW_COUNT)
+-            .mapNotNull { row ->
+-                val suggestions = row.items
+-                    .filter { it.name.isNotBlank() }
+-                    // Never recommend something the user already watched or saved.
+-                    .filterNot { normalizeAiTitle(it.name) in profile.excludedNames }
+-                    .take(ITEMS_PER_ROW + 4)
+-                val resolved = AiTitleResolver.resolveAll(suggestions)
+-                    .filterNotNull()
+-                    // A title should appear in only one row.
+-                    .filter { seen.add(it.id) }
+-                    .take(ITEMS_PER_ROW)
+-                if (resolved.size < MIN_ITEMS_PER_ROW) {
+-                    null
+-                } else {
+-                    CachedRow(
+-                        title = row.title.trim(),
+-                        reason = row.reason?.trim()?.takeIf { it.isNotBlank() },
+-                        items = resolved.map(CachedPreview::from),
+-                    )
++            .sortedBy { kindOrder(it.rowKind()) }
++
++        val pool = poolSize(settings.itemsPerRow)
++        val result = mutableListOf<CachedRow>()
++        val counts = HashMap<AiRowKind, Int>()
++        for (row in geminiRows) {
++            val kind = row.rowKind()
++            val cap = when (kind) {
++                AiRowKind.ForYou -> 1
++                AiRowKind.Themed -> settings.rowCount
++                AiRowKind.Mood -> MOOD_ROW_COUNT
++                AiRowKind.HiddenGems -> 1
++                AiRowKind.BecauseWatched -> 0
++            }
++            val used = counts[kind] ?: 0
++            if (used >= cap) continue
++            val cachedRow = toCachedRow(row, kind, profile, seen, pool) ?: continue
++            counts[kind] = used + 1
++            result += cachedRow
++        }
++
++        result += becauseYouWatchedRows(profile, seen, pool)
++        return result
++    }
++
++    private suspend fun toCachedRow(
++        row: AiRow,
++        kind: AiRowKind,
++        profile: TasteProfile,
++        seen: MutableSet<String>,
++        itemsPerRow: Int,
++    ): CachedRow? {
++        val suggestions = row.items
++            .filter { it.name.isNotBlank() }
++            // Never recommend something the user already watched or saved.
++            .filterNot { normalizeAiTitle(it.name) in profile.excludedNames }
++            .take(itemsPerRow + 4)
++        val unique = AiTitleResolver.resolveAll(suggestions)
++            .filterNotNull()
++            .distinctBy { it.id }
++            // A title should appear in only one row.
++            .filter { it.id !in seen }
++        val picked = if (kind == AiRowKind.HiddenGems) {
++            // Prefer under-the-radar titles; fall back to everything if too few qualify.
++            unique.filter { (it.voteCount ?: 0) < HIDDEN_GEM_MAX_VOTES }
++                .takeIf { it.size >= MIN_ITEMS_PER_ROW } ?: unique
++        } else {
++            unique
++        }
++        val resolved = picked.take(itemsPerRow)
++        if (resolved.size < MIN_ITEMS_PER_ROW) return null
++        seen += resolved.map { it.id }
++        return CachedRow(
++            kind = kind.key,
++            title = row.title.trim(),
++            reason = row.reason?.trim()?.takeIf { it.isNotBlank() },
++            items = resolved.map(CachedPreview::from),
++        )
++    }
++
++    /**
++     * One row per recently watched title, filled with TMDB's "more like this" results for it.
++     * Uses the same exclusion and no-duplicate rules as the Gemini rows.
++     */
++    private suspend fun becauseYouWatchedRows(
++        profile: TasteProfile,
++        seen: MutableSet<String>,
++        itemsPerRow: Int,
++    ): List<CachedRow> {
++        val tmdbSettings = TmdbSettingsRepository.snapshot()
++        if (!tmdbSettings.enabled) return emptyList()
++
++        return profile.watched
++            .filter { !it.id.isNullOrBlank() }
++            .take(BECAUSE_ROW_COUNT)
++            .mapNotNull { seed ->
++                val related = (1..2).flatMap { page ->
++                    TmdbMetadataService.fetchMoreLikeThisPage(
++                        itemId = seed.id.orEmpty(),
++                        itemType = seed.type,
++                        page = page,
++                        settings = tmdbSettings,
++                    ).items
+                 }
++                val resolved = related
++                    .filterNot { normalizeAiTitle(it.name) in profile.excludedNames }
++                    .filter { it.id !in seen }
++                    .distinctBy { it.id }
++                    .take(itemsPerRow)
++                if (resolved.size < MIN_ITEMS_PER_ROW) return@mapNotNull null
++                seen += resolved.map { it.id }
++                CachedRow(
++                    kind = AiRowKind.BecauseWatched.key,
++                    title = "Because you watched ${seed.name}",
++                    items = resolved.map(CachedPreview::from),
++                )
+             }
+     }
+ 
+-    private fun List<CachedRow>.toSections(): List<HomeCatalogSection> =
+-        mapIndexed { index, row ->
+-            val items = row.items.map(CachedPreview::toMetaPreview)
+-            val key = "ai_row_$index"
+-            HomeCatalogSection(
+-                key = key,
+-                title = row.title,
+-                subtitle = row.reason ?: "AI recommendations",
+-                addonName = "AI",
+-                // Required by the model, but never opened: view-all is disabled for AI rows.
+-                target = CatalogTarget.Addon(
+-                    manifestUrl = "ai://recommendations",
+-                    contentType = items.firstOrNull()?.type ?: "movie",
+-                    catalogId = key,
+-                ),
+-                items = items,
+-                availableItemCount = items.size,
+-                hasMore = false,
++    /** Pushes the cached rows, filtered by the current row settings, to the UI. */
++    private fun publish(generatedAtMs: Long?) {
++        val settings = AiSettingsRepository.snapshot()
++        _uiState.update {
++            it.copy(
++                sections = visibleSections(settings),
++                lastGeneratedAtMs = generatedAtMs,
+             )
+         }
++    }
++
++    private fun visibleSections(settings: AiRecommendationSettings): List<HomeCatalogSection> {
++        val enabledKeys = settings.enabledRowKinds.map { it.key }.toSet()
++        val enabled = allRows.filter { it.kind in enabledKeys }
++        val forYou = enabled.filter { it.kind == AiRowKind.ForYou.key }
++        // A different random set of themed rows each time, and the rest in shuffled order.
++        val themed = enabled.filter { it.kind == AiRowKind.Themed.key }.shuffled().take(settings.rowCount)
++        val others = enabled.filter {
++            it.kind != AiRowKind.ForYou.key && it.kind != AiRowKind.Themed.key
++        }
++        val ordered = forYou + (themed + others).shuffled()
++        return ordered.mapIndexed { index, row -> row.toSection(index, settings.itemsPerRow) }
++    }
++
++    private fun CachedRow.toSection(index: Int, itemsPerRow: Int): HomeCatalogSection {
++        // A different random subset of the pool each time the rows are shown.
++        val shown = this.items.shuffled().take(itemsPerRow).map(CachedPreview::toMetaPreview)
++        val key = "ai_row_$index"
++        return HomeCatalogSection(
++            key = key,
++            title = title,
++            subtitle = reason ?: defaultSubtitle(),
++            addonName = "AI",
++            // Required by the model, but never opened: view-all is disabled for AI rows.
++            target = CatalogTarget.Addon(
++                manifestUrl = "ai://recommendations",
++                contentType = shown.firstOrNull()?.type ?: "movie",
++                catalogId = key,
++            ),
++            items = shown,
++            availableItemCount = shown.size,
++            hasMore = false,
++        )
++    }
++
++    private fun CachedRow.defaultSubtitle(): String = when (AiRowKind.fromKey(kind)) {
++        AiRowKind.ForYou -> "Picked for your taste"
++        AiRowKind.BecauseWatched -> "Similar titles from TMDB"
++        else -> "AI recommendations"
++    }
++
++    private fun AiRow.rowKind(): AiRowKind =
++        AiRowKind.fromKey(kind)?.takeIf { it != AiRowKind.BecauseWatched } ?: AiRowKind.Themed
++
++    private fun kindOrder(kind: AiRowKind): Int = when (kind) {
++        AiRowKind.ForYou -> 0
++        AiRowKind.Themed -> 1
++        AiRowKind.Mood -> 2
++        AiRowKind.HiddenGems -> 3
++        AiRowKind.BecauseWatched -> 4
++    }
++
++    /** How many titles to keep per row. Shown rows are a random sample of this pool. */
++    private fun poolSize(itemsPerRow: Int): Int = (itemsPerRow + POOL_EXTRA).coerceAtMost(POOL_MAX)
++
++    /** What decides whether a cached generation is still valid. */
++    private fun rowPlan(settings: AiRecommendationSettings): String =
++        "${settings.rowCount}x${settings.itemsPerRow}"
++
++    private fun rowPlanPrompt(rowCount: Int, itemsPerRow: Int): String = buildString {
++        appendLine("Return these rows. Give every row a \"kind\" field with one of these values:")
++        appendLine("- Exactly one row with kind \"for_you\": broad, appealing picks across all of the viewer's taste.")
++        appendLine("- $rowCount rows with kind \"theme\": specific themed rows.")
++        appendLine("- $MOOD_ROW_COUNT rows with kind \"mood\": built around a mood or occasion, such as \"Late-night thrillers\" or \"Easy weekend comfort\".")
++        appendLine("- One row with kind \"hidden_gem\": lesser-known, under-the-radar titles, not widely known blockbusters.")
++        appendLine("Each row has $itemsPerRow titles.")
++        append("Vary your picks: avoid the most obvious choices and do not repeat the same well-known titles.")
++    }
+ 
+     private fun cachePath(): String = ProfileScopedKey.of("ai_recommendations") + ".json"
+ 
+@@ -204,9 +357,12 @@ object AiRecommendationsRepository {
+ 
+     private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000
+     private const val NEW_TITLES_THRESHOLD = 5
+-    private const val ROW_COUNT = 5
+-    private const val ITEMS_PER_ROW = 12
++    private const val BECAUSE_ROW_COUNT = 3
++    private const val MOOD_ROW_COUNT = 2
+     private const val MIN_ITEMS_PER_ROW = 4
++    private const val HIDDEN_GEM_MAX_VOTES = 2000
++    private const val POOL_EXTRA = 10
++    private const val POOL_MAX = 40
+ 
+     private const val SYSTEM_PROMPT =
+         "You are a film and TV recommendation engine inside a streaming app. " +
+@@ -222,11 +378,13 @@ private data class CachedRecommendations(
+     val generatedAtMs: Long,
+     val tasteCount: Int,
+     val model: String,
++    val plan: String = "",
+     val rows: List<CachedRow>,
+ )
+ 
+ @Serializable
+ private data class CachedRow(
++    val kind: String = AiRowKind.Themed.key,
+     val title: String,
+     val reason: String? = null,
+     val items: List<CachedPreview>,
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiSettingsRepository.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiSettingsRepository.kt
+index e2e7843..158b492 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiSettingsRepository.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiSettingsRepository.kt
+@@ -9,11 +9,31 @@ import kotlinx.coroutines.flow.asStateFlow
+  * so a retired model name never requires an app update.
+  */
+ const val AI_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
++const val AI_DEFAULT_ROW_COUNT = 5
++const val AI_DEFAULT_ITEMS_PER_ROW = 25
++val AI_ROW_COUNT_RANGE: IntRange = 1..8
++val AI_ITEMS_PER_ROW_RANGE: IntRange = 10..30
++
++/** The kinds of home rows the AI section can produce. [key] is what Gemini and the cache use. */
++enum class AiRowKind(val key: String, val label: String) {
++    ForYou("for_you", "For you"),
++    Themed("theme", "Themed rows"),
++    Mood("mood", "Mood & occasion rows"),
++    HiddenGems("hidden_gem", "Hidden gems"),
++    BecauseWatched("because", "Because you watched");
++
++    companion object {
++        fun fromKey(key: String): AiRowKind? = values().firstOrNull { it.key == key }
++    }
++}
+ 
+ data class AiRecommendationSettings(
+     val enabled: Boolean = false,
+     val apiKey: String = "",
+     val model: String = AI_DEFAULT_GEMINI_MODEL,
++    val rowCount: Int = AI_DEFAULT_ROW_COUNT,
++    val itemsPerRow: Int = AI_DEFAULT_ITEMS_PER_ROW,
++    val enabledRowKinds: Set<AiRowKind> = AiRowKind.values().toSet(),
+ ) {
+     val isUsable: Boolean
+         get() = enabled && apiKey.isNotBlank() && model.isNotBlank()
+@@ -23,6 +43,9 @@ object AiSettingsRepository {
+     private const val KEY_ENABLED = "ai_enabled"
+     private const val KEY_API_KEY = "ai_gemini_api_key"
+     private const val KEY_MODEL = "ai_gemini_model"
++    private const val KEY_ROW_COUNT = "ai_row_count"
++    private const val KEY_ITEMS_PER_ROW = "ai_items_per_row"
++    private const val KEY_ROW_KINDS = "ai_row_kinds"
+ 
+     private val _uiState = MutableStateFlow(AiRecommendationSettings())
+     val uiState: StateFlow<AiRecommendationSettings> = _uiState.asStateFlow()
+@@ -63,12 +86,52 @@ object AiSettingsRepository {
+         AiRecommendationsRepository.refresh(force = true)
+     }
+ 
++    /** Applies on the next "Refresh now" (fetches more rows from Gemini). */
++    fun setRowCount(value: Int) {
++        ensureLoaded()
++        val clamped = value.coerceIn(AI_ROW_COUNT_RANGE)
++        if (_uiState.value.rowCount == clamped) return
++        _uiState.value = _uiState.value.copy(rowCount = clamped)
++        AiSettingsStorage.save(KEY_ROW_COUNT, clamped.toString())
++        AiRecommendationsRepository.applySettings()
++    }
++
++    /** Applies on the next "Refresh now" (fetches more titles from Gemini). */
++    fun setItemsPerRow(value: Int) {
++        ensureLoaded()
++        val clamped = value.coerceIn(AI_ITEMS_PER_ROW_RANGE)
++        if (_uiState.value.itemsPerRow == clamped) return
++        _uiState.value = _uiState.value.copy(itemsPerRow = clamped)
++        AiSettingsStorage.save(KEY_ITEMS_PER_ROW, clamped.toString())
++        AiRecommendationsRepository.applySettings()
++    }
++
++    /** Shows or hides a row kind immediately, without calling Gemini. */
++    fun setRowKindEnabled(kind: AiRowKind, enabled: Boolean) {
++        ensureLoaded()
++        val current = _uiState.value.enabledRowKinds
++        val updated = if (enabled) current + kind else current - kind
++        if (updated == current) return
++        _uiState.value = _uiState.value.copy(enabledRowKinds = updated)
++        AiSettingsStorage.save(KEY_ROW_KINDS, updated.joinToString(",") { it.key })
++        AiRecommendationsRepository.applySettings()
++    }
++
+     private fun loadFromDisk() {
+         hasLoaded = true
+         _uiState.value = AiRecommendationSettings(
+             enabled = AiSettingsStorage.load(KEY_ENABLED)?.toBooleanStrictOrNull() ?: false,
+             apiKey = AiSettingsStorage.load(KEY_API_KEY).orEmpty(),
+             model = AiSettingsStorage.load(KEY_MODEL)?.takeIf { it.isNotBlank() } ?: AI_DEFAULT_GEMINI_MODEL,
++            rowCount = AiSettingsStorage.load(KEY_ROW_COUNT)?.toIntOrNull()?.coerceIn(AI_ROW_COUNT_RANGE)
++                ?: AI_DEFAULT_ROW_COUNT,
++            itemsPerRow = AiSettingsStorage.load(KEY_ITEMS_PER_ROW)?.toIntOrNull()?.coerceIn(AI_ITEMS_PER_ROW_RANGE)
++                ?: AI_DEFAULT_ITEMS_PER_ROW,
++            enabledRowKinds = AiSettingsStorage.load(KEY_ROW_KINDS)
++                ?.split(',')
++                ?.mapNotNull(AiRowKind::fromKey)
++                ?.toSet()
++                ?: AiRowKind.values().toSet(),
+         )
+     }
+ }
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiTasteProfile.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiTasteProfile.kt
+index 9d991de..be58cc2 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiTasteProfile.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/AiTasteProfile.kt
+@@ -9,6 +9,8 @@ internal data class TasteTitle(
+     val name: String,
+     val year: String?,
+     val type: String,
++    /** Addon/TMDB id used to look up related titles. Null when the title has no usable id. */
++    val id: String? = null,
+ )
+ 
+ /**
+@@ -27,7 +29,7 @@ internal data class TasteProfile(
+     val excludedNames: Set<String> =
+         (watched + saved).mapTo(HashSet()) { normalizeAiTitle(it.name) }
+ 
+-    fun toPrompt(rowCount: Int, itemsPerRow: Int): String = buildString {
++    fun toPrompt(): String = buildString {
+         appendLine("Recently watched (most recent first):")
+         watched.forEach { appendLine("- ${it.label()}") }
+         if (saved.isNotEmpty()) {
+@@ -40,7 +42,6 @@ internal data class TasteProfile(
+             appendLine("Favourite genres: ${topGenres.joinToString()}")
+         }
+         appendLine()
+-        append("Create $rowCount themed recommendation rows with $itemsPerRow titles each. ")
+         append("Do not include any title listed above.")
+     }
+ 
+@@ -86,7 +87,7 @@ internal object AiTasteProfileBuilder {
+             .forEach { item ->
+                 if (item.name.isBlank()) return@forEach
+                 candidates += Candidate(
+-                    TasteTitle(item.name.trim(), item.releaseInfo.firstYear(), normalizeAiType(item.type)),
++                    TasteTitle(item.name.trim(), item.releaseInfo.firstYear(), normalizeAiType(item.type), id = item.id),
+                     item.markedAtEpochMs,
+                 )
+             }
+@@ -100,7 +101,7 @@ internal object AiTasteProfileBuilder {
+             .forEach { entry ->
+                 if (entry.title.isBlank()) return@forEach
+                 candidates += Candidate(
+-                    TasteTitle(entry.title.trim(), null, normalizeAiType(entry.parentMetaType)),
++                    TasteTitle(entry.title.trim(), null, normalizeAiType(entry.parentMetaType), id = entry.parentMetaId),
+                     entry.lastUpdatedEpochMs,
+                 )
+             }
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/GeminiClient.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/GeminiClient.kt
+index fadf440..488939a 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/GeminiClient.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/ai/GeminiClient.kt
+@@ -20,6 +20,8 @@ internal data class AiRowsPayload(val rows: List<AiRow> = emptyList())
+ 
+ @Serializable
+ internal data class AiRow(
++    /** One of the [AiRowKind] keys: for_you, theme, mood, hidden_gem. */
++    val kind: String = "theme",
+     val title: String = "",
+     val reason: String? = null,
+     val items: List<AiSuggestion> = emptyList(),
+@@ -55,6 +57,7 @@ internal object GeminiClient {
+             }
+             putJsonObject("generationConfig") {
+                 put("temperature", 0.9)
++                put("maxOutputTokens", 16384)
+                 put("responseMimeType", "application/json")
+                 put("responseSchema", rowsSchema())
+             }
+@@ -83,6 +86,15 @@ internal object GeminiClient {
+                 putJsonObject("items") {
+                     put("type", "OBJECT")
+                     putJsonObject("properties") {
++                        putJsonObject("kind") {
++                            put("type", "STRING")
++                            putJsonArray("enum") {
++                                add("for_you")
++                                add("theme")
++                                add("mood")
++                                add("hidden_gem")
++                            }
++                        }
+                         putJsonObject("title") { put("type", "STRING") }
+                         putJsonObject("reason") { put("type", "STRING") }
+                         putJsonObject("items") {
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/HomescreenSettingsPage.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/HomescreenSettingsPage.kt
+index beb1d75..4be16f2 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/HomescreenSettingsPage.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/HomescreenSettingsPage.kt
+@@ -47,6 +47,9 @@ import com.nuvio.app.core.ui.NuvioToastController
+ import com.nuvio.app.features.addons.AddonRepository
+ import com.nuvio.app.features.ai.AiRecommendationsRepository
+ import com.nuvio.app.features.ai.AiSettingsRepository
++import com.nuvio.app.features.ai.AI_ITEMS_PER_ROW_RANGE
++import com.nuvio.app.features.ai.AI_ROW_COUNT_RANGE
++import com.nuvio.app.features.ai.AiRowKind
+ import com.nuvio.app.features.home.HomeCatalogSettingsItem
+ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+ import com.nuvio.app.features.home.HomeHeroStyle
+@@ -569,5 +572,41 @@ private fun AiRecommendationsSettingsGroup(isTablet: Boolean) {
+                 )
+             }
+         }
++        SettingsGroupDivider(isTablet = isTablet)
++        SettingsSliderRow(
++            title = "Themed rows",
++            description = "How many themed rows to show",
++            value = settings.rowCount,
++            valueRange = AI_ROW_COUNT_RANGE,
++            step = 1,
++            isTablet = isTablet,
++            onValueChange = AiSettingsRepository::setRowCount,
++        )
++        SettingsGroupDivider(isTablet = isTablet)
++        SettingsSliderRow(
++            title = "Titles per row",
++            description = "Most titles shown in each row",
++            value = settings.itemsPerRow,
++            valueRange = AI_ITEMS_PER_ROW_RANGE,
++            step = 5,
++            isTablet = isTablet,
++            onValueChange = AiSettingsRepository::setItemsPerRow,
++        )
++        AiRowKind.values().forEach { kind ->
++            SettingsGroupDivider(isTablet = isTablet)
++            SettingsSwitchRow(
++                title = kind.label,
++                checked = kind in settings.enabledRowKinds,
++                isTablet = isTablet,
++                onCheckedChange = { AiSettingsRepository.setRowKindEnabled(kind, it) },
++            )
++        }
++        SettingsGroupDivider(isTablet = isTablet)
++        Text(
++            text = "Row types take effect right away. Row count and titles per row take effect " +
++                "after Refresh now.",
++            style = MaterialTheme.typography.bodySmall,
++            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
++        )
+     }
+ }

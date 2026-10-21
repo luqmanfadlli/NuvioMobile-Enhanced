@@ -20,6 +20,8 @@ internal data class AiRowsPayload(val rows: List<AiRow> = emptyList())
 
 @Serializable
 internal data class AiRow(
+    /** One of the [AiRowKind] keys: for_you, theme, mood, hidden_gem. */
+    val kind: String = "theme",
     val title: String = "",
     val reason: String? = null,
     val items: List<AiSuggestion> = emptyList(),
@@ -55,6 +57,7 @@ internal object GeminiClient {
             }
             putJsonObject("generationConfig") {
                 put("temperature", 0.9)
+                put("maxOutputTokens", 16384)
                 put("responseMimeType", "application/json")
                 put("responseSchema", rowsSchema())
             }
@@ -83,6 +86,15 @@ internal object GeminiClient {
                 putJsonObject("items") {
                     put("type", "OBJECT")
                     putJsonObject("properties") {
+                        putJsonObject("kind") {
+                            put("type", "STRING")
+                            putJsonArray("enum") {
+                                add("for_you")
+                                add("theme")
+                                add("mood")
+                                add("hidden_gem")
+                            }
+                        }
                         putJsonObject("title") { put("type", "STRING") }
                         putJsonObject("reason") { put("type", "STRING") }
                         putJsonObject("items") {

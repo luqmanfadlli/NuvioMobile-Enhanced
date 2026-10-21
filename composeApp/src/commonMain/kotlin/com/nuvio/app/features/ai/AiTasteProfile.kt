@@ -9,6 +9,8 @@ internal data class TasteTitle(
     val name: String,
     val year: String?,
     val type: String,
+    /** Addon/TMDB id used to look up related titles. Null when the title has no usable id. */
+    val id: String? = null,
 )
 
 /**
@@ -27,7 +29,7 @@ internal data class TasteProfile(
     val excludedNames: Set<String> =
         (watched + saved).mapTo(HashSet()) { normalizeAiTitle(it.name) }
 
-    fun toPrompt(rowCount: Int, itemsPerRow: Int): String = buildString {
+    fun toPrompt(): String = buildString {
         appendLine("Recently watched (most recent first):")
         watched.forEach { appendLine("- ${it.label()}") }
         if (saved.isNotEmpty()) {
@@ -40,7 +42,6 @@ internal data class TasteProfile(
             appendLine("Favourite genres: ${topGenres.joinToString()}")
         }
         appendLine()
-        append("Create $rowCount themed recommendation rows with $itemsPerRow titles each. ")
         append("Do not include any title listed above.")
     }
 
@@ -86,7 +87,7 @@ internal object AiTasteProfileBuilder {
             .forEach { item ->
                 if (item.name.isBlank()) return@forEach
                 candidates += Candidate(
-                    TasteTitle(item.name.trim(), item.releaseInfo.firstYear(), normalizeAiType(item.type)),
+                    TasteTitle(item.name.trim(), item.releaseInfo.firstYear(), normalizeAiType(item.type), id = item.id),
                     item.markedAtEpochMs,
                 )
             }
@@ -100,7 +101,7 @@ internal object AiTasteProfileBuilder {
             .forEach { entry ->
                 if (entry.title.isBlank()) return@forEach
                 candidates += Candidate(
-                    TasteTitle(entry.title.trim(), null, normalizeAiType(entry.parentMetaType)),
+                    TasteTitle(entry.title.trim(), null, normalizeAiType(entry.parentMetaType), id = entry.parentMetaId),
                     entry.lastUpdatedEpochMs,
                 )
             }

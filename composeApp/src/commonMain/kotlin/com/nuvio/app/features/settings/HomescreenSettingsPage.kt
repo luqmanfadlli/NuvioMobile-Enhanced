@@ -47,6 +47,9 @@ import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.ai.AiRecommendationsRepository
 import com.nuvio.app.features.ai.AiSettingsRepository
+import com.nuvio.app.features.ai.AI_ITEMS_PER_ROW_RANGE
+import com.nuvio.app.features.ai.AI_ROW_COUNT_RANGE
+import com.nuvio.app.features.ai.AiRowKind
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeHeroStyle
@@ -569,5 +572,41 @@ private fun AiRecommendationsSettingsGroup(isTablet: Boolean) {
                 )
             }
         }
+        SettingsGroupDivider(isTablet = isTablet)
+        SettingsSliderRow(
+            title = "Themed rows",
+            description = "How many themed rows to show",
+            value = settings.rowCount,
+            valueRange = AI_ROW_COUNT_RANGE,
+            step = 1,
+            isTablet = isTablet,
+            onValueChange = AiSettingsRepository::setRowCount,
+        )
+        SettingsGroupDivider(isTablet = isTablet)
+        SettingsSliderRow(
+            title = "Titles per row",
+            description = "Most titles shown in each row",
+            value = settings.itemsPerRow,
+            valueRange = AI_ITEMS_PER_ROW_RANGE,
+            step = 5,
+            isTablet = isTablet,
+            onValueChange = AiSettingsRepository::setItemsPerRow,
+        )
+        AiRowKind.values().forEach { kind ->
+            SettingsGroupDivider(isTablet = isTablet)
+            SettingsSwitchRow(
+                title = kind.label,
+                checked = kind in settings.enabledRowKinds,
+                isTablet = isTablet,
+                onCheckedChange = { AiSettingsRepository.setRowKindEnabled(kind, it) },
+            )
+        }
+        SettingsGroupDivider(isTablet = isTablet)
+        Text(
+            text = "Row types take effect right away. Row count and titles per row take effect " +
+                "after Refresh now.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
     }
 }
