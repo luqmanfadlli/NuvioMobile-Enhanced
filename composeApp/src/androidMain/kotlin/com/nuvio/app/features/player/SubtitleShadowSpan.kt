@@ -1,3 +1,4 @@
+
 @file:OptIn(androidx.media3.common.util.UnstableApi::class)
 
 package com.nuvio.app.features.player
@@ -35,7 +36,7 @@ private class SubtitleShadowSpan(private val strength: Int) :
     LanguageFeatureSpan {
     override fun updateDrawState(paint: TextPaint) {
         val unit = paint.textSize * SHADOW_UNIT_OF_TEXT_SIZE * strength
-        paint.setShadowLayer(unit * 1.6f, unit, unit, SHADOW_COLOR)
+        paint.setShadowLayer(unit * 0.7f, unit, unit, SHADOW_COLOR)
     }
 
     private companion object {
