@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.DialogButton
@@ -14,7 +15,6 @@ import com.nuvio.app.core.ui.DialogButtons
 import com.nuvio.app.core.ui.DialogSurface
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.nuvio
-import kotlinx.serialization.json.JsonObject
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_backup_export
@@ -24,17 +24,21 @@ import nuvio.composeapp.generated.resources.settings_backup_export_failed
 import nuvio.composeapp.generated.resources.settings_backup_import
 import nuvio.composeapp.generated.resources.settings_backup_import_confirm_action
 import nuvio.composeapp.generated.resources.settings_backup_import_confirm_message
+import nuvio.composeapp.generated.resources.settings_backup_import_confirm_message_sensitive
 import nuvio.composeapp.generated.resources.settings_backup_import_confirm_title
 import nuvio.composeapp.generated.resources.settings_backup_import_description
 import nuvio.composeapp.generated.resources.settings_backup_import_failed
 import nuvio.composeapp.generated.resources.settings_backup_import_invalid
 import nuvio.composeapp.generated.resources.settings_backup_importing
+import nuvio.composeapp.generated.resources.settings_backup_include_sensitive
+import nuvio.composeapp.generated.resources.settings_backup_include_sensitive_description
 import nuvio.composeapp.generated.resources.settings_backup_section
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun SettingsConfigBackupSection(isTablet: Boolean) {
-    var pendingImport by remember { mutableStateOf<JsonObject?>(null) }
+    var includeSensitiveData by rememberSaveable { mutableStateOf(false) }
+    var pendingImport by remember { mutableStateOf<SettingsConfigImport?>(null) }
     val isImporting by SettingsConfigTransfer.isImporting.collectAsStateWithLifecycle()
 
     val exportDoneText = stringResource(Res.string.settings_backup_export_done)
@@ -46,11 +50,11 @@ internal fun SettingsConfigBackupSection(isTablet: Boolean) {
         onSaved = { NuvioToastController.show(exportDoneText) },
         onSaveFailed = { NuvioToastController.show(exportFailedText) },
         onLoaded = { content ->
-            val settings = SettingsConfigTransfer.parse(content)
-            if (settings == null) {
+            val config = SettingsConfigTransfer.parse(content)
+            if (config == null) {
                 NuvioToastController.show(importInvalidText)
             } else {
-                pendingImport = settings
+                pendingImport = config
             }
         },
         onLoadFailed = { NuvioToastController.show(importFailedText) },
@@ -61,12 +65,20 @@ internal fun SettingsConfigBackupSection(isTablet: Boolean) {
         isTablet = isTablet,
     ) {
         SettingsGroup(isTablet = isTablet) {
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_backup_include_sensitive),
+                description = stringResource(Res.string.settings_backup_include_sensitive_description),
+                checked = includeSensitiveData,
+                isTablet = isTablet,
+                onCheckedChange = { includeSensitiveData = it },
+            )
+            SettingsGroupDivider(isTablet = isTablet)
             SettingsNavigationRow(
                 title = stringResource(Res.string.settings_backup_export),
                 description = stringResource(Res.string.settings_backup_export_description),
                 isTablet = isTablet,
                 onClick = {
-                    val content = runCatching { SettingsConfigTransfer.export() }.getOrNull()
+                    val content = runCatching { SettingsConfigTransfer.export(includeSensitiveData) }.getOrNull()
                     if (content == null) {
                         NuvioToastController.show(exportFailedText)
                     } else {
@@ -87,13 +99,19 @@ internal fun SettingsConfigBackupSection(isTablet: Boolean) {
         }
     }
 
-    pendingImport?.let { settings ->
+    pendingImport?.let { config ->
         DialogSurface(
             onDismissRequest = { pendingImport = null },
             title = stringResource(Res.string.settings_backup_import_confirm_title),
         ) {
             Text(
-                text = stringResource(Res.string.settings_backup_import_confirm_message),
+                text = stringResource(
+                    if (config.includesSensitiveData) {
+                        Res.string.settings_backup_import_confirm_message_sensitive
+                    } else {
+                        Res.string.settings_backup_import_confirm_message
+                    },
+                ),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.nuvio.colors.textMuted,
             )
@@ -106,7 +124,7 @@ internal fun SettingsConfigBackupSection(isTablet: Boolean) {
                     text = stringResource(Res.string.settings_backup_import_confirm_action),
                     onClick = {
                         pendingImport = null
-                        SettingsConfigTransfer.startImport(settings)
+                        SettingsConfigTransfer.startImport(config.settings)
                     },
                     style = DialogButtonStyle.Primary,
                 )
