@@ -1,7 +1,9 @@
 <resources>
     <string name="settings_backup_section">BACKUP</string>
+    <string name="settings_backup_include_sensitive">Include Sensitive Info</string>
+    <string name="settings_backup_include_sensitive_description">Add API keys, debrid keys, addons, Live TV and the Discord application ID to the exported file. Keep that file private</string>
     <string name="settings_backup_export">Export Settings</string>
-    <string name="settings_backup_export_description">Save settings and plugins to a file. API keys, debrid keys, addons, Live TV, collections, trackers and your Nuvio account are not included</string>
+    <string name="settings_backup_export_description">Save settings and plugins to a file. Collections, trackers and your Nuvio account are never included</string>
     <string name="settings_backup_export_done">Settings exported</string>
     <string name="settings_backup_export_failed">Couldn\'t export settings</string>
     <string name="settings_backup_import">Import Settings</string>
@@ -9,6 +11,7 @@
     <string name="settings_backup_importing">Importing settings…</string>
     <string name="settings_backup_import_confirm_title">Import Settings?</string>
     <string name="settings_backup_import_confirm_message">Settings from this file will replace the current settings of this profile. Missing plugins will be added. Your API keys, addons and Live TV stay unchanged.</string>
+    <string name="settings_backup_import_confirm_message_sensitive">Settings from this file will replace the current settings of this profile, including API keys and debrid keys. Missing addons, plugins and Live TV sources will be added.</string>
     <string name="settings_backup_import_confirm_action">Import</string>
     <string name="settings_backup_import_done">Settings imported</string>
     <string name="settings_backup_import_partial">Settings imported, but some sections couldn\'t be applied</string>
