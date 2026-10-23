@@ -21,11 +21,14 @@ import com.nuvio.app.core.ui.CardDepthStyleStorage
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleStorage
+import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.autosync.AutoSyncPreferencesRepository
+import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridSettingsStorage
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsStorage
+import com.nuvio.app.features.details.OmdbSettingsRepository
 import com.nuvio.app.features.details.SeasonViewMode
 import com.nuvio.app.features.details.SeasonViewModeStorage
 import com.nuvio.app.features.discord.DiscordRpcActivityType
@@ -40,6 +43,12 @@ import com.nuvio.app.features.home.HomeRepository
 import com.nuvio.app.features.home.SyncHomeCatalogPayload
 import com.nuvio.app.features.library.LibraryDisplaySettingsRepository
 import com.nuvio.app.features.library.LibraryDisplaySettingsStorage
+import com.nuvio.app.features.livetv.LiveTvEpgSource
+import com.nuvio.app.features.livetv.LiveTvPlaylist
+import com.nuvio.app.features.livetv.LiveTvPlaylistType
+import com.nuvio.app.features.livetv.LiveTvRepository
+import com.nuvio.app.features.livetv.LiveTvStalkerSettings
+import com.nuvio.app.features.livetv.LiveTvXtreamSettings
 import com.nuvio.app.features.mdblist.MdbListMetadataService
 import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.mdblist.MdbListSettingsStorage
@@ -97,6 +106,7 @@ internal object SettingsConfigTransfer {
     private const val COLLECTION_KEY_PREFIX = "collection_"
     private const val DISMISSED_NEXT_UP_KEYS = "dismissedNextUpKeys"
     private const val DISCORD_APPLICATION_ID_KEY = "application_id"
+    private const val KEY_INCLUDES_SENSITIVE_DATA = "includes_sensitive_data"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val json = Json {
@@ -113,13 +123,14 @@ internal object SettingsConfigTransfer {
         return "nuvio-settings-$date.json"
     }
 
-    fun export(): String {
+    fun export(includeCredentials: Boolean): String {
         ensureRepositoriesLoaded()
         val root = buildJsonObject {
             put("format", FORMAT)
             put("version", VERSION)
             put("app_version", AppVersionConfig.VERSION_NAME)
             put("exported_at", Clock.System.now().toString())
+            put(KEY_INCLUDES_SENSITIVE_DATA, includeCredentials)
             put(
                 KEY_SETTINGS,
                 buildJsonObject {
@@ -127,12 +138,13 @@ internal object SettingsConfigTransfer {
                     put("poster_card_style", exportPayload(PosterCardStyleStorage.loadPayload()))
                     put("custom_poster", exportCustomPosterSettings())
                     put("card_depth_style", exportPayload(CardDepthStyleStorage.loadPayload()))
-                    put("player", exportPlayerSettings())
+                    put("player", exportPlayerSettings(includeCredentials))
                     put("subtitle_auto_sync", exportAutoSyncSettings())
                     put("stream_badges", exportStreamBadgeSettings())
-                    put("debrid", exportDebridSettings())
-                    put("tmdb", exportTmdbSettings())
-                    put("mdblist", exportMdbListSettings())
+                    put("debrid", exportDebridSettings(includeCredentials))
+                    put("tmdb", exportTmdbSettings(includeCredentials))
+                    put("mdblist", exportMdbListSettings(includeCredentials))
+                    put("omdb", exportOmdbSettings(includeCredentials))
                     put("meta_screen", exportPayload(MetaScreenSettingsStorage.loadPayload()))
                     put("details", exportDetailsSettings())
                     put("continue_watching", exportContinueWatchingSettings())
@@ -140,7 +152,11 @@ internal object SettingsConfigTransfer {
                     put("home", exportHomeSettings())
                     put("general", exportGeneralSettings())
                     put("p2p", exportP2pSettings())
-                    put("discord_rpc", exportDiscordSettings())
+                    put("discord_rpc", exportDiscordSettings(includeCredentials))
+                    if (includeCredentials) {
+                        put("live_tv", exportLiveTvSettings())
+                        put("addons", exportAddons())
+                    }
                     if (AppFeaturePolicy.pluginsEnabled) {
                         put("plugins", exportPlugins())
                     }
@@ -150,13 +166,17 @@ internal object SettingsConfigTransfer {
         return json.encodeToString(JsonObject.serializer(), root)
     }
 
-    fun parse(content: String): JsonObject? {
+    fun parse(content: String): SettingsConfigImport? {
         val root = runCatching {
             json.parseToJsonElement(content.removePrefix("\uFEFF").trim()) as? JsonObject
         }.getOrNull() ?: return null
         if (root.string("format") != FORMAT) return null
         if ((root.int("version") ?: 0) > VERSION) return null
-        return root[KEY_SETTINGS] as? JsonObject
+        val settings = root[KEY_SETTINGS] as? JsonObject ?: return null
+        return SettingsConfigImport(
+            settings = settings,
+            includesSensitiveData = root.boolean(KEY_INCLUDES_SENSITIVE_DATA) ?: root.boolean("includes_credentials") ?: false,
+        )
     }
 
     fun startImport(settings: JsonObject) {
@@ -234,6 +254,7 @@ internal object SettingsConfigTransfer {
             MdbListMetadataService.clearCache()
             MdbListSettingsRepository.onProfileChanged()
         }
+        section("omdb") { value -> importOmdbSettings(value.jsonObject) }
         section("meta_screen") { value ->
             value.payloadOrNull()?.let(MetaScreenSettingsStorage::savePayload)
             MetaScreenSettingsRepository.onProfileChanged()
@@ -247,6 +268,8 @@ internal object SettingsConfigTransfer {
         section("general") { value -> importGeneralSettings(value.jsonObject) }
         section("p2p") { value -> importP2pSettings(value.jsonObject) }
         section("discord_rpc") { value -> importDiscordSettings(value.jsonObject) }
+        section("live_tv") { value -> importLiveTvSettings(value.jsonObject) }
+        section("addons") { value -> importAddons(value as JsonArray) }
         if (AppFeaturePolicy.pluginsEnabled) {
             section("plugins") { value -> importPlugins(value.jsonObject) }
         }
@@ -266,6 +289,7 @@ internal object SettingsConfigTransfer {
         DebridSettingsRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
         MdbListSettingsRepository.ensureLoaded()
+        OmdbSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.ensureLoaded()
         EpisodeShuffleRepository.ensureLoaded()
         ContinueWatchingPreferencesRepository.ensureLoaded()
@@ -276,6 +300,7 @@ internal object SettingsConfigTransfer {
         DnsSettingsRepository.ensureLoaded()
         P2pSettingsRepository.ensureLoaded()
         DiscordRpcRepository.ensureLoaded()
+        LiveTvRepository.ensureLoaded()
     }
 
     private fun exportPayload(payload: String?): JsonElement =
@@ -289,6 +314,9 @@ internal object SettingsConfigTransfer {
     private fun JsonObject.boolean(key: String): Boolean? = (get(key) as? JsonPrimitive)?.booleanOrNull
 
     private fun JsonObject.int(key: String): Int? = (get(key) as? JsonPrimitive)?.intOrNull
+
+    private fun JsonObject.objects(key: String): List<JsonObject> =
+        (get(key) as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
 
     private fun JsonObject.strings(key: String): List<String> =
         (get(key) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
@@ -318,6 +346,16 @@ internal object SettingsConfigTransfer {
         payload.boolean("start_on_playback")?.let(AutoSyncPreferencesRepository::setPreferredSubtitleAutoSyncOnStart)
         payload.boolean("aggressive_mode")?.let(AutoSyncPreferencesRepository::setAggressiveMode)
         payload.int("tolerance_ms")?.let(AutoSyncPreferencesRepository::setSyncToleranceMs)
+    }
+
+    private fun exportOmdbSettings(includeCredentials: Boolean): JsonObject = buildJsonObject {
+        if (includeCredentials) {
+            OmdbSettingsRepository.apiKey.value.takeIf(String::isNotBlank)?.let { put("api_key", it) }
+        }
+    }
+
+    private fun importOmdbSettings(payload: JsonObject) {
+        payload.string("api_key")?.let(OmdbSettingsRepository::setApiKey)
     }
 
     private fun exportDetailsSettings(): JsonObject = buildJsonObject {
@@ -451,11 +489,10 @@ internal object SettingsConfigTransfer {
         P2pSettingsRepository.onProfileChanged()
     }
 
-    private fun exportDiscordSettings(): JsonElement =
-        JsonObject(
-            json.encodeToJsonElement(DiscordRpcSettings.serializer(), DiscordRpcRepository.uiState.value.settings)
-                .jsonObject - DISCORD_APPLICATION_ID_KEY,
-        )
+    private fun exportDiscordSettings(includeCredentials: Boolean): JsonElement {
+        val settings = json.encodeToJsonElement(DiscordRpcSettings.serializer(), DiscordRpcRepository.uiState.value.settings).jsonObject
+        return if (includeCredentials) settings else JsonObject(settings - DISCORD_APPLICATION_ID_KEY)
+    }
 
     private fun importDiscordSettings(payload: JsonObject) {
         val settings = json.decodeFromJsonElement(DiscordRpcSettings.serializer(), payload)
@@ -467,7 +504,159 @@ internal object SettingsConfigTransfer {
         DiscordRpcRepository.setShowTimestamps(settings.showTimestamps)
         DiscordRpcRepository.setHideOnPause(settings.hideOnPause)
         DiscordRpcRepository.setShowImdbButton(settings.showImdbButton)
+        if (payload.containsKey(DISCORD_APPLICATION_ID_KEY)) {
+            DiscordRpcRepository.setApplicationId(settings.applicationId)
+        }
         DiscordRpcRepository.setEnabled(settings.enabled)
+    }
+
+    private fun exportLiveTvSettings(): JsonObject {
+        val state = LiveTvRepository.uiState.value
+        return buildJsonObject {
+            put("navigation_enabled", state.isNavigationEnabled)
+            put("epg_auto_detect_enabled", state.isEpgAutoDetectEnabled)
+            put(
+                "playlists",
+                buildJsonArray {
+                    state.playlists.forEach { playlist ->
+                        add(
+                            buildJsonObject {
+                                put("name", playlist.name)
+                                put("type", playlist.type.name)
+                                put("source", playlist.source)
+                                put("enabled", playlist.isEnabled)
+                            },
+                        )
+                    }
+                },
+            )
+            put(
+                "epg_sources",
+                buildJsonArray {
+                    state.epgSources.forEach { source ->
+                        add(
+                            buildJsonObject {
+                                put("name", source.name)
+                                put("url", source.url)
+                                put("enabled", source.isEnabled)
+                            },
+                        )
+                    }
+                },
+            )
+            state.stalkerSettings.takeIf { it.isConfigured }?.let { stalker ->
+                put(
+                    "stalker",
+                    buildJsonObject {
+                        put("portal_url", stalker.portalUrl)
+                        put("mac_address", stalker.macAddress)
+                        put("username", stalker.username)
+                        put("password", stalker.password)
+                        put("enabled", stalker.isEnabled)
+                    },
+                )
+            }
+            state.xtreamSettings.takeIf { it.isConfigured }?.let { xtream ->
+                put(
+                    "xtream",
+                    buildJsonObject {
+                        put("server_url", xtream.serverUrl)
+                        put("username", xtream.username)
+                        put("password", xtream.password)
+                        put("enabled", xtream.isEnabled)
+                    },
+                )
+            }
+        }
+    }
+
+    private fun importLiveTvSettings(payload: JsonObject) {
+        payload.objects("playlists").forEach { item ->
+            val source = item.string("source")?.trim()?.takeIf(String::isNotEmpty) ?: return@forEach
+            val type = LiveTvPlaylistType.entries.firstOrNull { it.name == item.string("type") } ?: LiveTvPlaylistType.Url
+            val name = item.string("name")?.trim()?.takeIf(String::isNotEmpty)
+            val matches: (LiveTvPlaylist) -> Boolean = { playlist ->
+                playlist.type == type && playlist.source.trim().equals(source, ignoreCase = type == LiveTvPlaylistType.Url)
+            }
+            if (LiveTvRepository.uiState.value.playlists.none(matches)) {
+                when (type) {
+                    LiveTvPlaylistType.Url -> LiveTvRepository.addPlaylistUrl(name, source)
+                    LiveTvPlaylistType.LocalFile -> LiveTvRepository.addLocalPlaylist(name, null, source)
+                }
+            }
+            val enabled = item.boolean("enabled") ?: true
+            LiveTvRepository.uiState.value.playlists.lastOrNull(matches)
+                ?.takeIf { it.isEnabled != enabled }
+                ?.let { LiveTvRepository.setPlaylistEnabled(it.id, enabled) }
+        }
+        payload.objects("epg_sources").forEach { item ->
+            val url = item.string("url")?.trim()?.takeIf(String::isNotEmpty) ?: return@forEach
+            val matches: (LiveTvEpgSource) -> Boolean = { it.url.equals(url, ignoreCase = true) }
+            if (LiveTvRepository.uiState.value.epgSources.none(matches)) {
+                LiveTvRepository.addEpgSource(item.string("name"), url)
+            }
+            val enabled = item.boolean("enabled") ?: true
+            LiveTvRepository.uiState.value.epgSources.firstOrNull(matches)
+                ?.takeIf { it.isEnabled != enabled }
+                ?.let { LiveTvRepository.setEpgSourceEnabled(it.id, enabled) }
+        }
+        (payload["stalker"] as? JsonObject)?.let { stalker ->
+            LiveTvStalkerSettings(
+                portalUrl = stalker.string("portal_url").orEmpty(),
+                macAddress = stalker.string("mac_address").orEmpty(),
+                username = stalker.string("username").orEmpty(),
+                password = stalker.string("password").orEmpty(),
+                isEnabled = stalker.boolean("enabled") ?: true,
+            ).takeIf { it.isConfigured }?.let(LiveTvRepository::saveStalkerSettings)
+        }
+        (payload["xtream"] as? JsonObject)?.let { xtream ->
+            LiveTvXtreamSettings(
+                serverUrl = xtream.string("server_url").orEmpty(),
+                username = xtream.string("username").orEmpty(),
+                password = xtream.string("password").orEmpty(),
+                isEnabled = xtream.boolean("enabled") ?: true,
+            ).takeIf { it.isConfigured }?.let(LiveTvRepository::saveXtreamSettings)
+        }
+        payload.boolean("epg_auto_detect_enabled")?.let(LiveTvRepository::setEpgAutoDetectEnabled)
+        payload.boolean("navigation_enabled")?.let(LiveTvRepository::setNavigationEnabled)
+    }
+
+    private fun exportAddons(): JsonArray = buildJsonArray {
+        AddonRepository.uiState.value.addons.distinctBy { it.manifestUrl }.forEach { addon ->
+            add(
+                buildJsonObject {
+                    put("url", addon.manifestUrl)
+                    put("enabled", addon.enabled)
+                },
+            )
+        }
+    }
+
+    private suspend fun importAddons(items: JsonArray) {
+        val entries = items.mapNotNull { element ->
+            val item = element as? JsonObject ?: return@mapNotNull null
+            val url = item.string("url")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+            url to (item.boolean("enabled") ?: true)
+        }.distinctBy { it.first }
+        entries.forEach { (url, _) ->
+            if (AddonRepository.uiState.value.addons.none { it.manifestUrl == url }) {
+                AddonRepository.addAddon(url)
+            }
+        }
+        entries.forEach { (url, enabled) ->
+            AddonRepository.uiState.value.addons.firstOrNull { it.manifestUrl == url }
+                ?.takeIf { it.enabled != enabled }
+                ?.let { AddonRepository.setAddonEnabled(url, enabled) }
+        }
+        var targetIndex = 0
+        entries.forEach { (url, _) ->
+            val currentIndex = AddonRepository.uiState.value.addons.indexOfFirst { it.manifestUrl == url }
+            if (currentIndex < 0) return@forEach
+            if (currentIndex != targetIndex) {
+                AddonRepository.moveAddon(currentIndex, targetIndex)
+            }
+            targetIndex += 1
+        }
     }
 
     private fun exportPlugins(): JsonObject {
@@ -506,7 +695,7 @@ internal object SettingsConfigTransfer {
         payload.boolean("plugins_enabled")?.let(PluginRepository::setPluginsEnabled)
     }
 
-    private fun exportPlayerSettings(): JsonObject = buildJsonObject {
+    private fun exportPlayerSettings(includeCredentials: Boolean): JsonObject = buildJsonObject {
         PlayerSettingsStorage.loadUseLegacyPlayerLayout()?.let { put("use_legacy_player_layout", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadShowLoadingOverlay()?.let { put("show_loading_overlay", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadShowPlayerLoadingStatus()?.let { put("show_player_loading_status", encodeSyncBoolean(it)) }
@@ -576,6 +765,8 @@ internal object SettingsConfigTransfer {
         PlayerSettingsStorage.loadAutoSkipSegmentTypes()?.let { put("auto_skip_segment_types", encodeSyncStringSet(it)) }
         PlayerSettingsStorage.loadAutoSkipPostCredits()?.let { put("auto_skip_post_credits", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadAnimeSkipEnabled()?.let { put("anime_skip_enabled", encodeSyncBoolean(it)) }
+        if (includeCredentials) PlayerSettingsStorage.loadAnimeSkipClientId()?.let { put("anime_skip_client_id", encodeSyncString(it)) }
+        if (includeCredentials) PlayerSettingsStorage.loadIntroDbApiKey()?.let { put("intro_db_api_key", encodeSyncString(it)) }
         PlayerSettingsStorage.loadIntroSubmitEnabled()?.let { put("intro_submit_enabled", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeEnabled()?.let { put("stream_auto_play_next_episode_enabled", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeFallbackEnabled()?.let { put("stream_auto_play_next_episode_fallback_enabled", encodeSyncBoolean(it)) }
@@ -677,6 +868,8 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncStringSet("auto_skip_segment_types")?.let { PlayerSettingsStorage.saveAutoSkipSegmentTypes(it) }
         payload.decodeSyncBoolean("auto_skip_post_credits")?.let { PlayerSettingsStorage.saveAutoSkipPostCredits(it) }
         payload.decodeSyncBoolean("anime_skip_enabled")?.let { PlayerSettingsStorage.saveAnimeSkipEnabled(it) }
+        payload.decodeSyncString("anime_skip_client_id")?.let { PlayerSettingsStorage.saveAnimeSkipClientId(it) }
+        payload.decodeSyncString("intro_db_api_key")?.let { PlayerSettingsStorage.saveIntroDbApiKey(it) }
         payload.decodeSyncBoolean("intro_submit_enabled")?.let { PlayerSettingsStorage.saveIntroSubmitEnabled(it) }
         payload.decodeSyncBoolean("stream_auto_play_next_episode_enabled")?.let { PlayerSettingsStorage.saveStreamAutoPlayNextEpisodeEnabled(it) }
         payload.decodeSyncBoolean("stream_auto_play_next_episode_fallback_enabled")?.let { PlayerSettingsStorage.saveStreamAutoPlayNextEpisodeFallbackEnabled(it) }
@@ -770,7 +963,12 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncString("pinned_stream_sources")?.let { StreamBadgeSettingsStorage.savePinnedStreamSources(it) }
     }
 
-    private fun exportDebridSettings(): JsonObject = buildJsonObject {
+    private fun exportDebridSettings(includeCredentials: Boolean): JsonObject = buildJsonObject {
+        if (includeCredentials) {
+            DebridProviders.all().forEach { provider ->
+                DebridSettingsStorage.loadProviderApiKey(provider.id)?.let { put("api_key_${provider.id}", encodeSyncString(it)) }
+            }
+        }
         DebridSettingsStorage.loadEnabled()?.let { put("enabled", encodeSyncBoolean(it)) }
         DebridSettingsStorage.loadCloudLibraryEnabled()?.let { put("cloud_library_enabled", encodeSyncBoolean(it)) }
         DebridSettingsStorage.loadPreferredResolverProviderId()?.let { put("preferred_resolver_provider_id", encodeSyncString(it)) }
@@ -787,6 +985,9 @@ internal object SettingsConfigTransfer {
     }
 
     private fun importDebridSettings(payload: JsonObject) {
+        DebridProviders.all().forEach { provider ->
+            payload.decodeSyncString("api_key_${provider.id}")?.let { DebridSettingsStorage.saveProviderApiKey(provider.id, it) }
+        }
         payload.decodeSyncBoolean("enabled")?.let { DebridSettingsStorage.saveEnabled(it) }
         payload.decodeSyncBoolean("cloud_library_enabled")?.let { DebridSettingsStorage.saveCloudLibraryEnabled(it) }
         payload.decodeSyncString("preferred_resolver_provider_id")?.let { DebridSettingsStorage.savePreferredResolverProviderId(it) }
@@ -802,8 +1003,9 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncString("stream_description_template")?.let { DebridSettingsStorage.saveStreamDescriptionTemplate(it) }
     }
 
-    private fun exportTmdbSettings(): JsonObject = buildJsonObject {
+    private fun exportTmdbSettings(includeCredentials: Boolean): JsonObject = buildJsonObject {
         TmdbSettingsStorage.loadEnabled()?.let { put("enabled", encodeSyncBoolean(it)) }
+        if (includeCredentials) TmdbSettingsStorage.loadApiKey()?.let { put("api_key", encodeSyncString(it)) }
         TmdbSettingsStorage.loadLanguage()?.let { put("language", encodeSyncString(it)) }
         TmdbSettingsStorage.loadUseTrailers()?.let { put("use_trailers", encodeSyncBoolean(it)) }
         TmdbSettingsStorage.loadUseArtwork()?.let { put("use_artwork", encodeSyncBoolean(it)) }
@@ -821,6 +1023,7 @@ internal object SettingsConfigTransfer {
 
     private fun importTmdbSettings(payload: JsonObject) {
         payload.decodeSyncBoolean("enabled")?.let { TmdbSettingsStorage.saveEnabled(it) }
+        payload.decodeSyncString("api_key")?.let { TmdbSettingsStorage.saveApiKey(it) }
         payload.decodeSyncString("language")?.let { TmdbSettingsStorage.saveLanguage(it) }
         payload.decodeSyncBoolean("use_trailers")?.let { TmdbSettingsStorage.saveUseTrailers(it) }
         payload.decodeSyncBoolean("use_artwork")?.let { TmdbSettingsStorage.saveUseArtwork(it) }
@@ -836,8 +1039,9 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncBoolean("use_collections")?.let { TmdbSettingsStorage.saveUseCollections(it) }
     }
 
-    private fun exportMdbListSettings(): JsonObject = buildJsonObject {
+    private fun exportMdbListSettings(includeCredentials: Boolean): JsonObject = buildJsonObject {
         MdbListSettingsStorage.loadEnabled()?.let { put("enabled", encodeSyncBoolean(it)) }
+        if (includeCredentials) MdbListSettingsStorage.loadApiKey()?.let { put("api_key", encodeSyncString(it)) }
         MdbListSettingsStorage.loadUseImdb()?.let { put("use_imdb", encodeSyncBoolean(it)) }
         MdbListSettingsStorage.loadUseTmdb()?.let { put("use_tmdb", encodeSyncBoolean(it)) }
         MdbListSettingsStorage.loadUseTomatoes()?.let { put("use_tomatoes", encodeSyncBoolean(it)) }
@@ -850,6 +1054,7 @@ internal object SettingsConfigTransfer {
 
     private fun importMdbListSettings(payload: JsonObject) {
         payload.decodeSyncBoolean("enabled")?.let { MdbListSettingsStorage.saveEnabled(it) }
+        payload.decodeSyncString("api_key")?.let { MdbListSettingsStorage.saveApiKey(it) }
         payload.decodeSyncBoolean("use_imdb")?.let { MdbListSettingsStorage.saveUseImdb(it) }
         payload.decodeSyncBoolean("use_tmdb")?.let { MdbListSettingsStorage.saveUseTmdb(it) }
         payload.decodeSyncBoolean("use_tomatoes")?.let { MdbListSettingsStorage.saveUseTomatoes(it) }
@@ -860,3 +1065,8 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncBoolean("use_mal")?.let { MdbListSettingsStorage.saveUseMal(it) }
     }
 }
+
+internal class SettingsConfigImport(
+    val settings: JsonObject,
+    val includesSensitiveData: Boolean,
+)
