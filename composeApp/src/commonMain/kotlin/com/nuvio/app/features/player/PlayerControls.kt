@@ -222,9 +222,7 @@ internal fun PlayerControlsShell(
         )
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = horizontalSafePadding),
+            modifier = Modifier.fillMaxSize(),
         ) {
             if (useLegacyLayout) {
                 PlayerHeader(
