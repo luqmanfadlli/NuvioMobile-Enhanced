@@ -163,6 +163,8 @@ fun NuvioScreenHeader(
     glassSurface: LiquidGlassSurface? = null,
     /** Optional edge-to-edge background behind the header content, such as a fading artwork scrim. */
     backgroundBrushOverride: Brush? = null,
+    /** Bottom inset for a custom background that should stop before the header's trailing spacing. */
+    backgroundBrushBottomInset: Dp = 0.dp,
     /** Horizontal inset for header content when its background intentionally spans edge-to-edge. */
     contentHorizontalPadding: Dp = 0.dp,
     actions: @Composable RowScope.() -> Unit = {},
