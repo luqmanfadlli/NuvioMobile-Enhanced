@@ -14,7 +14,7 @@ class CustomDefaultTrackNameProvider(resources: Resources) : DefaultTrackNamePro
 
         if (format.sampleMimeType != null) {
             var sampleFormat = resolveCodecName(format.sampleMimeType, format.codecs)
-            if (sampleFormat == null) {
+            if (sampleFormat == null && format.sampleMimeType != MimeTypes.APPLICATION_MEDIA3_CUES) {
                 sampleFormat = format.sampleMimeType
             }
             if (sampleFormat != null) {
@@ -40,6 +40,7 @@ class CustomDefaultTrackNameProvider(resources: Resources) : DefaultTrackNamePro
         fun resolveCodecName(mimeType: String?, codecs: String?): String? {
             formatNameFromMime(mimeType)?.let { return it }
             if (codecs == null) return null
+            formatNameFromMime(codecs)?.let { return it }
             MimeTypes.getVideoMediaMimeType(codecs)?.let { formatNameFromMime(it) }?.let { return it }
             MimeTypes.getMediaMimeType(codecs)?.let { formatNameFromMime(it) }?.let { return it }
             return null
