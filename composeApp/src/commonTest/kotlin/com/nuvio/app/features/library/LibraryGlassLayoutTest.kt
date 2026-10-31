@@ -101,6 +101,12 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
+    fun savedHeaderScrimStopsBeforeTheTitleHeadersBottomSpacing() {
+        assertEquals(4.dp, librarySavedHeaderScrimBottomInset(scrimEnabled = true))
+        assertEquals(0.dp, librarySavedHeaderScrimBottomInset(scrimEnabled = false))
+    }
+
+    @Test
     fun artworkHeaderFadeIsOnlyUsedForCloudLibraryWithAnActiveBackdrop() {
         assertTrue(
             libraryHeaderUsesArtworkBackdrop(

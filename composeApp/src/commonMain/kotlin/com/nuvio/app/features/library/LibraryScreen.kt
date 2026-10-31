@@ -234,6 +234,10 @@ internal fun librarySavedHeaderUsesGlassScrim(
 ): Boolean = sourceMode == LibraryViewMode.Saved &&
     (librarySurfaceGlassEnabled || savedTypeGlassEnabled || savedSortGlassEnabled)
 
+/** Keep the Saved scrim clear of the title header's bottom spacing. */
+internal fun librarySavedHeaderScrimBottomInset(scrimEnabled: Boolean): Dp =
+    if (scrimEnabled) NuvioTokens.Space.s4 else 0.dp
+
 /** Any enabled Library surface needs the capture layer, including the calendar popup. */
 internal fun libraryBackdropCaptureRequired(
     masterEnabled: Boolean,
@@ -687,6 +691,7 @@ fun LibraryScreen(
                         savedHeaderScrimEnabled -> savedHeaderScrimBrush
                         else -> null
                     },
+                    backgroundBrushBottomInset = librarySavedHeaderScrimBottomInset(savedHeaderScrimEnabled),
                     contentHorizontalPadding = if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
                         16.dp
                     } else {

@@ -210,8 +210,15 @@ fun NuvioScreenHeader(
         Row(
             modifier = Modifier
                 .matchParentSize()
-                .then(headerBackgroundModifier)
-                .nuvioConsumePointerEvents(),
+                .nuvioConsumePointerEvents()
+                .padding(
+                    bottom = if (backgroundBrushOverride != null) {
+                        backgroundBrushBottomInset.coerceAtLeast(0.dp)
+                    } else {
+                        0.dp
+                    },
+                )
+                .then(headerBackgroundModifier),
         ) {}
         if (settingsGlassEnabled) {
             Box(
