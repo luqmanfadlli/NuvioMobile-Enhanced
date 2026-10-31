@@ -226,8 +226,8 @@ internal fun libraryHeaderUsesArtworkBackdrop(
     artworkBackgroundActive: Boolean,
 ): Boolean = sourceMode == LibraryViewMode.Cloud && artworkBackgroundActive
 
-internal fun librarySavedHeaderScrimHeight(headerHeight: Dp, topInset: Dp): Dp =
-    (headerHeight + topInset - NuvioTokens.Space.s4).coerceAtLeast(0.dp)
+internal fun librarySavedHeaderScrimHeight(headerHeight: Dp): Dp =
+    (headerHeight - NuvioTokens.Space.s4).coerceAtLeast(0.dp)
 
 internal fun librarySavedHeaderUsesGlassScrim(
     sourceMode: LibraryViewMode,
@@ -597,7 +597,6 @@ fun LibraryScreen(
     var libraryToolbarHeight by remember(sourceMode, headerDensity) { mutableStateOf(0.dp) }
     val savedHeaderScrimHeight = librarySavedHeaderScrimHeight(
         headerHeight = libraryHeaderHeight,
-        topInset = LocalVerticalBarPadding.current.calculateTopPadding(),
     )
     val savedHeaderBackground = MaterialTheme.colorScheme.background
     val savedHeaderScrimBrush = remember(
