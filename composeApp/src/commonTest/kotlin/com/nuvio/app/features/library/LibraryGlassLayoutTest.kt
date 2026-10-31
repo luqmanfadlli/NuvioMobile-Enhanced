@@ -147,4 +147,25 @@ class LibraryGlassLayoutTest {
             ),
         )
     }
+
+    @Test
+    fun savedScrollBackdropReservesToolbarAndPinnedControlsBeforeFirstPoster() {
+        assertEquals(
+            120.dp,
+            libraryContentTopPadding(
+                headerHeight = 48.dp,
+                hasSavedControls = true,
+                savedControlsInset = 72.dp,
+            ),
+        )
+        assertEquals(
+            48.dp,
+            libraryContentTopPadding(
+                headerHeight = 48.dp,
+                hasSavedControls = false,
+                savedControlsInset = 72.dp,
+            ),
+        )
+    }
+
 }
