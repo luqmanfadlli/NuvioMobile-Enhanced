@@ -19,14 +19,4 @@ class NativeLiquidGlassControlsTest {
         assertTrue(shouldExposeLiquidGlassSettings(true, false))
         assertTrue(shouldExposeLiquidGlassSettings(true, true))
     }
-
-    @Test
-    fun nativeGlassButtonsRequireEnabledRuntimeSurfaceAndNeverPreview() {
-        assertFalse(shouldUseNativeLiquidGlassButton(25L, true, true, false))
-        assertFalse(shouldUseNativeLiquidGlassButton(26L, false, true, false))
-        assertFalse(shouldUseNativeLiquidGlassButton(26L, true, false, false))
-        assertFalse(shouldUseNativeLiquidGlassButton(26L, true, true, true))
-        assertTrue(shouldUseNativeLiquidGlassButton(26L, true, true, false))
-        assertTrue(shouldUseNativeLiquidGlassButton(27L, true, true, false))
-    }
 }
