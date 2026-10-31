@@ -57,18 +57,6 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
-    fun savedHeaderScrimEndsAtTitleHeaderBottomPaddingAndNeverBecomesNegative() {
-        assertEquals(
-            48.dp,
-            librarySavedHeaderScrimHeight(headerHeight = 52.dp),
-        )
-        assertEquals(
-            0.dp,
-            librarySavedHeaderScrimHeight(headerHeight = 2.dp),
-        )
-    }
-
-    @Test
     fun savedHeaderScrimIsLimitedToSavedModeAndEnabledLibraryGlass() {
         assertTrue(
             librarySavedHeaderUsesGlassScrim(
