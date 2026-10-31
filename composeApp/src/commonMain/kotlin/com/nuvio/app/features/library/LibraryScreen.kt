@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -90,6 +91,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -212,6 +214,12 @@ import org.jetbrains.compose.resources.stringResource
 internal fun librarySavedControlsNeedContentInset(
     hasSavedControls: Boolean,
 ): Boolean = hasSavedControls
+
+internal fun libraryContentTopPadding(
+    headerHeight: Dp,
+    hasSavedControls: Boolean,
+    savedControlsInset: Dp,
+): Dp = headerHeight + if (hasSavedControls) savedControlsInset else 0.dp
 
 internal fun libraryHeaderUsesArtworkBackdrop(
     sourceMode: LibraryViewMode,
@@ -586,6 +594,7 @@ fun LibraryScreen(
     )
     val headerDensity = LocalDensity.current
     var libraryHeaderHeight by remember(sourceMode, headerDensity) { mutableStateOf(0.dp) }
+    var libraryToolbarHeight by remember(sourceMode, headerDensity) { mutableStateOf(0.dp) }
     val savedHeaderScrimHeight = librarySavedHeaderScrimHeight(
         headerHeight = libraryHeaderHeight,
         topInset = LocalVerticalBarPadding.current.calculateTopPadding(),
@@ -639,13 +648,25 @@ fun LibraryScreen(
             }
         }
         CompositionLocalProvider(
-            LocalLiquidGlassBackdrop provides if (anyLibraryGlassEnabled) libraryBackdrop else null,
+            LocalLiquidGlassBackdrop provides if (anyLibraryGlassEnabled) {
+                if (sourceMode == LibraryViewMode.Saved) libraryContentBackdrop else libraryBackdrop
+            } else {
+                null
+            },
             LocalDynamicArtworkBackgroundActive provides (
                 LocalDynamicArtworkBackgroundActive.current || cloudBackgroundActive
             ),
         ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .zIndex(1f)
+                .onSizeChanged { size ->
+                    libraryToolbarHeight = with(headerDensity) { size.height.toDp() }
+                },
+        ) {
             if (savedHeaderScrimEnabled && libraryHeaderHeight > 0.dp) {
                 Box(
                     modifier = Modifier
@@ -782,11 +803,13 @@ fun LibraryScreen(
             }
         }
 
-        BoxWithConstraints(modifier = Modifier.weight(1f)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val windowSize = LocalWindowInfo.current.containerSize
             val density = LocalDensity.current
             val windowShortSide = with(density) { minOf(windowSize.width, windowSize.height).toDp() }
-            val isLandscape = maxWidth > maxHeight
+            // Preserve the pre-overlay grid breakpoint: the old content viewport began below the toolbar.
+            val contentViewportHeight = (maxHeight - libraryToolbarHeight).coerceAtLeast(0.dp)
+            val isLandscape = maxWidth > contentViewportHeight
             val gridColumns = remember(isLandscape, windowShortSide) {
                 libraryGridColumnCount(
                     isLandscape = isLandscape,
@@ -803,6 +826,10 @@ fun LibraryScreen(
                         } else {
                             Modifier
                         },
+                    )
+                    .then(
+                        if (sourceMode == LibraryViewMode.Saved) Modifier
+                        else Modifier.padding(top = libraryToolbarHeight),
                     ),
             ) {
             NuvioScreen(
@@ -811,13 +838,16 @@ fun LibraryScreen(
                 // Saved filters are pinned outside the scrolling content. Always reserve their
                 // space initially so the first section heading stays visible regardless of material;
                 // after scrolling, poster content can pass beneath the pinned controls.
-                topPadding = if (
-                    librarySavedControlsNeedContentInset(hasSavedControls = hasSavedControls)
-                ) {
-                    savedControlsInset
+                topPadding = if (sourceMode == LibraryViewMode.Saved) {
+                    libraryContentTopPadding(
+                        headerHeight = libraryToolbarHeight,
+                        hasSavedControls = librarySavedControlsNeedContentInset(hasSavedControls = hasSavedControls),
+                        savedControlsInset = savedControlsInset,
+                    )
                 } else {
                     0.dp
                 },
+                transparentBackground = sourceMode == LibraryViewMode.Saved && anyLibraryGlassEnabled,
                 listState = listState,
                 autoHidesNativeTabBar = true,
             ) {
@@ -978,6 +1008,7 @@ fun LibraryScreen(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
+                            .offset(y = libraryToolbarHeight)
                             .height(savedControlsInset),
                     ) {
                         if (!savedTypeGlassEnabled && !savedSortGlassEnabled) {
