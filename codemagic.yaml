@@ -1,0 +1,160 @@
+workflows:
+  android-full-debug:
+    name: Nuvio Enhanced - Android Full Debug
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      java: 17
+      vars:
+        NUVIO_BUILD_CHANNEL: "beta"
+        # These pinned dependencies contain nested submodules required by their source trees.
+        CM_RECURSIVE_SUBMODULE_INIT: "true"
+
+    scripts:
+      - name: Configure Android build
+        script: |
+          set -euo pipefail
+
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+
+          discovery_json="$(curl --fail --silent --show-error --location \
+            --retry 3 --connect-timeout 10 --max-time 30 \
+            https://api.nuvio.tv/.well-known/nuvio)"
+
+          nuvio_backend_url="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["backend_url"])')"
+          nuvio_publishable_key="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["publishable_key"])')"
+
+          test -n "$nuvio_backend_url"
+          test -n "$nuvio_publishable_key"
+
+          cat >> "$CM_BUILD_DIR/local.properties" <<EOF
+          NUVIO_SUPABASE_URL=$nuvio_backend_url
+          NUVIO_SUPABASE_ANON_KEY=$nuvio_publishable_key
+          NUVIO_SUPABASE_FALLBACK_URL=
+          EOF
+
+      - name: Build Android Full Debug APK
+        script: |
+          set -o pipefail
+          version_file="$CM_BUILD_DIR/iosApp/Configuration/Version.xcconfig"
+          if ! grep -Eq '^MARKETING_VERSION=[0-9]+(\.[0-9]+)*$' "$version_file"; then
+            echo "ERROR: MARKETING_VERSION is missing or invalid in $version_file" >&2
+            exit 1
+          fi
+          marketing_version="$(sed -n 's/^MARKETING_VERSION=//p' "$version_file" | head -n 1)"
+          beta_version_name="${marketing_version}-beta"
+          ./gradlew :androidApp:assembleFullDebug \
+            -Pnuvio.app.versionName="$beta_version_name" \
+            -Pnuvio.android.distribution=full \
+            -Pnuvio.ios.distribution=appstore \
+            --no-daemon \
+            --stacktrace \
+            --console=plain 2>&1 | tee "$CM_BUILD_DIR/gradle-build.log"
+          build_status=${PIPESTATUS[0]}
+          if [ "$build_status" -ne 0 ]; then
+            echo ""
+            echo "===== Kotlin/Gradle compiler diagnostics ====="
+            grep -E '(^|[^[:alnum:]])(e: |error: |w: |FAILURE:|Caused by:)' \
+              "$CM_BUILD_DIR/gradle-build.log" | tail -n 200 || true
+          fi
+          exit "$build_status"
+
+    artifacts:
+      - androidApp/build/outputs/**/*.apk
+      - gradle-build.log
+
+  ios-simulator-debug:
+    name: Nuvio Enhanced - iOS Simulator Debug
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      java: 17
+      xcode: latest
+      vars:
+        NUVIO_BUILD_CHANNEL: "beta"
+        CM_RECURSIVE_SUBMODULE_INIT: "false"
+        NUVIO_IOS_DISTRIBUTION: "appstore"
+        XCODE_PROJECT: "iosApp.xcodeproj"
+        XCODE_SCHEME: "iosApp"
+        IOS_SIMULATOR_DESTINATION: "generic/platform=iOS Simulator"
+
+    scripts:
+      - name: Prepare and validate Kotlin Multiplatform configuration
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR"
+
+          # Disable automatic recursive submodule checkout for this iOS-only build.
+          # The root gitlinks have URLs in .gitmodules; this workflow initializes MPVKit explicitly.
+          cd "$CM_BUILD_DIR"
+          git submodule sync -- MPVKit
+          git submodule update --init --depth 1 MPVKit
+          test -f "$CM_BUILD_DIR/MPVKit/Package.swift"
+
+          # The Xcode Compile Kotlin Framework phase invokes Gradle from the
+          # repository root. Create the ignored local.properties file first,
+          # as the Android workflow does, so runtime config generation has a
+          # real, reproducible input file.
+          : > "$CM_BUILD_DIR/local.properties"
+          if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+            printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" >> "$CM_BUILD_DIR/local.properties"
+          fi
+
+          discovery_json="$(curl --fail --silent --show-error --location \
+            --retry 3 --connect-timeout 10 --max-time 30 \
+            https://api.nuvio.tv/.well-known/nuvio)"
+
+          nuvio_backend_url="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["backend_url"])')"
+          nuvio_publishable_key="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["publishable_key"])')"
+
+          test -n "$nuvio_backend_url"
+          test -n "$nuvio_publishable_key"
+
+          cat >> "$CM_BUILD_DIR/local.properties" <<EOF
+          NUVIO_SUPABASE_URL=$nuvio_backend_url
+          NUVIO_SUPABASE_ANON_KEY=$nuvio_publishable_key
+          NUVIO_SUPABASE_FALLBACK_URL=
+          EOF
+
+          # Run runtime configuration generation separately with full diagnostics.
+          set -o pipefail
+          ./gradlew :composeApp:generateRuntimeConfigs \
+            -Pnuvio.ios.distribution=appstore \
+            --no-daemon --stacktrace --console=plain \
+            2>&1 | tee "$CM_BUILD_DIR/gradle-runtime-config.log"
+
+      - name: Build iOS Simulator .app
+        script: |
+          set -o pipefail
+
+          cd "$CM_BUILD_DIR/iosApp"
+
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -destination "$IOS_SIMULATOR_DESTINATION" \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$CM_BUILD_DIR/xcodebuild-ios-simulator.log"
+
+          build_status=${PIPESTATUS[0]}
+          if [ "$build_status" -ne 0 ]; then
+            echo ""
+            echo "===== Xcode build diagnostics ====="
+            grep -E '(^|[[:space:]])(error:|warning:|fatal error:)' \
+              "$CM_BUILD_DIR/xcodebuild-ios-simulator.log" | tail -n 200 || true
+          fi
+          exit "$build_status"
+
+    artifacts:
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - /tmp/xcodebuild_logs/*.log
+      - xcodebuild-ios-simulator.log
+      - gradle-runtime-config.log

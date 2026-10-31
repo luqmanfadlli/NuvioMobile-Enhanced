@@ -1,6 +1,8 @@
 name: PR Full Debug Build
 
 on:
+  push:
+    branches: ["ci/liquid-glass-builds-restored-20261031"]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [enhanced]
@@ -31,16 +33,48 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Constrain Gradle memory for the hosted Linux runner
+        run: |
+          gradle_user_home="${GRADLE_USER_HOME:-${HOME}/.gradle}"
+          mkdir -p "${gradle_user_home}"
+          {
+            echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=1g -XX:+UseG1GC"
+            echo "kotlin.daemon.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -XX:+UseG1GC"
+            echo "org.gradle.parallel=false"
+            echo "org.gradle.workers.max=2"
+          } >> "${gradle_user_home}/gradle.properties"
+
       - name: Prepare runtime properties
         env:
           LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
         run: |
+          set -euo pipefail
+
           if [ -n "$LOCAL_PROPERTIES_BASE64" ]; then
             printf '%s' "$LOCAL_PROPERTIES_BASE64" | base64 --decode > local.properties
-            sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
           else
             touch local.properties
           fi
+
+          # Keep build configuration, but never use stale SDK, signing-file, or backend URLs.
+          sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE|NUVIO_SUPABASE_URL|NUVIO_SUPABASE_ANON_KEY|NUVIO_SUPABASE_FALLBACK_URL)[[:space:]]*=/d' local.properties
+
+          # Match Codemagic's public backend discovery for email-link sign-in and backend features.
+          discovery_json="$(curl --fail --silent --show-error --location \
+            --retry 3 --connect-timeout 10 --max-time 30 \
+            https://api.nuvio.tv/.well-known/nuvio)"
+
+          nuvio_backend_url="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["backend_url"])')"
+          nuvio_publishable_key="$(printf '%s' "$discovery_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["publishable_key"])')"
+
+          test -n "$nuvio_backend_url"
+          test -n "$nuvio_publishable_key"
+
+          cat >> local.properties <<EOF
+          NUVIO_SUPABASE_URL=$nuvio_backend_url
+          NUVIO_SUPABASE_ANON_KEY=$nuvio_publishable_key
+          NUVIO_SUPABASE_FALLBACK_URL=
+          EOF
 
       - name: Set up Rust
         run: |
