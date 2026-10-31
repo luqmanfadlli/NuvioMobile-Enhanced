@@ -55,10 +55,3 @@ internal fun shouldExposeLiquidGlassSettings(
     composeRendererAvailable: Boolean,
     nativeControlsAvailable: Boolean,
 ): Boolean = composeRendererAvailable || nativeControlsAvailable
-
-internal fun shouldUseNativeLiquidGlassButton(
-    operatingSystemMajorVersion: Long,
-    masterEnabled: Boolean,
-    surfaceEnabled: Boolean,
-    preview: Boolean,
-): Boolean = operatingSystemMajorVersion >= 26L && masterEnabled && surfaceEnabled && !preview
