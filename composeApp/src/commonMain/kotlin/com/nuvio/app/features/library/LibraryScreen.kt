@@ -675,9 +675,9 @@ fun LibraryScreen(
                             LibrarySourceMode.PUBLICMETADB -> stringResource(Res.string.library_publicmetadb_title)
                         }
                     },
-                    // On Cloud, let artwork continue behind the status bar and title.
-                    // A fading scrim preserves white-text contrast without a hard black rectangle.
-                    modifier = if (cloudHeaderBackdropActive) {
+                    // Keep artwork edge-to-edge, but constrain the Saved fade to the title
+                    // header itself so it cannot paint over the Saved/Cloud source-switch pill.
+                    modifier = if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
                         Modifier
                     } else {
                         Modifier.padding(horizontal = 16.dp)
@@ -687,7 +687,11 @@ fun LibraryScreen(
                         savedHeaderScrimEnabled -> savedHeaderScrimBrush
                         else -> null
                     },
-                    contentHorizontalPadding = if (cloudHeaderBackdropActive) 16.dp else 0.dp,
+                    contentHorizontalPadding = if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
+                        16.dp
+                    } else {
+                        0.dp
+                    },
                 )
                 LibrarySourceSwitch(
                     selectedMode = sourceMode,
