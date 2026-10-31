@@ -234,6 +234,17 @@ internal fun librarySavedHeaderUsesGlassScrim(
 ): Boolean = sourceMode == LibraryViewMode.Saved &&
     (librarySurfaceGlassEnabled || savedTypeGlassEnabled || savedSortGlassEnabled)
 
+/** Saved pinned controls must conceal scrolling poster content regardless of Glass settings. */
+internal fun libraryPinnedChromeNeedsOpaqueBackground(sourceMode: LibraryViewMode): Boolean =
+    sourceMode == LibraryViewMode.Saved
+
+/**
+ * Keep the Library source row aligned with Search's field height: the iOS native search field is
+ * 48 dp, while the Compose OutlinedTextField uses Material 3's minimum height.
+ */
+internal fun librarySourceSwitchMinimumHeight(nativeSegmentedControlEnabled: Boolean): Dp =
+    if (nativeSegmentedControlEnabled) 48.dp else OutlinedTextFieldDefaults.MinHeight
+
 /** Keep the Saved scrim clear of the title header's bottom spacing. */
 internal fun librarySavedHeaderScrimBottomInset(scrimEnabled: Boolean): Dp =
     if (scrimEnabled) NuvioTokens.Space.s4 else 0.dp
@@ -641,11 +652,9 @@ fun LibraryScreen(
             }
         }
         CompositionLocalProvider(
-            LocalLiquidGlassBackdrop provides if (anyLibraryGlassEnabled) {
-                if (sourceMode == LibraryViewMode.Saved) libraryContentBackdrop else libraryBackdrop
-            } else {
-                null
-            },
+            // Pinned chrome samples the static screen backdrop, never the scrolling poster list.
+            // The release calendar opts into libraryContentBackdrop explicitly below.
+            LocalLiquidGlassBackdrop provides if (anyLibraryGlassEnabled) libraryBackdrop else null,
             LocalDynamicArtworkBackgroundActive provides (
                 LocalDynamicArtworkBackgroundActive.current || cloudBackgroundActive
             ),
@@ -663,6 +672,13 @@ fun LibraryScreen(
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(
+                        if (libraryPinnedChromeNeedsOpaqueBackground(sourceMode)) {
+                            Modifier.background(MaterialTheme.colorScheme.background)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(LocalVerticalBarPadding.current),
             ) {
                 NuvioScreenHeader(
@@ -698,6 +714,8 @@ fun LibraryScreen(
                         0.dp
                     },
                 )
+                // Match SearchScreen's title-to-control spacing and trailing breathing room.
+                Spacer(modifier = Modifier.height(6.dp))
                 LibrarySourceSwitch(
                     selectedMode = sourceMode,
                     showServers = hasServers,
@@ -781,7 +799,7 @@ fun LibraryScreen(
                     }
                     },
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
         }
 
@@ -983,7 +1001,7 @@ fun LibraryScreen(
             if (hasSavedControls) {
                 val savedControlsGlassTextEnabled = savedTypeGlassEnabled || savedSortGlassEnabled
                 CompositionLocalProvider(
-                    LocalLiquidGlassBackdrop provides libraryContentBackdrop,
+                    LocalLiquidGlassBackdrop provides libraryBackdrop,
                 ) {
                     LiquidGlassTextContrastScope(enabled = savedControlsGlassTextEnabled) {
                     Box(
@@ -993,14 +1011,14 @@ fun LibraryScreen(
                             .offset(y = libraryToolbarHeight)
                             .height(savedControlsInset),
                     ) {
-                        if (!savedTypeGlassEnabled && !savedSortGlassEnabled) {
-                            Box(
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .background(MaterialTheme.colorScheme.background)
-                                    .nuvioConsumePointerEvents(),
-                            )
-                        }
+                        // Keep an opaque backing behind pinned filters even when either
+                        // filter uses Liquid Glass; the glass then samples the screen, not posters.
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(MaterialTheme.colorScheme.background)
+                                .nuvioConsumePointerEvents(),
+                        )
                         LibrarySavedControls(
                             layoutMode = displaySettings.layoutMode,
                             sourceMode = uiState.sourceMode,
@@ -1429,7 +1447,9 @@ internal fun LibrarySourceSwitch(
 
     LiquidGlassTextContrastScope(enabled = sourceSwitchGlassEnabled) {
         Row(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = librarySourceSwitchMinimumHeight(nativeSegmentedControlEnabled)),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

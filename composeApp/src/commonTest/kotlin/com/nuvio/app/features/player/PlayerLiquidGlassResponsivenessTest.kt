@@ -2,7 +2,7 @@ package com.nuvio.app.features.player
 
 import com.nuvio.app.core.ui.glass.LiquidGlassSurface
 import com.nuvio.app.core.ui.glass.LiquidGlassSurfaceOverrides
-import com.nuvio.app.features.settings.surfacePreviewRecipe
+import com.nuvio.app.core.ui.glass.liquidGlassSurfaceRecipe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -93,7 +93,7 @@ class PlayerLiquidGlassResponsivenessTest {
     fun previewUsesTheSameDefaultBlurAsTheLivePlayer() {
         assertEquals(
             PlayerGlassBlur.value,
-            surfacePreviewRecipe(LiquidGlassSurface.PLAYER, LiquidGlassSurfaceOverrides()).blurRadiusDp,
+            liquidGlassSurfaceRecipe(LiquidGlassSurface.PLAYER, LiquidGlassSurfaceOverrides()).blurRadiusDp,
         )
         assertTrue(PlayerGlassBackdropOpacity >= 0.85f)
     }

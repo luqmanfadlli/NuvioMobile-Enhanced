@@ -1,6 +1,7 @@
 package com.nuvio.app.features.library
 
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.nuvio.app.core.ui.glass.LiquidGlassSurface
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -129,6 +130,13 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
+    fun savedPinnedChromeKeepsItsOpaqueBackdropWhileCloudKeepsItsArtworkBackdrop() {
+        assertTrue(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Saved))
+        assertFalse(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Cloud))
+        assertFalse(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Servers))
+    }
+
+    @Test
     fun savedFilterOverlayReservesInitialListSpaceWheneverControlsAreVisible() {
         assertFalse(
             librarySavedControlsNeedContentInset(
@@ -139,6 +147,18 @@ class LibraryGlassLayoutTest {
             librarySavedControlsNeedContentInset(
                 hasSavedControls = true,
             ),
+        )
+    }
+
+    @Test
+    fun librarySourceSwitchMatchesSearchControlHeightOnNativeAndComposePaths() {
+        assertEquals(
+            48.dp,
+            librarySourceSwitchMinimumHeight(nativeSegmentedControlEnabled = true),
+        )
+        assertEquals(
+            OutlinedTextFieldDefaults.MinHeight,
+            librarySourceSwitchMinimumHeight(nativeSegmentedControlEnabled = false),
         )
     }
 
