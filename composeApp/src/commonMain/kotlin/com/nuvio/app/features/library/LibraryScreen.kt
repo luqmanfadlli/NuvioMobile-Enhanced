@@ -709,11 +709,9 @@ fun LibraryScreen(
                                 Modifier.liquidGlassForSurface(
                                     surface = LiquidGlassSurface.LIBRARY,
                                     shape = shape,
-                                    // Use the contrasting theme colour for the glass film. The Saved page
-                                    // can sit over an AMOLED-black canvas, where a surface-coloured tint
-                                    // makes this capsule read as a solid black pill instead of glass.
-                                    // liquidGlassForSurface still applies the saved per-surface tint opacity.
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    // Apple-like capsule material: show the wallpaper while keeping
+                                    // a restrained tint, soft edge and legible selected segment.
+                                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
                                     fallback = MaterialTheme.nuvio.colors.surfaceCard,
                                     blurRadius = 12.dp,
                                     refractionHeight = 6.dp,
