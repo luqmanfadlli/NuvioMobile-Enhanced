@@ -659,9 +659,11 @@ fun LibraryScreen(
             }
         }
         CompositionLocalProvider(
-            // Non-Saved Library surfaces use the static screen backdrop. Saved pinned controls
-            // opt into the scrolling content capture locally; the release calendar does so below.
-            LocalLiquidGlassBackdrop provides if (anyLibraryGlassEnabled) libraryBackdrop else null,
+            // Saved pinned glass controls sample the scrolling content beneath them; other modes
+            // retain the static screen backdrop. The release calendar uses its own scoped capture.
+            LocalLiquidGlassBackdrop provides if (
+                libraryPinnedChromeUsesContentBackdrop(sourceMode, anyLibraryGlassEnabled)
+            ) libraryContentBackdrop else if (anyLibraryGlassEnabled) libraryBackdrop else null,
             LocalDynamicArtworkBackgroundActive provides (
                 LocalDynamicArtworkBackgroundActive.current || cloudBackgroundActive
             ),
@@ -722,95 +724,89 @@ fun LibraryScreen(
                 )
                 // Keep the source pill close to the Library title.
                 Spacer(modifier = Modifier.height(4.dp))
-                CompositionLocalProvider(
-                    LocalLiquidGlassBackdrop provides if (
-                        libraryPinnedChromeUsesContentBackdrop(sourceMode, libraryGlassEnabled)
-                    ) libraryContentBackdrop else libraryBackdrop,
-                ) {
-                        LibrarySourceSwitch(
-                        selectedMode = sourceMode,
-                        showServers = hasServers,
-                        onModeSelected = { mode ->
-                            sourceModeName = mode.name
-                        },
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .then(
-                                if (libraryGlassEnabled) {
-                                    val shape = liquidGlassShape(LiquidGlassSurface.LIBRARY, RoundedCornerShape(50.dp))
-                                    Modifier.liquidGlassForSurface(
-                                        surface = LiquidGlassSurface.LIBRARY,
-                                        shape = shape,
-                                        // Apple-like capsule material: show the wallpaper while keeping
-                                        // a restrained tint, soft edge and legible selected segment.
-                                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
-                                        fallback = MaterialTheme.nuvio.colors.surfaceCard,
-                                        blurRadius = 12.dp,
-                                        refractionHeight = 6.dp,
-                                        refractionAmount = 9.dp,
-                                    ).border(
-                                        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                                        shape,
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            ),
-                        trailingActions = {
-                        if (sourceMode == LibraryViewMode.Saved) {
-                            LibraryListManagementButton()
-                            val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
-                                LibraryLayoutMode.VERTICAL
+                LibrarySourceSwitch(
+                    selectedMode = sourceMode,
+                    showServers = hasServers,
+                    onModeSelected = { mode ->
+                        sourceModeName = mode.name
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .then(
+                            if (libraryGlassEnabled) {
+                                val shape = liquidGlassShape(LiquidGlassSurface.LIBRARY, RoundedCornerShape(50.dp))
+                                Modifier.liquidGlassForSurface(
+                                    surface = LiquidGlassSurface.LIBRARY,
+                                    shape = shape,
+                                    // Apple-like capsule material: show the wallpaper while keeping
+                                    // a restrained tint, soft edge and legible selected segment.
+                                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
+                                    fallback = MaterialTheme.nuvio.colors.surfaceCard,
+                                    blurRadius = 12.dp,
+                                    refractionHeight = 6.dp,
+                                    refractionAmount = 9.dp,
+                                ).border(
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
+                                    shape,
+                                )
                             } else {
-                                LibraryLayoutMode.HORIZONTAL
-                            }
-                            IconButton(
-                                onClick = {
-                                    LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
-                                },
-                            ) {
-                                Crossfade(
-                                    targetState = targetLayout,
-                                    animationSpec = tween(durationMillis = 140),
-                                    label = "libraryLayoutAction",
-                                ) { animatedTargetLayout ->
-                                    Icon(
-                                        imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                            Icons.Rounded.GridView
-                                        } else {
-                                            Icons.Rounded.ViewAgenda
-                                        },
-                                        contentDescription = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                            stringResource(Res.string.library_layout_show_vertical)
-                                        } else {
-                                            stringResource(Res.string.library_layout_show_horizontal)
-                                        },
-                                        tint = liquidGlassIconTint(LiquidGlassSurface.LIBRARY, MaterialTheme.colorScheme.onSurfaceVariant),
-                                    )
-                                }
-                            }
+                                Modifier
+                            },
+                        ),
+                    trailingActions = {
+                    if (sourceMode == LibraryViewMode.Saved) {
+                        LibraryListManagementButton()
+                        val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
+                            LibraryLayoutMode.VERTICAL
+                        } else {
+                            LibraryLayoutMode.HORIZONTAL
                         }
-                        if (sourceMode == LibraryViewMode.Saved) {
-                            val openCalendarLabel = stringResource(Res.string.library_calendar_open)
-                            IconButton(
-                                onClick = { showReleaseCalendar = true },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .semantics { contentDescription = openCalendarLabel },
-                            ) {
-                                LibraryCalendarGlyph(
-                                    modifier = Modifier.size(19.dp),
+                        IconButton(
+                            onClick = {
+                                LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
+                            },
+                        ) {
+                            Crossfade(
+                                targetState = targetLayout,
+                                animationSpec = tween(durationMillis = 140),
+                                label = "libraryLayoutAction",
+                            ) { animatedTargetLayout ->
+                                Icon(
+                                    imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
+                                        Icons.Rounded.GridView
+                                    } else {
+                                        Icons.Rounded.ViewAgenda
+                                    },
+                                    contentDescription = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
+                                        stringResource(Res.string.library_layout_show_vertical)
+                                    } else {
+                                        stringResource(Res.string.library_layout_show_horizontal)
+                                    },
                                     tint = liquidGlassIconTint(LiquidGlassSurface.LIBRARY, MaterialTheme.colorScheme.onSurfaceVariant),
-                                    cutoutColor = MaterialTheme.colorScheme.background,
                                 )
                             }
                         }
-                        if (onDownloadsClick != null) {
-                            LibraryDownloadsButton(onClick = onDownloadsClick)
-                        }
-                        },
-                    )
                     }
+                    if (sourceMode == LibraryViewMode.Saved) {
+                        val openCalendarLabel = stringResource(Res.string.library_calendar_open)
+                        IconButton(
+                            onClick = { showReleaseCalendar = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .semantics { contentDescription = openCalendarLabel },
+                        ) {
+                            LibraryCalendarGlyph(
+                                modifier = Modifier.size(19.dp),
+                                tint = liquidGlassIconTint(LiquidGlassSurface.LIBRARY, MaterialTheme.colorScheme.onSurfaceVariant),
+                                cutoutColor = MaterialTheme.colorScheme.background,
+                            )
+                        }
+                    }
+                    if (onDownloadsClick != null) {
+                        LibraryDownloadsButton(onClick = onDownloadsClick)
+                    }
+                    },
+                )
                 Spacer(modifier = Modifier.height(14.dp))
             }
         }
