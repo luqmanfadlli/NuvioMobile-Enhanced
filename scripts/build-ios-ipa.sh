@@ -71,7 +71,7 @@ while true; do
     fi
 
     if (( xcodebuild_attempt >= max_xcodebuild_attempts )) ||
-        ! grep -Eq 'failed downloading .*badResponseStatusCode\\(5[0-9]{2}\\)' "${xcodebuild_log}"; then
+        ! grep -Eq 'failed downloading .*badResponseStatusCode\(5[0-9]{2}\)' "${xcodebuild_log}"; then
         exit "${build_status}"
     fi
 
