@@ -137,6 +137,34 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
+    fun savedPinnedGlassChromeUsesScrollingContentBackdropOnlyInSavedMode() {
+        assertTrue(
+            libraryPinnedChromeUsesContentBackdrop(
+                sourceMode = LibraryViewMode.Saved,
+                glassEnabled = true,
+            ),
+        )
+        assertFalse(
+            libraryPinnedChromeUsesContentBackdrop(
+                sourceMode = LibraryViewMode.Saved,
+                glassEnabled = false,
+            ),
+        )
+        assertFalse(
+            libraryPinnedChromeUsesContentBackdrop(
+                sourceMode = LibraryViewMode.Cloud,
+                glassEnabled = true,
+            ),
+        )
+        assertFalse(
+            libraryPinnedChromeUsesContentBackdrop(
+                sourceMode = LibraryViewMode.Servers,
+                glassEnabled = true,
+            ),
+        )
+    }
+
+    @Test
     fun savedFilterOverlayReservesInitialListSpaceWheneverControlsAreVisible() {
         assertFalse(
             librarySavedControlsNeedContentInset(
