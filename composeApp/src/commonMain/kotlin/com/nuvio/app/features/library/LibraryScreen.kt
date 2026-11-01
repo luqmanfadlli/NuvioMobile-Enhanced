@@ -222,6 +222,10 @@ internal fun libraryContentTopPadding(
     savedControlsInset: Dp,
 ): Dp = headerHeight + if (hasSavedControls) savedControlsInset else 0.dp
 
+/** Only the Saved title header needs an opaque backing beneath its fading scrim. */
+internal fun libraryTitleHeaderNeedsOpaqueBackground(sourceMode: LibraryViewMode): Boolean =
+    sourceMode == LibraryViewMode.Saved
+
 internal fun libraryHeaderUsesArtworkBackdrop(
     sourceMode: LibraryViewMode,
     artworkBackgroundActive: Boolean,
@@ -687,11 +691,17 @@ fun LibraryScreen(
                     },
                     // Keep artwork edge-to-edge, but constrain the Saved fade to the title
                     // header itself so it cannot paint over the Saved/Cloud source-switch pill.
-                    modifier = if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
+                    modifier = (if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
                         Modifier
                     } else {
                         Modifier.padding(horizontal = 16.dp)
-                    },
+                    }).then(
+                        if (savedHeaderScrimEnabled && libraryTitleHeaderNeedsOpaqueBackground(sourceMode)) {
+                            Modifier.background(MaterialTheme.colorScheme.background)
+                        } else {
+                            Modifier
+                        },
+                    ),
                     backgroundBrushOverride = when {
                         cloudHeaderBackdropActive -> cloudHeaderBackgroundBrush
                         savedHeaderScrimEnabled -> savedHeaderScrimBrush

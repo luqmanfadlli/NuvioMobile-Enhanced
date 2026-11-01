@@ -130,6 +130,13 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
+    fun savedTitleHeaderKeepsItsOpaqueBackingScopedToTheTitle() {
+        assertTrue(libraryTitleHeaderNeedsOpaqueBackground(LibraryViewMode.Saved))
+        assertFalse(libraryTitleHeaderNeedsOpaqueBackground(LibraryViewMode.Cloud))
+        assertFalse(libraryTitleHeaderNeedsOpaqueBackground(LibraryViewMode.Servers))
+    }
+
+    @Test
     fun savedFilterOverlayReservesInitialListSpaceWheneverControlsAreVisible() {
         assertFalse(
             librarySavedControlsNeedContentInset(
