@@ -235,10 +235,6 @@ internal fun librarySavedHeaderUsesGlassScrim(
 ): Boolean = sourceMode == LibraryViewMode.Saved &&
     (librarySurfaceGlassEnabled || savedTypeGlassEnabled || savedSortGlassEnabled)
 
-/** Saved pinned controls must conceal scrolling poster content regardless of Glass settings. */
-internal fun libraryPinnedChromeNeedsOpaqueBackground(sourceMode: LibraryViewMode): Boolean =
-    sourceMode == LibraryViewMode.Saved
-
 /**
  * Keep the Library source row aligned with Search's field height: the iOS native search field is
  * 48 dp, while the Compose OutlinedTextField uses Material 3's minimum height.
@@ -673,13 +669,6 @@ fun LibraryScreen(
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (libraryPinnedChromeNeedsOpaqueBackground(sourceMode)) {
-                            Modifier.background(MaterialTheme.colorScheme.background)
-                        } else {
-                            Modifier
-                        },
-                    )
                     .padding(LocalVerticalBarPadding.current),
             ) {
                 NuvioScreenHeader(

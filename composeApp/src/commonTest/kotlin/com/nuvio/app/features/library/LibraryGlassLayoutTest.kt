@@ -130,13 +130,6 @@ class LibraryGlassLayoutTest {
     }
 
     @Test
-    fun savedPinnedChromeKeepsItsOpaqueBackdropWhileCloudKeepsItsArtworkBackdrop() {
-        assertTrue(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Saved))
-        assertFalse(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Cloud))
-        assertFalse(libraryPinnedChromeNeedsOpaqueBackground(LibraryViewMode.Servers))
-    }
-
-    @Test
     fun savedFilterOverlayReservesInitialListSpaceWheneverControlsAreVisible() {
         assertFalse(
             librarySavedControlsNeedContentInset(
