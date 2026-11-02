@@ -102,6 +102,7 @@ internal object LiquidGlassEffectDefaults {
 
 private val liquidGlassSettingsJson = Json {
     ignoreUnknownKeys = true
+    encodeDefaults = true
 }
 
 internal fun encodeLiquidGlassEffectSettings(

@@ -3,6 +3,7 @@ package com.nuvio.app.core.storage
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import com.nuvio.app.features.profiles.MAX_PROFILES
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watchprogress.CachedNextUpItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
@@ -39,6 +40,52 @@ class LocalAccountDataCleanerTest {
     fun clearState() {
         ContinueWatchingEnrichmentCache.clearLocalState()
         preferences.edit().clear().commit()
+    }
+
+    @Test
+    fun profileBackgroundCleanupAttemptsBothImagesForEveryProfileAfterRemovalFailure() {
+        val attemptedSettingsProfiles = mutableListOf<Int>()
+        val attemptedCloudProfiles = mutableListOf<Int>()
+
+        val allRemoved = clearProfileBackgroundImages(
+            profileIndices = 1..MAX_PROFILES,
+            removeSettingsImage = { profileIndex ->
+                attemptedSettingsProfiles += profileIndex
+                profileIndex != 2
+            },
+            removeCloudImage = { profileIndex ->
+                attemptedCloudProfiles += profileIndex
+                profileIndex != 3
+            },
+        )
+
+        assertEquals((1..MAX_PROFILES).toList(), attemptedSettingsProfiles)
+        assertEquals((1..MAX_PROFILES).toList(), attemptedCloudProfiles)
+        assertFalse(allRemoved)
+    }
+
+    @Test
+    fun profileBackgroundCleanupContinuesBothImageTypesWhenRemovalThrows() {
+        val attemptedSettingsProfiles = mutableListOf<Int>()
+        val attemptedCloudProfiles = mutableListOf<Int>()
+
+        val allRemoved = clearProfileBackgroundImages(
+            profileIndices = 1..MAX_PROFILES,
+            removeSettingsImage = { profileIndex ->
+                attemptedSettingsProfiles += profileIndex
+                check(profileIndex != 2) { "simulated Settings background removal failure" }
+                true
+            },
+            removeCloudImage = { profileIndex ->
+                attemptedCloudProfiles += profileIndex
+                check(profileIndex != 3) { "simulated Cloud Library background removal failure" }
+                true
+            },
+        )
+
+        assertEquals((1..MAX_PROFILES).toList(), attemptedSettingsProfiles)
+        assertEquals((1..MAX_PROFILES).toList(), attemptedCloudProfiles)
+        assertFalse(allRemoved)
     }
 
     @Test

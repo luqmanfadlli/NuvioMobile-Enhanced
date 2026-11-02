@@ -1,6 +1,7 @@
 package com.nuvio.app.core.ui
 
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -21,3 +22,8 @@ internal actual fun NuvioNativeModalBottomSheet(
 ) = Unit
 
 internal actual fun dismissNativeNuvioBottomSheet() = Unit
+
+@Composable
+internal actual fun NuvioSystemBackHandler(enabled: Boolean, onBack: () -> Unit) {
+    BackHandler(enabled = enabled, onBack = onBack)
+}

@@ -70,6 +70,8 @@ internal actual object PlatformLocalAccountDataCleaner {
         "pending_watch_progress_source",
         "collection_mobile_settings_payload",
         "collections_payload",
+        "enhanced_local_liquid_glass_effects",
+        "enhanced_local_liquid_glass_surface_settings",
     )
 
     actual fun wipe() {

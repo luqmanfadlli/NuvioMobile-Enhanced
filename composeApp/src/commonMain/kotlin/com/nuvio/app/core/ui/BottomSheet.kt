@@ -20,6 +20,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,50 +41,95 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.glass.LiquidGlassSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
 import com.nuvio.app.core.ui.glass.NuvioBackdrop
+import com.nuvio.app.core.ui.glass.isLiquidGlassAvailable
 import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
-import com.nuvio.app.core.ui.glass.liquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfacePreferenceEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 
 private val SheetShape = RoundedCornerShape(NuvioTokens.Space.s28)
 
 // Keep the sheet background treatment consistent between the sheet and pinned content inside it.
+@Composable
 internal fun Modifier.nuvioSheetSurface(
     backdrop: NuvioBackdrop?,
     shape: Shape,
     containerColor: Color,
     withHighlight: Boolean = true,
+    preview: Boolean = false,
 ): Modifier {
-    val readyBackdrop = backdrop?.takeIf { it.isReady && isLiquidGlassSupported() }
-    return liquidGlassSurface(
-        backdrop = readyBackdrop,
-        shape = shape,
+    val surfaceGlassEnabled = isLiquidGlassSurfaceEffectivelyEnabled(
+        LiquidGlassSurface.BOTTOM_SHEETS,
+        preview = preview,
+    ) && (preview || isLiquidGlassSupported())
+    val readyBackdrop = backdrop?.takeIf { it.isReady && surfaceGlassEnabled }
+    val effectiveShape = liquidGlassShape(
+        surface = LiquidGlassSurface.BOTTOM_SHEETS,
+        defaultShape = shape,
+        preview = preview,
+    )
+    return liquidGlassForSurface(
+        surface = LiquidGlassSurface.BOTTOM_SHEETS,
+        shape = effectiveShape,
         tint = containerColor.copy(alpha = containerColor.alpha * 0.65f),
         fallback = containerColor,
         blurRadius = 24.dp,
         refractionHeight = 16.dp,
         refractionAmount = 32.dp,
         withHighlight = withHighlight,
+        explicitBackdrop = readyBackdrop,
+        useExplicitBackdrop = true,
+        preview = preview,
     )
 }
 
 @Stable
 class NuvioSheetBackdrop(val backdrop: NuvioBackdrop) {
     var activeSheets by mutableIntStateOf(0)
+    var activeGlassPreviews by mutableIntStateOf(0)
 }
 
 val LocalNuvioSheetBackdrop = staticCompositionLocalOf<NuvioSheetBackdrop?> { null }
+
+internal fun shouldCaptureNuvioSheetBackdrop(
+    platformSupported: Boolean,
+    masterEnabled: Boolean,
+    needsPreviewBackdrop: Boolean,
+    needsSheetGlassBackdrop: Boolean,
+): Boolean = platformSupported && (needsPreviewBackdrop || (masterEnabled && needsSheetGlassBackdrop))
 
 @Composable
 fun NuvioSheetBackdropHost(
     sheetBackdrop: NuvioSheetBackdrop,
     content: @Composable () -> Unit,
 ) {
+    val needsPreviewBackdrop = sheetBackdrop.activeGlassPreviews > 0
+    val needsSheetGlassBackdrop = sheetBackdrop.activeSheets > 0 &&
+        isLiquidGlassSurfacePreferenceEnabled(LiquidGlassSurface.BOTTOM_SHEETS)
     CompositionLocalProvider(LocalNuvioSheetBackdrop provides sheetBackdrop) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (sheetBackdrop.activeSheets > 0 && isLiquidGlassSupported()) Modifier.nuvioBackdropSource(sheetBackdrop.backdrop) else Modifier),
+                .then(
+                    if (
+                        shouldCaptureNuvioSheetBackdrop(
+                            platformSupported = isLiquidGlassAvailable(),
+                            masterEnabled = LiquidGlassSettings.enabled,
+                            needsPreviewBackdrop = needsPreviewBackdrop,
+                            needsSheetGlassBackdrop = needsSheetGlassBackdrop,
+                        )
+                    ) {
+                        Modifier.nuvioBackdropSource(sheetBackdrop.backdrop)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             content()
         }
@@ -100,6 +146,7 @@ fun NuvioModalBottomSheet(
     contentColor: Color = MaterialTheme.nuvio.colors.textPrimary,
     showDragHandle: Boolean = true,
     fullHeight: Boolean = false,
+    dismissOnBackPress: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (usesNativeNuvioBottomSheet) {
@@ -115,13 +162,21 @@ fun NuvioModalBottomSheet(
     } else {
         val tokens = MaterialTheme.nuvio
         val sheetBackdrop = LocalNuvioSheetBackdrop.current
-        if (sheetBackdrop != null) {
+        val sheetGlassEnabled = LiquidGlassSettings.enabled &&
+            isLiquidGlassSupported() &&
+            isLiquidGlassSurfacePreferenceEnabled(LiquidGlassSurface.BOTTOM_SHEETS)
+        if (sheetBackdrop != null && sheetGlassEnabled) {
             DisposableEffect(sheetBackdrop) {
                 sheetBackdrop.activeSheets += 1
                 onDispose { sheetBackdrop.activeSheets -= 1 }
             }
         }
-        val sheetGlassReady = sheetBackdrop != null && sheetBackdrop.backdrop.isReady && isLiquidGlassSupported()
+        val sheetGlassReady = sheetBackdrop != null && sheetBackdrop.backdrop.isReady && sheetGlassEnabled
+        val effectiveSheetShape = if (sheetGlassEnabled) {
+            liquidGlassShape(LiquidGlassSurface.BOTTOM_SHEETS, SheetShape)
+        } else {
+            SheetShape
+        }
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
@@ -130,23 +185,26 @@ fun NuvioModalBottomSheet(
             contentColor = contentColor,
             scrimColor = tokens.colors.overlayScrim,
             dragHandle = null,
+            properties = ModalBottomSheetProperties(shouldDismissOnBackPress = dismissOnBackPress),
         ) {
             CompositionLocalProvider(LocalBottomInsetsConsumed provides true) {
                 Column(
                     modifier = modifier
                         .padding(NuvioTokens.Space.s10)
-                        .clip(SheetShape)
                         .nuvioSheetSurface(
                             backdrop = sheetBackdrop?.backdrop,
                             shape = SheetShape,
                             containerColor = containerColor,
                         )
-                        .then(if (sheetGlassReady) Modifier else Modifier.border(tokens.borders.thin, SurfaceEdge, SheetShape)),
+                        .then(if (sheetGlassReady) Modifier else Modifier.border(tokens.borders.thin, SurfaceEdge, effectiveSheetShape)),
                 ) {
                     if (showDragHandle) {
                         NuvioBottomSheetDragHandle(Modifier.align(Alignment.CenterHorizontally))
                     }
-                    content()
+                    val sheetContentScope = this
+                    LiquidGlassTextContrastScope(enabled = sheetGlassEnabled, surface = LiquidGlassSurface.BOTTOM_SHEETS) {
+                        content.invoke(sheetContentScope)
+                    }
                 }
             }
         }

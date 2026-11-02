@@ -11,6 +11,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,6 +21,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.uikit.LocalUIViewController
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.window.ComposeUIViewController
+import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
+import platform.Foundation.NSProcessInfo
 import platform.UIKit.UIAdaptivePresentationControllerDelegateProtocol
 import platform.UIKit.UIColor
 import platform.UIKit.UIModalPresentationPageSheet
@@ -34,7 +43,7 @@ internal actual val usesNativeNuvioBottomSheet: Boolean = true
 private var activeNativeBottomSheet: UIViewController? = null
 private var activeNativeBottomSheetDelegate: NuvioNativeBottomSheetDelegate? = null
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalForeignApi::class)
 @Composable
 internal actual fun NuvioNativeModalBottomSheet(
     onDismissRequest: () -> Unit,
@@ -46,9 +55,17 @@ internal actual fun NuvioNativeModalBottomSheet(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val parentViewController = LocalUIViewController.current
+    val sheetBackdrop = LocalNuvioSheetBackdrop.current
     val latestContent = rememberUpdatedState(content)
     val latestOnDismissRequest = rememberUpdatedState(onDismissRequest)
-    val latestContainerColor = rememberUpdatedState(containerColor)
+    val usesNativeLiquidGlassSheetBackground = shouldUseNativeLiquidGlassSheetBackground(
+        operatingSystemMajorVersion = NSProcessInfo.processInfo.operatingSystemVersion.useContents { majorVersion.toLong() },
+        surfaceGlassEnabled = isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.BOTTOM_SHEETS),
+    )
+    val latestContainerColor = rememberUpdatedState(
+        if (usesNativeLiquidGlassSheetBackground) Color.Transparent else containerColor,
+    )
+    val nativeSheetController = remember { mutableStateOf<UIViewController?>(null) }
     val latestContentColor = rememberUpdatedState(contentColor)
     val latestModifier = rememberUpdatedState(modifier)
     val colorScheme = MaterialTheme.colorScheme
@@ -71,9 +88,18 @@ internal actual fun NuvioNativeModalBottomSheet(
     val latestDensity = rememberUpdatedState(density)
     val latestRippleConfiguration = rememberUpdatedState(rippleConfiguration)
 
+    SideEffect {
+        nativeSheetController.value?.view?.apply {
+            backgroundColor = latestContainerColor.value.toUIColor()
+            opaque = latestContainerColor.value.alpha >= 1f
+        }
+    }
+
     DisposableEffect(parentViewController) {
         val contentController = ComposeUIViewController {
             CompositionLocalProvider(
+                LocalNuvioSheetBackdrop provides sheetBackdrop,
+                LocalLiquidGlassBackdrop provides sheetBackdrop?.backdrop,
                 LocalDensity provides Density(
                     density = latestDensity.value.density,
                     fontScale = latestDensity.value.fontScale,
@@ -107,6 +133,7 @@ internal actual fun NuvioNativeModalBottomSheet(
         val sheetController = contentController
         sheetController.modalPresentationStyle = UIModalPresentationPageSheet
         sheetController.view.backgroundColor = latestContainerColor.value.toUIColor()
+        sheetController.view.opaque = latestContainerColor.value.alpha >= 1f
         (sheetController.presentationController() as? UISheetPresentationController)?.apply {
             if (fullHeight) {
                 detents = listOf(UISheetPresentationControllerDetent.largeDetent())
@@ -135,6 +162,7 @@ internal actual fun NuvioNativeModalBottomSheet(
             completion = null,
         )
         activeNativeBottomSheet = sheetController
+        nativeSheetController.value = sheetController
         activeNativeBottomSheetDelegate = dismissalDelegate
         parentViewController.presentViewController(
             viewControllerToPresent = sheetController,
@@ -147,6 +175,9 @@ internal actual fun NuvioNativeModalBottomSheet(
                 activeNativeBottomSheet = null
                 activeNativeBottomSheetDelegate = null
             }
+            if (nativeSheetController.value === sheetController) {
+                nativeSheetController.value = null
+            }
             if (sheetController.presentingViewController != null) {
                 sheetController.dismissViewControllerAnimated(
                     flag = true,
@@ -155,6 +186,11 @@ internal actual fun NuvioNativeModalBottomSheet(
             }
         }
     }
+}
+
+@Composable
+internal actual fun NuvioSystemBackHandler(enabled: Boolean, onBack: () -> Unit) {
+    // iOS uses the native sheet's dismissal gesture instead of Android system Back.
 }
 
 internal actual fun dismissNativeNuvioBottomSheet() {

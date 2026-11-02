@@ -99,6 +99,27 @@ class LiquidGlassEffectSettingsTest {
     }
 
     @Test
+    fun explicitFalseOptionalSourcesRoundTripAgainstTrueGroupDefaults() {
+        val defaults = LiquidGlassEffectDefaults.selectionLens
+        val settings = defaults.copy(affectTabIcons = false, affectFloatingBar = true)
+
+        val encoded = encodeLiquidGlassEffectSettings(
+            settings,
+            defaults,
+            LiquidGlassEffectDefaults.selectionLensLimits,
+        )
+
+        assertEquals(
+            settings,
+            decodeLiquidGlassEffectSettings(
+                encoded,
+                defaults,
+                LiquidGlassEffectDefaults.selectionLensLimits,
+            ),
+        )
+    }
+
+    @Test
     fun malformedPayloadFallsBackToTheGroupDefaults() {
         val defaults = LiquidGlassEffectDefaults.selectionLens
 

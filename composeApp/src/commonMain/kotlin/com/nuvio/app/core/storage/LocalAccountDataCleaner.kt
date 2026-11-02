@@ -35,6 +35,7 @@ import com.nuvio.app.features.profiles.MAX_PROFILES
 import com.nuvio.app.features.search.SearchRepository
 import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.streams.StreamContextStore
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamLaunchStore
@@ -49,11 +50,53 @@ import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import com.nuvio.app.features.watched.WatchedRepository
 
+/**
+ * Removes every profile-scoped local Liquid Glass background even if one file cannot be deleted.
+ * Attempts both image types for every profile and reports incomplete cleanup to the caller.
+ */
+internal fun clearProfileBackgroundImages(
+    profileIndices: IntRange,
+    removeSettingsImage: (Int) -> Boolean,
+    removeCloudImage: (Int) -> Boolean,
+): Boolean {
+    var allRemoved = true
+    for (profileIndex in profileIndices) {
+        val settingsRemoved = try {
+            removeSettingsImage(profileIndex)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+        val cloudRemoved = try {
+            removeCloudImage(profileIndex)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+        if (!settingsRemoved || !cloudRemoved) allRemoved = false
+    }
+    return allRemoved
+}
+
 internal object LocalAccountDataCleaner {
     suspend fun wipe(accountUserId: String? = null) {
         val cleanupUserId = accountUserId
             ?.takeIf { it.isNotBlank() }
             ?: (AuthRepository.state.value as? AuthState.Authenticated)?.userId
+        val profileBackgroundImagesRemoved = withContext(Dispatchers.IO) {
+            clearProfileBackgroundImages(
+                profileIndices = 1..MAX_PROFILES,
+                removeSettingsImage = { profileIndex ->
+                    ThemeSettingsStorage.clearCustomSettingsBackgroundImage(profileIndex)
+                },
+                removeCloudImage = { profileIndex ->
+                    ThemeSettingsStorage.clearCustomLibraryCloudBackgroundImage(profileIndex)
+                },
+            )
+        }
+
         var profileAuthenticationCleanupFailed = false
         (1..MAX_PROFILES).forEach { profileIndex ->
             val removed = try {
@@ -125,8 +168,8 @@ internal object LocalAccountDataCleaner {
         StreamLaunchStore.clear()
         StreamContextStore.clear()
 
-        if (profileAuthenticationCleanupFailed) {
-            throw IllegalStateException("Local profile authentication cleanup could not be confirmed")
+        if (!profileBackgroundImagesRemoved || profileAuthenticationCleanupFailed) {
+            throw IllegalStateException("Local profile data cleanup could not be confirmed")
         }
     }
 
