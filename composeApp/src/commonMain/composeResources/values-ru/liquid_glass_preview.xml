@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">АКТЁРЫ И СЪЁМОЧНАЯ ГРУППА</string>
+    <string name="settings_liquid_glass_preview_choose_source">Выберите источник для начала воспроизведения</string>
+    <string name="settings_liquid_glass_preview_available_streams">ДОСТУПНЫЕ ПОТОКИ</string>
+    <string name="settings_liquid_glass_preview_seasons_header">СЕЗОНЫ</string>
+    <string name="settings_nav_bar_glass_blur_radius">Радиус размытия</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Хроматическая аберрация</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Добавляет лёгкие цветные контуры вокруг преломлённых краёв.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Радиус углов</string>
+    <string name="settings_nav_bar_glass_depth_effect">Эффект глубины</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Добавляет затенение глубины преломлённой поверхности.</string>
+    <string name="settings_nav_bar_glass_highlight">Подсветка края</string>
+    <string name="settings_nav_bar_glass_material_clear">Прозрачный</string>
+    <string name="settings_nav_bar_glass_material_frosted">Матовый</string>
+    <string name="settings_nav_bar_glass_material_liquid">Жидкий</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Сила преломления</string>
+    <string name="settings_nav_bar_glass_refraction_height">Высота преломления</string>
+    <string name="settings_nav_bar_glass_shadow">Тень</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Непрозрачность оттенка</string>
+    <string name="settings_nav_bar_glass_vibrancy">Насыщенность</string>
+</resources>

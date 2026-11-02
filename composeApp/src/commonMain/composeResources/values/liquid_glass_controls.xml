@@ -1,0 +1,3 @@
+<resources>
+    <string name="settings_liquid_glass_ios_native_description">iOS uses Apple's native Liquid Glass appearance for supported controls, menus and sheets. Blur, tint and refraction tuning is managed by iOS and isn't adjustable here.</string>
+</resources>

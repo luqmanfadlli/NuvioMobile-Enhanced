@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">DISTRIBUTION ET ÉQUIPE</string>
+    <string name="settings_liquid_glass_preview_choose_source">Choisissez une source pour lancer la lecture</string>
+    <string name="settings_liquid_glass_preview_available_streams">SOURCES DISPONIBLES</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SAISONS</string>
+    <string name="settings_nav_bar_glass_blur_radius">Rayon du flou</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberration chromatique</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Ajoute de légères franges colorées autour des bords réfractés.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Rayon des angles</string>
+    <string name="settings_nav_bar_glass_depth_effect">Effet de profondeur</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Ajoute un ombrage de profondeur à la surface réfractée.</string>
+    <string name="settings_nav_bar_glass_highlight">Lumière de bord</string>
+    <string name="settings_nav_bar_glass_material_clear">Transparent</string>
+    <string name="settings_nav_bar_glass_material_frosted">Dépoli</string>
+    <string name="settings_nav_bar_glass_material_liquid">Liquide</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Intensité de réfraction</string>
+    <string name="settings_nav_bar_glass_refraction_height">Hauteur de réfraction</string>
+    <string name="settings_nav_bar_glass_shadow">Ombre</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Opacité de la teinte</string>
+    <string name="settings_nav_bar_glass_vibrancy">Vibrance</string>
+</resources>

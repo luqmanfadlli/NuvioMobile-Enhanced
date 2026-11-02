@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">OBSADA I EKIPA</string>
+    <string name="settings_liquid_glass_preview_choose_source">Wybierz źródło, aby rozpocząć odtwarzanie</string>
+    <string name="settings_liquid_glass_preview_available_streams">DOSTĘPNE ŹRÓDŁA</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEZONY</string>
+    <string name="settings_nav_bar_glass_blur_radius">Promień rozmycia</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberracja chromatyczna</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Dodaje delikatne kolorowe obwódki wokół załamanych krawędzi.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Promień narożników</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efekt głębi</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Dodaje cieniowanie głębi do załamanej powierzchni.</string>
+    <string name="settings_nav_bar_glass_highlight">Podświetlenie krawędzi</string>
+    <string name="settings_nav_bar_glass_material_clear">Przezroczysty</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matowy</string>
+    <string name="settings_nav_bar_glass_material_liquid">Płynny</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Siła załamania</string>
+    <string name="settings_nav_bar_glass_refraction_height">Wysokość załamania</string>
+    <string name="settings_nav_bar_glass_shadow">Cień</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Krycie barwienia</string>
+    <string name="settings_nav_bar_glass_vibrancy">Żywość kolorów</string>
+</resources>

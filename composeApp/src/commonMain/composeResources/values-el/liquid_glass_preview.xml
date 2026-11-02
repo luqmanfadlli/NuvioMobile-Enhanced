@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">ΣΥΝΤΕΛΕΣΤΕΣ ΚΑΙ ΣΥΝΕΡΓΕΙΟ</string>
+    <string name="settings_liquid_glass_preview_choose_source">Επιλέξτε πηγή για να ξεκινήσει η αναπαραγωγή</string>
+    <string name="settings_liquid_glass_preview_available_streams">ΔΙΑΘΕΣΙΜΕΣ ΡΟΕΣ</string>
+    <string name="settings_liquid_glass_preview_seasons_header">ΣΕΖΟΝ</string>
+    <string name="settings_nav_bar_glass_blur_radius">Ακτίνα θολώματος</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Χρωματική εκτροπή</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Προσθέτει διακριτικά χρωματικά περιγράμματα στις διαθλώμενες ακμές.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Ακτίνα γωνίας</string>
+    <string name="settings_nav_bar_glass_depth_effect">Εφέ βάθους</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Προσθέτει σκίαση βάθους στη διαθλώμενη επιφάνεια.</string>
+    <string name="settings_nav_bar_glass_highlight">Τονισμός ακμής</string>
+    <string name="settings_nav_bar_glass_material_clear">Διαυγές</string>
+    <string name="settings_nav_bar_glass_material_frosted">Θαμπό</string>
+    <string name="settings_nav_bar_glass_material_liquid">Ρευστό</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Ένταση διάθλασης</string>
+    <string name="settings_nav_bar_glass_refraction_height">Ύψος διάθλασης</string>
+    <string name="settings_nav_bar_glass_shadow">Σκιά</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Αδιαφάνεια χρωματισμού</string>
+    <string name="settings_nav_bar_glass_vibrancy">Ζωντάνια</string>
+</resources>

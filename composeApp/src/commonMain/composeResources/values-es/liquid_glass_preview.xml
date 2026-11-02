@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">REPARTO Y EQUIPO</string>
+    <string name="settings_liquid_glass_preview_choose_source">Elige una fuente para iniciar la reproducción</string>
+    <string name="settings_liquid_glass_preview_available_streams">FUENTES DISPONIBLES</string>
+    <string name="settings_liquid_glass_preview_seasons_header">TEMPORADAS</string>
+    <string name="settings_nav_bar_glass_blur_radius">Radio de desenfoque</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberración cromática</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Añade ligeros bordes de color alrededor de los bordes refractados.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Radio de esquina</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efecto de profundidad</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Añade sombreado de profundidad a la superficie refractada.</string>
+    <string name="settings_nav_bar_glass_highlight">Resaltado del borde</string>
+    <string name="settings_nav_bar_glass_material_clear">Transparente</string>
+    <string name="settings_nav_bar_glass_material_frosted">Esmerilado</string>
+    <string name="settings_nav_bar_glass_material_liquid">Líquido</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Intensidad de refracción</string>
+    <string name="settings_nav_bar_glass_refraction_height">Altura de refracción</string>
+    <string name="settings_nav_bar_glass_shadow">Sombra</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Opacidad del tinte</string>
+    <string name="settings_nav_bar_glass_vibrancy">Intensidad de color</string>
+</resources>

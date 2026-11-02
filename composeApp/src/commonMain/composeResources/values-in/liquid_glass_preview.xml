@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">PEMERAN DAN KRU</string>
+    <string name="settings_liquid_glass_preview_choose_source">Pilih sumber untuk mulai memutar</string>
+    <string name="settings_liquid_glass_preview_available_streams">STREAM TERSEDIA</string>
+    <string name="settings_liquid_glass_preview_seasons_header">MUSIM</string>
+    <string name="settings_nav_bar_glass_blur_radius">Radius buram</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberasi kromatik</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Menambahkan pinggiran warna halus di sekitar tepi yang dibiaskan.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Radius sudut</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efek kedalaman</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Menambahkan bayangan kedalaman pada permukaan yang dibiaskan.</string>
+    <string name="settings_nav_bar_glass_highlight">Sorotan tepi</string>
+    <string name="settings_nav_bar_glass_material_clear">Jernih</string>
+    <string name="settings_nav_bar_glass_material_frosted">Buram</string>
+    <string name="settings_nav_bar_glass_material_liquid">Cair</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Kekuatan refraksi</string>
+    <string name="settings_nav_bar_glass_refraction_height">Tinggi refraksi</string>
+    <string name="settings_nav_bar_glass_shadow">Bayangan</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Opasitas warna</string>
+    <string name="settings_nav_bar_glass_vibrancy">Vibransi</string>
+</resources>

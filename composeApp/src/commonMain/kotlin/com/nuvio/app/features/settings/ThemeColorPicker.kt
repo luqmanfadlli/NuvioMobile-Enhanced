@@ -68,21 +68,26 @@ internal fun ThemeColorPicker(
     Column(verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4)) {
             colorSwatches.forEach { swatch ->
+                val swatchArgb = swatch or 0xFF000000.toInt()
                 Box(
                     Modifier
                         .size(NuvioTokens.Space.s48)
                         .clip(CircleShape)
-                        .selectable(color == swatch, role = Role.RadioButton, onClick = { onColorChanged(swatch) })
-                        .semantics { contentDescription = formatHexColor(swatch) }
+                        .selectable(
+                            selected = color == swatchArgb,
+                            role = Role.RadioButton,
+                            onClick = { updateColor(HsvColor.fromRgb(swatchArgb)) },
+                        )
+                        .semantics { contentDescription = formatHexColor(swatchArgb) }
                         .padding(NuvioTokens.Space.s6)
                         .border(
                             tokens.borders.medium,
-                            if (color == swatch) tokens.colors.textPrimary else tokens.colors.borderDefault,
+                            if (color == swatchArgb) tokens.colors.textPrimary else tokens.colors.borderDefault,
                             CircleShape,
                         )
                         .padding(NuvioTokens.Space.s4)
                         .clip(CircleShape)
-                        .background(Color(swatch or 0xFF000000.toInt())),
+                        .background(Color(swatchArgb)),
                 )
             }
         }

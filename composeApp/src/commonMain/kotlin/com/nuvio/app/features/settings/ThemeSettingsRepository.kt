@@ -8,6 +8,12 @@ import com.nuvio.app.core.ui.glass.LiquidGlassSettings
 import com.nuvio.app.core.ui.glass.LiquidGlassStyle
 import com.nuvio.app.core.ui.glass.LiquidGlassEffectDefaults
 import com.nuvio.app.core.ui.glass.LiquidGlassEffectSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassSurfaceOverrides
+import com.nuvio.app.core.ui.glass.LiquidGlassSurfacesSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassGeneralStyle
+import com.nuvio.app.core.ui.glass.decodeLiquidGlassSurfaceSettings
+import com.nuvio.app.core.ui.glass.encodeLiquidGlassSurfaceSettings
 import com.nuvio.app.core.ui.glass.decodeLiquidGlassEffectSettings
 import com.nuvio.app.core.ui.glass.encodeLiquidGlassEffectSettings
 import com.nuvio.app.core.ui.glass.migrateLegacyNavBarGlassEffects
@@ -15,11 +21,16 @@ import com.nuvio.app.core.ui.formatHexColor
 import com.nuvio.app.core.ui.parseHexColor
 import com.nuvio.app.core.ui.nativeAccentGradientHex
 import com.nuvio.app.features.membership.MemberAccessRepository
+import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.membership.resolveCustomThemeColors
 import com.nuvio.app.features.membership.resolveAppTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,6 +64,19 @@ object ThemeSettingsRepository {
 
     private val _showCatalogAccentEnabled = MutableStateFlow(false)
     val showCatalogAccentEnabled: StateFlow<Boolean> = _showCatalogAccentEnabled.asStateFlow()
+
+    private val _customSettingsBackgroundImageUri = MutableStateFlow<String?>(null)
+    val customSettingsBackgroundImageUri: StateFlow<String?> = _customSettingsBackgroundImageUri.asStateFlow()
+    private val _customSettingsBackgroundImageRevision = MutableStateFlow(0L)
+    val customSettingsBackgroundImageRevision: StateFlow<Long> =
+        _customSettingsBackgroundImageRevision.asStateFlow()
+
+    private val _customLibraryCloudBackgroundImageUri = MutableStateFlow<String?>(null)
+    val customLibraryCloudBackgroundImageUri: StateFlow<String?> =
+        _customLibraryCloudBackgroundImageUri.asStateFlow()
+    private val _customLibraryCloudBackgroundImageRevision = MutableStateFlow(0L)
+    val customLibraryCloudBackgroundImageRevision: StateFlow<Long> =
+        _customLibraryCloudBackgroundImageRevision.asStateFlow()
 
     private val _selectedAppLanguage = MutableStateFlow(AppLanguage.DEVICE)
     val selectedAppLanguage: StateFlow<AppLanguage> = _selectedAppLanguage.asStateFlow()
@@ -88,6 +112,10 @@ object ThemeSettingsRepository {
     private val _navBarGlass = MutableStateFlow(LiquidGlassStyle.Default)
     val navBarGlass: StateFlow<LiquidGlassStyle> = _navBarGlass.asStateFlow()
 
+    private val _liquidGlassSurfaceSettings = MutableStateFlow(LiquidGlassSurfacesSettings())
+    internal val liquidGlassSurfaceSettings: StateFlow<LiquidGlassSurfacesSettings> =
+        _liquidGlassSurfaceSettings.asStateFlow()
+
     private val _liquidGlassEffectsEnabled = MutableStateFlow(true)
     val liquidGlassEffectsEnabled: StateFlow<Boolean> = _liquidGlassEffectsEnabled.asStateFlow()
 
@@ -115,6 +143,10 @@ object ThemeSettingsRepository {
         _liquidGlassNativeTabBarEnabled.value = NuvioTabBarBehavior.Default.isEnabled
         _dynamicArtworkBackgroundEnabled.value = false
         _showCatalogAccentEnabled.value = false
+        _customSettingsBackgroundImageUri.value = null
+        _customSettingsBackgroundImageRevision.value += 1L
+        _customLibraryCloudBackgroundImageUri.value = null
+        _customLibraryCloudBackgroundImageRevision.value += 1L
         NativeTabBridge.publishAccentColor(
             hexColor = AppTheme.WHITE.nativeTabAccentHex(),
             gradientHexColors = ThemeColors.getColorPalette(AppTheme.WHITE).nativeAccentGradientHex(),
@@ -131,6 +163,8 @@ object ThemeSettingsRepository {
         _navBarStyle.value = NavBarStyle.ADAPTIVE
         _navBarPosition.value = NavBarPosition.BOTTOM
         _navBarGlass.value = LiquidGlassStyle.Default
+        _liquidGlassSurfaceSettings.value = LiquidGlassSurfacesSettings()
+        LiquidGlassSettings.surfaceOverrides = LiquidGlassSurfacesSettings()
         applyLiquidGlassEffectsEnabled(true)
     }
 
@@ -159,6 +193,10 @@ object ThemeSettingsRepository {
             ThemeSettingsStorage.loadDynamicArtworkBackgroundEnabled() ?: false
         _showCatalogAccentEnabled.value =
             ThemeSettingsStorage.loadShowCatalogAccentEnabled() ?: false
+        _customSettingsBackgroundImageUri.value = ThemeSettingsStorage.loadCustomSettingsBackgroundImageUri()
+        _customSettingsBackgroundImageRevision.value += 1L
+        _customLibraryCloudBackgroundImageUri.value = ThemeSettingsStorage.loadCustomLibraryCloudBackgroundImageUri()
+        _customLibraryCloudBackgroundImageRevision.value += 1L
         val appLanguage = AppLanguage.fromCode(ThemeSettingsStorage.loadSelectedAppLanguage())
         ThemeSettingsStorage.applySelectedAppLanguage(appLanguage.code)
         _selectedAppLanguage.value = appLanguage
@@ -182,6 +220,11 @@ object ThemeSettingsRepository {
         val storedNavBarGlass = ThemeSettingsStorage.loadNavBarGlass()
         _navBarGlass.value = LiquidGlassStyle.decode(storedNavBarGlass)
         migrateLegacyNavBarGlass(storedNavBarGlass)
+
+        val surfaceSettings = decodeLiquidGlassSurfaceSettings(ThemeSettingsStorage.loadLiquidGlassSurfaceSettings())
+        _liquidGlassSurfaceSettings.value = surfaceSettings
+        LiquidGlassSettings.surfaceOverrides = surfaceSettings
+
         applyLiquidGlassEffectsEnabled(ThemeSettingsStorage.loadLiquidGlassEffectsEnabled() ?: true)
     }
 
@@ -242,6 +285,169 @@ object ThemeSettingsRepository {
         if (_showCatalogAccentEnabled.value == enabled) return
         _showCatalogAccentEnabled.value = enabled
         ThemeSettingsStorage.saveShowCatalogAccentEnabled(enabled)
+    }
+
+    /**
+     * Performs only local persistence. Call this from a background dispatcher; publish the
+     * returned local URI on the UI dispatcher after the I/O completes.
+     */
+    internal fun storeCustomSettingsBackgroundImageForProfile(bytes: ByteArray, profileId: Int): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        return ThemeSettingsStorage.saveCustomSettingsBackgroundImage(bytes, profileId)
+            ?.takeIf(::isLocalBackgroundImageUri)
+    }
+
+    internal fun removeCustomSettingsBackgroundImageForProfile(profileId: Int): Boolean =
+        ThemeSettingsStorage.clearCustomSettingsBackgroundImage(profileId)
+
+    internal fun publishCustomSettingsBackgroundImageForProfile(profileId: Int, imageUri: String?) {
+        if (ProfileRepository.activeProfileId != profileId) return
+        if (imageUri != null && !isLocalBackgroundImageUri(imageUri)) return
+        _customSettingsBackgroundImageUri.value = imageUri
+        _customSettingsBackgroundImageRevision.value += 1L
+    }
+
+    /**
+     * Persist off the UI thread and publish the completed result on the caller's dispatcher.
+     * A synchronous storage operation can finish just as the caller is cancelled while
+     * withContext dispatches back; preserve that completed result so the preview cannot go stale.
+     */
+    private suspend fun persistBackgroundImageForStudio(
+        store: () -> String?,
+        publish: (String?) -> Unit,
+    ): Boolean {
+        var savedUri: String? = null
+        try {
+            withContext(Dispatchers.IO) {
+                savedUri = store()
+            }
+        } catch (cancelled: CancellationException) {
+            savedUri?.let { uri ->
+                withContext(NonCancellable) {
+                    publish(uri)
+                }
+            }
+            throw cancelled
+        }
+        val uri = savedUri ?: return false
+        publish(uri)
+        return true
+    }
+
+    private suspend fun removeBackgroundImageForStudio(
+        remove: () -> Boolean,
+        publish: (String?) -> Unit,
+    ): Boolean {
+        var removed = false
+        try {
+            withContext(Dispatchers.IO) {
+                removed = remove()
+            }
+        } catch (cancelled: CancellationException) {
+            if (removed) {
+                withContext(NonCancellable) {
+                    publish(null)
+                }
+            }
+            throw cancelled
+        }
+        if (!removed) return false
+        publish(null)
+        return true
+    }
+
+    internal suspend fun saveCustomSettingsBackgroundImageForStudio(
+        bytes: ByteArray,
+        profileId: Int,
+    ): Boolean {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return false
+        return persistBackgroundImageForStudio(
+            store = { storeCustomSettingsBackgroundImageForProfile(bytes, profileId) },
+            publish = { uri -> publishCustomSettingsBackgroundImageForProfile(profileId, uri) },
+        )
+    }
+
+    internal suspend fun clearCustomSettingsBackgroundImageForStudio(profileId: Int): Boolean =
+        removeBackgroundImageForStudio(
+            remove = { removeCustomSettingsBackgroundImageForProfile(profileId) },
+            publish = { uri -> publishCustomSettingsBackgroundImageForProfile(profileId, uri) },
+        )
+
+    internal suspend fun saveCustomLibraryCloudBackgroundImageForStudio(
+        bytes: ByteArray,
+        profileId: Int,
+    ): Boolean {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return false
+        return persistBackgroundImageForStudio(
+            store = { storeCustomLibraryCloudBackgroundImageForProfile(bytes, profileId) },
+            publish = { uri -> publishCustomLibraryCloudBackgroundImageForProfile(profileId, uri) },
+        )
+    }
+
+    internal suspend fun clearCustomLibraryCloudBackgroundImageForStudio(profileId: Int): Boolean =
+        removeBackgroundImageForStudio(
+            remove = { removeCustomLibraryCloudBackgroundImageForProfile(profileId) },
+            publish = { uri -> publishCustomLibraryCloudBackgroundImageForProfile(profileId, uri) },
+        )
+
+    fun setCustomSettingsBackgroundImage(
+        bytes: ByteArray,
+        profileId: Int = ProfileRepository.activeProfileId,
+    ): Boolean {
+        ensureLoaded()
+        val localImageUri = storeCustomSettingsBackgroundImageForProfile(bytes, profileId) ?: return false
+        publishCustomSettingsBackgroundImageForProfile(profileId, localImageUri)
+        return true
+    }
+
+    fun clearCustomSettingsBackgroundImage(
+        profileId: Int = ProfileRepository.activeProfileId,
+    ): Boolean {
+        ensureLoaded()
+        val deleted = removeCustomSettingsBackgroundImageForProfile(profileId)
+        if (!deleted) return false
+        publishCustomSettingsBackgroundImageForProfile(profileId, null)
+        return true
+    }
+
+    /**
+     * Performs only local persistence. Call this from a background dispatcher; publish the
+     * returned local URI on the UI dispatcher after the I/O completes.
+     */
+    internal fun storeCustomLibraryCloudBackgroundImageForProfile(bytes: ByteArray, profileId: Int): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        return ThemeSettingsStorage.saveCustomLibraryCloudBackgroundImage(bytes, profileId)
+            ?.takeIf(::isLocalBackgroundImageUri)
+    }
+
+    internal fun removeCustomLibraryCloudBackgroundImageForProfile(profileId: Int): Boolean =
+        ThemeSettingsStorage.clearCustomLibraryCloudBackgroundImage(profileId)
+
+    internal fun publishCustomLibraryCloudBackgroundImageForProfile(profileId: Int, imageUri: String?) {
+        if (ProfileRepository.activeProfileId != profileId) return
+        if (imageUri != null && !isLocalBackgroundImageUri(imageUri)) return
+        _customLibraryCloudBackgroundImageUri.value = imageUri
+        _customLibraryCloudBackgroundImageRevision.value += 1L
+    }
+
+    fun setCustomLibraryCloudBackgroundImage(
+        bytes: ByteArray,
+        profileId: Int = ProfileRepository.activeProfileId,
+    ): Boolean {
+        ensureLoaded()
+        val localImageUri = storeCustomLibraryCloudBackgroundImageForProfile(bytes, profileId) ?: return false
+        publishCustomLibraryCloudBackgroundImageForProfile(profileId, localImageUri)
+        return true
+    }
+
+    fun clearCustomLibraryCloudBackgroundImage(
+        profileId: Int = ProfileRepository.activeProfileId,
+    ): Boolean {
+        ensureLoaded()
+        val deleted = removeCustomLibraryCloudBackgroundImageForProfile(profileId)
+        if (!deleted) return false
+        publishCustomLibraryCloudBackgroundImageForProfile(profileId, null)
+        return true
     }
 
     fun setAppLanguage(language: AppLanguage) {
@@ -393,6 +599,60 @@ object ThemeSettingsRepository {
         _liquidGlassEffectsEnabled.value = enabled
         LiquidGlassSettings.enabled = enabled
     }
+
+    internal fun updateLiquidGlassSurfaceOverrides(
+        surface: LiquidGlassSurface,
+        overrides: LiquidGlassSurfaceOverrides,
+    ) {
+        ensureLoaded()
+        val updated = _liquidGlassSurfaceSettings.value.withSurface(surface, overrides).sanitized()
+        if (updated == _liquidGlassSurfaceSettings.value) return
+        _liquidGlassSurfaceSettings.value = updated
+        LiquidGlassSettings.surfaceOverrides = updated
+    }
+
+    internal fun saveLiquidGlassSurfaceSettings() {
+        ensureLoaded()
+        val settings = _liquidGlassSurfaceSettings.value.sanitized()
+        val encoded = encodeLiquidGlassSurfaceSettings(settings)
+        if (ThemeSettingsStorage.loadLiquidGlassSurfaceSettings() != encoded) {
+            ThemeSettingsStorage.saveLiquidGlassSurfaceSettings(encoded)
+        }
+        _liquidGlassSurfaceSettings.value = settings
+        LiquidGlassSettings.surfaceOverrides = settings
+    }
+
+    private fun updateLiquidGlassSurfacesGeneral(
+        transform: (LiquidGlassSurfacesSettings) -> LiquidGlassSurfacesSettings,
+    ) {
+        ensureLoaded()
+        val updated = transform(_liquidGlassSurfaceSettings.value).sanitized()
+        if (updated == _liquidGlassSurfaceSettings.value) return
+        _liquidGlassSurfaceSettings.value = updated
+        LiquidGlassSettings.surfaceOverrides = updated
+        saveLiquidGlassSurfaceSettings()
+    }
+
+    /** Experimental surfaces master switch. Off keeps every screen exactly as it shipped. */
+    internal fun setLiquidGlassExperimentalSurfacesEnabled(enabled: Boolean) =
+        updateLiquidGlassSurfacesGeneral { it.copy(experimentalEnabled = enabled) }
+
+    /** Advanced mode exposes per-surface customization; saved per-surface values are kept either way. */
+    internal fun setLiquidGlassAdvancedEnabled(enabled: Boolean) =
+        updateLiquidGlassSurfacesGeneral { it.copy(advancedEnabled = enabled) }
+
+    internal fun setLiquidGlassGeneralStyle(style: LiquidGlassGeneralStyle) =
+        updateLiquidGlassSurfacesGeneral { it.copy(generalStyle = style) }
+
+    /** Clears every per-surface customization while keeping the General choices. */
+    internal fun resetLiquidGlassSurfaceCustomizations() =
+        updateLiquidGlassSurfacesGeneral { current ->
+            LiquidGlassSurfacesSettings(
+                experimentalEnabled = current.experimentalEnabled,
+                advancedEnabled = current.advancedEnabled,
+                generalStyle = current.generalStyle,
+            )
+        }
 
     private fun observeMembership() {
         if (observesMembership) return

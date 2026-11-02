@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">অভিনয়শিল্পী ও কলাকুশলী</string>
+    <string name="settings_liquid_glass_preview_choose_source">প্লেব্যাক শুরু করতে একটি উৎস বেছে নিন</string>
+    <string name="settings_liquid_glass_preview_available_streams">উপলভ্য স্ট্রিম</string>
+    <string name="settings_liquid_glass_preview_seasons_header">সিজনসমূহ</string>
+    <string name="settings_nav_bar_glass_blur_radius">ব্লার ব্যাসার্ধ</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">ক্রোম্যাটিক অ্যাবেরেশন</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">প্রতিসরিত প্রান্তে সূক্ষ্ম রঙের আভা যোগ করে।</string>
+    <string name="settings_nav_bar_glass_corner_radius">কোণার ব্যাসার্ধ</string>
+    <string name="settings_nav_bar_glass_depth_effect">গভীরতার প্রভাব</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">প্রতিসরিত পৃষ্ঠে গভীরতার ছায়া যোগ করে।</string>
+    <string name="settings_nav_bar_glass_highlight">প্রান্তের হাইলাইট</string>
+    <string name="settings_nav_bar_glass_material_clear">স্বচ্ছ</string>
+    <string name="settings_nav_bar_glass_material_frosted">ফ্রস্টেড</string>
+    <string name="settings_nav_bar_glass_material_liquid">তরল</string>
+    <string name="settings_nav_bar_glass_refraction_amount">প্রতিসরণের মাত্রা</string>
+    <string name="settings_nav_bar_glass_refraction_height">প্রতিসরণের উচ্চতা</string>
+    <string name="settings_nav_bar_glass_shadow">ছায়া</string>
+    <string name="settings_nav_bar_glass_tint_opacity">টিন্টের অস্বচ্ছতা</string>
+    <string name="settings_nav_bar_glass_vibrancy">রঙের উজ্জ্বলতা</string>
+</resources>

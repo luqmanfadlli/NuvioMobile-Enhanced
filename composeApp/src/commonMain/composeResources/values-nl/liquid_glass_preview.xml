@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">CAST EN CREW</string>
+    <string name="settings_liquid_glass_preview_choose_source">Kies een bron om af te spelen</string>
+    <string name="settings_liquid_glass_preview_available_streams">BESCHIKBARE STREAMS</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEIZOENEN</string>
+    <string name="settings_nav_bar_glass_blur_radius">Vervagingsradius</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Chromatische aberratie</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Voegt subtiele kleurranden toe rond gebroken randen.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Hoekradius</string>
+    <string name="settings_nav_bar_glass_depth_effect">Diepte-effect</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Voegt diepteschaduw toe aan het gebroken oppervlak.</string>
+    <string name="settings_nav_bar_glass_highlight">Randaccent</string>
+    <string name="settings_nav_bar_glass_material_clear">Helder</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matglas</string>
+    <string name="settings_nav_bar_glass_material_liquid">Vloeibaar</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Brekingsterkte</string>
+    <string name="settings_nav_bar_glass_refraction_height">Brekingshoogte</string>
+    <string name="settings_nav_bar_glass_shadow">Schaduw</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Tintdekking</string>
+    <string name="settings_nav_bar_glass_vibrancy">Kleurkracht</string>
+</resources>

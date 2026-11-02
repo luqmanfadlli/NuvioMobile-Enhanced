@@ -71,16 +71,19 @@ private data class LicenseItem(
 fun LicensesAttributionsSettingsScreen(
     onBack: () -> Unit,
 ) {
-    NuvioScreen(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        stickyHeader {
-            NuvioScreenHeader(
-                title = stringResource(Res.string.compose_settings_page_licenses_attributions),
-                onBack = onBack,
-            )
+    SettingsGlassPageBackground {
+        NuvioScreen(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            stickyHeader {
+                NuvioScreenHeader(
+                    title = stringResource(Res.string.compose_settings_page_licenses_attributions),
+                    onBack = onBack,
+                    useSettingsGlass = true,
+                )
+            }
+            licensesAttributionsContent(isTablet = false)
         }
-        licensesAttributionsContent(isTablet = false)
     }
 }
 
@@ -169,9 +172,7 @@ private fun PlainSettingsStack(
             fontWeight = FontWeight.Bold,
         )
         Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 10.dp))
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        SettingsSurfaceCard(isTablet = isTablet) {
             content()
         }
     }

@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">CAST E TROUPE</string>
+    <string name="settings_liquid_glass_preview_choose_source">Scegli una sorgente per avviare la riproduzione</string>
+    <string name="settings_liquid_glass_preview_available_streams">SORGENTI DISPONIBILI</string>
+    <string name="settings_liquid_glass_preview_seasons_header">STAGIONI</string>
+    <string name="settings_nav_bar_glass_blur_radius">Raggio di sfocatura</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberrazione cromatica</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Aggiunge leggere frange colorate attorno ai bordi rifratti.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Raggio degli angoli</string>
+    <string name="settings_nav_bar_glass_depth_effect">Effetto profondità</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Aggiunge ombreggiatura di profondità alla superficie rifratta.</string>
+    <string name="settings_nav_bar_glass_highlight">Luce sul bordo</string>
+    <string name="settings_nav_bar_glass_material_clear">Trasparente</string>
+    <string name="settings_nav_bar_glass_material_frosted">Satinato</string>
+    <string name="settings_nav_bar_glass_material_liquid">Liquido</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Intensità della rifrazione</string>
+    <string name="settings_nav_bar_glass_refraction_height">Altezza della rifrazione</string>
+    <string name="settings_nav_bar_glass_shadow">Ombra</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Opacità della tinta</string>
+    <string name="settings_nav_bar_glass_vibrancy">Vividezza</string>
+</resources>

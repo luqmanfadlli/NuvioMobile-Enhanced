@@ -103,13 +103,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.format.resolveReleaseInfoForDisplay
 import com.nuvio.app.core.ui.platformPhysicalTopInset
 import com.nuvio.app.core.ui.NuvioPrimaryButton
-import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.core.ui.NuvioAsyncImage
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaLookupOutcome
 import com.nuvio.app.features.details.MetaDetails
@@ -402,7 +406,7 @@ private fun ProfileInsightsBody(
                 title = stringResource(Res.string.profile_insights_section_taste),
                 isTablet = isTablet,
             ) {
-                ProfileTasteCard(stats = stats, factsProgress = factsProgress)
+                ProfileTasteCard(isTablet = isTablet, stats = stats, factsProgress = factsProgress)
             }
         }
     }
@@ -957,10 +961,32 @@ private fun ProfileMetricPill(
 @Composable
 private fun ProfileWatchTimeRow(stats: ProfileInsightsStats) {
     val tokens = MaterialTheme.nuvio
+    val surface = LiquidGlassSurface.SETTINGS
+    val glassEnabled = isLiquidGlassSurfaceEffectivelyEnabled(
+        surface = surface,
+        platformSupported = isLiquidGlassSupported(),
+    )
+    val shape = liquidGlassShape(surface, tokens.shapes.card)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = tokens.colors.surface,
-        shape = tokens.shapes.card,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (glassEnabled) {
+                    Modifier.liquidGlassForSurface(
+                        surface = surface,
+                        shape = shape,
+                        tint = tokens.colors.surface.copy(alpha = 0.18f),
+                        fallback = tokens.colors.surface,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 12.dp,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
+        color = if (glassEnabled) Color.Transparent else tokens.colors.surface,
+        shape = shape,
         border = BorderStroke(1.dp, tokens.colors.borderSubtle),
     ) {
         Column(
@@ -1174,6 +1200,7 @@ private fun ProfileInsightPosterTile(
 
 @Composable
 private fun ProfileTasteCard(
+    isTablet: Boolean,
     stats: ProfileInsightsStats,
     factsProgress: ProfileTitleFactsProgress? = null,
 ) {
@@ -1186,7 +1213,7 @@ private fun ProfileTasteCard(
     }
     val topSignal = stats.topGenre ?: fallbackType ?: stringResource(Res.string.profile_insights_taste_empty)
 
-    NuvioSurfaceCard {
+    SettingsSurfaceCard(isTablet = isTablet) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),

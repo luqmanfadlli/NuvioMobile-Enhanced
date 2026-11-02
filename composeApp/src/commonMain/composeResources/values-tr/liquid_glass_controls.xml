@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_liquid_glass_expand_controls">Kontrolleri göster</string>
+    <string name="settings_liquid_glass_collapse_controls">Kontrolleri gizle</string>
+    <string name="settings_liquid_glass_controls_in">%1$s kontrolleri</string>
+    <string name="settings_liquid_glass_default">Varsayılan</string>
+</resources>

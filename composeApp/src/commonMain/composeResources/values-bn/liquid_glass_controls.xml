@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_liquid_glass_expand_controls">কন্ট্রোল দেখান</string>
+    <string name="settings_liquid_glass_collapse_controls">কন্ট্রোল লুকান</string>
+    <string name="settings_liquid_glass_controls_in">%1$s-এর কন্ট্রোল</string>
+    <string name="settings_liquid_glass_default">ডিফল্ট</string>
+</resources>

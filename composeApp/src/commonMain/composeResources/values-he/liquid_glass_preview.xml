@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">שחקנים וצוות</string>
+    <string name="settings_liquid_glass_preview_choose_source">בחרו מקור כדי להתחיל בניגון</string>
+    <string name="settings_liquid_glass_preview_available_streams">מקורות זמינים</string>
+    <string name="settings_liquid_glass_preview_seasons_header">עונות</string>
+    <string name="settings_nav_bar_glass_blur_radius">רדיוס טשטוש</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">סטייה כרומטית</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">מוסיף שוליים צבעוניים עדינים סביב קצוות שעברו שבירה.</string>
+    <string name="settings_nav_bar_glass_corner_radius">רדיוס הפינות</string>
+    <string name="settings_nav_bar_glass_depth_effect">אפקט עומק</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">מוסיף הצללת עומק למשטח שעבר שבירה.</string>
+    <string name="settings_nav_bar_glass_highlight">הדגשת קצה</string>
+    <string name="settings_nav_bar_glass_material_clear">שקוף</string>
+    <string name="settings_nav_bar_glass_material_frosted">מט</string>
+    <string name="settings_nav_bar_glass_material_liquid">נוזלי</string>
+    <string name="settings_nav_bar_glass_refraction_amount">עוצמת השבירה</string>
+    <string name="settings_nav_bar_glass_refraction_height">גובה השבירה</string>
+    <string name="settings_nav_bar_glass_shadow">צל</string>
+    <string name="settings_nav_bar_glass_tint_opacity">אטימות הגוון</string>
+    <string name="settings_nav_bar_glass_vibrancy">חיות צבע</string>
+</resources>

@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">MEDVIRKENDE OG CREW</string>
+    <string name="settings_liquid_glass_preview_choose_source">Velg en kilde for å starte avspilling</string>
+    <string name="settings_liquid_glass_preview_available_streams">TILGJENGELIGE STRØMMER</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SESONGER</string>
+    <string name="settings_nav_bar_glass_blur_radius">Uskarphetsradius</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Kromatisk aberrasjon</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Legger til diskrete fargekanter rundt brutte kanter.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Hjørneradius</string>
+    <string name="settings_nav_bar_glass_depth_effect">Dybdeeffekt</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Legger til dybdeskygge på den brutte overflaten.</string>
+    <string name="settings_nav_bar_glass_highlight">Kantlys</string>
+    <string name="settings_nav_bar_glass_material_clear">Klar</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matt</string>
+    <string name="settings_nav_bar_glass_material_liquid">Flytende</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Brytningsstyrke</string>
+    <string name="settings_nav_bar_glass_refraction_height">Brytningshøyde</string>
+    <string name="settings_nav_bar_glass_shadow">Skygge</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Fargetoneopasitet</string>
+    <string name="settings_nav_bar_glass_vibrancy">Fargesterke</string>
+</resources>

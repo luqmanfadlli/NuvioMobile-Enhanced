@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">АКТЬОРСКИ СЪСТАВ И ЕКИП</string>
+    <string name="settings_liquid_glass_preview_choose_source">Изберете източник, за да започнете възпроизвеждане</string>
+    <string name="settings_liquid_glass_preview_available_streams">НАЛИЧНИ ПОТОЦИ</string>
+    <string name="settings_liquid_glass_preview_seasons_header">СЕЗОНИ</string>
+    <string name="settings_nav_bar_glass_blur_radius">Радиус на замъгляване</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Хроматична аберация</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Добавя фини цветни ореоли около пречупените ръбове.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Радиус на ъгъла</string>
+    <string name="settings_nav_bar_glass_depth_effect">Ефект на дълбочина</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Добавя засенчване за дълбочина към пречупената повърхност.</string>
+    <string name="settings_nav_bar_glass_highlight">Подсветка на ръба</string>
+    <string name="settings_nav_bar_glass_material_clear">Прозрачен</string>
+    <string name="settings_nav_bar_glass_material_frosted">Матиран</string>
+    <string name="settings_nav_bar_glass_material_liquid">Течен</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Сила на пречупване</string>
+    <string name="settings_nav_bar_glass_refraction_height">Височина на пречупване</string>
+    <string name="settings_nav_bar_glass_shadow">Сянка</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Непрозрачност на оттенъка</string>
+    <string name="settings_nav_bar_glass_vibrancy">Наситеност</string>
+</resources>

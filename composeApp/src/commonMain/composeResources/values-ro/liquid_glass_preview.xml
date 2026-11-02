@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">DISTRIBUȚIE ȘI ECHIPĂ</string>
+    <string name="settings_liquid_glass_preview_choose_source">Alege o sursă pentru a începe redarea</string>
+    <string name="settings_liquid_glass_preview_available_streams">SURSE DISPONIBILE</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEZOANE</string>
+    <string name="settings_nav_bar_glass_blur_radius">Rază de estompare</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Aberație cromatică</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Adaugă franjuri discrete de culoare în jurul marginilor refractate.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Raza colțului</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efect de profunzime</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Adaugă umbrire de profunzime suprafeței refractate.</string>
+    <string name="settings_nav_bar_glass_highlight">Evidențiere margine</string>
+    <string name="settings_nav_bar_glass_material_clear">Clar</string>
+    <string name="settings_nav_bar_glass_material_frosted">Mat</string>
+    <string name="settings_nav_bar_glass_material_liquid">Lichid</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Intensitatea refracției</string>
+    <string name="settings_nav_bar_glass_refraction_height">Înălțimea refracției</string>
+    <string name="settings_nav_bar_glass_shadow">Umbră</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Opacitatea nuanței</string>
+    <string name="settings_nav_bar_glass_vibrancy">Vibrație</string>
+</resources>

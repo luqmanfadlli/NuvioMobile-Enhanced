@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">اداکار اور عملہ</string>
+    <string name="settings_liquid_glass_preview_choose_source">پلے بیک شروع کرنے کے لیے ایک ماخذ منتخب کریں</string>
+    <string name="settings_liquid_glass_preview_available_streams">دستیاب اسٹریمز</string>
+    <string name="settings_liquid_glass_preview_seasons_header">سیزنز</string>
+    <string name="settings_nav_bar_glass_blur_radius">دھندلاہٹ کا رداس</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">رنگی انحراف</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">منکسر کناروں کے گرد ہلکی رنگین جھلک شامل کرتا ہے۔</string>
+    <string name="settings_nav_bar_glass_corner_radius">کونے کا رداس</string>
+    <string name="settings_nav_bar_glass_depth_effect">گہرائی کا اثر</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">منکسر سطح پر گہرائی کی شیڈنگ شامل کرتا ہے۔</string>
+    <string name="settings_nav_bar_glass_highlight">کنارے کی جھلک</string>
+    <string name="settings_nav_bar_glass_material_clear">شفاف</string>
+    <string name="settings_nav_bar_glass_material_frosted">دھندلا</string>
+    <string name="settings_nav_bar_glass_material_liquid">مائع</string>
+    <string name="settings_nav_bar_glass_refraction_amount">انعطاف کی مقدار</string>
+    <string name="settings_nav_bar_glass_refraction_height">انعطاف کی اونچائی</string>
+    <string name="settings_nav_bar_glass_shadow">سایہ</string>
+    <string name="settings_nav_bar_glass_tint_opacity">رنگت کی دھندلاہٹ</string>
+    <string name="settings_nav_bar_glass_vibrancy">رنگوں کی چمک</string>
+</resources>

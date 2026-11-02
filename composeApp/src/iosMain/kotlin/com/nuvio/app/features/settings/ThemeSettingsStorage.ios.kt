@@ -8,10 +8,25 @@ import com.nuvio.app.core.storage.ProfileScopedKey
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.usePinned
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSFileSize
+import platform.Foundation.NSNumber
+import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSURL
+import platform.Foundation.NSURLIsExcludedFromBackupKey
 import platform.Foundation.NSUserDefaults
+import platform.posix.fclose
+import platform.posix.fopen
+import platform.posix.fwrite
+import platform.posix.rename
 import platform.UIKit.UIDevice
 import platform.UIKit.UIUserInterfaceIdiomPad
 
+@OptIn(ExperimentalForeignApi::class)
 actual object ThemeSettingsStorage {
     private const val selectedThemeKey = "selected_theme"
     private const val customThemeColorsKey = "custom_theme_colors"
@@ -28,6 +43,10 @@ actual object ThemeSettingsStorage {
     private const val localNavBarPositionKey = "enhanced_local_nav_bar_position"
     private const val localNavBarGlassKey = "enhanced_local_nav_bar_glass"
     private const val localLiquidGlassEffectsKey = "enhanced_local_liquid_glass_effects"
+    private const val localLiquidGlassSurfaceSettingsKey = "enhanced_local_liquid_glass_surface_settings"
+    private const val legacyCustomSettingsBackgroundUrlKey = "enhanced_local_settings_background_url"
+    private const val localCustomSettingsBackgroundImageKey = "enhanced_local_settings_background_image"
+    private const val localCustomLibraryCloudBackgroundImageKey = "enhanced_local_library_cloud_background_image"
     private const val localTabletTabBarBehaviorKey = "enhanced_local_tablet_tab_bar_behavior"
     private const val tabletTabBarBehaviorDefault = "off"
     private const val navBarGlowEnabledKey = "nav_bar_glow_enabled"
@@ -258,6 +277,183 @@ actual object ThemeSettingsStorage {
 
     actual fun saveLiquidGlassEffectsEnabled(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(localLiquidGlassEffectsKey))
+    }
+
+    actual fun loadLiquidGlassSurfaceSettings(): String? =
+        loadRawString(localLiquidGlassSurfaceSettingsKey)
+
+    actual fun saveLiquidGlassSurfaceSettings(settings: String) {
+        saveRawString(localLiquidGlassSurfaceSettingsKey, settings)
+    }
+
+    private fun isValidCustomBackgroundImageSize(path: String): Boolean {
+        val attributes = NSFileManager.defaultManager.attributesOfItemAtPath(path, error = null)
+            ?: return false
+        val size = (attributes[NSFileSize] as? NSNumber)?.longLongValue ?: return false
+        return size in 1..CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES.toLong()
+    }
+
+    actual fun loadCustomSettingsBackgroundImageUri(): String? {
+        clearLegacyCustomSettingsBackgroundUrl()
+        val path = settingsBackgroundImagePath()
+        if (!NSFileManager.defaultManager.fileExistsAtPath(path)) return null
+        if (!isValidCustomBackgroundImageSize(path)) return null
+        if (!excludeFromBackup(path)) {
+            NSFileManager.defaultManager.removeItemAtPath(path, null)
+            return null
+        }
+        return NSURL.fileURLWithPath(path).absoluteString
+    }
+
+    actual fun saveCustomSettingsBackgroundImage(bytes: ByteArray): String? =
+        writeCustomSettingsBackgroundImage(bytes, profileId = null)
+
+    actual fun saveCustomSettingsBackgroundImage(bytes: ByteArray, profileId: Int): String? =
+        writeCustomSettingsBackgroundImage(bytes, profileId = profileId)
+
+    @OptIn(ExperimentalForeignApi::class)
+    private fun writeCustomSettingsBackgroundImage(bytes: ByteArray, profileId: Int?): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        if (profileId == null) clearLegacyCustomSettingsBackgroundUrl()
+        else clearLegacyCustomSettingsBackgroundUrl(profileId)
+        val path = settingsBackgroundImagePath(profileId)
+        val directory = path.substringBeforeLast('/')
+        val temporary = "$path.tmp"
+        NSFileManager.defaultManager.createDirectoryAtPath(
+            path = directory,
+            withIntermediateDirectories = true,
+            attributes = null,
+            error = null,
+        )
+        if (!excludeFromBackup("$directory/")) return null
+        val file = fopen(temporary, "wb") ?: return null
+        val written = try {
+            bytes.usePinned { pinned ->
+                fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file).toLong() == bytes.size.toLong()
+            }
+        } finally {
+            fclose(file)
+        }
+        if (!written || rename(temporary, path) != 0) {
+            NSFileManager.defaultManager.removeItemAtPath(temporary, null)
+            return null
+        }
+        return if (NSFileManager.defaultManager.fileExistsAtPath(path) && excludeFromBackup(path)) {
+            NSURL.fileURLWithPath(path).absoluteString
+        } else {
+            NSFileManager.defaultManager.removeItemAtPath(path, null)
+            null
+        }
+    }
+
+    actual fun clearCustomSettingsBackgroundImage(): Boolean {
+        val deleted = deleteSettingsBackgroundImage(settingsBackgroundImagePath())
+        clearLegacyCustomSettingsBackgroundUrl()
+        return deleted
+    }
+
+    actual fun clearCustomSettingsBackgroundImage(profileIndex: Int): Boolean {
+        val path = settingsBackgroundImagePath(profileIndex)
+        val deleted = deleteSettingsBackgroundImage(path)
+        clearLegacyCustomSettingsBackgroundUrl(profileIndex)
+        return deleted
+    }
+
+    actual fun loadCustomLibraryCloudBackgroundImageUri(): String? {
+        val path = libraryCloudBackgroundImagePath()
+        if (!NSFileManager.defaultManager.fileExistsAtPath(path)) return null
+        if (!isValidCustomBackgroundImageSize(path)) return null
+        if (!excludeFromBackup(path)) {
+            NSFileManager.defaultManager.removeItemAtPath(path, null)
+            return null
+        }
+        return NSURL.fileURLWithPath(path).absoluteString
+    }
+
+    actual fun saveCustomLibraryCloudBackgroundImage(bytes: ByteArray): String? =
+        writeCustomLibraryCloudBackgroundImage(bytes, profileId = null)
+
+    actual fun saveCustomLibraryCloudBackgroundImage(bytes: ByteArray, profileId: Int): String? =
+        writeCustomLibraryCloudBackgroundImage(bytes, profileId = profileId)
+
+    @OptIn(ExperimentalForeignApi::class)
+    private fun writeCustomLibraryCloudBackgroundImage(bytes: ByteArray, profileId: Int?): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        val path = libraryCloudBackgroundImagePath(profileId)
+        val directory = path.substringBeforeLast('/')
+        val temporary = "$path.tmp"
+        NSFileManager.defaultManager.createDirectoryAtPath(
+            path = directory,
+            withIntermediateDirectories = true,
+            attributes = null,
+            error = null,
+        )
+        if (!excludeFromBackup("$directory/")) return null
+        val file = fopen(temporary, "wb") ?: return null
+        val written = try {
+            bytes.usePinned { pinned ->
+                fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file).toLong() == bytes.size.toLong()
+            }
+        } finally {
+            fclose(file)
+        }
+        if (!written || rename(temporary, path) != 0) {
+            NSFileManager.defaultManager.removeItemAtPath(temporary, null)
+            return null
+        }
+        return if (NSFileManager.defaultManager.fileExistsAtPath(path) && excludeFromBackup(path)) {
+            NSURL.fileURLWithPath(path).absoluteString
+        } else {
+            NSFileManager.defaultManager.removeItemAtPath(path, null)
+            null
+        }
+    }
+
+    actual fun clearCustomLibraryCloudBackgroundImage(): Boolean =
+        deleteLibraryCloudBackgroundImage(libraryCloudBackgroundImagePath())
+
+    actual fun clearCustomLibraryCloudBackgroundImage(profileIndex: Int): Boolean =
+        deleteLibraryCloudBackgroundImage(libraryCloudBackgroundImagePath(profileIndex))
+
+    private fun deleteLibraryCloudBackgroundImage(path: String): Boolean {
+        NSFileManager.defaultManager.removeItemAtPath(path, null)
+        NSFileManager.defaultManager.removeItemAtPath("$path.tmp", null)
+        return !NSFileManager.defaultManager.fileExistsAtPath(path) &&
+            !NSFileManager.defaultManager.fileExistsAtPath("$path.tmp")
+    }
+
+    private fun libraryCloudBackgroundImagePath(profileIndex: Int? = null): String {
+        val key = profileIndex?.let { ProfileScopedKey.of(localCustomLibraryCloudBackgroundImageKey, it) }
+            ?: ProfileScopedKey.of(localCustomLibraryCloudBackgroundImageKey)
+        return "${NSHomeDirectory()}/Library/Application Support/NuvioLibraryCloudBackgrounds/$key.jpg"
+    }
+
+    private fun deleteSettingsBackgroundImage(path: String): Boolean {
+        NSFileManager.defaultManager.removeItemAtPath(path, null)
+        NSFileManager.defaultManager.removeItemAtPath("$path.tmp", null)
+        return !NSFileManager.defaultManager.fileExistsAtPath(path) &&
+            !NSFileManager.defaultManager.fileExistsAtPath("$path.tmp")
+    }
+
+    private fun settingsBackgroundImagePath(profileIndex: Int? = null): String {
+        val key = profileIndex?.let { ProfileScopedKey.of(localCustomSettingsBackgroundImageKey, it) }
+            ?: ProfileScopedKey.of(localCustomSettingsBackgroundImageKey)
+        return "${NSHomeDirectory()}/Library/Application Support/NuvioSettingsBackgrounds/$key.jpg"
+    }
+
+    // Kotlin/Native maps Objective-C booleans to NSNumber for Objective-C object parameters.
+    @Suppress("CAST_NEVER_SUCCEEDS")
+    private fun excludeFromBackup(path: String): Boolean =
+        NSURL.fileURLWithPath(path).setResourceValue(
+            true as NSNumber,
+            forKey = NSURLIsExcludedFromBackupKey,
+            error = null,
+        )
+
+    private fun clearLegacyCustomSettingsBackgroundUrl(profileIndex: Int? = null) {
+        val key = profileIndex?.let { ProfileScopedKey.of(legacyCustomSettingsBackgroundUrlKey, it) }
+            ?: ProfileScopedKey.of(legacyCustomSettingsBackgroundUrlKey)
+        NSUserDefaults.standardUserDefaults.removeObjectForKey(key)
     }
 
     private fun loadRawString(key: String): String? =

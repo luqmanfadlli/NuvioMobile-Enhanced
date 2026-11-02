@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">SZEREPLŐK ÉS STÁB</string>
+    <string name="settings_liquid_glass_preview_choose_source">Válasszon forrást a lejátszás indításához</string>
+    <string name="settings_liquid_glass_preview_available_streams">ELÉRHETŐ ADATFOLYAMOK</string>
+    <string name="settings_liquid_glass_preview_seasons_header">ÉVADOK</string>
+    <string name="settings_nav_bar_glass_blur_radius">Elmosás sugara</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Kromatikus aberráció</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Finom színes peremet ad a megtört élek köré.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Saroksugár</string>
+    <string name="settings_nav_bar_glass_depth_effect">Mélységhatás</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Mélységárnyékolást ad a megtört felülethez.</string>
+    <string name="settings_nav_bar_glass_highlight">Élkiemelés</string>
+    <string name="settings_nav_bar_glass_material_clear">Tiszta</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matt</string>
+    <string name="settings_nav_bar_glass_material_liquid">Folyékony</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Törés erőssége</string>
+    <string name="settings_nav_bar_glass_refraction_height">Törés magassága</string>
+    <string name="settings_nav_bar_glass_shadow">Árnyék</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Színezés átlátszatlansága</string>
+    <string name="settings_nav_bar_glass_vibrancy">Színélénkség</string>
+</resources>

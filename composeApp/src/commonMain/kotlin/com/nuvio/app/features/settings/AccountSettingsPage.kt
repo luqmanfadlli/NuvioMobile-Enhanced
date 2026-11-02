@@ -30,7 +30,6 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioStatusModal
-import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import kotlinx.coroutines.launch
@@ -78,7 +77,7 @@ private fun AccountSettingsBody(
     val isAnonymousGuest = (authState as? AuthState.Authenticated)?.isAnonymous == true
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NuvioSurfaceCard {
+        SettingsSurfaceCard(isTablet = isTablet) {
             Text(
                 text = stringResource(Res.string.compose_settings_page_account),
                 style = MaterialTheme.typography.titleLarge,
@@ -127,6 +126,7 @@ private fun AccountSettingsBody(
 
         if (canDeleteAccount) {
             DeleteAccountCard(
+                isTablet = isTablet,
                 errorMessage = deleteErrorMessage,
                 onDeleteClick = {
                     deleteErrorMessage = null
@@ -195,12 +195,13 @@ private fun AccountSettingsBody(
 
 @Composable
 private fun DeleteAccountCard(
+    isTablet: Boolean,
     errorMessage: String?,
     onDeleteClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
 
-    NuvioSurfaceCard {
+    SettingsSurfaceCard(isTablet = isTablet) {
         Text(
             text = stringResource(Res.string.settings_account_delete_account),
             style = MaterialTheme.typography.titleMedium,

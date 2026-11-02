@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_liquid_glass_expand_controls">إظهار عناصر التحكم</string>
+    <string name="settings_liquid_glass_collapse_controls">إخفاء عناصر التحكم</string>
+    <string name="settings_liquid_glass_controls_in">عناصر التحكم في %1$s</string>
+    <string name="settings_liquid_glass_default">افتراضي</string>
+</resources>

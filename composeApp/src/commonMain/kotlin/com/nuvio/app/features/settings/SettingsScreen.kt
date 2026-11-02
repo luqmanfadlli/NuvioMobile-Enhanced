@@ -4,7 +4,9 @@ import com.nuvio.app.features.whatsnew.WhatsNewSettingsScreen
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import com.nuvio.app.core.build.AppFeaturePolicy
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,10 +24,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.runtime.getValue
@@ -38,6 +42,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -48,14 +54,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import com.nuvio.app.core.ui.LocalDynamicArtworkBackgroundActive
 import com.nuvio.app.core.ui.LocalScreenActive
+import com.nuvio.app.core.ui.LocalNuvioThemeTokens
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
+import com.nuvio.app.core.ui.glass.LiquidGlassSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfacePreferenceEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.nuvioBackdropSource
+import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
@@ -160,9 +180,78 @@ fun SettingsScreen(
     onCollectionsClick: () -> Unit = {},
     onWatchPartyClick: () -> Unit = {},
 ) {
+    val settingsBackdrop = rememberNuvioBackdrop()
+    val customSettingsBackgroundImageUri by remember {
+        ThemeSettingsRepository.ensureLoaded()
+        ThemeSettingsRepository.customSettingsBackgroundImageUri
+    }.collectAsStateWithLifecycle()
+    val customSettingsBackgroundImageRevision by remember {
+        ThemeSettingsRepository.customSettingsBackgroundImageRevision
+    }.collectAsStateWithLifecycle()
+    val settingsImageContext = LocalPlatformContext.current
+    val settingsBackgroundImageRequest = remember(
+        customSettingsBackgroundImageUri,
+        customSettingsBackgroundImageRevision,
+        settingsImageContext,
+    ) {
+        customSettingsBackgroundImageUri?.let { imageUrl ->
+            ImageRequest.Builder(settingsImageContext)
+                .data(imageUrl)
+                .memoryCacheKey("$imageUrl#settings-background-$customSettingsBackgroundImageRevision")
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .build()
+        }
+    }
+    var settingsBackgroundLoaded by remember(
+        customSettingsBackgroundImageUri,
+        customSettingsBackgroundImageRevision,
+    ) { mutableStateOf(false) }
+    val settingsGlassEnabled = LiquidGlassSettings.enabled &&
+        isLiquidGlassSurfacePreferenceEnabled(LiquidGlassSurface.SETTINGS)
+    val settingsGlassTextContrastEnabled = settingsGlassEnabled && isLiquidGlassSupported()
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
     ) {
+        if (settingsGlassEnabled || customSettingsBackgroundImageUri != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .then(if (settingsGlassEnabled) Modifier.nuvioBackdropSource(settingsBackdrop) else Modifier),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                )
+                settingsBackgroundImageRequest?.let { imageRequest ->
+                    AsyncImage(
+                        model = imageRequest,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        onSuccess = { settingsBackgroundLoaded = true },
+                        onError = { settingsBackgroundLoaded = false },
+                    )
+                    if (settingsBackgroundLoaded) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.28f)),
+                        )
+                    }
+                }
+            }
+        }
+        CompositionLocalProvider(
+            LocalLiquidGlassBackdrop provides if (settingsGlassEnabled) settingsBackdrop else null,
+            LocalNuvioThemeTokens provides MaterialTheme.nuvio.withSettingsGlassTextContrast(
+                enabled = settingsGlassTextContrastEnabled,
+            ),
+            LocalTextStyle provides LocalTextStyle.current.withSettingsGlassTextShadow(
+                enabled = settingsGlassTextContrastEnabled,
+            ),
+        ) {
         val screenActive = LocalScreenActive.current
         val pageStateHolder = rememberSaveableStateHolder()
 
@@ -453,6 +542,7 @@ fun SettingsScreen(
                 } else {
                     MobileSettingsScreen(
                         page = page,
+                        hasCustomSettingsBackgroundImage = customSettingsBackgroundImageUri != null,
                         scrollToTopRequests = scrollToTopRequests,
                         onPageChange = ::openPage,
                         onNavigateBack = ::navigateBack,
@@ -511,12 +601,14 @@ fun SettingsScreen(
                 }
             }
         }
+        }
     }
 }
 
 @Composable
 private fun MobileSettingsScreen(
     page: SettingsPage,
+    hasCustomSettingsBackgroundImage: Boolean,
     scrollToTopRequests: Flow<Unit>,
     onPageChange: (SettingsPage) -> Unit,
     onNavigateBack: () -> Unit,
@@ -644,6 +736,11 @@ private fun MobileSettingsScreen(
         val watchPartyRowClick = watchPartyRow(onWatchPartyClick)
         val profileDrawsOwnChrome = page == SettingsPage.Profile && showInternalHeader && !LocalUseNativeNavigation.current
         ProfileInsightsPullToRefresh(enabled = page == SettingsPage.Profile) {
+        CompositionLocalProvider(
+            LocalDynamicArtworkBackgroundActive provides (
+                LocalDynamicArtworkBackgroundActive.current || hasCustomSettingsBackgroundImage
+            ),
+        ) {
         NuvioScreen(
             modifier = Modifier.nestedScroll(rootSearchRevealConnection),
             listState = listState,
@@ -657,6 +754,7 @@ private fun MobileSettingsScreen(
                     NuvioScreenHeader(
                         title = stringResource(page.titleRes),
                         onBack = previousPage?.let { { onNavigateBack() } },
+                        useSettingsGlass = true,
                     )
                 }
             } else {
@@ -871,6 +969,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                 )
             }
+        }
         }
         }
     }

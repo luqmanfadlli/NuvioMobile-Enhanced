@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">فريق التمثيل والطاقم</string>
+    <string name="settings_liquid_glass_preview_choose_source">اختر مصدرًا لبدء التشغيل</string>
+    <string name="settings_liquid_glass_preview_available_streams">التدفقات المتاحة</string>
+    <string name="settings_liquid_glass_preview_seasons_header">المواسم</string>
+    <string name="settings_nav_bar_glass_blur_radius">نصف قطر التمويه</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">الانحراف اللوني</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">يضيف تدرجات لونية خفيفة حول الحواف المنكسرة.</string>
+    <string name="settings_nav_bar_glass_corner_radius">نصف قطر الزاوية</string>
+    <string name="settings_nav_bar_glass_depth_effect">تأثير العمق</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">يضيف تظليلًا لإظهار عمق السطح المنكسر.</string>
+    <string name="settings_nav_bar_glass_highlight">إضاءة الحافة</string>
+    <string name="settings_nav_bar_glass_material_clear">شفاف</string>
+    <string name="settings_nav_bar_glass_material_frosted">مصنفر</string>
+    <string name="settings_nav_bar_glass_material_liquid">سائل</string>
+    <string name="settings_nav_bar_glass_refraction_amount">مقدار الانكسار</string>
+    <string name="settings_nav_bar_glass_refraction_height">ارتفاع الانكسار</string>
+    <string name="settings_nav_bar_glass_shadow">ظل</string>
+    <string name="settings_nav_bar_glass_tint_opacity">عتامة الصبغة</string>
+    <string name="settings_nav_bar_glass_vibrancy">حيوية الألوان</string>
+</resources>

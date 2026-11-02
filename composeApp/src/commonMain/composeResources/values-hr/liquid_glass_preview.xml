@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">GLUMAČKA POSTAVA I EKIPA</string>
+    <string name="settings_liquid_glass_preview_choose_source">Odaberite izvor za početak reprodukcije</string>
+    <string name="settings_liquid_glass_preview_available_streams">DOSTUPNI STREAMOVI</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEZONE</string>
+    <string name="settings_nav_bar_glass_blur_radius">Radijus zamućenja</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Kromatska aberacija</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Dodaje suptilne rubove u boji oko prelomljenih rubova.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Radijus kuta</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efekt dubine</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Dodaje sjenčanje dubine prelomljenoj površini.</string>
+    <string name="settings_nav_bar_glass_highlight">Isticanje ruba</string>
+    <string name="settings_nav_bar_glass_material_clear">Prozirno</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matirano</string>
+    <string name="settings_nav_bar_glass_material_liquid">Tekuće</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Jačina loma</string>
+    <string name="settings_nav_bar_glass_refraction_height">Visina loma</string>
+    <string name="settings_nav_bar_glass_shadow">Sjena</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Neprozirnost nijanse</string>
+    <string name="settings_nav_bar_glass_vibrancy">Živost boja</string>
+</resources>

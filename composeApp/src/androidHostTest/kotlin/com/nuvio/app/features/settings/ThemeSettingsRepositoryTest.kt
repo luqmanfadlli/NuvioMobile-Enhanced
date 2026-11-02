@@ -6,6 +6,8 @@ import com.nuvio.app.core.sync.decodeSyncString
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.CustomThemeColors
 import com.nuvio.app.core.ui.glass.LiquidGlassEffectDefaults
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassSurfaceOverrides
 import com.nuvio.app.core.ui.glass.decodeLiquidGlassEffectSettings
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.MemberAssetStorage
@@ -17,6 +19,9 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -26,6 +31,7 @@ class ThemeSettingsRepositoryTest {
         val context = RuntimeEnvironment.getApplication()
         context.getSharedPreferences("nuvio_theme_settings", Context.MODE_PRIVATE).edit().clear().commit()
         ThemeSettingsStorage.initialize(context)
+        ThemeSettingsStorage.clearCustomSettingsBackgroundImage()
         MemberAssetStorage.initialize(context)
         MemberAccessRepository.clearLocalState()
         ThemeSettingsRepository.clearLocalState()
@@ -34,6 +40,7 @@ class ThemeSettingsRepositoryTest {
     @AfterTest
     fun clearState() {
         ThemeSettingsRepository.clearLocalState()
+        ThemeSettingsStorage.clearCustomSettingsBackgroundImage()
     }
 
     @Test
@@ -282,5 +289,122 @@ class ThemeSettingsRepositoryTest {
         assertEquals(CustomThemeColors.solid(0x445566), ThemeSettingsRepository.customThemeColors.value)
         assertEquals(saved, ThemeSettingsRepository.customThemePreference.value)
         assertEquals(saved.encode(), ThemeSettingsStorage.exportToSyncPayload().decodeSyncString("custom_theme_colors"))
+    }
+
+    @Test
+    fun liquidGlassSurfaceDraftUpdatesLivePersistsOnSaveAndReloads() {
+        ThemeSettingsRepository.ensureLoaded()
+        val surface = LiquidGlassSurface.SEARCH
+        val overrides = LiquidGlassSurfaceOverrides(
+            enabled = true,
+            blurRadiusDp = 15f,
+        )
+
+        ThemeSettingsRepository.updateLiquidGlassSurfaceOverrides(surface, overrides)
+
+        assertEquals(overrides, ThemeSettingsRepository.liquidGlassSurfaceSettings.value.forSurface(surface))
+        assertNull(ThemeSettingsStorage.loadLiquidGlassSurfaceSettings())
+
+        ThemeSettingsRepository.saveLiquidGlassSurfaceSettings()
+
+        assertEquals(
+            overrides,
+            ThemeSettingsRepository.liquidGlassSurfaceSettings.value.forSurface(surface),
+        )
+        assertTrue(ThemeSettingsStorage.loadLiquidGlassSurfaceSettings() != null)
+
+        ThemeSettingsRepository.clearLocalState()
+        ThemeSettingsRepository.ensureLoaded()
+
+        assertEquals(overrides, ThemeSettingsRepository.liquidGlassSurfaceSettings.value.forSurface(surface))
+    }
+
+
+    @Test
+    fun customSettingsBackgroundImagePersistsAsLocalFileAndCanBeCleared() {
+        ThemeSettingsRepository.ensureLoaded()
+        val imageBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
+        val initialRevision = ThemeSettingsRepository.customSettingsBackgroundImageRevision.value
+
+        assertTrue(ThemeSettingsRepository.setCustomSettingsBackgroundImage(imageBytes))
+        val imageUri = ThemeSettingsRepository.customSettingsBackgroundImageUri.value
+        assertTrue(imageUri?.startsWith("file:") == true)
+        assertEquals(imageUri, ThemeSettingsStorage.loadCustomSettingsBackgroundImageUri())
+        assertEquals(initialRevision + 1L, ThemeSettingsRepository.customSettingsBackgroundImageRevision.value)
+
+        val savedRevision = ThemeSettingsRepository.customSettingsBackgroundImageRevision.value
+        assertTrue(ThemeSettingsRepository.clearCustomSettingsBackgroundImage())
+        assertEquals(savedRevision + 1L, ThemeSettingsRepository.customSettingsBackgroundImageRevision.value)
+        assertNull(ThemeSettingsRepository.customSettingsBackgroundImageUri.value)
+        assertNull(ThemeSettingsStorage.loadCustomSettingsBackgroundImageUri())
+    }
+
+    @Test
+    fun savingBackgroundImagesForAnotherProfileDoesNotChangeActivePreviewState() {
+        ThemeSettingsRepository.ensureLoaded()
+        val activeProfileId = com.nuvio.app.features.profiles.ProfileRepository.activeProfileId
+        val otherProfileId = activeProfileId + 10_000
+        val initialSettingsUri = ThemeSettingsRepository.customSettingsBackgroundImageUri.value
+        val initialCloudUri = ThemeSettingsRepository.customLibraryCloudBackgroundImageUri.value
+        val imageBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0x01, 0x02, 0xFF.toByte(), 0xD9.toByte())
+
+        try {
+            val storedSettings = kotlinx.coroutines.runBlocking {
+                ThemeSettingsRepository.saveCustomSettingsBackgroundImageForStudio(imageBytes, otherProfileId)
+            }
+            val storedCloud = kotlinx.coroutines.runBlocking {
+                ThemeSettingsRepository.saveCustomLibraryCloudBackgroundImageForStudio(imageBytes, otherProfileId)
+            }
+            assertTrue(storedSettings)
+            assertTrue(storedCloud)
+            assertEquals(initialSettingsUri, ThemeSettingsRepository.customSettingsBackgroundImageUri.value)
+            assertEquals(initialCloudUri, ThemeSettingsRepository.customLibraryCloudBackgroundImageUri.value)
+
+            val clearedSettings = kotlinx.coroutines.runBlocking {
+                ThemeSettingsRepository.clearCustomSettingsBackgroundImageForStudio(otherProfileId)
+            }
+            val clearedCloud = kotlinx.coroutines.runBlocking {
+                ThemeSettingsRepository.clearCustomLibraryCloudBackgroundImageForStudio(otherProfileId)
+            }
+            assertTrue(clearedSettings)
+            assertTrue(clearedCloud)
+            assertEquals(initialSettingsUri, ThemeSettingsRepository.customSettingsBackgroundImageUri.value)
+            assertEquals(initialCloudUri, ThemeSettingsRepository.customLibraryCloudBackgroundImageUri.value)
+        } finally {
+            ThemeSettingsStorage.clearCustomSettingsBackgroundImage(otherProfileId)
+            ThemeSettingsStorage.clearCustomLibraryCloudBackgroundImage(otherProfileId)
+        }
+    }
+
+    @Test
+    fun backgroundImageUriGuardRejectsRemoteAndEmptySources() {
+        assertTrue(isLocalBackgroundImageUri("file:///private/background.jpg"))
+        assertFalse(isLocalBackgroundImageUri("https://example.com/background.jpg"))
+        assertFalse(isLocalBackgroundImageUri(null))
+
+        ThemeSettingsRepository.ensureLoaded()
+        val activeProfileId = com.nuvio.app.features.profiles.ProfileRepository.activeProfileId
+        val originalUri = ThemeSettingsRepository.customSettingsBackgroundImageUri.value
+        val originalRevision = ThemeSettingsRepository.customSettingsBackgroundImageRevision.value
+        ThemeSettingsRepository.publishCustomSettingsBackgroundImageForProfile(
+            activeProfileId,
+            "https://example.com/not-a-local-background.jpg",
+        )
+        assertEquals(originalUri, ThemeSettingsRepository.customSettingsBackgroundImageUri.value)
+        assertEquals(originalRevision, ThemeSettingsRepository.customSettingsBackgroundImageRevision.value)
+    }
+
+    @Test
+    fun legacyRemoteSettingsBackgroundUrlIsRemovedWithoutLoadingIt() {
+        val context = RuntimeEnvironment.getApplication()
+        val preferences = context.getSharedPreferences("nuvio_theme_settings", Context.MODE_PRIVATE)
+        val legacyKey = com.nuvio.app.core.storage.ProfileScopedKey.of("enhanced_local_settings_background_url")
+        preferences.edit().putString(legacyKey, "https://private.example/old-image?token=secret").commit()
+
+        ThemeSettingsRepository.clearLocalState()
+        ThemeSettingsRepository.ensureLoaded()
+
+        assertNull(ThemeSettingsRepository.customSettingsBackgroundImageUri.value)
+        assertNull(preferences.getString(legacyKey, null))
     }
 }

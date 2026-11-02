@@ -33,6 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 import com.nuvio.app.features.membership.MemberTier
 import com.nuvio.app.features.membership.MembershipOverview
 import com.nuvio.app.features.membership.MembershipOverviewState
@@ -67,11 +72,30 @@ internal fun SupporterMembershipCard(
     onAction: () -> Unit,
     onRefresh: () -> Unit,
 ) {
+    val surface = LiquidGlassSurface.SETTINGS
+    val glassEnabled = isLiquidGlassSurfaceEffectivelyEnabled(
+        surface = surface,
+        platformSupported = isLiquidGlassSupported(),
+    )
+    val shape = liquidGlassShape(surface, RoundedCornerShape(16.dp))
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardColor),
+            .then(
+                if (glassEnabled) {
+                    Modifier.liquidGlassForSurface(
+                        surface = surface,
+                        shape = shape,
+                        tint = Color.White.copy(alpha = 0.14f),
+                        fallback = CardColor,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 12.dp,
+                    )
+                } else {
+                    Modifier.clip(shape).background(CardColor)
+                },
+            ),
     ) {
         when {
             state.isLoading -> LoadingMembershipContent(isTablet = isTablet)

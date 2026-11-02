@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">キャストとスタッフ</string>
+    <string name="settings_liquid_glass_preview_choose_source">再生を開始するソースを選択</string>
+    <string name="settings_liquid_glass_preview_available_streams">利用可能なストリーム</string>
+    <string name="settings_liquid_glass_preview_seasons_header">シーズン</string>
+    <string name="settings_nav_bar_glass_blur_radius">ぼかし半径</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">色収差</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">屈折したエッジの周囲に控えめな色のにじみを加えます。</string>
+    <string name="settings_nav_bar_glass_corner_radius">角の半径</string>
+    <string name="settings_nav_bar_glass_depth_effect">奥行き効果</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">屈折した表面に奥行きの陰影を加えます。</string>
+    <string name="settings_nav_bar_glass_highlight">エッジのハイライト</string>
+    <string name="settings_nav_bar_glass_material_clear">クリア</string>
+    <string name="settings_nav_bar_glass_material_frosted">フロスト</string>
+    <string name="settings_nav_bar_glass_material_liquid">リキッド</string>
+    <string name="settings_nav_bar_glass_refraction_amount">屈折量</string>
+    <string name="settings_nav_bar_glass_refraction_height">屈折の高さ</string>
+    <string name="settings_nav_bar_glass_shadow">影</string>
+    <string name="settings_nav_bar_glass_tint_opacity">色合いの不透明度</string>
+    <string name="settings_nav_bar_glass_vibrancy">鮮やかさ</string>
+</resources>

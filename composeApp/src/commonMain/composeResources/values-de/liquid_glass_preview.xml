@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">BESETZUNG UND TEAM</string>
+    <string name="settings_liquid_glass_preview_choose_source">Wähle eine Quelle, um die Wiedergabe zu starten</string>
+    <string name="settings_liquid_glass_preview_available_streams">VERFÜGBARE STREAMS</string>
+    <string name="settings_liquid_glass_preview_seasons_header">STAFFELN</string>
+    <string name="settings_nav_bar_glass_blur_radius">Unschärferadius</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Chromatische Aberration</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Fügt an gebrochenen Kanten dezente Farbsäume hinzu.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Eckenradius</string>
+    <string name="settings_nav_bar_glass_depth_effect">Tiefeneffekt</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Fügt der gebrochenen Oberfläche Tiefenschattierung hinzu.</string>
+    <string name="settings_nav_bar_glass_highlight">Kantenlicht</string>
+    <string name="settings_nav_bar_glass_material_clear">Klar</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matt</string>
+    <string name="settings_nav_bar_glass_material_liquid">Flüssig</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Brechungsstärke</string>
+    <string name="settings_nav_bar_glass_refraction_height">Brechungshöhe</string>
+    <string name="settings_nav_bar_glass_shadow">Schatten</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Deckkraft der Tönung</string>
+    <string name="settings_nav_bar_glass_vibrancy">Farbintensität</string>
+</resources>

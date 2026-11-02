@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_liquid_glass_expand_controls">Zobraziť ovládacie prvky</string>
+    <string name="settings_liquid_glass_collapse_controls">Skryť ovládacie prvky</string>
+    <string name="settings_liquid_glass_controls_in">Ovládacie prvky: %1$s</string>
+    <string name="settings_liquid_glass_default">Predvolené</string>
+</resources>

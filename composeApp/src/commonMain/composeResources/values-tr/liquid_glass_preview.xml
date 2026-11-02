@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">OYUNCULAR VE EKİP</string>
+    <string name="settings_liquid_glass_preview_choose_source">Oynatmayı başlatmak için bir kaynak seçin</string>
+    <string name="settings_liquid_glass_preview_available_streams">KULLANILABİLİR AKIŞLAR</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEZONLAR</string>
+    <string name="settings_nav_bar_glass_blur_radius">Bulanıklık yarıçapı</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Kromatik sapma</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Kırılan kenarların çevresine hafif renk saçakları ekler.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Köşe yarıçapı</string>
+    <string name="settings_nav_bar_glass_depth_effect">Derinlik efekti</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Kırılan yüzeye derinlik gölgelendirmesi ekler.</string>
+    <string name="settings_nav_bar_glass_highlight">Kenar vurgusu</string>
+    <string name="settings_nav_bar_glass_material_clear">Şeffaf</string>
+    <string name="settings_nav_bar_glass_material_frosted">Buzlu</string>
+    <string name="settings_nav_bar_glass_material_liquid">Sıvı</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Kırılma miktarı</string>
+    <string name="settings_nav_bar_glass_refraction_height">Kırılma yüksekliği</string>
+    <string name="settings_nav_bar_glass_shadow">Gölge</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Renk tonu opaklığı</string>
+    <string name="settings_nav_bar_glass_vibrancy">Canlılık</string>
+</resources>

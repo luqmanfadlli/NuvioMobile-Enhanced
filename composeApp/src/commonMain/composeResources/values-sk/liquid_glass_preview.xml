@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">OBSADENIE A ŠTÁB</string>
+    <string name="settings_liquid_glass_preview_choose_source">Vyberte zdroj na spustenie prehrávania</string>
+    <string name="settings_liquid_glass_preview_available_streams">DOSTUPNÉ STREAMY</string>
+    <string name="settings_liquid_glass_preview_seasons_header">SEZÓNY</string>
+    <string name="settings_nav_bar_glass_blur_radius">Polomer rozmazania</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Chromatická aberácia</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Pridáva jemné farebné lemovanie okolo lomených hrán.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Polomer rohu</string>
+    <string name="settings_nav_bar_glass_depth_effect">Efekt hĺbky</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Pridáva tieňovanie hĺbky lomenému povrchu.</string>
+    <string name="settings_nav_bar_glass_highlight">Zvýraznenie hrany</string>
+    <string name="settings_nav_bar_glass_material_clear">Číre</string>
+    <string name="settings_nav_bar_glass_material_frosted">Matné</string>
+    <string name="settings_nav_bar_glass_material_liquid">Tekuté</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Sila lomu</string>
+    <string name="settings_nav_bar_glass_refraction_height">Výška lomu</string>
+    <string name="settings_nav_bar_glass_shadow">Tieň</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Nepriehľadnosť odtieňa</string>
+    <string name="settings_nav_bar_glass_vibrancy">Živosť farieb</string>
+</resources>

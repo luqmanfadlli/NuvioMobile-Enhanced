@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_liquid_glass_preview_cast_crew">DIỄN VIÊN VÀ Ê-KÍP</string>
+    <string name="settings_liquid_glass_preview_choose_source">Chọn nguồn để bắt đầu phát</string>
+    <string name="settings_liquid_glass_preview_available_streams">LUỒNG KHẢ DỤNG</string>
+    <string name="settings_liquid_glass_preview_seasons_header">MÙA</string>
+    <string name="settings_nav_bar_glass_blur_radius">Bán kính làm mờ</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration">Quang sai màu</string>
+    <string name="settings_nav_bar_glass_chromatic_aberration_description">Thêm viền màu nhẹ quanh các cạnh khúc xạ.</string>
+    <string name="settings_nav_bar_glass_corner_radius">Bán kính góc</string>
+    <string name="settings_nav_bar_glass_depth_effect">Hiệu ứng chiều sâu</string>
+    <string name="settings_nav_bar_glass_depth_effect_description">Thêm bóng đổ chiều sâu cho bề mặt khúc xạ.</string>
+    <string name="settings_nav_bar_glass_highlight">Làm nổi cạnh</string>
+    <string name="settings_nav_bar_glass_material_clear">Trong</string>
+    <string name="settings_nav_bar_glass_material_frosted">Mờ sương</string>
+    <string name="settings_nav_bar_glass_material_liquid">Lỏng</string>
+    <string name="settings_nav_bar_glass_refraction_amount">Mức khúc xạ</string>
+    <string name="settings_nav_bar_glass_refraction_height">Độ cao khúc xạ</string>
+    <string name="settings_nav_bar_glass_shadow">Bóng đổ</string>
+    <string name="settings_nav_bar_glass_tint_opacity">Độ mờ màu phủ</string>
+    <string name="settings_nav_bar_glass_vibrancy">Độ rực màu</string>
+</resources>

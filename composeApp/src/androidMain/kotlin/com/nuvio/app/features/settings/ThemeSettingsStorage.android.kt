@@ -2,6 +2,7 @@ package com.nuvio.app.features.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.io.File
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.nuvio.app.core.sync.decodeSyncBoolean
@@ -30,6 +31,10 @@ actual object ThemeSettingsStorage {
     private const val localNavBarPositionKey = "enhanced_local_nav_bar_position"
     private const val localNavBarGlassKey = "enhanced_local_nav_bar_glass"
     private const val localLiquidGlassEffectsKey = "enhanced_local_liquid_glass_effects"
+    private const val localLiquidGlassSurfaceSettingsKey = "enhanced_local_liquid_glass_surface_settings"
+    private const val legacyCustomSettingsBackgroundUrlKey = "enhanced_local_settings_background_url"
+    private const val localCustomSettingsBackgroundImageKey = "enhanced_local_settings_background_image"
+    private const val localCustomLibraryCloudBackgroundImageKey = "enhanced_local_library_cloud_background_image"
     private const val navBarGlowEnabledKey = "nav_bar_glow_enabled"
     private const val navBarDefaultIconColorEnabledKey = "enhanced_local_nav_bar_default_icon_color_enabled"
     private const val navBarDefaultIconColorKey = "enhanced_local_nav_bar_default_icon_color"
@@ -46,8 +51,10 @@ actual object ThemeSettingsStorage {
     )
 
     private var preferences: SharedPreferences? = null
+    private var appContext: Context? = null
 
     fun initialize(context: Context) {
+        appContext = context.applicationContext
         preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.DEVICE.code)
     }
@@ -239,6 +246,135 @@ actual object ThemeSettingsStorage {
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(localLiquidGlassEffectsKey), enabled)
             ?.apply()
+    }
+
+    actual fun loadLiquidGlassSurfaceSettings(): String? =
+        loadRawString(localLiquidGlassSurfaceSettingsKey)
+
+    actual fun saveLiquidGlassSurfaceSettings(settings: String) {
+        saveRawString(localLiquidGlassSurfaceSettingsKey, settings)
+    }
+
+    actual fun loadCustomSettingsBackgroundImageUri(): String? {
+        clearLegacyCustomSettingsBackgroundUrl()
+        return settingsBackgroundImageFile()
+            ?.takeIf { it.isFile && it.length() in 1..CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES.toLong() }
+            ?.toURI()
+            ?.toString()
+    }
+
+    actual fun saveCustomSettingsBackgroundImage(bytes: ByteArray): String? =
+        writeCustomSettingsBackgroundImage(bytes, profileId = null)
+
+    actual fun saveCustomSettingsBackgroundImage(bytes: ByteArray, profileId: Int): String? =
+        writeCustomSettingsBackgroundImage(bytes, profileId = profileId)
+
+    private fun writeCustomSettingsBackgroundImage(bytes: ByteArray, profileId: Int?): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        if (profileId == null) clearLegacyCustomSettingsBackgroundUrl()
+        else clearLegacyCustomSettingsBackgroundUrl(profileId)
+        val target = settingsBackgroundImageFile(profileId) ?: return null
+        val directory = target.parentFile ?: return null
+        if (!directory.isDirectory && !directory.mkdirs()) return null
+        val temporary = directory.resolve(".${target.name}.tmp")
+        return try {
+            temporary.writeBytes(bytes)
+            if (!temporary.renameTo(target)) {
+                // Some filesystems don't replace an existing destination on rename. Keep the
+                // same profile-scoped path usable when the user selects a replacement image.
+                temporary.copyTo(target, overwrite = true)
+            }
+            target.takeIf {
+                it.isFile && it.length() in 1..CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES.toLong()
+            }?.toURI()?.toString()
+        } catch (_: Exception) {
+            null
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    actual fun clearCustomSettingsBackgroundImage(): Boolean {
+        val deleted = deleteSettingsBackgroundImage(settingsBackgroundImageFile())
+        clearLegacyCustomSettingsBackgroundUrl()
+        return deleted
+    }
+
+    actual fun clearCustomSettingsBackgroundImage(profileIndex: Int): Boolean {
+        val deleted = deleteSettingsBackgroundImage(settingsBackgroundImageFile(profileIndex))
+        clearLegacyCustomSettingsBackgroundUrl(profileIndex)
+        return deleted
+    }
+
+    actual fun loadCustomLibraryCloudBackgroundImageUri(): String? =
+        libraryCloudBackgroundImageFile()
+            ?.takeIf { it.isFile && it.length() in 1..CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES.toLong() }
+            ?.toURI()
+            ?.toString()
+
+    actual fun saveCustomLibraryCloudBackgroundImage(bytes: ByteArray): String? =
+        writeCustomLibraryCloudBackgroundImage(bytes, profileId = null)
+
+    actual fun saveCustomLibraryCloudBackgroundImage(bytes: ByteArray, profileId: Int): String? =
+        writeCustomLibraryCloudBackgroundImage(bytes, profileId = profileId)
+
+    private fun writeCustomLibraryCloudBackgroundImage(bytes: ByteArray, profileId: Int?): String? {
+        if (bytes.isEmpty() || bytes.size > CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES) return null
+        val target = libraryCloudBackgroundImageFile(profileId) ?: return null
+        val directory = target.parentFile ?: return null
+        if (!directory.isDirectory && !directory.mkdirs()) return null
+        val temporary = directory.resolve(".${target.name}.tmp")
+        return try {
+            temporary.writeBytes(bytes)
+            if (!temporary.renameTo(target)) temporary.copyTo(target, overwrite = true)
+            target.takeIf {
+                it.isFile && it.length() in 1..CUSTOM_SETTINGS_BACKGROUND_MAX_IMAGE_BYTES.toLong()
+            }?.toURI()?.toString()
+        } catch (_: Exception) {
+            null
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    actual fun clearCustomLibraryCloudBackgroundImage(): Boolean =
+        deleteLibraryCloudBackgroundImage(libraryCloudBackgroundImageFile())
+
+    actual fun clearCustomLibraryCloudBackgroundImage(profileIndex: Int): Boolean =
+        deleteLibraryCloudBackgroundImage(libraryCloudBackgroundImageFile(profileIndex))
+
+    private fun deleteLibraryCloudBackgroundImage(target: File?): Boolean {
+        if (target == null) return false
+        val temporary = target.parentFile?.resolve(".${target.name}.tmp")
+        val imageRemoved = !target.exists() || target.delete()
+        val temporaryRemoved = temporary?.let { !it.exists() || it.delete() } ?: true
+        return imageRemoved && temporaryRemoved
+    }
+
+    private fun libraryCloudBackgroundImageFile(profileIndex: Int? = null): File? {
+        val key = profileIndex?.let { ProfileScopedKey.of(localCustomLibraryCloudBackgroundImageKey, it) }
+            ?: ProfileScopedKey.of(localCustomLibraryCloudBackgroundImageKey)
+        return appContext?.noBackupFilesDir?.resolve("library_cloud_backgrounds")?.resolve("$key.jpg")
+    }
+
+    private fun deleteSettingsBackgroundImage(target: File?): Boolean {
+        if (target == null) return false
+        val temporary = target.parentFile?.resolve(".${target.name}.tmp")
+        val imageRemoved = !target.exists() || target.delete()
+        val temporaryRemoved = temporary?.let { !it.exists() || it.delete() } ?: true
+        return imageRemoved && temporaryRemoved
+    }
+
+    private fun settingsBackgroundImageFile(profileIndex: Int? = null): File? {
+        val key = profileIndex?.let { ProfileScopedKey.of(localCustomSettingsBackgroundImageKey, it) }
+            ?: ProfileScopedKey.of(localCustomSettingsBackgroundImageKey)
+        return appContext?.noBackupFilesDir?.resolve("settings_backgrounds")?.resolve("$key.jpg")
+    }
+
+    private fun clearLegacyCustomSettingsBackgroundUrl(profileIndex: Int? = null) {
+        val key = profileIndex?.let { ProfileScopedKey.of(legacyCustomSettingsBackgroundUrlKey, it) }
+            ?: ProfileScopedKey.of(legacyCustomSettingsBackgroundUrlKey)
+        preferences?.edit()?.remove(key)?.apply()
     }
 
     private fun loadRawString(key: String): String? =

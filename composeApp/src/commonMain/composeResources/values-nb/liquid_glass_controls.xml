@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_liquid_glass_expand_controls">Vis kontroller</string>
+    <string name="settings_liquid_glass_collapse_controls">Skjul kontroller</string>
+    <string name="settings_liquid_glass_controls_in">Kontroller for %1$s</string>
+    <string name="settings_liquid_glass_default">Standard</string>
+</resources>

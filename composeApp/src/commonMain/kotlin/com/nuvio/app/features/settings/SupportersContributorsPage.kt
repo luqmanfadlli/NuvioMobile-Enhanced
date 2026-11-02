@@ -53,7 +53,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
-import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.membership.MembershipOverviewRepository
 import kotlinx.coroutines.launch
@@ -277,16 +276,19 @@ private object SupportersContributorsRepository {
 fun SupportersContributorsSettingsScreen(
     onBack: () -> Unit,
 ) {
-    NuvioScreen(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        stickyHeader {
-            NuvioScreenHeader(
-                title = stringResource(Res.string.compose_settings_page_supporters_contributors),
-                onBack = onBack,
-            )
+    SettingsGlassPageBackground {
+        NuvioScreen(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            stickyHeader {
+                NuvioScreenHeader(
+                    title = stringResource(Res.string.compose_settings_page_supporters_contributors),
+                    onBack = onBack,
+                    useSettingsGlass = true,
+                )
+            }
+            supportersContributorsContent(isTablet = false)
         }
-        supportersContributorsContent(isTablet = false)
     }
 }
 
@@ -407,7 +409,7 @@ private fun SupportersContributorsBody(
         )
 
         if (AppFeaturePolicy.donationProgressEnabled) {
-            NuvioSurfaceCard {
+            SettingsSurfaceCard(isTablet = isTablet) {
                 if (donationsConfigured) {
                     DonationProgressSection(
                         progress = uiState.donationProgress,
@@ -424,7 +426,7 @@ private fun SupportersContributorsBody(
             }
         }
 
-        NuvioSurfaceCard {
+        SettingsSurfaceCard(isTablet = isTablet) {
             CommunityTabRow(
                 selectedTab = uiState.selectedTab,
                 onSelectTab = { tab -> uiState = uiState.copy(selectedTab = tab) },
@@ -433,6 +435,7 @@ private fun SupportersContributorsBody(
 
         when (uiState.selectedTab) {
             CommunityTab.Contributors -> ContributorsCard(
+                isTablet = isTablet,
                 contributors = uiState.contributors,
                 isLoading = uiState.isContributorsLoading,
                 errorMessage = uiState.contributorsErrorMessage,
@@ -441,6 +444,7 @@ private fun SupportersContributorsBody(
             )
 
             CommunityTab.Supporters -> SupportersCard(
+                isTablet = isTablet,
                 supporters = uiState.supporters,
                 isLoading = uiState.isSupportersLoading,
                 errorMessage = uiState.supportersErrorMessage,
@@ -570,13 +574,14 @@ private fun CommunityTabRow(
 
 @Composable
 private fun ContributorsCard(
+    isTablet: Boolean,
     contributors: List<CommunityContributor>,
     isLoading: Boolean,
     errorMessage: String?,
     onRetry: () -> Unit,
     onContributorClick: (CommunityContributor) -> Unit,
 ) {
-    NuvioSurfaceCard {
+    SettingsSurfaceCard(isTablet = isTablet) {
         when {
             isLoading -> LoadingState(label = stringResource(Res.string.community_loading_contributors))
             errorMessage != null -> ErrorState(
@@ -608,13 +613,14 @@ private fun ContributorsCard(
 
 @Composable
 private fun SupportersCard(
+    isTablet: Boolean,
     supporters: List<CommunitySupporter>,
     isLoading: Boolean,
     errorMessage: String?,
     onRetry: () -> Unit,
     onSupporterClick: (CommunitySupporter) -> Unit,
 ) {
-    NuvioSurfaceCard {
+    SettingsSurfaceCard(isTablet = isTablet) {
         when {
             isLoading -> LoadingState(label = stringResource(Res.string.community_loading_supporters))
             errorMessage != null -> ErrorState(
