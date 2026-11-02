@@ -1,5 +1,7 @@
 package com.nuvio.app.features.streams
 
+import com.nuvio.app.core.ui.LocalAppBackgroundBackdrop
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import com.nuvio.app.core.ui.nuvioScreenBackground
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -480,7 +482,9 @@ private fun MobileStreamsLayout(
     modifier: Modifier = Modifier,
 ) {
     val streamsGlassBackdrop = rememberNuvioBackdrop()
-    val streamsGlassEnabled = backgroundMode == StreamBackgroundMode.Cinematic && heroArtwork != null
+    val cinematicGlass = backgroundMode == StreamBackgroundMode.Cinematic && heroArtwork != null
+    val appBackgroundBackdrop = LocalAppBackgroundBackdrop.current
+    val appBackgroundGlass = !cinematicGlass && LocalAppBackgroundActive.current && appBackgroundBackdrop != null
     Box(modifier = modifier.fillMaxSize()) {
         if (backgroundMode == StreamBackgroundMode.Cinematic && heroArtwork != null) {
             AsyncImage(
@@ -502,7 +506,11 @@ private fun MobileStreamsLayout(
         val streamBlendColor = MaterialTheme.colorScheme.background
 
         CompositionLocalProvider(
-            LocalLiquidGlassBackdrop provides if (streamsGlassEnabled) streamsGlassBackdrop else null,
+            LocalLiquidGlassBackdrop provides when {
+                cinematicGlass -> streamsGlassBackdrop
+                appBackgroundGlass -> appBackgroundBackdrop
+                else -> null
+            },
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isEpisode && seasonNumber != null && episodeNumber != null) {

@@ -1,5 +1,9 @@
 package com.nuvio.app.features.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import com.nuvio.app.core.ui.appBackgroundHeaderGlass
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundBackdrop
 import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import com.nuvio.app.core.ui.AppBackgroundImage
 import androidx.compose.ui.platform.LocalDensity
@@ -636,8 +640,6 @@ fun LibraryScreen(
         uiState.isLoaded && uiState.sections.isNotEmpty()
     val savedControlsInset = 72.dp
     Box(modifier = modifier.fillMaxSize()) {
-        // Cloud has a dedicated black default backdrop, matching Studio; a custom local image
-        // is drawn above it when present. Draw it even with Liquid Glass disabled.
         val appBackgroundActive = LocalAppBackgroundActive.current
         if (anyLibraryGlassEnabled || sourceMode == LibraryViewMode.Cloud || appBackgroundActive) {
             Box(
@@ -665,8 +667,6 @@ fun LibraryScreen(
             }
         }
         CompositionLocalProvider(
-            // Saved pinned glass controls sample the scrolling content beneath them; other modes
-            // retain the static screen backdrop. The release calendar uses its own scoped capture.
             LocalLiquidGlassBackdrop provides if (
                 libraryPinnedChromeUsesContentBackdrop(sourceMode, anyLibraryGlassEnabled)
             ) libraryContentBackdrop else if (anyLibraryGlassEnabled) libraryBackdrop else null,
@@ -684,12 +684,22 @@ fun LibraryScreen(
                     libraryToolbarHeight = with(headerDensity) { size.height.toDp() }
                 },
         ) {
+            if (appBackgroundActive) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .appBackgroundHeaderGlass(
+                            hairline = sourceMode == LibraryViewMode.Saved && !hasSavedControls,
+                        ),
+                )
+            }
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(LocalVerticalBarPadding.current),
             ) {
                 NuvioScreenHeader(
+                    appBackgroundGlass = false,
                     title = if (sourceMode != LibraryViewMode.Saved) {
                         stringResource(Res.string.library_title)
                     } else {
@@ -703,8 +713,6 @@ fun LibraryScreen(
                             LibrarySourceMode.PUBLICMETADB -> stringResource(Res.string.library_publicmetadb_title)
                         }
                     },
-                    // Keep artwork edge-to-edge, but constrain the Saved fade to the title
-                    // header itself so it cannot paint over the Saved/Cloud source-switch pill.
                     modifier = (if (cloudHeaderBackdropActive || savedHeaderScrimEnabled) {
                         Modifier
                     } else {
@@ -732,7 +740,6 @@ fun LibraryScreen(
                         0.dp
                     },
                 )
-                // Keep the source pill close to the Library title.
                 Spacer(modifier = Modifier.height(4.dp))
                 LibrarySourceSwitch(
                     selectedMode = sourceMode,
@@ -748,14 +755,14 @@ fun LibraryScreen(
                                 Modifier.liquidGlassForSurface(
                                     surface = LiquidGlassSurface.LIBRARY,
                                     shape = shape,
-                                    // Rounded-rectangle toolbar without an outline; the glass edge
-                                    // highlight is enough to separate it from the background.
                                     tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
                                     fallback = MaterialTheme.nuvio.colors.surfaceCard,
                                     blurRadius = 12.dp,
                                     refractionHeight = 6.dp,
                                     refractionAmount = 9.dp,
                                 )
+                            } else if (appBackgroundActive) {
+                                Modifier.appBackgroundGlass(LibraryToolbarGlassShape)
                             } else {
                                 Modifier
                             },
@@ -822,7 +829,6 @@ fun LibraryScreen(
             val windowSize = LocalWindowInfo.current.containerSize
             val density = LocalDensity.current
             val windowShortSide = with(density) { minOf(windowSize.width, windowSize.height).toDp() }
-            // Preserve the pre-overlay grid breakpoint: the old content viewport began below the toolbar.
             val contentViewportHeight = (maxHeight - libraryToolbarHeight).coerceAtLeast(0.dp)
             val isLandscape = maxWidth > contentViewportHeight
             val gridColumns = remember(isLandscape, windowShortSide) {
@@ -850,9 +856,6 @@ fun LibraryScreen(
             NuvioScreen(
                 modifier = Modifier.fillMaxSize(),
                 horizontalPadding = 0.dp,
-                // Saved filters are pinned outside the scrolling content. Always reserve their
-                // space initially so the first section heading stays visible regardless of material;
-                // after scrolling, poster content can pass beneath the pinned controls.
                 topPadding = if (sourceMode == LibraryViewMode.Saved) {
                     libraryContentTopPadding(
                         headerHeight = libraryToolbarHeight,
@@ -1029,9 +1032,16 @@ fun LibraryScreen(
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
                             .offset(y = libraryToolbarHeight)
-                            .height(savedControlsInset),
+                            .height(savedControlsInset)
+                            .zIndex(1f),
                     ) {
-                        // Keep the overlay hit target without painting a full-width black bar.
+                        if (LocalAppBackgroundActive.current) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .appBackgroundHeaderGlass(extendUp = false),
+                            )
+                        }
                         Box(
                             modifier = Modifier
                                 .matchParentSize()
@@ -1064,15 +1074,13 @@ fun LibraryScreen(
     }
 
     if (showReleaseCalendar) {
-        // Dialog is outside the main Library provider. Supply captured content explicitly so
-        // runtime glass samples the Library beneath it instead of falling back to a solid tint.
+        val appBackgroundBackdrop = LocalAppBackgroundBackdrop.current
         CompositionLocalProvider(
-            LocalLiquidGlassBackdrop provides if (
-                shouldUseLibraryContentBackdropForCalendar(sourceMode, calendarGlassEnabled)
-            ) {
-                libraryContentBackdrop
-            } else {
-                null
+            LocalLiquidGlassBackdrop provides when {
+                !calendarGlassEnabled -> null
+                appBackgroundBackdrop != null -> appBackgroundBackdrop
+                shouldUseLibraryContentBackdropForCalendar(sourceMode, calendarGlassEnabled) -> libraryContentBackdrop
+                else -> null
             },
         ) {
             LibraryReleaseCalendarPanel(
@@ -1109,6 +1117,7 @@ fun LibraryScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.cloudLibraryContent(
     uiState: CloudLibraryUiState,
     cloudFiltersGlassEnabled: Boolean,
@@ -1197,63 +1206,73 @@ private fun LazyListScope.cloudLibraryContent(
                     }
                 }
             } else {
-                item {
-                    LiquidGlassTextContrastScope(enabled = cloudFiltersGlassEnabled) {
-                        CloudLibraryToolbar(
-                            uiState = uiState,
-                            selectedProviderId = selectedProviderId,
-                            selectedType = effectiveSelectedType,
-                            availableTypes = availableTypes,
-                            onProviderSelected = onProviderSelected,
-                            onTypeSelected = onTypeSelected,
-                            onRefresh = onRefresh,
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                        )
-                    }
-                }
-
-                item(key = "cloud-library-search") {
-                    LiquidGlassTextContrastScope(enabled = cloudSearchGlassEnabled) {
-                        val defaultSearchShape = RoundedCornerShape(12.dp)
-                        val searchShape = liquidGlassShape(
-                            LiquidGlassSurface.LIBRARY_CLOUD_SEARCH,
-                            defaultSearchShape,
-                        )
-                        val glassRimCanRender = cloudSearchGlassEnabled &&
-                            isLiquidGlassBackdropReady(LocalLiquidGlassBackdrop.current)
-                        CloudLibrarySearchField(
-                            query = searchQuery,
-                            onQueryChange = onSearchQueryChange,
-                            nativeGlassEnabled = isNativeLiquidGlassControlsAvailable() &&
-                                isLiquidGlassSurfaceEffectivelyEnabled(
+                stickyHeader(key = "cloud-library-controls") {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (LocalAppBackgroundActive.current) {
+                            Box(modifier = Modifier.matchParentSize().appBackgroundHeaderGlass())
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .background(MaterialTheme.colorScheme.background),
+                            )
+                        }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            LiquidGlassTextContrastScope(enabled = cloudFiltersGlassEnabled) {
+                                CloudLibraryToolbar(
+                                    uiState = uiState,
+                                    selectedProviderId = selectedProviderId,
+                                    selectedType = effectiveSelectedType,
+                                    availableTypes = availableTypes,
+                                    onProviderSelected = onProviderSelected,
+                                    onTypeSelected = onTypeSelected,
+                                    onRefresh = onRefresh,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                )
+                            }
+                            LiquidGlassTextContrastScope(enabled = cloudSearchGlassEnabled) {
+                                val defaultSearchShape = RoundedCornerShape(12.dp)
+                                val searchShape = liquidGlassShape(
                                     LiquidGlassSurface.LIBRARY_CLOUD_SEARCH,
-                                    platformSupported = true,
-                                ),
-                            transparentContainer = cloudSearchGlassEnabled,
-                            shape = searchShape,
-                            showOutline = shouldDrawNuvioInputFieldOutline(
-                                glassSurfaceEnabled = cloudSearchGlassEnabled,
-                                glassRimCanRender = glassRimCanRender,
-                            ),
-                            onGlassSurfaceInteracted = {},
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .then(
-                                    if (cloudSearchGlassEnabled) {
-                                        Modifier.liquidGlassForSurface(
-                                            surface = LiquidGlassSurface.LIBRARY_CLOUD_SEARCH,
-                                            shape = searchShape,
-                                            tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.24f),
-                                            fallback = MaterialTheme.nuvio.colors.surfaceCard,
-                                            blurRadius = 12.dp,
-                                            refractionHeight = 6.dp,
-                                            refractionAmount = 9.dp,
-                                        )
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
-                        )
+                                    defaultSearchShape,
+                                )
+                                val glassRimCanRender = cloudSearchGlassEnabled &&
+                                    isLiquidGlassBackdropReady(LocalLiquidGlassBackdrop.current)
+                                CloudLibrarySearchField(
+                                    query = searchQuery,
+                                    onQueryChange = onSearchQueryChange,
+                                    nativeGlassEnabled = isNativeLiquidGlassControlsAvailable() &&
+                                        isLiquidGlassSurfaceEffectivelyEnabled(
+                                            LiquidGlassSurface.LIBRARY_CLOUD_SEARCH,
+                                            platformSupported = true,
+                                        ),
+                                    transparentContainer = cloudSearchGlassEnabled,
+                                    shape = searchShape,
+                                    showOutline = shouldDrawNuvioInputFieldOutline(
+                                        glassSurfaceEnabled = cloudSearchGlassEnabled,
+                                        glassRimCanRender = glassRimCanRender,
+                                    ),
+                                    onGlassSurfaceInteracted = {},
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        .then(
+                                            if (cloudSearchGlassEnabled) {
+                                                Modifier.liquidGlassForSurface(
+                                                    surface = LiquidGlassSurface.LIBRARY_CLOUD_SEARCH,
+                                                    shape = searchShape,
+                                                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.24f),
+                                                    fallback = MaterialTheme.nuvio.colors.surfaceCard,
+                                                    blurRadius = 12.dp,
+                                                    refractionHeight = 6.dp,
+                                                    refractionAmount = 9.dp,
+                                                )
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -1443,7 +1462,7 @@ internal fun LibrarySourceSwitch(
         surface = LiquidGlassSurface.LIBRARY,
         preview = isPreview,
         platformSupported = if (isPreview) isLiquidGlassAvailable() else isLiquidGlassSupported(),
-    )
+    ) || (!isPreview && LocalAppBackgroundActive.current)
     val nativeSegmentedControlEnabled = isNativeLiquidGlassControlsAvailable() &&
         isLiquidGlassSurfaceEffectivelyEnabled(
             surface = LiquidGlassSurface.LIBRARY,
@@ -1747,12 +1766,15 @@ private fun CloudLibraryRow(
         surface = LiquidGlassSurface.LIBRARY_CLOUD_CARDS,
         platformSupported = isLiquidGlassSupported(),
     )
+    val appGlass = !renderGlass && LocalAppBackgroundActive.current
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .then(
-                if (renderGlass) {
+                if (appGlass) {
+                    Modifier.appBackgroundGlass(glassShape)
+                } else if (renderGlass) {
                     Modifier.liquidGlassForSurface(
                         surface = LiquidGlassSurface.LIBRARY_CLOUD_CARDS,
                         shape = glassShape,
@@ -1767,7 +1789,7 @@ private fun CloudLibraryRow(
             )
             .clickable(enabled = playableCount > 0, onClick = onClick),
         shape = glassShape,
-        color = if (renderGlass) Color.Transparent else colorScheme.surfaceContainerLow,
+        color = if (renderGlass || appGlass) Color.Transparent else colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier
@@ -2245,7 +2267,7 @@ internal fun LibraryCalendarGlassSurface(
         shape = shape,
         color = if (glassEnabled) Color.Transparent else MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 18.dp,
+        shadowElevation = if (glassEnabled) 0.dp else 18.dp,
         content = { content(glassEnabled) },
     )
     }
@@ -3520,7 +3542,6 @@ private object LibraryReleaseCalendarCache {
                 if (latest.cacheKey == cacheKey) {
                     _state.value = latest.copy(
                         events = (latest.events + result.events).sortedLibraryCalendarEvents(),
-                        // Leave the month unloaded when a series failed, so it is requested again.
                         loadedMonthKeys = if (result.failedSeriesKeys.isEmpty()) {
                             latest.loadedMonthKeys + monthKey
                         } else {
@@ -3700,7 +3721,6 @@ private object LibraryReleaseCalendarCache {
                 .collect { signature ->
                     if (signature == null) return@collect
                     if (_state.value.addonSignature != signature) {
-                        // Addons became ready or changed: failures may now succeed.
                         resetRetry()
                         refreshIfStale()
                     }

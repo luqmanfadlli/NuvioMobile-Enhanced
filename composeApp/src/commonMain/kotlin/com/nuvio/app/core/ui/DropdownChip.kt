@@ -103,6 +103,8 @@ fun NuvioDropdownChip(
             refractionAmount = 9.dp,
             preview = previewGlass,
         ).clip(chipShape)
+    } else if (LocalAppBackgroundActive.current) {
+        Modifier.appBackgroundGlass(chipShape).clip(chipShape)
     } else {
         Modifier.clip(chipShape).background(tokens.colors.surface)
     }

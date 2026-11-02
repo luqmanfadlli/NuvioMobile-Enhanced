@@ -1,5 +1,9 @@
 package com.nuvio.app.features.livetv
 
+import androidx.compose.ui.graphics.Shape
+import com.nuvio.app.core.ui.appBackgroundHeaderGlass
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -418,7 +422,13 @@ private fun LiveTvChannelControls(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(background)
+            .then(
+                if (LocalAppBackgroundActive.current) {
+                    Modifier.appBackgroundHeaderGlass()
+                } else {
+                    Modifier.background(background)
+                },
+            )
             .padding(top = topPadding + 4.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
     ) {
@@ -557,14 +567,7 @@ private fun LiveTvFilterChip(
     Row(
         modifier = Modifier
             .clip(tokens.shapes.chip)
-            .background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
-            .then(
-                if (selected) Modifier else Modifier.border(
-                    width = NuvioTokens.Border.thin,
-                    color = tokens.colors.borderSubtle,
-                    shape = tokens.shapes.chip,
-                ),
-            )
+            .liveTvChipSurface(selected = selected, shape = tokens.shapes.chip)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
@@ -596,12 +599,7 @@ private fun LiveTvCategoryFilterChip(
         Row(
             modifier = Modifier
                 .clip(shape)
-                .background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
-                .border(
-                    width = if (selected) 0.dp else NuvioTokens.Border.thin,
-                    color = if (selected) Color.Transparent else tokens.colors.borderSubtle,
-                    shape = shape,
-                )
+                .liveTvChipSurface(selected = selected, shape = shape)
                 .clickable { expanded = true }
                 .padding(horizontal = 16.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
@@ -657,12 +655,15 @@ private fun LiveTvRecentChannelCard(
     onGuideClick: () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
+    val appGlass = LocalAppBackgroundActive.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (appGlass) Modifier.appBackgroundGlass(tokens.shapes.card) else Modifier),
         onClick = onContinueClick,
-        color = tokens.colors.surface,
+        color = if (appGlass) Color.Transparent else tokens.colors.surface,
         shape = tokens.shapes.card,
-        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
+        border = if (appGlass) null else BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
     ) {
         Row(
             modifier = Modifier.padding(tokens.spacing.cardPadding),
@@ -772,10 +773,13 @@ private fun LiveTvChannelCard(
     onGuideClick: () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
+    val appGlass = LocalAppBackgroundActive.current
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (appGlass) Modifier.appBackgroundGlass(tokens.shapes.compactCard) else Modifier),
         onClick = onPlayClick,
-        color = tokens.colors.surface,
+        color = if (appGlass) Color.Transparent else tokens.colors.surface,
         shape = tokens.shapes.compactCard,
     ) {
         Row(
@@ -972,3 +976,28 @@ private fun categoryNameForChannel(
     channel: LiveTvChannel,
     uncategorizedGroupName: String,
 ): String = channel.group?.trim()?.takeIf(String::isNotBlank) ?: uncategorizedGroupName
+
+@Composable
+private fun Modifier.liveTvChipSurface(selected: Boolean, shape: Shape): Modifier {
+    val tokens = MaterialTheme.nuvio
+    return if (LocalAppBackgroundActive.current) {
+        appBackgroundGlass(
+            shape = shape,
+            tintAlpha = if (selected) 0.55f else 0.28f,
+            outline = !selected,
+        )
+    } else {
+        background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
+            .then(
+                if (selected) {
+                    Modifier
+                } else {
+                    Modifier.border(
+                        width = NuvioTokens.Border.thin,
+                        color = tokens.colors.borderSubtle,
+                        shape = shape,
+                    )
+                },
+            )
+    }
+}

@@ -1,5 +1,8 @@
 package com.nuvio.app.features.downloads
 
+import androidx.compose.ui.graphics.Color
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -238,9 +241,10 @@ private fun LazyListScope.downloadsRootContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .downloadsCardGlass()
                     .clickable { onOpenShow(item.parentMetaId, item.title) },
                 shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = downloadsCardColor(MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 Row(
                     modifier = Modifier
@@ -379,9 +383,10 @@ private fun DownloadRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
+            .downloadsCardGlass()
             .clickable(enabled = item.isPlayable, onClick = onOpen),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = downloadsCardColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
@@ -553,3 +558,11 @@ private fun formatBytes(bytes: Long): String {
         else -> "$bytes ${localizedByteUnit("B")}"
     }
 }
+
+@Composable
+private fun Modifier.downloadsCardGlass(): Modifier =
+    if (LocalAppBackgroundActive.current) appBackgroundGlass(MaterialTheme.shapes.medium) else this
+
+@Composable
+private fun downloadsCardColor(solid: Color): Color =
+    if (LocalAppBackgroundActive.current) Color.Transparent else solid

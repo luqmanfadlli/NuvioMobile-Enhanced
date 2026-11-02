@@ -281,8 +281,6 @@ fun SearchScreen(
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // The source records the actual scrollable catalogue, including poster artwork. The
-            // floating search field samples this layer instead of a blank black background.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -298,34 +296,6 @@ fun SearchScreen(
                     if (query.isBlank()) {
                         item {
                             DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
-                        }
-                        stickyHeader {
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                Box(
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .then(
-                                            if (LocalAppBackgroundActive.current) {
-                                                Modifier.appBackgroundHeaderGlass(
-                                                    extendToWindow = false,
-                                                    hairline = false,
-                                                )
-                                            } else {
-                                                Modifier.background(MaterialTheme.colorScheme.background)
-                                            },
-                                        )
-                                        .nuvioConsumePointerEvents(),
-                                )
-                                DiscoverFilterRow(
-                                    state = discoverUiState,
-                                    modifier = Modifier
-                                        .padding(horizontal = 16.dp)
-                                        .padding(top = 8.dp, bottom = 14.dp),
-                                    onTypeSelected = SearchRepository::selectDiscoverType,
-                                    onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                                    onGenreSelected = SearchRepository::selectDiscoverGenre,
-                                )
-                            }
                         }
                     }
                     if (query.isBlank()) {
@@ -566,6 +536,17 @@ fun SearchScreen(
                                 }
                             }
                             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(14.dp))
+                            if (query.isBlank()) {
+                                DiscoverFilterRow(
+                                    state = discoverUiState,
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .padding(bottom = 14.dp),
+                                    onTypeSelected = SearchRepository::selectDiscoverType,
+                                    onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                                    onGenreSelected = SearchRepository::selectDiscoverGenre,
+                                )
+                            }
                         }
                     }
                 }

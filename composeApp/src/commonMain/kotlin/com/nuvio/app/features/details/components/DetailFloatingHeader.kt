@@ -1,5 +1,7 @@
 package com.nuvio.app.features.details.components
 
+import com.nuvio.app.core.ui.appBackgroundHeaderGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -105,6 +107,8 @@ fun DetailFloatingHeader(
             preview = previewGlass,
             platformSupported = true,
         )
+    val appHeaderGlass = !previewGlass && LocalAppBackgroundActive.current &&
+        glassBackdrop == null && backgroundColor == null
     var logoLoadError by remember(meta.id, meta.logo) {
         mutableStateOf(false)
     }
@@ -115,7 +119,7 @@ fun DetailFloatingHeader(
             .graphicsLayer {
                 alpha = progress
                 translationY = lerp((-20).dp, 0.dp, progress).toPx()
-                shadowElevation = 4.dp.toPx()
+                shadowElevation = if (appHeaderGlass) 0f else 4.dp.toPx()
                 shape = RectangleShape
             },
     ) {
@@ -125,16 +129,22 @@ fun DetailFloatingHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .clipToBounds()
-                .liquidGlassForSurface(
-                    surface = LiquidGlassSurface.DETAIL_HEADER,
-                    shape = RectangleShape,
-                    tint = surfaceColor.copy(alpha = surfaceColor.alpha * 0.7f),
-                    fallback = surfaceColor,
-                    blurRadius = 24.dp,
-                    withHighlight = false,
-                    explicitBackdrop = glassBackdrop,
-                    useExplicitBackdrop = true,
-                    preview = previewGlass,
+                .then(
+                    if (appHeaderGlass) {
+                        Modifier.appBackgroundHeaderGlass(extendToWindow = false)
+                    } else {
+                        Modifier.liquidGlassForSurface(
+                            surface = LiquidGlassSurface.DETAIL_HEADER,
+                            shape = RectangleShape,
+                            tint = surfaceColor.copy(alpha = surfaceColor.alpha * 0.7f),
+                            fallback = surfaceColor,
+                            blurRadius = 24.dp,
+                            withHighlight = false,
+                            explicitBackdrop = glassBackdrop,
+                            useExplicitBackdrop = true,
+                            preview = previewGlass,
+                        )
+                    },
                 ),
         ) {
             LiquidGlassTextContrastScope(enabled = headerGlassEnabled, surface = LiquidGlassSurface.DETAIL_HEADER) {

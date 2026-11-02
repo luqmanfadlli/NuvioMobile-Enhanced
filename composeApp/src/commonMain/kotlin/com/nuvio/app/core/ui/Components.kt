@@ -216,8 +216,6 @@ fun NuvioScreenHeader(
     Box(
         modifier = modifier.fillMaxWidth(),
     ) {
-        // Keep a deliberate underlay beneath the header: normal surfaces use the solid
-        // screen background, while artwork-backed callers can supply a fading contrast scrim.
         Row(
             modifier = Modifier
                 .matchParentSize()
@@ -260,8 +258,6 @@ fun NuvioScreenHeader(
                         blurRadius = 14.dp,
                         refractionHeight = 8.dp,
                         refractionAmount = 12.dp,
-                        // Full-width scroll-edge header: no rim highlight and no outline. Either one
-                        // draws a visible box around the screen edges and under the status bar.
                         withHighlight = false,
                     )
                     .bottomHairline(),
@@ -459,11 +455,19 @@ fun NuvioInputField(
     showOutline: Boolean = true,
 ) {
     val tokens = MaterialTheme.nuvio
-    val borderColor = if (showOutline) tokens.colors.borderDefault else Color.Transparent
+    val appGlass = LocalAppBackgroundActive.current
+    val borderColor = when {
+        !showOutline -> Color.Transparent
+        appGlass -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        else -> tokens.colors.borderDefault
+    }
+    val fieldContainerColor = if (appGlass) Color.Transparent else containerColor
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (appGlass) Modifier.appBackgroundGlass(shape, outline = false) else Modifier),
         singleLine = true,
         shape = shape,
         placeholder = {
@@ -478,8 +482,8 @@ fun NuvioInputField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = if (showOutline) tokens.colors.borderFocus else Color.Transparent,
             unfocusedBorderColor = borderColor,
-            focusedContainerColor = containerColor,
-            unfocusedContainerColor = containerColor,
+            focusedContainerColor = fieldContainerColor,
+            unfocusedContainerColor = fieldContainerColor,
             cursorColor = tokens.colors.accent,
         ),
     )
@@ -723,4 +727,32 @@ internal fun Modifier.appBackgroundHeaderGlass(
             withHighlight = false,
         )
         .then(if (hairline) Modifier.bottomHairline() else Modifier)
+}
+
+@Composable
+internal fun Modifier.appBackgroundGlass(
+    shape: Shape,
+    tintAlpha: Float = 0.32f,
+    outline: Boolean = true,
+    blurRadius: Dp = 20.dp,
+): Modifier {
+    val colors = MaterialTheme.colorScheme
+    return this
+        .liquidGlassSurface(
+            backdrop = LocalAppBackgroundBackdrop.current,
+            shape = shape,
+            tint = colors.surface.copy(alpha = tintAlpha),
+            fallback = colors.surface.copy(alpha = 0.72f),
+            blurRadius = blurRadius,
+            refractionHeight = 8.dp,
+            refractionAmount = 12.dp,
+            withHighlight = true,
+        )
+        .then(
+            if (outline) {
+                Modifier.border(1.dp, colors.onSurface.copy(alpha = 0.12f), shape)
+            } else {
+                Modifier
+            },
+        )
 }
