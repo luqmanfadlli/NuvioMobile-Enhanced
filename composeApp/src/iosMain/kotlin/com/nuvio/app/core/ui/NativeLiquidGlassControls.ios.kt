@@ -34,14 +34,16 @@ import platform.UIKit.UISwitch
 import platform.UIKit.UITextFieldViewMode
 import platform.UIKit.UIReturnKeyType
 import com.nuvio.app.core.ui.glass.LiquidGlassSettings
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun isNativeLiquidGlassControlsAvailable(): Boolean {
     val majorVersion = NSProcessInfo.processInfo.operatingSystemVersion.useContents {
         majorVersion.toLong()
     }
-    // Native UIKit glass controls replace Compose controls, so they are part of the experiment.
+    val appBackgroundSet = ThemeSettingsRepository.customSettingsBackgroundImageUri.value != null
     return LiquidGlassSettings.surfaceOverrides.experimentalEnabled &&
+        !appBackgroundSet &&
         shouldUseNativeLiquidGlassControls(majorVersion)
 }
 

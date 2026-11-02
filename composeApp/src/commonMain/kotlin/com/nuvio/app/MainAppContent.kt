@@ -1,5 +1,7 @@
 package com.nuvio.app
 
+import com.nuvio.app.core.ui.glass.isLiquidGlassAvailable
+import com.nuvio.app.core.ui.LocalAppBackgroundBackdrop
 import com.nuvio.app.core.ui.AppBackgroundImage
 import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import com.nuvio.app.core.ui.LocalDynamicArtworkBackgroundActive
@@ -1543,6 +1545,8 @@ internal fun MainAppContent(
             val settingsRouteBarVisible = currentRoute is SettingsDestinationRoute && !nativeTabBarOwnsChrome
             val settingsRouteBarBackdrop = rememberNuvioBackdrop()
             val appBackgroundActive = rememberAppBackgroundImageUri() != null
+            val rootAppBackgroundBackdrop = rememberNuvioBackdrop()
+            val captureRootAppBackground = appBackgroundActive && isLiquidGlassAvailable()
             var settingsRouteBarOverlay by remember { mutableStateOf(0.dp) }
             val settingsRouteBottomOverlay = when {
                 currentRoute !is SettingsDestinationRoute -> 0.dp
@@ -1567,7 +1571,17 @@ internal fun MainAppContent(
                     .then(if (appBackgroundActive) Modifier else Modifier.background(MaterialTheme.nuvio.colors.background)),
             ) {
             if (appBackgroundActive) {
-                AppBackgroundImage(modifier = Modifier.fillMaxSize())
+                AppBackgroundImage(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (captureRootAppBackground) {
+                                Modifier.nuvioBackdropSource(rootAppBackgroundBackdrop)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
             }
             val verticalBarPadding = LocalVerticalBarPadding.current
             val drawsUnderVerticalBar = currentRoute.drawsUnderVerticalBar(selectedTab)
@@ -1575,6 +1589,7 @@ internal fun MainAppContent(
                 CompositionLocalProvider(
                     LocalNuvioBottomNavigationOverlayPadding provides settingsRouteBottomOverlay,
                     LocalAppBackgroundActive provides appBackgroundActive,
+                    LocalAppBackgroundBackdrop provides if (captureRootAppBackground) rootAppBackgroundBackdrop else null,
                     LocalDynamicArtworkBackgroundActive provides appBackgroundActive,
                     LocalPosterClickAnchor provides if (posterNavigationEnabled) posterNavigation::prepare else null,
                     LocalUseNativeNavigation provides useNativeNavigation,
