@@ -419,16 +419,15 @@ private fun LiveTvChannelControls(
     onGroupSelected: (String) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val appBackgroundActive = LocalAppBackgroundActive.current
+    Box(modifier = Modifier.fillMaxWidth()) {
+    if (appBackgroundActive) {
+        Box(modifier = Modifier.matchParentSize().appBackgroundHeaderGlass(extendUp = false))
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (LocalAppBackgroundActive.current) {
-                    Modifier.appBackgroundHeaderGlass()
-                } else {
-                    Modifier.background(background)
-                },
-            )
+            .then(if (appBackgroundActive) Modifier else Modifier.background(background))
             .padding(top = topPadding + 4.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
     ) {
@@ -461,6 +460,7 @@ private fun LiveTvChannelControls(
                 color = tokens.colors.textMuted,
             )
         }
+    }
     }
 }
 

@@ -439,14 +439,16 @@ fun SearchScreen(
                         .zIndex(1f)
                         .then(
                             when {
-                                searchGlassEnabled -> Modifier
-                                appBackgroundActive -> Modifier.appBackgroundHeaderGlass()
+                                searchGlassEnabled || appBackgroundActive -> Modifier
                                 else -> Modifier.background(MaterialTheme.colorScheme.background)
                             },
                         ),
                 ) {
 
                     Box(modifier = Modifier.fillMaxWidth()) {
+                        if (appBackgroundActive && !searchGlassEnabled) {
+                            Box(modifier = Modifier.matchParentSize().appBackgroundHeaderGlass())
+                        }
                         androidx.compose.foundation.layout.Column(
                             modifier = Modifier.fillMaxWidth(),
                         ) {

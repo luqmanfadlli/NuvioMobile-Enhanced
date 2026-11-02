@@ -670,12 +670,20 @@ object NuvioToastController {
     }
 }
 
-internal fun Modifier.extendToWindowEdges(originInWindow: Offset, windowWidthPx: Int): Modifier =
+internal fun Modifier.extendToWindowEdges(
+    originInWindow: Offset,
+    windowWidthPx: Int,
+    extendUp: Boolean = true,
+): Modifier =
     layout { measurable, constraints ->
+        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+            val placeable = measurable.measure(constraints)
+            return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
         val slotWidth = constraints.maxWidth
         val slotHeight = constraints.maxHeight
         val left = originInWindow.x.roundToInt().coerceAtLeast(0)
-        val top = originInWindow.y.roundToInt().coerceAtLeast(0)
+        val top = if (extendUp) originInWindow.y.roundToInt().coerceAtLeast(0) else 0
         val right = if (windowWidthPx > 0) (windowWidthPx - left - slotWidth).coerceAtLeast(0) else 0
         val placeable = measurable.measure(
             Constraints.fixed(width = slotWidth + left + right, height = slotHeight + top),
@@ -703,6 +711,7 @@ internal fun Modifier.bottomHairline(): Modifier {
 internal fun Modifier.appBackgroundHeaderGlass(
     extendToWindow: Boolean = true,
     hairline: Boolean = true,
+    extendUp: Boolean = true,
 ): Modifier {
     var originInWindow by remember { mutableStateOf(Offset.Zero) }
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
@@ -713,7 +722,7 @@ internal fun Modifier.appBackgroundHeaderGlass(
             if (extendToWindow) {
                 Modifier
                     .onGloballyPositioned { originInWindow = it.positionInWindow() }
-                    .extendToWindowEdges(originInWindow, windowWidthPx)
+                    .extendToWindowEdges(originInWindow, windowWidthPx, extendUp)
             } else {
                 Modifier
             },
