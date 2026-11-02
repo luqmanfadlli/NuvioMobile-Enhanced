@@ -84,7 +84,9 @@ import nuvio.composeapp.generated.resources.live_tv_no_matching_channels_message
 import nuvio.composeapp.generated.resources.live_tv_no_matching_channels_title
 import nuvio.composeapp.generated.resources.live_tv_search_placeholder
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
 
 @Composable
 fun PlayerLiveChannelsPanel(
@@ -192,8 +194,8 @@ fun PlayerLiveChannelsPanel(
                         .widthIn(max = 520.dp)
                         .fillMaxWidth(0.92f)
                         .heightIn(max = 640.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .ambientLiquidGlass(
+                        .liquidGlassForSurface(
+                            surface = LiquidGlassSurface.PLAYER,
                             shape = RoundedCornerShape(24.dp),
                             tint = colorScheme.surface.copy(alpha = colorScheme.surface.alpha * 0.74f),
                             fallback = colorScheme.surface,
@@ -333,14 +335,14 @@ private fun PlayerLiveChannelSearchField(
                     Icon(
                         imageVector = Icons.Rounded.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = liquidGlassIconTint(LiquidGlassSurface.PLAYER, MaterialTheme.colorScheme.onSurfaceVariant),
                     )
                 } else {
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = liquidGlassIconTint(LiquidGlassSurface.PLAYER, MaterialTheme.colorScheme.onSurfaceVariant),
                         )
                     }
                 }
@@ -453,7 +455,7 @@ private fun PlayerLiveChannelCategoryFilterChip(
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = null,
-                tint = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
+                tint = if (selected) colorScheme.onPrimaryContainer else liquidGlassIconTint(LiquidGlassSurface.PLAYER, colorScheme.onSurfaceVariant),
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -585,7 +587,7 @@ private fun LiveChannelRow(
                 Icon(
                     imageVector = Icons.Rounded.LiveTv,
                     contentDescription = null,
-                    tint = colorScheme.onSurfaceVariant,
+                    tint = liquidGlassIconTint(LiquidGlassSurface.PLAYER, colorScheme.onSurfaceVariant),
                     modifier = Modifier.size(24.dp),
                 )
             }

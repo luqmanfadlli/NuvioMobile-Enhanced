@@ -1,5 +1,8 @@
 package com.nuvio.app.features.library
 
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
@@ -38,7 +41,7 @@ internal fun LibraryListManagementButton() {
         Icon(
             imageVector = Icons.Rounded.Add,
             contentDescription = stringResource(Res.string.library_create_list),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = liquidGlassIconTint(LiquidGlassSurface.LIBRARY, MaterialTheme.colorScheme.onSurfaceVariant),
         )
     }
     state?.let { dialog ->

@@ -61,11 +61,13 @@ class PlayerGestureOverlayTest {
                         .testTag("surface")
                         .playerSurfaceDragGestures(
                             gestureController = null,
+                            playerController = runtime.playerController,
                             layoutSize = IntSize(480, 270),
                             playbackGesturesEnabled = true,
                             sideGestureSystemEdgeExclusionPx = 0f,
                             playerControlsLockedState = callbacks.playerControlsLocked,
                             touchGesturesEnabledState = callbacks.touchGesturesEnabled,
+                            swipeToSeekEnabledState = callbacks.swipeToSeekEnabled,
                             isHoldToSpeedGestureActiveState = callbacks.isHoldToSpeedGestureActive,
                             currentPositionMsState = callbacks.currentPositionMs,
                             currentDurationMsState = callbacks.currentDurationMs,
@@ -96,11 +98,11 @@ class PlayerGestureOverlayTest {
         // A twelfth of the width is 5 s: swipes on titles under 30 minutes span 60 s.
         compose.onNodeWithTag("surface").performTouchInput {
             down(center)
-            moveBy(Offset(width / 12f, 0f))
+            moveBy(Offset(width / 6f, 0f))
         }
 
-        val target = compose.onNodeWithText("01:05").assertIsDisplayed().getUnclippedBoundsInRoot()
-        val delta = compose.onNodeWithText("+5s").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val target = compose.onNodeWithText("01:10").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val delta = compose.onNodeWithText("+10s").assertIsDisplayed().getUnclippedBoundsInRoot()
         val surface = compose.onNodeWithTag("surface").getUnclippedBoundsInRoot()
         assertTrue(target.right <= delta.left, "the target time comes before the offset")
         assertTrue(delta.bottom < surface.top + (surface.bottom - surface.top) / 3, "the preview sits at the top")
@@ -129,11 +131,11 @@ class PlayerGestureOverlayTest {
         setPlayerContent()
         compose.onNodeWithTag("surface").performTouchInput {
             down(center)
-            moveBy(Offset(width / 12f, 0f))
+            moveBy(Offset(width / 6f, 0f))
         }
 
-        compose.onNodeWithText("1:00:10").assertIsDisplayed()
-        compose.onNodeWithText("+10s").assertIsDisplayed()
+        compose.onNodeWithText("1:00:20").assertIsDisplayed()
+        compose.onNodeWithText("+20s").assertIsDisplayed()
     }
 
     @Test
@@ -186,18 +188,18 @@ class PlayerGestureOverlayTest {
         val surface = compose.onNodeWithTag("surface")
         surface.performTouchInput {
             down(center)
-            moveBy(Offset(width / 12f, 0f))
+            moveBy(Offset(width / 6f, 0f))
         }
-        compose.onNodeWithText("+5s").assertIsDisplayed()
+        compose.onNodeWithText("+10s").assertIsDisplayed()
 
         surface.performTouchInput { up() }
 
         compose.runOnIdle {
-            assertEquals(listOf(65_000L), seeks)
+            assertEquals(listOf(70_000L), seeks)
             assertNull(runtime.liveGestureFeedback)
         }
-        compose.onNodeWithText("+5s").assertDoesNotExist()
-        compose.onNodeWithText("01:05").assertDoesNotExist()
+        compose.onNodeWithText("+10s").assertDoesNotExist()
+        compose.onNodeWithText("01:10").assertDoesNotExist()
     }
 
     @Test
@@ -206,11 +208,11 @@ class PlayerGestureOverlayTest {
         setPlayerContent()
         compose.onNodeWithTag("surface").performTouchInput {
             down(center)
-            moveBy(Offset(width / 12f, 0f))
+            moveBy(Offset(width / 6f, 0f))
         }
 
-        compose.onNodeWithText("01:05").assertIsDisplayed()
-        compose.onNodeWithText("+5s").assertIsDisplayed()
+        compose.onNodeWithText("01:10").assertIsDisplayed()
+        compose.onNodeWithText("+10s").assertIsDisplayed()
     }
 
     @Test
@@ -238,7 +240,7 @@ class PlayerGestureOverlayTest {
             runtime.liveGestureFeedback = null
             runtime.showBrightnessFeedback(0.4f)
         }
-        compose.onNodeWithText("40").assertIsDisplayed()
+        compose.onNodeWithText("40%").assertIsDisplayed()
         compose.onNodeWithText("2x").assertDoesNotExist()
     }
 

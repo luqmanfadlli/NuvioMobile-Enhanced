@@ -26,11 +26,32 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.NativeLiquidGlassMenuOption
+import com.nuvio.app.core.ui.NuvioNativeLiquidGlassOptionMenu
+import com.nuvio.app.core.ui.isNativeLiquidGlassOptionMenuAvailable
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.compose_player_speed
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
 
 internal val PlayerPlaybackSpeedOptions: List<Float> =
     listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+internal fun playerPlaybackSpeedOptionId(currentSpeed: Float): String? =
+    PlayerPlaybackSpeedOptions.firstOrNull { abs(currentSpeed - it) < 0.01f }?.toString()
+
+internal fun parsePlayerPlaybackSpeedOption(optionId: String): Float? {
+    val speed = optionId.toFloatOrNull() ?: return null
+    return speed.takeIf { candidate ->
+        candidate.isFinite() && PlayerPlaybackSpeedOptions.any { it == candidate }
+    }
+}
 
 @Composable
 internal fun PlayerSpeedPopup(
@@ -40,9 +61,36 @@ internal fun PlayerSpeedPopup(
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
+
+    val useNativeLiquidGlassMenu = isNativeLiquidGlassOptionMenuAvailable() &&
+        isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.PLAYER)
+    if (useNativeLiquidGlassMenu) {
+        NuvioNativeLiquidGlassOptionMenu(
+            visible = true,
+            title = stringResource(Res.string.compose_player_speed),
+            cancelLabel = stringResource(Res.string.action_cancel),
+            options = PlayerPlaybackSpeedOptions.asReversed().map { speed ->
+                NativeLiquidGlassMenuOption(
+                    id = speed.toString(),
+                    title = formatPlaybackSpeedLabel(speed),
+                )
+            },
+            selectedOptionId = playerPlaybackSpeedOptionId(currentSpeed),
+            onOptionSelected = { optionId ->
+                parsePlayerPlaybackSpeedOption(optionId)?.let(onSpeedSelected)
+            },
+            onDismiss = onDismiss,
+        )
+        return
+    }
+
     val gapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
     val positionProvider = remember(gapPx) { AboveAnchorPositionProvider(gapPx) }
     val accent = MaterialTheme.nuvio.colors.accent
+    val playerGlassEnabled = isLiquidGlassSurfaceEffectivelyEnabled(
+        surface = LiquidGlassSurface.PLAYER,
+        platformSupported = isLiquidGlassSupported(),
+    )
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -52,8 +100,8 @@ internal fun PlayerSpeedPopup(
         Column(
             modifier = Modifier
                 .width(76.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .ambientLiquidGlass(
+                .liquidGlassForSurface(
+                    surface = LiquidGlassSurface.PLAYER,
                     shape = RoundedCornerShape(14.dp),
                     tint = Color.Black.copy(alpha = 0.45f),
                     fallback = Color.Black.copy(alpha = 0.6f),
@@ -64,6 +112,7 @@ internal fun PlayerSpeedPopup(
                 .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            LiquidGlassTextContrastScope(enabled = playerGlassEnabled, surface = LiquidGlassSurface.PLAYER) {
             PlayerPlaybackSpeedOptions.asReversed().forEach { speed ->
                 val selected = abs(currentSpeed - speed) < 0.01f
                 Text(
@@ -80,6 +129,7 @@ internal fun PlayerSpeedPopup(
                         .padding(vertical = 6.dp)
                         .width(64.dp),
                 )
+            }
             }
         }
     }

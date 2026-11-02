@@ -29,10 +29,42 @@ import kotlin.math.roundToInt
 // 480px wide keeps the glass crisp enough for a "light blur" look; ~30fps keeps it in step with the video.
 private const val VideoFrameCaptureWidth = 480
 private const val VideoFrameCaptureIntervalMs = 33L
+private const val VideoFrameUnavailableRetryIntervalMs = 1_000L
 private const val VideoFrameBufferCount = 3
 
-/** About half a second of all-black captures means PixelCopy can't read this video (DRM/tunneling/device). */
-private const val BlackFrameLimit = 15
+/** After repeated unavailable captures, retry slowly so protected/unsupported video costs less CPU. */
+private const val VideoFrameUnavailableFrameLimit = 15
+
+/** Decides when repeated missing/black/failed frames should switch capture to a low-rate retry. */
+internal class VideoFrameCapturePolicy(
+    private val unavailableFrameLimit: Int = VideoFrameUnavailableFrameLimit,
+) {
+    init {
+        require(unavailableFrameLimit > 0) { "unavailableFrameLimit must be positive" }
+    }
+
+    private var consecutiveUnavailableFrames = 0
+
+    val shouldUseSlowRetry: Boolean
+        get() = consecutiveUnavailableFrames >= unavailableFrameLimit
+
+    val delayMs: Long
+        get() = if (shouldUseSlowRetry) {
+            VideoFrameUnavailableRetryIntervalMs
+        } else {
+            VideoFrameCaptureIntervalMs
+        }
+
+    fun recordUnavailableFrame() {
+        if (consecutiveUnavailableFrames < unavailableFrameLimit) {
+            consecutiveUnavailableFrames += 1
+        }
+    }
+
+    fun recordUsableFrame() {
+        consecutiveUnavailableFrames = 0
+    }
+}
 
 /** View tag carried by SurfaceViews that sit over the video (e.g. the libass subtitle layer). */
 internal const val PlayerOverlaySurfaceTag = "nuvio:player-overlay-surface"
@@ -43,50 +75,65 @@ internal actual fun rememberVideoFrameBackdrop(enabled: Boolean): VideoFrameBack
     val view = LocalView.current
     val backdrop = remember { VideoFrameBackdrop() }
     LaunchedEffect(backdrop, view) {
-        val handler = Handler(Looper.getMainLooper())
-        val buffers = arrayOfNulls<Bitmap>(VideoFrameBufferCount)
-        var nextBuffer = 0
-        var blackFrames = 0
         snapshotFlow { backdrop.consumers > 0 }
             .distinctUntilChanged()
             .collectLatest { active ->
                 if (!active) {
+                    // Drop the last captured frame as soon as no glass surface needs it.
+                    backdrop.clearFrame()
                     return@collectLatest
                 }
-                while (currentCoroutineContext().isActive) {
-                    val surfaceView = view.rootView.findVideoSurfaceView()
-                    if (surfaceView != null) {
-                        val width = VideoFrameCaptureWidth
-                        val height = (width * surfaceView.height / surfaceView.width.toFloat())
-                            .roundToInt()
-                            .coerceIn(1, width * 4)
-                        val bitmap = buffers[nextBuffer]?.takeIf { it.width == width && it.height == height }
-                            ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+
+                // Expensive/native resources are scoped to visible glass consumers, not playback.
+                val handler = Handler(Looper.getMainLooper())
+                val buffers = arrayOfNulls<Bitmap>(VideoFrameBufferCount)
+                var nextBuffer = 0
+                val capturePolicy = VideoFrameCapturePolicy()
+                try {
+                    while (currentCoroutineContext().isActive) {
+                        val surfaceView = view.rootView.findVideoSurfaceView()
+                        if (surfaceView == null) {
+                            capturePolicy.recordUnavailableFrame()
+                            if (capturePolicy.shouldUseSlowRetry) backdrop.clearFrame()
+                        } else {
+                            val width = VideoFrameCaptureWidth
+                            val height = (width * surfaceView.height / surfaceView.width.toFloat())
+                                .roundToInt()
+                                .coerceIn(1, width * 4)
+                            val bitmap = buffers[nextBuffer]?.takeIf {
+                                it.width == width && it.height == height
+                            } ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
                                 buffers[nextBuffer] = it
                             }
-                        val copied = surfaceView.copyFrameInto(bitmap, handler)
-                        if (copied && bitmap.isBlankCapture()) {
-                            // Never paint a failed (black) capture into the glass; after a run of them fall
-                            // back to the clear fallback style instead of showing a dark blob.
-                            blackFrames += 1
-                            if (blackFrames >= BlackFrameLimit) backdrop.clearFrame()
-                        } else if (copied) {
-                            blackFrames = 0
-                            val location = IntArray(2)
-                            surfaceView.getLocationOnScreen(location)
-                            backdrop.publishFrame(
-                                image = bitmap.asImageBitmap(),
-                                boundsOnScreen = Rect(
-                                    left = location[0].toFloat(),
-                                    top = location[1].toFloat(),
-                                    right = (location[0] + surfaceView.width).toFloat(),
-                                    bottom = (location[1] + surfaceView.height).toFloat(),
-                                ),
-                            )
-                            nextBuffer = (nextBuffer + 1) % buffers.size
+                            val copied = surfaceView.copyFrameInto(bitmap, handler)
+                            if (copied && !bitmap.isBlankCapture()) {
+                                // A usable frame restores the responsive capture cadence immediately.
+                                capturePolicy.recordUsableFrame()
+                                val location = IntArray(2)
+                                surfaceView.getLocationOnScreen(location)
+                                backdrop.publishFrame(
+                                    image = bitmap.asImageBitmap(),
+                                    boundsOnScreen = Rect(
+                                        left = location[0].toFloat(),
+                                        top = location[1].toFloat(),
+                                        right = (location[0] + surfaceView.width).toFloat(),
+                                        bottom = (location[1] + surfaceView.height).toFloat(),
+                                    ),
+                                )
+                                nextBuffer = (nextBuffer + 1) % buffers.size
+                            } else {
+                                // PixelCopy errors and black/protected frames both count as unavailable.
+                                capturePolicy.recordUnavailableFrame()
+                                if (capturePolicy.shouldUseSlowRetry) backdrop.clearFrame()
+                            }
                         }
+                        delay(capturePolicy.delayMs)
                     }
-                    delay(VideoFrameCaptureIntervalMs)
+                } finally {
+                    // collectLatest cancels this block when the last glass consumer leaves. Do not recycle
+                    // Bitmaps here: a draw or a cancelled PixelCopy callback may still hold a reference.
+                    backdrop.clearFrame()
+                    buffers.fill(null)
                 }
             }
     }

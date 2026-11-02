@@ -17,6 +17,7 @@ import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.core.poster.withCustomPosterUrl
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.PosterGridRow
 import com.nuvio.app.features.home.components.PosterGridSkeletonRow
@@ -44,6 +45,11 @@ internal fun LibrarySavedControls(
     onTypeSelected: (String?) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     modifier: Modifier = Modifier,
+    typeGlassSurface: LiquidGlassSurface? = null,
+    sortGlassSurface: LiquidGlassSurface? = null,
+    previewGlass: Boolean = false,
+    selectedPreviewSurface: LiquidGlassSurface? = null,
+    onPreviewSurfaceSelected: ((LiquidGlassSurface) -> Unit)? = null,
 ) {
     val sortOptions = availableLibrarySortOptions(sourceMode)
     val allTypesLabel = stringResource(Res.string.library_filter_all_types)
@@ -85,6 +91,10 @@ internal fun LibrarySavedControls(
                 options = typeOptions,
                 enabled = typeOptions.size > 1,
                 onSelected = { option -> onTypeSelected(option.key.ifBlank { null }) },
+                glassSurface = typeGlassSurface,
+                previewGlass = previewGlass,
+                selectedPreviewSurface = selectedPreviewSurface,
+                onGlassSurfaceInteracted = { onPreviewSurfaceSelected?.invoke(LiquidGlassSurface.LIBRARY_SAVED_TYPE_FILTER) },
             )
         }
 
@@ -101,6 +111,10 @@ internal fun LibrarySavedControls(
                     .firstOrNull { it.name == option.key }
                     ?.let(onSortSelected)
             },
+            glassSurface = sortGlassSurface,
+            previewGlass = previewGlass,
+            selectedPreviewSurface = selectedPreviewSurface,
+            onGlassSurfaceInteracted = { onPreviewSurfaceSelected?.invoke(LiquidGlassSurface.LIBRARY_SAVED_SORT_FILTER) },
         )
     }
 }

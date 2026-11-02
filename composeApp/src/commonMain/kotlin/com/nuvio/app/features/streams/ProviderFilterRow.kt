@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
+import com.nuvio.app.core.ui.NuvioNativeLiquidGlassButton
+import com.nuvio.app.core.ui.isNativeLiquidGlassControlsAvailable
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
@@ -64,7 +66,13 @@ import nuvio.composeapp.generated.resources.streams_pinned_source
 import nuvio.composeapp.generated.resources.streams_refresh
 import nuvio.composeapp.generated.resources.streams_unpin_source
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassLegacyPassthrough
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 
 @Composable
 internal fun ProviderFilterRow(
@@ -76,8 +84,9 @@ internal fun ProviderFilterRow(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     spacing: Dp = 8.dp,
+    preview: Boolean = false,
     refreshChip: @Composable (Boolean, () -> Unit) -> Unit = { isLoading, onClick ->
-        RefreshChip(isLoading = isLoading, onClick = onClick)
+        RefreshChip(isLoading = isLoading, onClick = onClick, preview = preview)
     },
     filterChip: (@Composable (AddonStreamGroup?, Boolean, () -> Unit) -> Unit)? = null,
 ) {
@@ -89,9 +98,12 @@ internal fun ProviderFilterRow(
             FilterChip(
                 label = group?.addonName ?: stringResource(Res.string.collections_tab_all),
                 isSelected = isSelected,
-                isPinned = group != null && group.soleSourcePin()?.key in pinnedSourceIds,
+                isPinned = !preview && group != null && group.soleSourcePin()?.key in pinnedSourceIds,
                 onClick = onClick,
-                onLongClick = group?.let { pinnedGroup -> { pinSheetTarget = pinnedGroup.soleSourcePin() } },
+                onLongClick = if (preview) null else group?.let { pinnedGroup ->
+                    { pinSheetTarget = pinnedGroup.soleSourcePin() }
+                },
+                preview = preview,
             )
         }
     LaunchedEffect(addonGroups, selectedFilter) {
@@ -117,10 +129,12 @@ internal fun ProviderFilterRow(
         }
     }
 
-    StreamSourcePinSheet(
-        target = pinSheetTarget,
-        onDismiss = { pinSheetTarget = null },
-    )
+    if (!preview) {
+        StreamSourcePinSheet(
+            target = pinSheetTarget,
+            onDismiss = { pinSheetTarget = null },
+        )
+    }
 }
 
 @Composable
@@ -227,6 +241,7 @@ private fun remainingTurn(rotation: Float) =
 private fun RefreshChip(
     isLoading: Boolean,
     onClick: () -> Unit,
+    preview: Boolean = false,
 ) {
     val rotation = rememberRefreshRotation(isLoading)
     FilterChip(
@@ -235,6 +250,8 @@ private fun RefreshChip(
         iconModifier = Modifier.graphicsLayer { rotationZ = rotation.value },
         isSelected = false,
         onClick = onClick,
+        preview = preview,
+        nativeRotationDegrees = rotation.value,
     )
 }
 
@@ -248,6 +265,8 @@ private fun FilterChip(
     isPinned: Boolean = false,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    preview: Boolean = false,
+    nativeRotationDegrees: Float = 0f,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -274,20 +293,66 @@ private fun FilterChip(
         animationSpec = tween(durationMillis = 180),
         label = "filter_chip_content",
     )
-    Box(
-        modifier = Modifier
-            .graphicsLayer {
+    val defaultShape = RoundedCornerShape(16.dp)
+    val nativeGlassAllowed = isNativeLiquidGlassControlsAvailable() &&
+        (preview || !isLiquidGlassLegacyPassthrough(LiquidGlassSurface.STREAM_FILTERS)) &&
+        isLiquidGlassSurfaceEffectivelyEnabled(
+            LiquidGlassSurface.STREAM_FILTERS,
+            preview = preview,
+            platformSupported = true,
+        )
+    if (nativeGlassAllowed) {
+        NuvioNativeLiquidGlassButton(
+            title = label,
+            systemImage = when {
+                isPinned -> "pin.fill"
+                label == null && icon != null -> "arrow.clockwise"
+                else -> null
+            },
+            accessibilityLabel = contentDescription ?: label ?: stringResource(Res.string.collections_tab_all),
+            selected = isSelected,
+            enabled = true,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            modifier = Modifier
+                .height(36.dp)
+                .graphicsLayer { rotationZ = nativeRotationDegrees },
+        )
+        return
+    }
+    val glassAllowed = isLiquidGlassSurfaceEffectivelyEnabled(
+        LiquidGlassSurface.STREAM_FILTERS,
+        preview = preview,
+    ) && (preview || isLiquidGlassSupported())
+    val chipShape = if (glassAllowed) {
+        liquidGlassShape(LiquidGlassSurface.STREAM_FILTERS, defaultShape, preview = preview)
+    } else {
+        defaultShape
+    }
+    LiquidGlassTextContrastScope(enabled = glassAllowed, surface = LiquidGlassSurface.STREAM_FILTERS) {
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
             .height(36.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .ambientLiquidGlass(
-                shape = RoundedCornerShape(16.dp),
-                tint = containerColor,
-                fallback = containerColor,
-                blurRadius = 14.dp,
-                refractionHeight = 8.dp,
+            .clip(chipShape)
+            .then(
+                if (glassAllowed) {
+                    Modifier.liquidGlassForSurface(
+                        surface = LiquidGlassSurface.STREAM_FILTERS,
+                        shape = chipShape,
+                        tint = containerColor,
+                        fallback = containerColor,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 8.dp * 1.6f,
+                        preview = preview,
+                    )
+                } else {
+                    Modifier.background(containerColor, chipShape)
+                },
             )
             .combinedClickable(
                 interactionSource = interactionSource,
@@ -331,5 +396,6 @@ private fun FilterChip(
                 )
             }
         }
+    }
     }
 }

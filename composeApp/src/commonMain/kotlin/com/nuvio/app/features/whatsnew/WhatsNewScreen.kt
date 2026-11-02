@@ -55,7 +55,8 @@ import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
-import com.nuvio.app.core.ui.NuvioSurfaceCard
+import com.nuvio.app.features.settings.SettingsGlassPageBackground
+import com.nuvio.app.features.settings.SettingsSurfaceCard
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import kotlin.time.Clock
@@ -183,11 +184,13 @@ fun WhatsNewSettingsScreen(onBack: () -> Unit) {
         null
     }
 
-    NuvioScreen {
+    SettingsGlassPageBackground {
+        NuvioScreen {
         stickyHeader {
             NuvioScreenHeader(
                 title = stringResource(Res.string.compose_settings_page_whats_new),
                 onBack = onBack,
+                useSettingsGlass = true,
                 actions = {
                     if (isRefreshing) {
                         Box(
@@ -226,7 +229,7 @@ fun WhatsNewSettingsScreen(onBack: () -> Unit) {
             }
 
             LoadState.Error -> item {
-                NuvioSurfaceCard {
+                SettingsSurfaceCard(isTablet = false) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
@@ -373,6 +376,7 @@ fun WhatsNewSettingsScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.size(80.dp))
         }
     }
+    }
 }
 
 private sealed interface LoadState {
@@ -390,7 +394,7 @@ private fun CurrentVersionCard(
     lastCheckedLabel: String,
     status: String,
 ) {
-    NuvioSurfaceCard {
+    SettingsSurfaceCard(isTablet = false) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
@@ -573,7 +577,8 @@ private fun ReleaseCard(
     var expanded by rememberSaveable(release.version) { mutableStateOf(false) }
     val previewNoteCount = previewNotes(release.notes).size
 
-    NuvioSurfaceCard(
+    SettingsSurfaceCard(
+        isTablet = false,
         modifier = modifier.animateContentSize(
             animationSpec = tween(
                 durationMillis = NuvioTokens.Motion.normalMillis,
@@ -649,7 +654,8 @@ private fun ReleaseHistoryRow(
         ),
         label = "release_chevron_rotation",
     )
-    NuvioSurfaceCard(
+    SettingsSurfaceCard(
+        isTablet = false,
         modifier = modifier.animateContentSize(
             animationSpec = tween(
                 durationMillis = NuvioTokens.Motion.normalMillis,

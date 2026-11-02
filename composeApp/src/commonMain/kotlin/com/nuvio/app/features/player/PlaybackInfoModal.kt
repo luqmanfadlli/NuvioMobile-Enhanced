@@ -33,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +50,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_playback_info
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 
 @Composable
 internal fun PlaybackInfoModal(
@@ -95,8 +97,8 @@ internal fun PlaybackInfoModal(
                         .widthIn(max = 520.dp)
                         .fillMaxWidth(0.9f)
                         .heightIn(max = 560.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .ambientLiquidGlass(
+                        .liquidGlassForSurface(
+                            surface = LiquidGlassSurface.PLAYER,
                             shape = RoundedCornerShape(24.dp),
                             tint = Color(0xFF16161B).copy(alpha = 0.74f),
                             fallback = Color(0xFF1E1E24),
@@ -110,7 +112,7 @@ internal fun PlaybackInfoModal(
                                 ),
                             ),
                         )
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), liquidGlassShape(LiquidGlassSurface.PLAYER, RoundedCornerShape(24.dp)))
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() },
@@ -140,7 +142,7 @@ internal fun PlaybackInfoModal(
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
                                     contentDescription = "Close",
-                                    tint = Color.White,
+                                    tint = liquidGlassIconTint(LiquidGlassSurface.PLAYER, Color.White),
                                     modifier = Modifier.size(18.dp),
                                 )
                             }

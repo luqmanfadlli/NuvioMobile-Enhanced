@@ -54,7 +54,11 @@ import nuvio.composeapp.generated.resources.compose_player_youre_watching
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.max
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
 
 internal enum class GestureFeedbackIcon {
     Speed,
@@ -104,7 +108,7 @@ internal fun GestureFeedbackPill(
         GestureFeedbackIcon.SeekBackward -> Icons.Rounded.FastRewind
         GestureFeedbackIcon.VideoZoom -> Icons.Rounded.ZoomOutMap
     }
-    val iconTint = if (feedback.isDanger) Color(0xFFFFC1C1) else Color.White
+    val iconTint = if (feedback.isDanger) Color(0xFFFFC1C1) else liquidGlassIconTint(LiquidGlassSurface.PLAYER, Color.White)
     val messageText = feedback.messageRes?.let { resource ->
         stringResource(resource, *feedback.messageArgs.toTypedArray())
     } ?: feedback.message.orEmpty()
@@ -112,10 +116,12 @@ internal fun GestureFeedbackPill(
         stringResource(resource, *feedback.secondaryMessageArgs.toTypedArray())
     } ?: feedback.secondaryMessage
 
+    val playerGlassActive = isAmbientLiquidGlassActive()
+    LiquidGlassTextContrastScope(enabled = playerGlassActive, surface = LiquidGlassSurface.PLAYER) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .ambientLiquidGlass(
+            .liquidGlassForSurface(
+                surface = LiquidGlassSurface.PLAYER,
                 shape = RoundedCornerShape(24.dp),
                 tint = backgroundColor.copy(alpha = backgroundColor.alpha * 0.7f),
                 fallback = backgroundColor,
@@ -153,6 +159,7 @@ internal fun GestureFeedbackPill(
                 color = feedback.secondaryMessageColor ?: Color.White.copy(alpha = 0.92f),
             )
         }
+    }
     }
 }
 

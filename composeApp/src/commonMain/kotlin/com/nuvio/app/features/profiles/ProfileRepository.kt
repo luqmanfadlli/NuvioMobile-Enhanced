@@ -29,6 +29,7 @@ import com.nuvio.app.features.search.SearchHistoryRepository
 import com.nuvio.app.features.search.SearchRepository
 import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
@@ -312,6 +313,14 @@ object ProfileRepository {
         if (AuthRepository.state.value.isAnonymous) {
             val remaining = _state.value.profiles.filter { it.profileIndex != profileIndex }
             val localLockCleanupSucceeded = withContext(Dispatchers.IO) {
+                val settingsBackgroundRemoved = ThemeSettingsStorage.clearCustomSettingsBackgroundImage(profileIndex)
+                if (!settingsBackgroundRemoved) {
+                    log.w { "Profile $profileIndex was deleted, but its local Settings background could not be removed" }
+                }
+                val cloudBackgroundRemoved = ThemeSettingsStorage.clearCustomLibraryCloudBackgroundImage(profileIndex)
+                if (!cloudBackgroundRemoved) {
+                    log.w { "Profile $profileIndex was deleted, but its local Cloud Library background could not be removed" }
+                }
                 val pinCacheRemoved = ProfilePinCacheStorage.removePayload(profileIndex)
                 val biometricRemoved = ProfileBiometricAuth.disable(profileIndex, userId)
                 pinCacheRemoved && biometricRemoved
@@ -344,6 +353,14 @@ object ProfileRepository {
             // Remote deletion succeeded; remove device-local authentication artifacts even if
             // the subsequent profile refresh is interrupted or unavailable.
             val localLockCleanupSucceeded = withContext(Dispatchers.IO) {
+                val settingsBackgroundRemoved = ThemeSettingsStorage.clearCustomSettingsBackgroundImage(profileIndex)
+                if (!settingsBackgroundRemoved) {
+                    log.w { "Profile $profileIndex was deleted, but its local Settings background could not be removed" }
+                }
+                val cloudBackgroundRemoved = ThemeSettingsStorage.clearCustomLibraryCloudBackgroundImage(profileIndex)
+                if (!cloudBackgroundRemoved) {
+                    log.w { "Profile $profileIndex was deleted, but its local Cloud Library background could not be removed" }
+                }
                 val pinCacheRemoved = ProfilePinCacheStorage.removePayload(profileIndex)
                 val biometricRemoved = ProfileBiometricAuth.disable(profileIndex, userId)
                 pinCacheRemoved && biometricRemoved

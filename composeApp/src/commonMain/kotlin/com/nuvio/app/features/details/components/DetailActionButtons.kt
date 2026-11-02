@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.rounded.Download
 import com.nuvio.app.core.ui.AppIconResource
+import com.nuvio.app.core.ui.NuvioNativeLiquidGlassButton
+import com.nuvio.app.core.ui.isNativeLiquidGlassControlsAvailable
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.themePalette
@@ -77,13 +79,19 @@ import nuvio.composeapp.generated.resources.details_action_start_from_beginning
 import nuvio.composeapp.generated.resources.sidebar_library
 import nuvio.composeapp.generated.resources.streams_open_external_player
 import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
-import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 
 data class DetailSecondaryAction(
     val label: String,
     val icon: ImageVector,
     val drawable: DrawableResource? = null,
+    val nativeSystemImage: String? = null,
     val isActive: Boolean = false,
     val onClick: () -> Unit = {},
     val onLongClick: (() -> Unit)? = null,
@@ -91,7 +99,7 @@ data class DetailSecondaryAction(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DetailActionButtons(
+internal fun DetailActionButtons(
     modifier: Modifier = Modifier,
     playLabel: String = stringResource(Res.string.action_play),
     playEnabled: Boolean = true,
@@ -106,7 +114,20 @@ fun DetailActionButtons(
     iconActions: List<DetailSecondaryAction> = emptyList(),
     userRating: Int? = null,
     onRateClick: (() -> Unit)? = null,
+    previewGlassSurface: LiquidGlassSurface? = null,
+    previewGlassAll: Boolean = false,
 ) {
+    val isGlassPreview = previewGlassAll || previewGlassSurface != null
+    val previewDetailsGlass = if (isGlassPreview) {
+        isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.DETAILS, preview = true)
+    } else {
+        false
+    }
+    val previewPrimaryGlass = if (isGlassPreview) {
+        isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.DETAIL_PRIMARY_ACTION, preview = true)
+    } else {
+        false
+    }
     val playPainter = appIconPainter(AppIconResource.PlayerPlay)
     val buttonHeight = if (isTablet) 56.dp else 52.dp
     val iconButtonSize = buttonHeight
@@ -144,6 +165,8 @@ fun DetailActionButtons(
                     preferredSize = iconButtonSize,
                     preferredSpacing = if (isTablet) 20.dp else 16.dp,
                     modifier = Modifier.fillMaxWidth(),
+                    previewGlass = previewDetailsGlass,
+                    previewMode = isGlassPreview,
                 )
             }
             onRateClick?.let { rate ->
@@ -185,6 +208,7 @@ fun DetailActionButtons(
                 DetailIconAction(
                     label = pinnedAction.label,
                     icon = pinnedAction.icon,
+                    nativeSystemImage = pinnedAction.nativeSystemImage,
                     active = pinnedAction.isActive,
                     progress = 1f,
                     size = iconButtonSize,
@@ -192,6 +216,8 @@ fun DetailActionButtons(
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         pinnedAction.onClick()
                     },
+                    previewGlass = previewDetailsGlass,
+                    previewMode = isGlassPreview,
                 )
             }
 
@@ -212,6 +238,7 @@ fun DetailActionButtons(
                                 label = action.label,
                                 icon = action.icon,
                                 drawable = action.drawable,
+                                nativeSystemImage = action.nativeSystemImage,
                                 active = action.isActive,
                                 progress = menuProgress,
                                 size = iconButtonSize,
@@ -225,6 +252,8 @@ fun DetailActionButtons(
                                         longClick()
                                     }
                                 },
+                                previewGlass = previewDetailsGlass,
+                                previewMode = isGlassPreview,
                             )
                         }
                     }
@@ -237,53 +266,91 @@ fun DetailActionButtons(
             }
 
             if (hasSecondaryActions) {
-                val moreGlassActive = !actionsExpanded && isAmbientLiquidGlassActive()
-                Surface(
-                    modifier = Modifier
-                        .size(iconButtonSize)
-                        .then(
-                            if (moreGlassActive) {
-                                Modifier.ambientLiquidGlass(
-                                    shape = CircleShape,
-                                    tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    fallback = Color.Transparent,
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    shape = CircleShape,
-                    color = if (actionsExpanded) {
-                        MaterialTheme.colorScheme.onBackground
-                    } else if (moreGlassActive) {
-                        Color.Transparent
+                val moreGlassEnabled = if (isGlassPreview) {
+                    previewDetailsGlass
+                } else if (isNativeLiquidGlassControlsAvailable()) {
+                    isLiquidGlassSurfaceEffectivelyEnabled(
+                        LiquidGlassSurface.DETAILS,
+                        platformSupported = true,
+                    )
+                } else {
+                    isLiquidGlassSupported() && isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.DETAILS)
+                }
+                val useNativeMoreButton = isNativeLiquidGlassControlsAvailable() && moreGlassEnabled
+                if (useNativeMoreButton) {
+                    NuvioNativeLiquidGlassButton(
+                        systemImage = "ellipsis",
+                        accessibilityLabel = actionsMenuLabel,
+                        selected = actionsExpanded,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            actionsExpanded = !actionsExpanded
+                        },
+                        modifier = Modifier.size(iconButtonSize),
+                    )
+                } else {
+                    val moreGlassActive = !actionsExpanded && moreGlassEnabled
+                    val moreSurfaceShape = if (moreGlassActive) {
+                        liquidGlassShape(LiquidGlassSurface.DETAILS, CircleShape, preview = previewDetailsGlass)
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
-                    },
-                    contentColor = if (actionsExpanded) {
-                        MaterialTheme.colorScheme.background
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                ) {
-                    Box(
+                        CircleShape
+                    }
+                    Surface(
                         modifier = Modifier
                             .size(iconButtonSize)
-                            .clickable(role = Role.Button) {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                actionsExpanded = !actionsExpanded
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = actionsMenuLabel,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer {
-                                    rotationZ = 90f * menuProgress
+                            .then(
+                                if (moreGlassActive) {
+                                    Modifier.liquidGlassForSurface(
+                                        surface = LiquidGlassSurface.DETAILS,
+                                        shape = moreSurfaceShape,
+                                        tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                                        fallback = Color.Transparent,
+                                        blurRadius = 14.dp,
+                                        refractionHeight = 8.dp,
+                                        refractionAmount = 12.dp,
+                                        preview = isGlassPreview,
+                                    )
+                                } else {
+                                    Modifier
                                 },
-                        )
+                            ),
+                        shape = moreSurfaceShape,
+                        color = if (actionsExpanded) {
+                            MaterialTheme.colorScheme.onBackground
+                        } else if (moreGlassActive) {
+                            Color.Transparent
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
+                        },
+                        contentColor = if (actionsExpanded) {
+                            MaterialTheme.colorScheme.background
+                        } else {
+                            liquidGlassIconTint(
+                                LiquidGlassSurface.DETAILS,
+                                MaterialTheme.colorScheme.onSurface,
+                                preview = isGlassPreview,
+                            )
+                        },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(iconButtonSize)
+                                .clickable(role = Role.Button) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    actionsExpanded = !actionsExpanded
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = actionsMenuLabel,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .graphicsLayer {
+                                        rotationZ = 90f * menuProgress
+                                    },
+                            )
+                        }
                     }
                 }
             }
@@ -291,50 +358,90 @@ fun DetailActionButtons(
     }
 
         if (onDownloadClick != null) {
-            val downloadGlassActive = isAmbientLiquidGlassActive()
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(buttonHeight)
-                    .then(
-                        if (downloadGlassActive) {
-                            Modifier.ambientLiquidGlass(
-                                shape = playShape,
-                                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                fallback = Color.Transparent,
-                            )
-                        } else {
-                            Modifier
-                        },
-                    ),
-                shape = playShape,
-                color = if (downloadGlassActive) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                Row(
+            val useNativeDownloadButton = isNativeLiquidGlassControlsAvailable() &&
+                if (isGlassPreview) {
+                    previewPrimaryGlass
+                } else {
+                    isLiquidGlassSurfaceEffectivelyEnabled(
+                        LiquidGlassSurface.DETAIL_PRIMARY_ACTION,
+                        platformSupported = true,
+                    )
+                }
+            if (useNativeDownloadButton) {
+                NuvioNativeLiquidGlassButton(
+                    title = stringResource(Res.string.details_download_action),
+                    systemImage = "arrow.down.to.line",
+                    accessibilityLabel = stringResource(Res.string.details_download_action),
+                    onClick = onDownloadClick,
+                    modifier = Modifier.fillMaxWidth().height(buttonHeight),
+                )
+            } else {
+                val downloadGlassActive = if (isGlassPreview) {
+                    previewPrimaryGlass
+                } else {
+                    isLiquidGlassSupported() &&
+                        isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.DETAIL_PRIMARY_ACTION)
+                }
+                val downloadSurfaceShape = if (downloadGlassActive) {
+                    liquidGlassShape(LiquidGlassSurface.DETAIL_PRIMARY_ACTION, playShape, preview = isGlassPreview)
+                } else {
+                    playShape
+                }
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(role = Role.Button, onClick = onDownloadClick)
-                        .height(buttonHeight),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                        .height(buttonHeight)
+                        .then(
+                            if (downloadGlassActive) {
+                                Modifier.liquidGlassForSurface(
+                                    surface = LiquidGlassSurface.DETAIL_PRIMARY_ACTION,
+                                    shape = downloadSurfaceShape,
+                                    tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                                    fallback = Color.Transparent,
+                                    blurRadius = 14.dp,
+                                    refractionHeight = 6.dp,
+                                    refractionAmount = 9.dp,
+                                    preview = isGlassPreview,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    shape = downloadSurfaceShape,
+                    color = if (downloadGlassActive) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = liquidGlassIconTint(
+                        LiquidGlassSurface.DETAIL_PRIMARY_ACTION,
+                        MaterialTheme.colorScheme.onSurface,
+                        preview = isGlassPreview,
+                    ),
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(if (isTablet) 20.dp else 18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.details_download_action),
-                        style = if (isTablet) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.titleSmall
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    LiquidGlassTextContrastScope(enabled = downloadGlassActive) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(role = Role.Button, onClick = onDownloadClick)
+                                .height(buttonHeight),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(if (isTablet) 20.dp else 18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(Res.string.details_download_action),
+                                style = if (isTablet) {
+                                    MaterialTheme.typography.titleMedium
+                                } else {
+                                    MaterialTheme.typography.titleSmall
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -352,7 +459,7 @@ fun DetailActionButtons(
 // Fork additions: download / play from start / external player in the icon row, the icon-row
 // layout itself, the user rating stars, and the fork's watched/library icons.
 @Composable
-fun DetailActions(
+internal fun DetailActions(
     playLabel: String,
     playEnabled: Boolean,
     isSaved: Boolean,
@@ -371,6 +478,8 @@ fun DetailActions(
     iconActionRow: Boolean = false,
     userRating: Int? = null,
     onRateClick: (() -> Unit)? = null,
+    previewGlassSurface: LiquidGlassSurface? = null,
+    previewGlassAll: Boolean = false,
 ) {
     val actionSet = detailActionSet(
         isSaved = isSaved,
@@ -405,6 +514,8 @@ fun DetailActions(
         onPlayLongClick = onPlayLongClick,
         userRating = userRating,
         onRateClick = onRateClick,
+        previewGlassSurface = previewGlassSurface,
+        previewGlassAll = previewGlassAll,
     )
 }
 
@@ -432,6 +543,7 @@ private fun detailActionSet(
         DetailSecondaryAction(
             label = stringResource(if (shuffleEnabled) Res.string.shuffle_stop else Res.string.random_episode_title),
             icon = Icons.Default.Shuffle,
+            nativeSystemImage = "shuffle",
             isActive = shuffleEnabled,
             onClick = onClick,
         )
@@ -439,6 +551,7 @@ private fun detailActionSet(
     val watchedAction = DetailSecondaryAction(
         label = stringResource(if (isWatched) Res.string.hero_mark_unwatched else Res.string.hero_mark_watched),
         icon = if (isWatched) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+        nativeSystemImage = if (isWatched) "eye" else "eye.slash",
         isActive = isWatched,
         onClick = onWatchedClick,
     )
@@ -446,6 +559,7 @@ private fun detailActionSet(
         label = stringResource(if (isSaved) Res.string.hero_remove_from_library else Res.string.hero_add_to_library),
         icon = Icons.Default.Add,
         drawable = Res.drawable.sidebar_library.takeIf { isSaved },
+        nativeSystemImage = if (isSaved) "books.vertical.fill" else "plus",
         isActive = isSaved,
         onClick = onSaveClick,
         onLongClick = onSaveLongClick,
@@ -455,10 +569,10 @@ private fun detailActionSet(
     val externalLabel = stringResource(Res.string.streams_open_external_player)
     val iconActions = buildList {
         onDownloadClick?.let { download ->
-            add(DetailSecondaryAction(label = downloadLabel, icon = Icons.Rounded.Download, onClick = download))
+            add(DetailSecondaryAction(label = downloadLabel, icon = Icons.Rounded.Download, nativeSystemImage = "arrow.down.to.line", onClick = download))
         }
         onPlayFromStartClick?.let { playFromStart ->
-            add(DetailSecondaryAction(label = playFromStartLabel, icon = Icons.Rounded.Replay, onClick = playFromStart))
+            add(DetailSecondaryAction(label = playFromStartLabel, icon = Icons.Rounded.Replay, nativeSystemImage = "backward.end", onClick = playFromStart))
         }
         shuffleAction?.let(::add)
         onPlayExternallyClick?.let { playExternally ->
@@ -466,6 +580,7 @@ private fun detailActionSet(
                 DetailSecondaryAction(
                     label = externalLabel,
                     icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                    nativeSystemImage = "arrow.up.right.square",
                     onClick = playExternally,
                 ),
             )
@@ -599,6 +714,8 @@ private fun DetailIconActionRow(
     preferredSpacing: Dp,
     modifier: Modifier = Modifier,
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    previewGlass: Boolean = false,
+    previewMode: Boolean = false,
 ) {
     if (actions.isEmpty()) {
         Spacer(modifier = modifier)
@@ -626,11 +743,14 @@ private fun DetailIconActionRow(
                     label = action.label,
                     icon = action.icon,
                     drawable = action.drawable,
+                    nativeSystemImage = action.nativeSystemImage,
                     active = action.isActive,
                     progress = 1f,
                     size = layout.size,
                     onClick = action.onClick,
                     onLongClick = action.onLongClick,
+                    previewGlass = previewGlass,
+                    previewMode = previewMode,
                 )
             }
         }
@@ -648,9 +768,52 @@ internal fun DetailIconAction(
     modifier: Modifier = Modifier,
     size: Dp,
     drawable: DrawableResource? = null,
+    nativeSystemImage: String? = null,
     onLongClick: (() -> Unit)? = null,
+    previewGlass: Boolean = false,
+    previewMode: Boolean = false,
 ) {
-    val glassActive = !active && isAmbientLiquidGlassActive()
+    val nativeGlassActive = nativeSystemImage != null &&
+        isNativeLiquidGlassControlsAvailable() &&
+        if (previewMode) {
+            previewGlass
+        } else {
+            isLiquidGlassSurfaceEffectivelyEnabled(
+                LiquidGlassSurface.DETAILS,
+                platformSupported = true,
+            )
+        }
+    if (nativeGlassActive) {
+        NuvioNativeLiquidGlassButton(
+            systemImage = nativeSystemImage,
+            accessibilityLabel = label,
+            selected = active,
+            enabled = true,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            modifier = modifier
+                .size(size)
+                .graphicsLayer {
+                    alpha = progress
+                    scaleX = 0.86f + (0.14f * progress)
+                    scaleY = 0.86f + (0.14f * progress)
+                },
+        )
+        return
+    }
+
+    val glassActive = !active && (
+        if (previewMode) {
+            previewGlass
+        } else {
+            isLiquidGlassSupported() && isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.DETAILS)
+        }
+    )
+    val actionSurfaceShape = if (glassActive) {
+        liquidGlassShape(LiquidGlassSurface.DETAILS, CircleShape, preview = previewMode)
+    } else {
+        CircleShape
+    }
     Surface(
         modifier = modifier
             .graphicsLayer {
@@ -660,16 +823,21 @@ internal fun DetailIconAction(
             }
             .then(
                 if (glassActive) {
-                    Modifier.ambientLiquidGlass(
-                        shape = CircleShape,
-                        tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    Modifier.liquidGlassForSurface(
+                        surface = LiquidGlassSurface.DETAILS,
+                        shape = actionSurfaceShape,
+                        tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
                         fallback = Color.Transparent,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 12.dp,
+                        preview = previewMode,
                     )
                 } else {
                     Modifier
                 },
             ),
-        shape = CircleShape,
+        shape = actionSurfaceShape,
         color = if (active) {
             MaterialTheme.colorScheme.onBackground
         } else if (glassActive) {
@@ -680,7 +848,7 @@ internal fun DetailIconAction(
         contentColor = if (active) {
             MaterialTheme.colorScheme.background
         } else {
-            MaterialTheme.colorScheme.onSurface
+            liquidGlassIconTint(LiquidGlassSurface.DETAILS, MaterialTheme.colorScheme.onSurface, preview = previewMode)
         },
         tonalElevation = 6.dp,
     ) {

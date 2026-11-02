@@ -832,6 +832,17 @@ internal fun LayoutCoordinates.boundsOnScreen(): Rect {
     )
 }
 
+internal fun resolveProfileAvatarBorderColor(
+    selected: Boolean,
+    avatarColor: Color,
+    selectedBorderColor: Color,
+    defaultIconColorOverride: Color?,
+): Color = if (selected) {
+    selectedBorderColor
+} else {
+    defaultIconColorOverride ?: avatarColor.copy(alpha = 0.5f)
+}
+
 @Composable
 fun ActiveProfileMiniAvatar(
     profile: NuvioProfile?,
@@ -859,11 +870,12 @@ fun ActiveProfileMiniAvatar(
         profileAvatarImageUrl(profile, avatarItem)
     }
 
-    val borderColor = if (selected) {
-        tokens.colors.borderSelected
-    } else {
-        avatarColor.copy(alpha = 0.5f)
-    }
+    val borderColor = resolveProfileAvatarBorderColor(
+        selected = selected,
+        avatarColor = avatarColor,
+        selectedBorderColor = tokens.colors.borderSelected,
+        defaultIconColorOverride = iconColorOverride,
+    )
 
     Box(
         modifier = Modifier

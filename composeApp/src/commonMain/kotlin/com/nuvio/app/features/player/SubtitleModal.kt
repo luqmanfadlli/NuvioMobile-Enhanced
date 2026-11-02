@@ -48,6 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.usesNativeNuvioBottomSheet
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.addon_title
@@ -536,7 +539,10 @@ private fun SubtitleRailEmptyState(
             Icon(
                 imageVector = Icons.Rounded.CloudDownload,
                 contentDescription = null,
-                tint = tokens.colors.textMuted,
+                tint = liquidGlassIconTint(
+                            if (usesNativeNuvioBottomSheet) LiquidGlassSurface.PLAYER else LiquidGlassSurface.BOTTOM_SHEETS,
+                            tokens.colors.textMuted,
+                        ),
                 modifier = Modifier.size(20.dp),
             )
         }

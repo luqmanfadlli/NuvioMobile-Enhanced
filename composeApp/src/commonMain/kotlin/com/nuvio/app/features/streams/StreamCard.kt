@@ -44,8 +44,13 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.SkeletonBlock
 import com.nuvio.app.features.debrid.DebridProviders
 import androidx.compose.ui.graphics.compositeOver
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
 import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.isLiquidGlassSupported
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
 
@@ -72,15 +77,32 @@ internal fun StreamCard(
     isCurrent: Boolean = false,
     currentLabel: String? = null,
     outlined: Boolean = false,
+    preview: Boolean = false,
 ) {
     val partyLabel = if (isCurrent) null else LocalStreamHighlight.current(stream)
-    val cardShape = RoundedCornerShape(12.dp)
+    val defaultCardShape = RoundedCornerShape(12.dp)
+    val glassAllowed = isLiquidGlassSurfaceEffectivelyEnabled(
+        LiquidGlassSurface.STREAM_RESULTS,
+        preview = preview,
+    ) && (preview || isLiquidGlassSupported())
+    val cardShape = if (glassAllowed) {
+        liquidGlassShape(LiquidGlassSurface.STREAM_RESULTS, defaultCardShape, preview = preview)
+    } else {
+        defaultCardShape
+    }
+    val surfaceFallback = if (isCurrent) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    } else {
+        Color.White.copy(alpha = 0.05f)
+    }
+    val surfaceTint = surfaceFallback.compositeOver(Color.Black.copy(alpha = StreamGlassTintAlpha))
     val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
     val hasBadges = badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 68.dp)
+    LiquidGlassTextContrastScope(enabled = glassAllowed, surface = LiquidGlassSurface.STREAM_RESULTS) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 68.dp)
             .shadow(
                 elevation = 2.dp,
                 shape = cardShape,
@@ -88,19 +110,21 @@ internal fun StreamCard(
                 spotColor = Color.Black.copy(alpha = 0.04f),
             )
             .clip(cardShape)
-            .ambientLiquidGlass(
-                shape = cardShape,
-                tint = if (isCurrent) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            .then(
+                if (glassAllowed) {
+                    Modifier.liquidGlassForSurface(
+                        surface = LiquidGlassSurface.STREAM_RESULTS,
+                        shape = cardShape,
+                        tint = surfaceTint,
+                        fallback = surfaceFallback,
+                        blurRadius = 18.dp,
+                        refractionHeight = 10.dp,
+                        refractionAmount = 16.dp,
+                        preview = preview,
+                    )
                 } else {
-                    Color.White.copy(alpha = 0.05f)
-                }.compositeOver(Color.Black.copy(alpha = StreamGlassTintAlpha)),
-                fallback = if (isCurrent) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                } else {
-                    Color.White.copy(alpha = 0.05f)
+                    Modifier.background(surfaceFallback, cardShape)
                 },
-                blurRadius = 18.dp,
             )
             .then(
                 if (isCurrent || outlined) {
@@ -134,6 +158,7 @@ internal fun StreamCard(
             StreamNameWithInstantService(
                 stream = stream,
                 appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                preview = preview,
             ) {
                 if (isCurrent && !currentLabel.isNullOrBlank()) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -160,7 +185,7 @@ internal fun StreamCard(
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
-                        shadow = streamGlassTextShadow(),
+                        shadow = streamGlassTextShadow(preview = preview),
                     ),
                     color = Color.White,
                 )
@@ -194,13 +219,14 @@ internal fun StreamCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = stream.addonName,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, shadow = streamGlassTextShadow()),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, shadow = streamGlassTextShadow(preview = preview)),
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+    }
     }
 }
 
@@ -245,6 +271,7 @@ private fun StreamCardBadgeRow(
 private fun StreamNameWithInstantService(
     stream: StreamItem,
     appendInstantServiceToDefaultName: Boolean,
+    preview: Boolean = false,
     trailingContent: @Composable RowScope.() -> Unit = {},
 ) {
     val nameStyle = MaterialTheme.typography.bodyMedium.copy(
@@ -252,7 +279,7 @@ private fun StreamNameWithInstantService(
         fontWeight = FontWeight.Bold,
         lineHeight = 20.sp,
         letterSpacing = 0.sp,
-        shadow = streamGlassTextShadow(),
+        shadow = streamGlassTextShadow(preview = preview),
     )
     val instantLabel = if (appendInstantServiceToDefaultName) {
         stream.instantServiceLabel()
@@ -327,8 +354,14 @@ private val StreamGlassTextShadow = Shadow(
 )
 
 @Composable
-internal fun streamGlassTextShadow(): Shadow? =
-    if (isAmbientLiquidGlassActive()) StreamGlassTextShadow else null
+internal fun streamGlassTextShadow(preview: Boolean = false): Shadow? {
+    val glassEnabled = if (preview) {
+        isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.STREAM_RESULTS, preview = true)
+    } else {
+        isAmbientLiquidGlassActive() && isLiquidGlassSurfaceEffectivelyEnabled(LiquidGlassSurface.STREAM_RESULTS)
+    }
+    return if (glassEnabled) StreamGlassTextShadow else null
+}
 
 private fun StreamItem.instantServiceLabel(): String? {
     val status = debridCacheStatus ?: return null

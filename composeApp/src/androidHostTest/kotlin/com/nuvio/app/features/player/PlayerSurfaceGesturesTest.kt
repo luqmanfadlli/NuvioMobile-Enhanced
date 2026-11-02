@@ -70,11 +70,13 @@ class PlayerSurfaceGesturesTest {
                     )
                     .playerSurfaceDragGestures(
                         gestureController = gestureController,
+                        playerController = null,
                         layoutSize = IntSize(320, 180),
                         playbackGesturesEnabled = playbackReady.value,
                         sideGestureSystemEdgeExclusionPx = 0f,
                         playerControlsLockedState = locked,
                         touchGesturesEnabledState = rememberUpdatedState(true),
+                        swipeToSeekEnabledState = rememberUpdatedState(true),
                         isHoldToSpeedGestureActiveState = rememberUpdatedState(false),
                         currentPositionMsState = rememberUpdatedState(30_000L),
                         currentDurationMsState = rememberUpdatedState(120_000L),

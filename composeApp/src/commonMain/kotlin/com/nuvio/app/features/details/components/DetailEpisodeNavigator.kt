@@ -3,6 +3,11 @@ package com.nuvio.app.features.details.components
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -11,6 +16,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.Dp
 import com.nuvio.app.features.details.EpisodeRatingsVisibility
 import com.nuvio.app.features.details.MetaDetails
@@ -73,10 +79,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
+import com.nuvio.app.core.ui.NuvioNativeLiquidGlassButton
+import com.nuvio.app.core.ui.NuvioNativeLiquidGlassSearchField
+import com.nuvio.app.core.ui.isNativeLiquidGlassControlsAvailable
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.glass.LiquidGlassSurface
+import com.nuvio.app.core.ui.glass.isLiquidGlassAvailable
+import com.nuvio.app.core.ui.glass.isLiquidGlassSurfaceEffectivelyEnabled
+import com.nuvio.app.core.ui.glass.liquidGlassForSurface
+import com.nuvio.app.core.ui.glass.LiquidGlassTextContrastScope
+import com.nuvio.app.core.ui.glass.liquidGlassIconTint
+import com.nuvio.app.core.ui.glass.liquidGlassShape
 import com.nuvio.app.features.details.MetaVideo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -183,6 +199,25 @@ internal suspend fun EpisodeNavigatorState.flashHighlight(key: String) {
 
 private const val EPISODE_HIGHLIGHT_MS = 1_600L
 
+/**
+ * Lets the Studio preview select an entire glass surface without intercepting its real child
+ * controls. Runtime callers pass no callback and keep their existing input behavior.
+ */
+internal fun Modifier.onLiquidGlassPreviewSurfaceTap(
+    surface: LiquidGlassSurface,
+    onSurfaceSelected: ((LiquidGlassSurface) -> Unit)?,
+): Modifier {
+    val callback = onSurfaceSelected ?: return this
+    return pointerInput(surface, callback) {
+        awaitEachGesture {
+            awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+            if (waitForUpOrCancellation(pass = PointerEventPass.Initial) != null) {
+                callback(surface)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun EpisodeNavigatorBar(
     state: EpisodeNavigatorState,
@@ -190,72 +225,136 @@ internal fun EpisodeNavigatorBar(
     totalCount: Int,
     onSubmitNumber: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onPreviewSurfaceSelected: ((LiquidGlassSurface) -> Unit)? = null,
+    selectedPreviewSurface: LiquidGlassSurface? = null,
 ) {
     val tokens = MaterialTheme.nuvio
-    val fieldShape = RoundedCornerShape(14.dp)
+    val searchSurface = LiquidGlassSurface.DETAIL_EPISODE_SEARCH
+    val searchGlassEnabled = isLiquidGlassAvailable() && isLiquidGlassSurfaceEffectivelyEnabled(searchSurface)
+    val nativeSearchPreview = onPreviewSurfaceSelected != null || selectedPreviewSurface != null
+    val nativeSearchEnabled = isNativeLiquidGlassControlsAvailable() &&
+        isLiquidGlassSurfaceEffectivelyEnabled(
+            searchSurface,
+            preview = nativeSearchPreview,
+            platformSupported = true,
+        ) &&
+        (!nativeSearchPreview || selectedPreviewSurface == null || selectedPreviewSurface == searchSurface)
+    val fieldShape = liquidGlassShape(searchSurface, RoundedCornerShape(14.dp))
+    val searchSelected = selectedPreviewSurface == searchSurface
+    val searchSurfaceModifier = if (searchGlassEnabled) {
+        Modifier.liquidGlassForSurface(
+            surface = searchSurface,
+            shape = fieldShape,
+            tint = tokens.colors.surfaceSheet.copy(alpha = 0.24f),
+            fallback = tokens.colors.surfaceSheet.copy(alpha = 0.6f),
+            blurRadius = 12.dp,
+            refractionHeight = 6.dp,
+            refractionAmount = 9.dp,
+        )
+    } else {
+        Modifier
+            .clip(fieldShape)
+            .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
+            .border(
+                width = if (searchSelected) 2.dp else 1.dp,
+                color = if (searchSelected) MaterialTheme.colorScheme.primary else tokens.colors.borderDefault,
+                shape = fieldShape,
+            )
+    }
+    val searchSelectionBorder = if (searchGlassEnabled && searchSelected) {
+        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, fieldShape)
+    } else {
+        Modifier
+    }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .clip(fieldShape)
-                    .background(tokens.colors.surfaceSheet.copy(alpha = 0.6f))
-                    .border(1.dp, tokens.colors.borderDefault, fieldShape)
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = tokens.colors.textMuted,
-                    modifier = Modifier.size(18.dp),
-                )
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (state.query.isEmpty()) {
-                        Text(
-                            text = stringResource(Res.string.episode_navigator_search_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = tokens.colors.textMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    BasicTextField(
+            LiquidGlassTextContrastScope(enabled = searchGlassEnabled) {
+                if (nativeSearchEnabled) {
+                    NuvioNativeLiquidGlassSearchField(
                         value = state.query,
+                        placeholder = stringResource(Res.string.episode_navigator_search_hint),
+                        accessibilityLabel = stringResource(Res.string.episode_navigator_search_hint),
                         onValueChange = { state.query = it },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = tokens.colors.textPrimary),
-                        cursorBrush = SolidColor(tokens.colors.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = { state.query.trim().toIntOrNull()?.let(onSubmitNumber) },
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
+                        onSearch = { state.query.trim().toIntOrNull()?.let(onSubmitNumber) },
+                        modifier = Modifier.weight(1f),
                     )
-                }
-                if (state.query.isNotEmpty()) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(Res.string.episode_navigator_clear_search),
-                        tint = tokens.colors.textMuted,
+                } else {
+                    Row(
                         modifier = Modifier
-                            .size(18.dp)
-                            .clickable { state.query = "" },
-                    )
+                            .weight(1f)
+                            .heightIn(min = 44.dp)
+                            .then(searchSurfaceModifier)
+                            .then(searchSelectionBorder)
+                            .onLiquidGlassPreviewSurfaceTap(
+                                surface = searchSurface,
+                                onSurfaceSelected = onPreviewSurfaceSelected,
+                            )
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = liquidGlassIconTint(searchSurface, tokens.colors.textMuted),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (state.query.isEmpty()) {
+                                Text(
+                                    text = stringResource(Res.string.episode_navigator_search_hint),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = tokens.colors.textMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            BasicTextField(
+                                value = state.query,
+                                onValueChange = { state.query = it },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = tokens.colors.textPrimary),
+                                cursorBrush = SolidColor(tokens.colors.accent),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { state.query.trim().toIntOrNull()?.let(onSubmitNumber) },
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focus ->
+                                        if (focus.isFocused) onPreviewSurfaceSelected?.invoke(searchSurface)
+                                    },
+                            )
+                        }
+                        if (state.query.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(Res.string.episode_navigator_clear_search),
+                                tint = tokens.colors.textMuted,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable { state.query = "" },
+                            )
+                        }
+                    }
                 }
             }
             EpisodeNavigatorChip(
                 text = stringResource(Res.string.episode_navigator_go_to),
+                glassSurface = LiquidGlassSurface.DETAIL_EPISODE_GO_TO,
+                onPreviewSurfaceSelected = onPreviewSurfaceSelected,
+                selectedPreviewSurface = selectedPreviewSurface,
                 onClick = { state.goToSheetVisible = true },
             )
             EpisodeNavigatorChip(
                 text = stringResource(Res.string.episode_navigator_sort),
+                glassSurface = LiquidGlassSurface.DETAIL_EPISODE_SORT,
+                onPreviewSurfaceSelected = onPreviewSurfaceSelected,
+                selectedPreviewSurface = selectedPreviewSurface,
                 onClick = { state.sortSheetVisible = true },
             )
         }
@@ -276,15 +375,77 @@ internal fun EpisodeNavigatorBar(
 }
 
 @Composable
-private fun EpisodeNavigatorChip(text: String, onClick: () -> Unit) {
+private fun EpisodeNavigatorChip(
+    text: String,
+    onClick: () -> Unit,
+    glassSurface: LiquidGlassSurface? = null,
+    onPreviewSurfaceSelected: ((LiquidGlassSurface) -> Unit)? = null,
+    selectedPreviewSurface: LiquidGlassSurface? = null,
+) {
     val tokens = MaterialTheme.nuvio
-    val shape = RoundedCornerShape(14.dp)
+    val nativeShape = RoundedCornerShape(14.dp)
+    val surface = glassSurface
+    val isPreview = onPreviewSurfaceSelected != null || selectedPreviewSurface != null
+    val nativeGlassEnabled = surface != null &&
+        isNativeLiquidGlassControlsAvailable() &&
+        isLiquidGlassSurfaceEffectivelyEnabled(
+            surface,
+            preview = isPreview,
+            platformSupported = true,
+        ) &&
+        (!isPreview || selectedPreviewSurface == null || selectedPreviewSurface == surface)
+    if (nativeGlassEnabled) {
+        NuvioNativeLiquidGlassButton(
+            title = text,
+            accessibilityLabel = text,
+            onClick = {
+                if (isPreview && surface != null) {
+                    onPreviewSurfaceSelected?.invoke(surface)
+                } else {
+                    onClick()
+                }
+            },
+            modifier = Modifier.heightIn(min = 44.dp),
+        )
+        return
+    }
+    val glassEnabled = surface != null && isLiquidGlassAvailable() && isLiquidGlassSurfaceEffectivelyEnabled(surface)
+    val shape = surface?.let { liquidGlassShape(it, nativeShape) } ?: nativeShape
+    val isSelected = surface != null && selectedPreviewSurface == surface
+    val containerModifier = if (glassEnabled && surface != null) {
+        Modifier.liquidGlassForSurface(
+            surface = surface,
+            shape = shape,
+            tint = tokens.colors.surfaceSheet.copy(alpha = 0.24f),
+            fallback = tokens.colors.surfaceSheet.copy(alpha = 0.6f),
+            blurRadius = 12.dp,
+            refractionHeight = 6.dp,
+            refractionAmount = 9.dp,
+        )
+    } else {
+        Modifier
+            .clip(shape)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else tokens.colors.borderDefault,
+                shape = shape,
+            )
+    }
+    val selectedOutlineModifier = if (glassEnabled && isSelected) {
+        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+    } else {
+        Modifier
+    }
+    LiquidGlassTextContrastScope(enabled = glassEnabled) {
     Box(
         modifier = Modifier
             .heightIn(min = 44.dp)
-            .clip(shape)
-            .border(1.dp, tokens.colors.borderDefault, shape)
-            .clickable(onClick = onClick)
+            .then(containerModifier)
+            .then(selectedOutlineModifier)
+            .clickable {
+                surface?.let { onPreviewSurfaceSelected?.invoke(it) }
+                onClick()
+            }
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -294,6 +455,7 @@ private fun EpisodeNavigatorChip(text: String, onClick: () -> Unit) {
             color = tokens.colors.textPrimary,
             maxLines = 1,
         )
+    }
     }
 }
 
