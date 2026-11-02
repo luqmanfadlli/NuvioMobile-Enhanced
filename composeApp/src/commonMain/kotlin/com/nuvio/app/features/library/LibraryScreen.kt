@@ -740,20 +740,17 @@ fun LibraryScreen(
                         .padding(horizontal = 16.dp)
                         .then(
                             if (libraryGlassEnabled) {
-                                val shape = liquidGlassShape(LiquidGlassSurface.LIBRARY, RoundedCornerShape(50.dp))
+                                val shape = liquidGlassShape(LiquidGlassSurface.LIBRARY, LibraryToolbarGlassShape)
                                 Modifier.liquidGlassForSurface(
                                     surface = LiquidGlassSurface.LIBRARY,
                                     shape = shape,
-                                    // Apple-like capsule material: show the wallpaper while keeping
-                                    // a restrained tint, soft edge and legible selected segment.
+                                    // Rounded-rectangle toolbar without an outline; the glass edge
+                                    // highlight is enough to separate it from the background.
                                     tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
                                     fallback = MaterialTheme.nuvio.colors.surfaceCard,
                                     blurRadius = 12.dp,
                                     refractionHeight = 6.dp,
                                     refractionAmount = 9.dp,
-                                ).border(
-                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                                    shape,
                                 )
                             } else {
                                 Modifier
@@ -1682,7 +1679,7 @@ private fun LibraryChip(
     glassSelection: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val chipShape = if (glassSelection) RoundedCornerShape(50.dp) else RoundedCornerShape(18.dp)
+    val chipShape = if (glassSelection) LibraryToolbarSegmentShape else RoundedCornerShape(18.dp)
     Surface(
         modifier = modifier
             .clip(chipShape)
@@ -1695,7 +1692,6 @@ private fun LibraryChip(
             else -> colorScheme.surfaceContainerLow
         },
         border = when {
-            glassSelection && selected -> BorderStroke(1.dp, colorScheme.onSurface.copy(alpha = 0.22f))
             selected && !glassSelection -> BorderStroke(1.dp, colorScheme.primary.copy(alpha = 0.45f))
             else -> null
         },
@@ -4225,3 +4221,7 @@ internal fun libraryGridColumnCount(isLandscape: Boolean, isTablet: Boolean): In
     isLandscape -> 6
     else -> 3
 }
+
+private val LibraryToolbarGlassShape = RoundedCornerShape(16.dp)
+
+private val LibraryToolbarSegmentShape = RoundedCornerShape(12.dp)
