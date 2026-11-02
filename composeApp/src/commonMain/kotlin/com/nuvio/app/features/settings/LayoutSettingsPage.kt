@@ -1,5 +1,9 @@
 package com.nuvio.app.features.settings
 
+import nuvio.composeapp.generated.resources.settings_appearance_catalog_accent_description
+import nuvio.composeapp.generated.resources.settings_appearance_catalog_accent
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background_description
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -66,11 +70,31 @@ internal fun LazyListScope.layoutSettingsContent(
     onPosterCustomizationClick: () -> Unit,
 ) {
     item {
+        val dynamicArtworkBackgroundEnabled by ThemeSettingsRepository.dynamicArtworkBackgroundEnabled.collectAsStateWithLifecycle()
+        val showCatalogAccentEnabled by ThemeSettingsRepository.showCatalogAccentEnabled.collectAsStateWithLifecycle()
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_home),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
+                    description = stringResource(
+                        Res.string.settings_appearance_dynamic_artwork_background_description,
+                    ),
+                    checked = dynamicArtworkBackgroundEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = ThemeSettingsRepository::setDynamicArtworkBackground,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_catalog_accent),
+                    description = stringResource(Res.string.settings_appearance_catalog_accent_description),
+                    checked = showCatalogAccentEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = ThemeSettingsRepository::setShowCatalogAccent,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.compose_settings_page_homescreen),
                     description = stringResource(Res.string.settings_content_discovery_homescreen_description),

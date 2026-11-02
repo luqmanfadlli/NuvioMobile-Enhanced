@@ -172,8 +172,6 @@ internal fun LazyListScope.appearanceSettingsContent(
             onError = { settingsBackgroundImageError = true },
         )
         var showAppIconPicker by remember { mutableStateOf(false) }
-        val dynamicArtworkBackgroundEnabled by ThemeSettingsRepository.dynamicArtworkBackgroundEnabled.collectAsStateWithLifecycle()
-        val showCatalogAccentEnabled by ThemeSettingsRepository.showCatalogAccentEnabled.collectAsStateWithLifecycle()
         val liquidGlassEffectsEnabled by ThemeSettingsRepository.liquidGlassEffectsEnabled.collectAsStateWithLifecycle()
         val liquidGlassSurfaceSettings by ThemeSettingsRepository.liquidGlassSurfaceSettings.collectAsStateWithLifecycle()
         SettingsSection(
@@ -187,16 +185,6 @@ internal fun LazyListScope.appearanceSettingsContent(
                     checked = amoledEnabled,
                     isTablet = isTablet,
                     onCheckedChange = onAmoledToggle,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
-                    description = stringResource(
-                        Res.string.settings_appearance_dynamic_artwork_background_description,
-                    ),
-                    checked = dynamicArtworkBackgroundEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = ThemeSettingsRepository::setDynamicArtworkBackground,
                 )
                 Column(
                     modifier = Modifier
@@ -276,14 +264,6 @@ internal fun LazyListScope.appearanceSettingsContent(
                         }
                     }
                 }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_appearance_catalog_accent),
-                    description = stringResource(Res.string.settings_appearance_catalog_accent_description),
-                    checked = showCatalogAccentEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = ThemeSettingsRepository::setShowCatalogAccent,
-                )
                 if (shouldExposeLiquidGlassSettings(isLiquidGlassAvailable(), isNativeLiquidGlassControlsSupportedByOs())) {
                     SettingsGroupDivider(isTablet = isTablet)
                     LiquidGlassSettingsSwitchRow(
