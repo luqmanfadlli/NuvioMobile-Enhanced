@@ -1,5 +1,6 @@
 package com.nuvio.app.navigation
 
+import com.nuvio.app.core.ui.AppRouteBackground
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
@@ -67,7 +68,7 @@ private fun PosterNavigationEntry(
             )
         },
     ) {
-        Box(
+        AppRouteBackground(
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 if (outgoing) {
                     val scale = PosterOpenMotion.backgroundScale(request.elapsedMillis)
@@ -90,7 +91,7 @@ private fun PosterNavigationEntry(
                     shape = PosterNavigationShape(radius / scaleX, radius / scaleY)
                     clip = true
                 }
-            }.background(MaterialTheme.colorScheme.background),
+            },
         ) {
             if (openingRequest == null || openingRequest.contentReady) {
                 content()

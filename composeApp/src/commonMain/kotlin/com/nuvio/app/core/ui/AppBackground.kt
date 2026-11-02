@@ -19,8 +19,16 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.kyant.backdrop.Backdrop
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.BoxScope
+import com.nuvio.app.core.ui.glass.isLiquidGlassAvailable
+import com.nuvio.app.core.ui.glass.nuvioBackdropSource
+import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 
 val LocalAppBackgroundActive = staticCompositionLocalOf { false }
+
+val LocalAppBackgroundBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 private const val AppBackgroundScrimAlpha = 0.28f
 
@@ -79,3 +87,28 @@ fun nuvioScreenBackground(ownsBackground: Boolean = false): Color =
     } else {
         MaterialTheme.colorScheme.background
     }
+
+@Composable
+fun AppRouteBackground(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    if (!LocalAppBackgroundActive.current) {
+        Box(modifier = modifier.background(MaterialTheme.colorScheme.background), content = content)
+        return
+    }
+    val backdrop = rememberNuvioBackdrop()
+    val captureBackdrop = isLiquidGlassAvailable()
+    Box(modifier = modifier) {
+        AppBackgroundImage(
+            modifier = Modifier
+                .matchParentSize()
+                .then(if (captureBackdrop) Modifier.nuvioBackdropSource(backdrop) else Modifier),
+        )
+        CompositionLocalProvider(
+            LocalAppBackgroundBackdrop provides if (captureBackdrop) backdrop else null,
+        ) {
+            content()
+        }
+    }
+}
