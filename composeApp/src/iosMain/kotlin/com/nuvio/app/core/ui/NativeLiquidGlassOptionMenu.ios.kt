@@ -90,7 +90,6 @@ internal actual fun NuvioNativeLiquidGlassOptionMenu(
                 handler = { _ -> dismissalDelegate.notifyDismissed() },
             ),
         )
-        alert.presentationController()?.delegate = dismissalDelegate
         presenter.presentViewController(
             viewControllerToPresent = alert,
             animated = true,
@@ -98,7 +97,6 @@ internal actual fun NuvioNativeLiquidGlassOptionMenu(
         )
 
         onDispose {
-            alert.presentationController()?.delegate = null
             if (!dismissalStarted && alert.presentingViewController != null) {
                 alert.dismissViewControllerAnimated(
                     flag = false,
