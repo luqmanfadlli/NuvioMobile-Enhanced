@@ -1,5 +1,7 @@
 package com.nuvio.app.features.library
 
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
+import com.nuvio.app.core.ui.AppBackgroundImage
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.animation.Crossfade
@@ -636,7 +638,8 @@ fun LibraryScreen(
     Box(modifier = modifier.fillMaxSize()) {
         // Cloud has a dedicated black default backdrop, matching Studio; a custom local image
         // is drawn above it when present. Draw it even with Liquid Glass disabled.
-        if (anyLibraryGlassEnabled || sourceMode == LibraryViewMode.Cloud) {
+        val appBackgroundActive = LocalAppBackgroundActive.current
+        if (anyLibraryGlassEnabled || sourceMode == LibraryViewMode.Cloud || appBackgroundActive) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -646,6 +649,9 @@ fun LibraryScreen(
                     )
                     .then(if (anyLibraryGlassEnabled) Modifier.nuvioBackdropSource(libraryBackdrop) else Modifier),
             ) {
+                if (appBackgroundActive && !cloudBackgroundActive) {
+                    AppBackgroundImage(modifier = Modifier.fillMaxSize())
+                }
                 if (cloudBackgroundActive) {
                     cloudBackgroundImageRequest?.let { request ->
                         AsyncImage(

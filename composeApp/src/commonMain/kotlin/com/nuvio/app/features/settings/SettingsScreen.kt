@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.AppBackgroundImage
 import com.nuvio.app.features.whatsnew.WhatsNewSettingsScreen
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import com.nuvio.app.core.build.AppFeaturePolicy
@@ -219,28 +220,7 @@ fun SettingsScreen(
                     .matchParentSize()
                     .then(if (settingsGlassEnabled) Modifier.nuvioBackdropSource(settingsBackdrop) else Modifier),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                )
-                settingsBackgroundImageRequest?.let { imageRequest ->
-                    AsyncImage(
-                        model = imageRequest,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { settingsBackgroundLoaded = true },
-                        onError = { settingsBackgroundLoaded = false },
-                    )
-                    if (settingsBackgroundLoaded) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.28f)),
-                        )
-                    }
-                }
+                AppBackgroundImage(modifier = Modifier.fillMaxSize())
             }
         }
         CompositionLocalProvider(

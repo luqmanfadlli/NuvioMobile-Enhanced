@@ -1,5 +1,9 @@
 package com.nuvio.app
 
+import com.nuvio.app.core.ui.AppBackgroundImage
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
+import com.nuvio.app.core.ui.LocalDynamicArtworkBackgroundActive
+import com.nuvio.app.core.ui.rememberAppBackgroundImageUri
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.MutableTransitionState
@@ -1538,6 +1542,7 @@ internal fun MainAppContent(
             val nativeTabBarOwnsChrome = useNativeNavigation && useNativeTabBar
             val settingsRouteBarVisible = currentRoute is SettingsDestinationRoute && !nativeTabBarOwnsChrome
             val settingsRouteBarBackdrop = rememberNuvioBackdrop()
+            val appBackgroundActive = rememberAppBackgroundImageUri() != null
             var settingsRouteBarOverlay by remember { mutableStateOf(0.dp) }
             val settingsRouteBottomOverlay = when {
                 currentRoute !is SettingsDestinationRoute -> 0.dp
@@ -1559,13 +1564,18 @@ internal fun MainAppContent(
                             Modifier
                         },
                     )
-                    .background(MaterialTheme.nuvio.colors.background),
+                    .then(if (appBackgroundActive) Modifier else Modifier.background(MaterialTheme.nuvio.colors.background)),
             ) {
+            if (appBackgroundActive) {
+                AppBackgroundImage(modifier = Modifier.fillMaxSize())
+            }
             val verticalBarPadding = LocalVerticalBarPadding.current
             val drawsUnderVerticalBar = currentRoute.drawsUnderVerticalBar(selectedTab)
             SharedTransitionLayout {
                 CompositionLocalProvider(
                     LocalNuvioBottomNavigationOverlayPadding provides settingsRouteBottomOverlay,
+                    LocalAppBackgroundActive provides appBackgroundActive,
+                    LocalDynamicArtworkBackgroundActive provides appBackgroundActive,
                     LocalPosterClickAnchor provides if (posterNavigationEnabled) posterNavigation::prepare else null,
                     LocalUseNativeNavigation provides useNativeNavigation,
                     LocalNativeNavigationBarHidden provides (currentRoute?.hidesNavigationBar == true),

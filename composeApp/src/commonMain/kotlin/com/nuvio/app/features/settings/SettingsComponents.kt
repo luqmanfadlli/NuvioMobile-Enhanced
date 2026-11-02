@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.AppBackgroundImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -152,28 +153,7 @@ internal fun SettingsGlassPageBackground(content: @Composable () -> Unit) {
                     .matchParentSize()
                     .then(if (settingsGlassEnabled) Modifier.nuvioBackdropSource(backdrop) else Modifier),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                )
-                imageRequest?.let { request ->
-                    AsyncImage(
-                        model = request,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { imageLoaded = true },
-                        onError = { imageLoaded = false },
-                    )
-                    if (imageLoaded) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.28f)),
-                        )
-                    }
-                }
+                AppBackgroundImage(modifier = Modifier.fillMaxSize())
             }
         }
         CompositionLocalProvider(

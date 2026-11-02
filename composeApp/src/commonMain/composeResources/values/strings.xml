@@ -2948,9 +2948,9 @@
     <string name="settings_playback_toolbar_note">Buttons that do not apply to the current video, such as Next Episode on a movie, are skipped.</string>
     <string name="player_toolbar_button_resize">Resize</string>
     <string name="player_toolbar_button_quality">Quality</string>
-    <string name="settings_appearance_custom_settings_background">Custom settings background</string>
-    <string name="settings_appearance_custom_settings_background_description">Choose an image from your device. It is saved privately on this device for this profile and is never uploaded or synced.</string>
-    <string name="settings_appearance_custom_settings_background_preview">Custom Settings background preview</string>
+    <string name="settings_appearance_custom_settings_background">App background</string>
+    <string name="settings_appearance_custom_settings_background_description">Shown behind every screen. Home, details and streams keep their own background while Dynamic color or Cinematic is on. The image stays private on this device for this profile and is never uploaded or synced.</string>
+    <string name="settings_appearance_custom_settings_background_preview">App background preview</string>
     <string name="settings_appearance_custom_settings_background_choose">Choose image</string>
     <string name="settings_appearance_custom_settings_background_clear">Clear background</string>
     <string name="settings_appearance_custom_settings_background_saving">Saving image…</string>

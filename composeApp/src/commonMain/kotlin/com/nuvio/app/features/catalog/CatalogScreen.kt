@@ -1,5 +1,6 @@
 package com.nuvio.app.features.catalog
 
+import com.nuvio.app.core.ui.nuvioScreenBackground
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -188,7 +189,7 @@ fun CatalogScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(nuvioScreenBackground()),
     ) {
         val columns = remember(maxWidth) { catalogGridColumnsForWidth(maxWidth) }
 
@@ -197,7 +198,7 @@ fun CatalogScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (catalogHeaderGlassEnabled) Modifier.nuvioBackdropSource(catalogBackdrop) else Modifier)
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(nuvioScreenBackground()),
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),

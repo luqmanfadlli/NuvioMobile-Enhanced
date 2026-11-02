@@ -42,7 +42,7 @@ fun DynamicArtworkBackground(
 ) {
     val active = rememberDynamicArtworkBackgroundEnabled()
     if (!active) {
-        CompositionLocalProvider(LocalDynamicArtworkBackgroundActive provides false) {
+        CompositionLocalProvider(LocalDynamicArtworkBackgroundActive provides LocalAppBackgroundActive.current) {
             content()
         }
         return

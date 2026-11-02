@@ -1,5 +1,6 @@
 package com.nuvio.app.features.details
 
+import com.nuvio.app.core.ui.nuvioScreenBackground
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -425,10 +426,13 @@ fun MetaDetailsScreen(
         }
     }
 
+    val detailsScreenBackground = nuvioScreenBackground(
+        ownsBackground = metaScreenSettingsUiState.backgroundMode != MetaScreenBackgroundMode.Normal,
+    )
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(detailsScreenBackground),
     ) {
         Box(
             modifier = Modifier
@@ -440,7 +444,7 @@ fun MetaDetailsScreen(
                         Modifier
                     },
                 )
-                .background(MaterialTheme.colorScheme.background),
+                .background(detailsScreenBackground),
         ) {
             when {
             displayedMeta == null && uiState.isLoading -> {
