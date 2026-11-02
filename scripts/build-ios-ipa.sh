@@ -38,18 +38,48 @@ build_environment=(
 if [[ -n "${NUVIO_KOTLIN_NATIVE_JVMARGS:-}" ]]; then
     build_environment+=("ORG_GRADLE_PROJECT_kotlin.native.jvmArgs=${NUVIO_KOTLIN_NATIVE_JVMARGS}")
 fi
-"${build_environment[@]}" \
-    xcodebuild \
-    -project iosApp/iosApp.xcodeproj \
-    -scheme iosApp \
-    -configuration "${configuration}" \
-    -sdk iphoneos \
-    -destination 'generic/platform=iOS' \
-    -derivedDataPath "${derived_data}" \
-    CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGN_IDENTITY= \
-    build
+# Resolve/build can fail transiently when a SwiftPM binaryTarget release asset returns
+# HTTP 5xx. Retry only that specific server-side failure; never retry checksum,
+# missing-asset, configuration, or compiler failures.
+mkdir -p "${derived_data}"
+xcodebuild_log="${derived_data}/xcodebuild.log"
+xcodebuild_attempt=1
+max_xcodebuild_attempts=3
+
+while true; do
+    : > "${xcodebuild_log}"
+    echo "Building iOS ${configuration} (attempt ${xcodebuild_attempt}/${max_xcodebuild_attempts})"
+
+    set +e
+    "${build_environment[@]}" \
+        xcodebuild \
+        -project iosApp/iosApp.xcodeproj \
+        -scheme iosApp \
+        -configuration "${configuration}" \
+        -sdk iphoneos \
+        -destination 'generic/platform=iOS' \
+        -derivedDataPath "${derived_data}" \
+        CODE_SIGNING_ALLOWED=NO \
+        CODE_SIGNING_REQUIRED=NO \
+        CODE_SIGN_IDENTITY= \
+        build 2>&1 | tee "${xcodebuild_log}"
+    build_status=${PIPESTATUS[0]}
+    set -e
+
+    if (( build_status == 0 )); then
+        break
+    fi
+
+    if (( xcodebuild_attempt >= max_xcodebuild_attempts )) ||
+        ! grep -Eq 'failed downloading .*badResponseStatusCode\(5[0-9]{2}\)' "${xcodebuild_log}"; then
+        exit "${build_status}"
+    fi
+
+    retry_delay=$((xcodebuild_attempt * 15))
+    echo "SwiftPM binary dependency returned HTTP 5xx; retrying Xcode build in ${retry_delay}s." >&2
+    sleep "${retry_delay}"
+    xcodebuild_attempt=$((xcodebuild_attempt + 1))
+done
 
 products_directory="${derived_data}/Build/Products/${configuration}-iphoneos"
 app_paths=()
