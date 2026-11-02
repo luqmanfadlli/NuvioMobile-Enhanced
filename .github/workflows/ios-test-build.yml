@@ -11,6 +11,11 @@ on:
           - Debug
           - Release
         default: Release
+      disable_phases:
+        description: "Release only: Kotlin/Native phases to skip to save memory (e.g. DevirtualizationAnalysis,Devirtualization). Leave empty for full optimization."
+        required: false
+        type: string
+        default: "DevirtualizationAnalysis,Devirtualization,RemoveRedundantCallsToStaticInitializersPhase"
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
       IOS_CONFIGURATION: ${{ inputs.configuration }}
+      NUVIO_IOS_DISABLE_PHASES: ${{ inputs.disable_phases }}
       KOTLIN_DAEMON_JVMARGS: -Xmx1024M
       NUVIO_GRADLE_JVMARGS: -Xmx2048M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M -XX:+UseG1GC
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M -XX:+UseG1GC
@@ -80,6 +86,9 @@ jobs:
             echo "org.gradle.parallel=false"
             echo "org.gradle.workers.max=1"
             echo "kotlin.native.disableCompilerDaemon=true"
+            if [ -n "${NUVIO_IOS_DISABLE_PHASES}" ]; then
+              echo "nuvio.ios.releaseDisablePhases=${NUVIO_IOS_DISABLE_PHASES}"
+            fi
           } >> "${gradle_user_home}/gradle.properties"
           cat "${gradle_user_home}/gradle.properties"
 

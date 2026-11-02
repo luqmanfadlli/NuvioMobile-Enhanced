@@ -35,6 +35,11 @@ on:
         description: Optional commit to start the release notes after (default - the last "chore(store) publish" commit on this branch)
         required: false
         type: string
+      ios_disable_phases:
+        description: "iOS only: Kotlin/Native phases to skip so the Release link fits the hosted runner's memory. Clear for full optimization."
+        required: false
+        type: string
+        default: "DevirtualizationAnalysis,Devirtualization,RemoveRedundantCallsToStaticInitializersPhase"
 
 permissions:
   contents: read
@@ -272,6 +277,7 @@ jobs:
       KOTLIN_DAEMON_JVMARGS: -Xmx1024M
       NUVIO_GRADLE_JVMARGS: -Xmx2048M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M -XX:+UseG1GC
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M -XX:+UseG1GC
+      NUVIO_IOS_DISABLE_PHASES: ${{ inputs.ios_disable_phases }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       CONTRIBUTIONS_URL: ${{ secrets.CONTRIBUTIONS_URL }}
 
@@ -320,6 +326,9 @@ jobs:
             echo "org.gradle.parallel=false"
             echo "org.gradle.workers.max=1"
             echo "kotlin.native.disableCompilerDaemon=true"
+            if [ -n "${NUVIO_IOS_DISABLE_PHASES}" ]; then
+              echo "nuvio.ios.releaseDisablePhases=${NUVIO_IOS_DISABLE_PHASES}"
+            fi
           } >> "${gradle_user_home}/gradle.properties"
           cat "${gradle_user_home}/gradle.properties"
 
