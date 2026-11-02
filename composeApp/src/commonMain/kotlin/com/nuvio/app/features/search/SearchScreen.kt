@@ -1,5 +1,7 @@
 package com.nuvio.app.features.search
 
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
+import com.nuvio.app.core.ui.appBackgroundHeaderGlass
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -302,7 +304,16 @@ fun SearchScreen(
                                 Box(
                                     modifier = Modifier
                                         .matchParentSize()
-                                        .background(MaterialTheme.colorScheme.background)
+                                        .then(
+                                            if (LocalAppBackgroundActive.current) {
+                                                Modifier.appBackgroundHeaderGlass(
+                                                    extendToWindow = false,
+                                                    hairline = false,
+                                                )
+                                            } else {
+                                                Modifier.background(MaterialTheme.colorScheme.background)
+                                            },
+                                        )
                                         .nuvioConsumePointerEvents(),
                                 )
                                 DiscoverFilterRow(
@@ -442,6 +453,7 @@ fun SearchScreen(
                 )
             }
 
+            val appBackgroundActive = LocalAppBackgroundActive.current
             CompositionLocalProvider(
                 LocalLiquidGlassBackdrop provides if (searchGlassEnabled) searchBackdrop else null,
             ) {
@@ -456,8 +468,11 @@ fun SearchScreen(
                         }
                         .zIndex(1f)
                         .then(
-                            if (searchGlassEnabled) Modifier
-                            else Modifier.background(MaterialTheme.colorScheme.background),
+                            when {
+                                searchGlassEnabled -> Modifier
+                                appBackgroundActive -> Modifier.appBackgroundHeaderGlass()
+                                else -> Modifier.background(MaterialTheme.colorScheme.background)
+                            },
                         ),
                 ) {
 
@@ -468,6 +483,7 @@ fun SearchScreen(
                             NuvioScreenHeader(
                                 title = headerTitle,
                                 modifier = Modifier.padding(horizontal = 16.dp),
+                                appBackgroundGlass = false,
                             )
                             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
                             androidx.compose.foundation.layout.Box(modifier = Modifier.padding(horizontal = 16.dp)) {

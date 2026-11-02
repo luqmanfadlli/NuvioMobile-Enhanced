@@ -710,7 +710,11 @@ fun LibraryScreen(
                     } else {
                         Modifier.padding(horizontal = 16.dp)
                     }).then(
-                        if (savedHeaderScrimEnabled && libraryTitleHeaderNeedsOpaqueBackground(sourceMode)) {
+                        if (
+                            savedHeaderScrimEnabled &&
+                            libraryTitleHeaderNeedsOpaqueBackground(sourceMode) &&
+                            !LocalAppBackgroundActive.current
+                        ) {
                             Modifier.background(MaterialTheme.colorScheme.background)
                         } else {
                             Modifier

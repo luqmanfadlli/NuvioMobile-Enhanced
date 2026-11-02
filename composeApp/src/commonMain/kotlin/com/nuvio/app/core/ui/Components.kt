@@ -1,5 +1,8 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import com.nuvio.app.core.ui.glass.liquidGlassSurface
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -168,15 +171,14 @@ fun NuvioScreenHeader(
     onBack: (() -> Unit)? = null,
     useSettingsGlass: Boolean = false,
     glassSurface: LiquidGlassSurface? = null,
-    /** Optional edge-to-edge background behind the header content, such as a fading artwork scrim. */
     backgroundBrushOverride: Brush? = null,
-    /** Bottom inset for a custom background that should stop before the header's trailing spacing. */
     backgroundBrushBottomInset: Dp = 0.dp,
-    /** Horizontal inset for header content when its background intentionally spans edge-to-edge. */
     contentHorizontalPadding: Dp = 0.dp,
+    appBackgroundGlass: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
+    val appBackgroundActive = LocalAppBackgroundActive.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val headerGlassSurface = glassSurface ?: LiquidGlassSurface.SETTINGS.takeIf { useSettingsGlass }
     val settingsGlassEnabled = headerGlassSurface?.let { surface ->
@@ -190,7 +192,7 @@ fun NuvioScreenHeader(
     val headerBackgroundModifier = backgroundBrushOverride?.let { brush ->
         Modifier.background(brush)
     } ?: Modifier.background(
-        if (glassSurface != null && settingsGlassEnabled) {
+        if ((glassSurface != null && settingsGlassEnabled) || appBackgroundActive) {
             Color.Transparent
         } else {
             tokens.colors.background
@@ -229,6 +231,9 @@ fun NuvioScreenHeader(
                 )
                 .then(headerBackgroundModifier),
         ) {}
+        if (!settingsGlassEnabled && appBackgroundGlass && appBackgroundActive) {
+            Box(modifier = Modifier.matchParentSize().appBackgroundHeaderGlass())
+        }
         if (settingsGlassEnabled) {
             var headerOriginInWindow by remember { mutableStateOf(Offset.Zero) }
             val windowWidthPx = LocalWindowInfo.current.containerSize.width
@@ -258,7 +263,8 @@ fun NuvioScreenHeader(
                         // Full-width scroll-edge header: no rim highlight and no outline. Either one
                         // draws a visible box around the screen edges and under the status bar.
                         withHighlight = false,
-                    ),
+                    )
+                    .bottomHairline(),
             )
         }
         Row(
@@ -660,7 +666,7 @@ object NuvioToastController {
     }
 }
 
-private fun Modifier.extendToWindowEdges(originInWindow: Offset, windowWidthPx: Int): Modifier =
+internal fun Modifier.extendToWindowEdges(originInWindow: Offset, windowWidthPx: Int): Modifier =
     layout { measurable, constraints ->
         val slotWidth = constraints.maxWidth
         val slotHeight = constraints.maxHeight
@@ -674,3 +680,47 @@ private fun Modifier.extendToWindowEdges(originInWindow: Offset, windowWidthPx: 
             placeable.place(x = -left, y = -top)
         }
     }
+
+@Composable
+internal fun Modifier.bottomHairline(): Modifier {
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    return drawWithContent {
+        drawContent()
+        val thickness = 1.dp.toPx().coerceAtLeast(1f)
+        drawRect(
+            color = color,
+            topLeft = Offset(0f, size.height - thickness),
+            size = Size(size.width, thickness),
+        )
+    }
+}
+
+@Composable
+internal fun Modifier.appBackgroundHeaderGlass(
+    extendToWindow: Boolean = true,
+    hairline: Boolean = true,
+): Modifier {
+    var originInWindow by remember { mutableStateOf(Offset.Zero) }
+    val windowWidthPx = LocalWindowInfo.current.containerSize.width
+    val backdrop = LocalAppBackgroundBackdrop.current
+    val colors = MaterialTheme.colorScheme
+    return this
+        .then(
+            if (extendToWindow) {
+                Modifier
+                    .onGloballyPositioned { originInWindow = it.positionInWindow() }
+                    .extendToWindowEdges(originInWindow, windowWidthPx)
+            } else {
+                Modifier
+            },
+        )
+        .liquidGlassSurface(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            tint = colors.surface.copy(alpha = 0.45f),
+            fallback = colors.background.copy(alpha = 0.88f),
+            blurRadius = 24.dp,
+            withHighlight = false,
+        )
+        .then(if (hairline) Modifier.bottomHairline() else Modifier)
+}
