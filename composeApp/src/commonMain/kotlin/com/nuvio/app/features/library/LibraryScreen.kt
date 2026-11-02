@@ -2217,9 +2217,9 @@ internal fun LibraryCalendarGlassSurface(
                     Modifier.liquidGlassForSurface(
                         surface = surface,
                         shape = shape,
-                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.28f),
+                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
                         fallback = MaterialTheme.colorScheme.surface,
-                        blurRadius = 20.dp,
+                        blurRadius = 32.dp,
                         refractionHeight = 3.dp,
                         refractionAmount = 5.dp,
                         withHighlight = true,
@@ -2333,6 +2333,7 @@ internal fun LibraryCalendarGlassPreview(
                     todayIso = today.iso,
                     isLoading = false,
                     onEventClick = null,
+                    glassEnabled = glassEnabled,
                 )
             }
         }
@@ -2404,6 +2405,7 @@ private fun LibraryReleaseCalendarPanel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .clickable(onClick = onDismiss),
             )
 
@@ -2501,6 +2503,7 @@ private fun LibraryReleaseCalendarPanel(
                                         todayIso = todayIso,
                                         isLoading = isLoading,
                                         onEventClick = handleEventClick,
+                                        glassEnabled = glassEnabled,
                                     )
                                 }
                             }
@@ -2564,6 +2567,7 @@ private fun LibraryReleaseCalendarPanel(
                                     todayIso = todayIso,
                                     isLoading = isLoading,
                                     onEventClick = handleEventClick,
+                                    glassEnabled = glassEnabled,
                                 )
                             }
                         }
@@ -2580,6 +2584,7 @@ private fun LazyListScope.libraryCalendarAgendaContent(
     todayIso: String,
     isLoading: Boolean,
     onEventClick: ((LibraryCalendarEvent) -> Unit)?,
+    glassEnabled: Boolean = false,
 ) {
     item {
         Spacer(modifier = Modifier.height(4.dp))
@@ -2597,6 +2602,7 @@ private fun LazyListScope.libraryCalendarAgendaContent(
                 event = event,
                 todayIso = todayIso,
                 onClick = onEventClick?.let { eventClick -> { eventClick(event) } },
+                glassEnabled = glassEnabled,
             )
         }
     }
@@ -3239,6 +3245,7 @@ private fun LibraryCalendarEventRow(
     event: LibraryCalendarEvent,
     todayIso: String,
     onClick: (() -> Unit)?,
+    glassEnabled: Boolean = false,
 ) {
     val isUpcoming = event.date.iso > todayIso
     val modifier = if (onClick != null) {
@@ -3251,11 +3258,19 @@ private fun LibraryCalendarEventRow(
     }
     Surface(
         modifier = modifier.padding(bottom = 10.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = if (glassEnabled) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+            if (glassEnabled) {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+            },
         ),
     ) {
         Row(
