@@ -1,5 +1,12 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -223,14 +230,23 @@ fun NuvioScreenHeader(
                 .then(headerBackgroundModifier),
         ) {}
         if (settingsGlassEnabled) {
+            var headerOriginInWindow by remember { mutableStateOf(Offset.Zero) }
+            val windowWidthPx = LocalWindowInfo.current.containerSize.width
             Box(
                 modifier = Modifier
                     .matchParentSize()
+                    .onGloballyPositioned { headerOriginInWindow = it.positionInWindow() },
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .extendToWindowEdges(headerOriginInWindow, windowWidthPx)
                     .liquidGlassBackdropUnderlay(settingsBackdrop),
             )
             Box(
                 modifier = Modifier
                     .matchParentSize()
+                    .extendToWindowEdges(headerOriginInWindow, windowWidthPx)
                     .liquidGlassForSurface(
                         surface = headerGlassSurface ?: LiquidGlassSurface.SETTINGS,
                         shape = headerShape,
@@ -643,3 +659,18 @@ object NuvioToastController {
         }
     }
 }
+
+private fun Modifier.extendToWindowEdges(originInWindow: Offset, windowWidthPx: Int): Modifier =
+    layout { measurable, constraints ->
+        val slotWidth = constraints.maxWidth
+        val slotHeight = constraints.maxHeight
+        val left = originInWindow.x.roundToInt().coerceAtLeast(0)
+        val top = originInWindow.y.roundToInt().coerceAtLeast(0)
+        val right = if (windowWidthPx > 0) (windowWidthPx - left - slotWidth).coerceAtLeast(0) else 0
+        val placeable = measurable.measure(
+            Constraints.fixed(width = slotWidth + left + right, height = slotHeight + top),
+        )
+        layout(slotWidth, slotHeight) {
+            placeable.place(x = -left, y = -top)
+        }
+    }
