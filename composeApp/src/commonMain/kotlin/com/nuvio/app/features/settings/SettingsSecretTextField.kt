@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -40,9 +41,9 @@ internal fun SettingsSecretTextField(
     colors: TextFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        focusedContainerColor = MaterialTheme.colorScheme.surface,
-        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-        disabledContainerColor = MaterialTheme.colorScheme.surface,
+        focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+        unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+        disabledContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
     ),
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     imeAction: ImeAction = ImeAction.Default,

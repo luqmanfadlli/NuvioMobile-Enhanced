@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import com.nuvio.app.core.ui.AppBackgroundImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -858,9 +859,9 @@ internal fun HomescreenCatalogRow(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = tokens.colors.borderFocus.copy(alpha = tokens.opacity.strong),
                         unfocusedBorderColor = tokens.colors.borderDefault.copy(alpha = tokens.opacity.medium),
-                        focusedContainerColor = tokens.colors.surface,
-                        unfocusedContainerColor = tokens.colors.surface,
-                        disabledContainerColor = tokens.colors.surface,
+                        focusedContainerColor = nuvioFieldContainerColor(tokens.colors.surface),
+                        unfocusedContainerColor = nuvioFieldContainerColor(tokens.colors.surface),
+                        disabledContainerColor = nuvioFieldContainerColor(tokens.colors.surface),
                     ),
                 )
             }

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.library
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,8 +52,8 @@ internal fun LibraryListEditor(
     val inputColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = tokens.colors.borderFocus,
         unfocusedBorderColor = tokens.colors.borderDefault,
-        focusedContainerColor = tokens.colors.surfaceCard,
-        unfocusedContainerColor = tokens.colors.surfaceCard,
+        focusedContainerColor = nuvioFieldContainerColor(tokens.colors.surfaceCard),
+        unfocusedContainerColor = nuvioFieldContainerColor(tokens.colors.surfaceCard),
     )
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         OutlinedTextField(

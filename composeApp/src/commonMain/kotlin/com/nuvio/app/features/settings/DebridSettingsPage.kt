@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -678,9 +679,9 @@ private fun DebridTemplateDialog(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                disabledContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
             ),
         )
         DialogButtons {
@@ -1121,9 +1122,9 @@ private fun DebridTextListDialog(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                disabledContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
             ),
         )
         DialogButtons {
@@ -1659,9 +1660,9 @@ private fun DebridApiKeyDialog(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                disabledContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
             ),
         )
         validationMessage?.let { message ->

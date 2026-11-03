@@ -1,5 +1,6 @@
 package com.nuvio.app.features.cloud
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,9 +97,9 @@ fun TorboxCloudConnectDialog(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
+                disabledContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surface),
             ),
         )
         validationMessage?.let { message ->

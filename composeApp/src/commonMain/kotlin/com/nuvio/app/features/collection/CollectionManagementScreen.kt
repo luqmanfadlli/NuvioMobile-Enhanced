@@ -1,5 +1,6 @@
 package com.nuvio.app.features.collection
 
+import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -400,8 +401,8 @@ private fun ImportDialog(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.outline,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surfaceVariant),
+                unfocusedContainerColor = nuvioFieldContainerColor(MaterialTheme.colorScheme.surfaceVariant),
                 cursorColor = MaterialTheme.colorScheme.primary,
             ),
         )
