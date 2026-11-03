@@ -245,6 +245,7 @@ private fun LazyListScope.downloadsRootContent(
                     .clickable { onOpenShow(item.parentMetaId, item.title) },
                 shape = MaterialTheme.shapes.medium,
                 color = downloadsCardColor(MaterialTheme.colorScheme.surfaceContainer),
+        contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Row(
                     modifier = Modifier
@@ -387,6 +388,7 @@ private fun DownloadRow(
             .clickable(enabled = item.isPlayable, onClick = onOpen),
         shape = MaterialTheme.shapes.medium,
         color = downloadsCardColor(MaterialTheme.colorScheme.surfaceContainerLow),
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier

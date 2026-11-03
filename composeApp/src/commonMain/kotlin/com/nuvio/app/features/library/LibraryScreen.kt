@@ -1790,6 +1790,7 @@ private fun CloudLibraryRow(
             .clickable(enabled = playableCount > 0, onClick = onClick),
         shape = glassShape,
         color = if (renderGlass || appGlass) Color.Transparent else colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier
@@ -1888,6 +1889,7 @@ private fun CloudLibraryFilePicker(
             ),
         shape = glassShape,
         color = if (renderGlass) Color.Transparent else colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier
@@ -1989,6 +1991,7 @@ private fun CloudLibraryFileRow(
             .clickable(onClick = onClick),
         shape = glassShape,
         color = if (renderGlass) Color.Transparent else colorScheme.surfaceContainerHigh.copy(alpha = 0.58f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier
