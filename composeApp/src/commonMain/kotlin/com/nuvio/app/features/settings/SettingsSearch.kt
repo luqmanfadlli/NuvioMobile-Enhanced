@@ -419,12 +419,20 @@ internal fun settingsSearchEntries(
         section = stringResource(Res.string.settings_appearance_section_display),
     )
     addRow(
-        page = SettingsPage.Appearance,
+        page = SettingsPage.Layout,
         key = "dynamic-artwork-background",
         title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
         description = stringResource(Res.string.settings_appearance_dynamic_artwork_background_description),
         pageLabel = layoutPage,
-        section = stringResource(Res.string.settings_appearance_section_display),
+        section = stringResource(Res.string.settings_appearance_section_home),
+    )
+    addRow(
+        page = SettingsPage.Layout,
+        key = "catalog-accent",
+        title = stringResource(Res.string.settings_appearance_catalog_accent),
+        description = stringResource(Res.string.settings_appearance_catalog_accent_description),
+        pageLabel = layoutPage,
+        section = stringResource(Res.string.settings_appearance_section_home),
     )
     if (liquidGlassNativeTabBarSupported) {
         addRow(
