@@ -1,5 +1,7 @@
 package com.nuvio.app.features.livetv
 
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -112,30 +114,19 @@ private fun LiveTvPanelFilterChip(
     onClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val appGlass = LocalAppBackgroundActive.current
     Row(
         modifier = Modifier
-            .clip(tokens.shapes.chip)
-            .background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
-            .then(
-                if (selected) {
-                    Modifier
-                } else {
-                    Modifier.border(
-                        width = NuvioTokens.Border.thin,
-                        color = tokens.colors.borderSubtle,
-                        shape = tokens.shapes.chip,
-                    )
-                },
-            )
+            .liveTvPanelChipSurface(selected = selected, appGlass = appGlass)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .liveTvPanelChipPadding(appGlass),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) tokens.colors.accent else tokens.colors.textSecondary,
+            color = liveTvPanelChipTextColor(selected, appGlass),
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -162,26 +153,20 @@ private fun LiveTvCategoryPanelChip(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
     val selected = selectedGroup != null
-    val shape = tokens.shapes.chip
+    val appGlass = LocalAppBackgroundActive.current
 
     Row(
         modifier = Modifier
-            .clip(shape)
-            .background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
-            .border(
-                width = if (selected) 0.dp else NuvioTokens.Border.thin,
-                color = if (selected) Color.Transparent else tokens.colors.borderSubtle,
-                shape = shape,
-            )
+            .liveTvPanelChipSurface(selected = selected, appGlass = appGlass)
             .clickable { isSheetVisible = true }
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .liveTvPanelChipPadding(appGlass),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) tokens.colors.accent else tokens.colors.textSecondary,
+            color = liveTvPanelChipTextColor(selected, appGlass),
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -272,17 +257,6 @@ private fun LiveTvCategoryOptionsSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
-        // The width cap belongs on the content, not on the sheet: the iOS path hands the sheet
-        // modifier to a fillMaxSize() column inside a full-width presentation controller, so a
-        // sheet-level widthIn only pinned a narrow column to the leading edge of a screen-wide
-        // panel. Capping and centering the content here behaves the same on both platforms, and
-        // keeps rows away from the landscape notch, which the leading-edge layout ran under.
-        // The horizontal safe-area padding covers the narrow viewports where the panel still
-        // spans the full width and centering alone would not clear the cutout.
-        //
-        // Everything also lives in one LazyColumn now. The header used to sit in a Column above
-        // a list capped at a fixed 420dp, which overflowed any short viewport — landscape phones
-        // and tablets clipped the bottom of the panel with no way to scroll to it.
         LazyColumn(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -442,4 +416,49 @@ private fun LiveTvFilterSheetRow(
 @Composable
 private fun LiveTvFilterSheetDivider() {
     HorizontalDivider(color = MaterialTheme.nuvio.colors.borderSubtle.copy(alpha = 0.7f))
+}
+
+@Composable
+private fun Modifier.liveTvPanelChipSurface(selected: Boolean, appGlass: Boolean): Modifier {
+    val tokens = MaterialTheme.nuvio
+    return if (appGlass) {
+        val shape = tokens.shapes.compactCard
+        appBackgroundGlass(shape = shape, tintAlpha = if (selected) 0.5f else 0.32f).clip(shape)
+    } else {
+        val shape = tokens.shapes.chip
+        clip(shape)
+            .background(if (selected) tokens.colors.overlaySelected else tokens.colors.surface)
+            .then(
+                if (selected) {
+                    Modifier
+                } else {
+                    Modifier.border(
+                        width = NuvioTokens.Border.thin,
+                        color = tokens.colors.borderSubtle,
+                        shape = shape,
+                    )
+                },
+            )
+    }
+}
+
+@Composable
+private fun Modifier.liveTvPanelChipPadding(appGlass: Boolean): Modifier =
+    if (appGlass) {
+        padding(
+            horizontal = NuvioTokens.Space.s12,
+            vertical = MaterialTheme.nuvio.components.chipVerticalPadding,
+        )
+    } else {
+        padding(horizontal = 16.dp, vertical = 9.dp)
+    }
+
+@Composable
+private fun liveTvPanelChipTextColor(selected: Boolean, appGlass: Boolean): Color {
+    val tokens = MaterialTheme.nuvio
+    return when {
+        selected -> tokens.colors.accent
+        appGlass -> tokens.colors.textPrimary
+        else -> tokens.colors.textSecondary
+    }
 }
