@@ -1,5 +1,11 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.RectangleShape
+import com.nuvio.app.core.ui.background.appGlassBackdrop
 import com.nuvio.app.features.whatsnew.WhatsNewSettingsScreen
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import com.nuvio.app.core.build.AppFeaturePolicy
@@ -975,6 +981,10 @@ private fun TabletSettingsScreen(
     val activeCategory = settingsCategoryForName(selectedCategory)
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topOffset = max(statusBarPadding + 24.dp, 48.dp) + 64.dp
+    val isCompactHeight = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.height.toDp()
+    } < 500.dp
+    val sidebarTopOffset = if (isCompactHeight) max(statusBarPadding + 12.dp, 24.dp) else topOffset
 
     LaunchedEffect(page) {
         if (page.opensInlineOnTablet) {
@@ -993,13 +1003,16 @@ private fun TabletSettingsScreen(
         Surface(
             modifier = Modifier
                 .width(280.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .appGlassBackdrop(RectangleShape),
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = topOffset),
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = sidebarTopOffset)
+                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp),
             ) {
                 Text(
                     text = stringResource(Res.string.compose_settings_page_root),
