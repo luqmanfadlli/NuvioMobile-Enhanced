@@ -1,5 +1,6 @@
 package com.nuvio.app.features.search
 
+import com.nuvio.app.core.ui.appBackgroundGlass
 import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import com.nuvio.app.core.ui.appBackgroundHeaderGlass
 import androidx.compose.foundation.clickable
@@ -657,9 +658,15 @@ private fun SearchRecentRow(
             .fillMaxWidth()
             .clickable(onClick = onSearchPress)
             .padding(vertical = 2.dp)
-            .background(
-                color = MaterialTheme.colorScheme.background,
-                shape = RoundedCornerShape(16.dp),
+            .then(
+                if (LocalAppBackgroundActive.current) {
+                    Modifier.appBackgroundGlass(RoundedCornerShape(16.dp))
+                } else {
+                    Modifier.background(
+                        color = MaterialTheme.colorScheme.background,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                },
             )
             .padding(start = 2.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
