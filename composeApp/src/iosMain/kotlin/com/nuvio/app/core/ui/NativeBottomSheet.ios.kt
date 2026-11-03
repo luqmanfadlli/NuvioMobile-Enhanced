@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,7 +39,8 @@ import platform.UIKit.UIViewController
 import platform.UIKit.presentationController
 import platform.darwin.NSObject
 
-internal actual val usesNativeNuvioBottomSheet: Boolean = true
+internal actual val usesNativeNuvioBottomSheet: Boolean
+    get() = ThemeSettingsRepository.customSettingsBackgroundImageUri.value == null
 
 private var activeNativeBottomSheet: UIViewController? = null
 private var activeNativeBottomSheetDelegate: NuvioNativeBottomSheetDelegate? = null
