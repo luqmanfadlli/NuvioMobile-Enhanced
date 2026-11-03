@@ -76,6 +76,7 @@ internal fun LazyListScope.appearanceSettingsContent(
             }
         }
     }
+    appBackgroundSettingsItem(isTablet = isTablet)
     item {
         var showLanguageSheet by remember { mutableStateOf(false) }
         var showLanguageRestartDialog by remember { mutableStateOf(false) }

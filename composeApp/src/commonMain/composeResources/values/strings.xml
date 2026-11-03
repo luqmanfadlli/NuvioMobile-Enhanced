@@ -3018,4 +3018,20 @@
     <string name="subtitle_shadow_opacity">Shadow opacity</string>
     <string name="subtitle_shadow_size">Shadow size</string>
     <string name="subtitle_reset_appearance">Reset appearance</string>
+    <string name="settings_appearance_section_background">App background</string>
+    <string name="settings_app_background">Background</string>
+    <string name="settings_app_background_none">Default</string>
+    <string name="settings_app_background_local">Photo from gallery</string>
+    <string name="settings_app_background_url">Image URL</string>
+    <string name="settings_app_background_choose_photo">Choose from gallery</string>
+    <string name="settings_app_background_use_url">Use an image URL</string>
+    <string name="settings_app_background_remove">Remove background</string>
+    <string name="settings_app_background_url_hint">https://… (JPG, PNG, GIF or WebP)</string>
+    <string name="settings_app_background_error">Couldn\'t load that image.</string>
+    <string name="settings_glass_ui">Glass UI (Experimental)</string>
+    <string name="settings_glass_ui_description">Turns cards, sheets and dialogs into frosted glass over the app background.</string>
+    <string name="settings_glass_ui_style">Glass style</string>
+    <string name="settings_glass_ui_style_dark">Dark</string>
+    <string name="settings_glass_ui_style_balanced">Balanced</string>
+    <string name="settings_glass_ui_style_vivid">Vivid</string>
 </resources>

@@ -412,6 +412,21 @@ internal fun settingsSearchEntries(
     )
     addRow(
         page = SettingsPage.Appearance,
+        key = "app-background",
+        title = stringResource(Res.string.settings_app_background),
+        pageLabel = appearancePage,
+        section = stringResource(Res.string.settings_appearance_section_background),
+    )
+    addRow(
+        page = SettingsPage.Appearance,
+        key = "glass-ui",
+        title = stringResource(Res.string.settings_glass_ui),
+        description = stringResource(Res.string.settings_glass_ui_description),
+        pageLabel = appearancePage,
+        section = stringResource(Res.string.settings_appearance_section_background),
+    )
+    addRow(
+        page = SettingsPage.Appearance,
         key = "amoled",
         title = stringResource(Res.string.settings_appearance_amoled_black),
         description = stringResource(Res.string.settings_appearance_amoled_description),

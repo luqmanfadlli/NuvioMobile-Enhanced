@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import com.nuvio.app.core.ui.background.AppBackgroundRepository
+import com.nuvio.app.core.ui.background.OpaqueAppSurfaces
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1773,40 +1775,46 @@ internal fun MainAppContent(
                     )
                 }
                 entry<DetailRoute> { route ->
-                    DetailsDestination(
-                        route = route,
-                        navController = navController,
-                        onPlay = onPlay,
-                        onPlayManually = onPlayManually,
-                        onDownload = onDownloadContent,
-                        onPlayExternally = onPlayExternally,
-                        onPlayFromStart = onPlayFromStart,
-                        sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = LocalNavAnimatedContentScope.current,
-                    )
+                    OpaqueAppSurfaces {
+                        DetailsDestination(
+                            route = route,
+                            navController = navController,
+                            onPlay = onPlay,
+                            onPlayManually = onPlayManually,
+                            onDownload = onDownloadContent,
+                            onPlayExternally = onPlayExternally,
+                            onPlayFromStart = onPlayFromStart,
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = LocalNavAnimatedContentScope.current,
+                        )
+                    }
                 }
                 entry<PersonDetailRoute> { route ->
-                    PersonDestination(
-                        route = route,
-                        navController = navController,
-                        sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = LocalNavAnimatedContentScope.current,
-                    )
+                    OpaqueAppSurfaces {
+                        PersonDestination(
+                            route = route,
+                            navController = navController,
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = LocalNavAnimatedContentScope.current,
+                        )
+                    }
                 }
                 entry<EntityBrowseRoute> { route ->
                     EntityDestination(route = route, navController = navController)
                 }
                 entry<StreamRoute> { route ->
-                    StreamDestination(
-                        route = route,
-                        onLandscapeLoadingChanged = { visible ->
-                            if (currentRoute == route) streamLandscapeLoadingVisible = visible
-                        },
-                        navController = navController,
-                        p2pEnabled = p2pSettingsUiState.p2pEnabled,
-                        openExternalPlayback = ::openExternalPlayback,
-                        openExternalStreamUrl = ::openExternalStreamUrl,
-                    )
+                    OpaqueAppSurfaces {
+                        StreamDestination(
+                            route = route,
+                            onLandscapeLoadingChanged = { visible ->
+                                if (currentRoute == route) streamLandscapeLoadingVisible = visible
+                            },
+                            navController = navController,
+                            p2pEnabled = p2pSettingsUiState.p2pEnabled,
+                            openExternalPlayback = ::openExternalPlayback,
+                            openExternalStreamUrl = ::openExternalStreamUrl,
+                        )
+                    }
                 }
                 entry<PlayerRoute>(
                     metadata = if (isIos) {
@@ -1836,17 +1844,23 @@ internal fun MainAppContent(
                     ) {
                         HostedPlayerRoutePlaceholder(route)
                     } else {
-                    PlayerDestination(
-                        route = route,
-                        navController = navController,
-                        externalPlayerId = playerSettingsUiState.externalPlayerId,
-                        externalPlayerNotConfiguredText = externalPlayerNotConfiguredText,
-                        externalPlayerFailedText = externalPlayerFailedText,
-                        onExternalPlayerLaunch = { launch -> lastExternalPlayerLaunch = launch },
-                        launchExternalPlayer = launchExternalPlayer,
-                        openExternalStreamUrl = ::openExternalStreamUrl,
-                        onOpenPartyMedia = ::openPartyMedia,
-                    )
+                    DisposableEffect(Unit) {
+                        AppBackgroundRepository.suspend()
+                        onDispose { AppBackgroundRepository.resume() }
+                    }
+                    OpaqueAppSurfaces {
+                        PlayerDestination(
+                            route = route,
+                            navController = navController,
+                            externalPlayerId = playerSettingsUiState.externalPlayerId,
+                            externalPlayerNotConfiguredText = externalPlayerNotConfiguredText,
+                            externalPlayerFailedText = externalPlayerFailedText,
+                            onExternalPlayerLaunch = { launch -> lastExternalPlayerLaunch = launch },
+                            launchExternalPlayer = launchExternalPlayer,
+                            openExternalStreamUrl = ::openExternalStreamUrl,
+                            onOpenPartyMedia = ::openPartyMedia,
+                        )
+                    }
                     }
                 }
                 entry<CatalogRoute> { route ->
