@@ -7,16 +7,11 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.nuvio.app.core.ui.glass.LiquidGlassGeneralStyle
 import nuvio.composeapp.generated.resources.settings_liquid_glass_experimental
 import nuvio.composeapp.generated.resources.settings_liquid_glass_experimental_description
-import nuvio.composeapp.generated.resources.settings_liquid_glass_advanced
-import nuvio.composeapp.generated.resources.settings_liquid_glass_advanced_description
 import nuvio.composeapp.generated.resources.settings_liquid_glass_style
 import nuvio.composeapp.generated.resources.settings_liquid_glass_style_description
-import nuvio.composeapp.generated.resources.settings_liquid_glass_style_advanced_note
 import nuvio.composeapp.generated.resources.settings_liquid_glass_style_readable
 import nuvio.composeapp.generated.resources.settings_liquid_glass_style_balanced
 import nuvio.composeapp.generated.resources.settings_liquid_glass_style_vivid
-import nuvio.composeapp.generated.resources.settings_liquid_glass_customize_description
-import nuvio.composeapp.generated.resources.settings_liquid_glass_customize
 import nuvio.composeapp.generated.resources.settings_appearance_custom_settings_background_clear
 import nuvio.composeapp.generated.resources.settings_appearance_custom_settings_background_choose
 import nuvio.composeapp.generated.resources.settings_appearance_custom_settings_background_saving
@@ -124,7 +119,6 @@ internal fun LazyListScope.appearanceSettingsContent(
         var showLanguageSheet by remember { mutableStateOf(false) }
         var showLanguageRestartDialog by remember { mutableStateOf(false) }
         val layoutDirection = LocalLayoutDirection.current
-        var showLiquidGlassSurfacesSheet by remember { mutableStateOf(false) }
         val customSettingsBackgroundImageUri by remember {
             ThemeSettingsRepository.ensureLoaded()
             ThemeSettingsRepository.customSettingsBackgroundImageUri
@@ -286,27 +280,9 @@ internal fun LazyListScope.appearanceSettingsContent(
                             SettingsGroupDivider(isTablet = isTablet)
                             LiquidGlassGeneralStyleRow(
                                 selected = liquidGlassSurfaceSettings.generalStyle,
-                                enabled = !liquidGlassSurfaceSettings.advancedEnabled,
                                 isTablet = isTablet,
                                 onSelected = ThemeSettingsRepository::setLiquidGlassGeneralStyle,
                             )
-                            SettingsGroupDivider(isTablet = isTablet)
-                            LiquidGlassSettingsSwitchRow(
-                                title = stringResource(Res.string.settings_liquid_glass_advanced),
-                                description = stringResource(Res.string.settings_liquid_glass_advanced_description),
-                                checked = liquidGlassSurfaceSettings.advancedEnabled,
-                                isTablet = isTablet,
-                                onCheckedChange = ThemeSettingsRepository::setLiquidGlassAdvancedEnabled,
-                            )
-                            if (liquidGlassSurfaceSettings.advancedEnabled) {
-                                SettingsGroupDivider(isTablet = isTablet)
-                                SettingsNavigationRow(
-                                    title = stringResource(Res.string.settings_liquid_glass_customize),
-                                    description = stringResource(Res.string.settings_liquid_glass_customize_description),
-                                    isTablet = isTablet,
-                                    onClick = { showLiquidGlassSurfacesSheet = true },
-                                )
-                            }
                         }
                     }
                 }
@@ -370,17 +346,6 @@ internal fun LazyListScope.appearanceSettingsContent(
             )
         }
 
-        if (showLiquidGlassSurfacesSheet) {
-            LiquidGlassSurfaceSettingsDrafts { surfaceSettings ->
-                LiquidGlassSurfacesSettingsSheet(
-                    isTablet = isTablet,
-                    settings = surfaceSettings,
-                    onSurfaceChanged = ThemeSettingsRepository::updateLiquidGlassSurfaceOverrides,
-                    onSave = ThemeSettingsRepository::saveLiquidGlassSurfaceSettings,
-                    onDismiss = { showLiquidGlassSurfacesSheet = false },
-                )
-            }
-        }
     }
 }
 
@@ -459,7 +424,6 @@ private fun AppearanceLanguageBottomSheet(
 @Composable
 private fun LiquidGlassGeneralStyleRow(
     selected: LiquidGlassGeneralStyle,
-    enabled: Boolean,
     isTablet: Boolean,
     onSelected: (LiquidGlassGeneralStyle) -> Unit,
 ) {
@@ -476,13 +440,7 @@ private fun LiquidGlassGeneralStyleRow(
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = stringResource(
-                if (enabled) {
-                    Res.string.settings_liquid_glass_style_description
-                } else {
-                    Res.string.settings_liquid_glass_style_advanced_note
-                },
-            ),
+            text = stringResource(Res.string.settings_liquid_glass_style_description),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -492,7 +450,6 @@ private fun LiquidGlassGeneralStyleRow(
                 SegmentedButton(
                     selected = style == selected,
                     onClick = { onSelected(style) },
-                    enabled = enabled,
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = styles.size),
                 ) {
                     Text(

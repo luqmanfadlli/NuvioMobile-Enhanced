@@ -3106,10 +3106,7 @@
     <string name="settings_liquid_glass_experimental_description">Extends Liquid Glass to details, library, search, categories and more. The navigation bar, player, sheets and stream picker keep their current look.</string>
     <string name="settings_liquid_glass_style">Style</string>
     <string name="settings_liquid_glass_style_description">Applies to every experimental surface.</string>
-    <string name="settings_liquid_glass_style_advanced_note">Advanced is on, so each area uses its own settings.</string>
     <string name="settings_liquid_glass_style_readable">Readable</string>
     <string name="settings_liquid_glass_style_balanced">Balanced</string>
     <string name="settings_liquid_glass_style_vivid">Vivid</string>
-    <string name="settings_liquid_glass_advanced">Advanced</string>
-    <string name="settings_liquid_glass_advanced_description">Customize each area individually, including the surfaces that already use glass.</string>
 </resources>

@@ -637,22 +637,10 @@ object ThemeSettingsRepository {
     internal fun setLiquidGlassExperimentalSurfacesEnabled(enabled: Boolean) =
         updateLiquidGlassSurfacesGeneral { it.copy(experimentalEnabled = enabled) }
 
-    /** Advanced mode exposes per-surface customization; saved per-surface values are kept either way. */
-    internal fun setLiquidGlassAdvancedEnabled(enabled: Boolean) =
-        updateLiquidGlassSurfacesGeneral { it.copy(advancedEnabled = enabled) }
 
     internal fun setLiquidGlassGeneralStyle(style: LiquidGlassGeneralStyle) =
         updateLiquidGlassSurfacesGeneral { it.copy(generalStyle = style) }
 
-    /** Clears every per-surface customization while keeping the General choices. */
-    internal fun resetLiquidGlassSurfaceCustomizations() =
-        updateLiquidGlassSurfacesGeneral { current ->
-            LiquidGlassSurfacesSettings(
-                experimentalEnabled = current.experimentalEnabled,
-                advancedEnabled = current.advancedEnabled,
-                generalStyle = current.generalStyle,
-            )
-        }
 
     private fun observeMembership() {
         if (observesMembership) return

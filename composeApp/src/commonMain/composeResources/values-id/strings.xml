@@ -1549,10 +1549,7 @@
     <string name="settings_liquid_glass_experimental_description">Memperluas Liquid Glass ke detail, pustaka, pencarian, kategori, dan lainnya. Bilah navigasi, pemutar, sheet, dan pemilih stream tetap seperti sekarang.</string>
     <string name="settings_liquid_glass_style">Gaya</string>
     <string name="settings_liquid_glass_style_description">Berlaku untuk semua permukaan eksperimental.</string>
-    <string name="settings_liquid_glass_style_advanced_note">Mode lanjutan aktif, jadi setiap area memakai pengaturannya sendiri.</string>
     <string name="settings_liquid_glass_style_readable">Mudah dibaca</string>
     <string name="settings_liquid_glass_style_balanced">Seimbang</string>
     <string name="settings_liquid_glass_style_vivid">Jernih</string>
-    <string name="settings_liquid_glass_advanced">Lanjutan</string>
-    <string name="settings_liquid_glass_advanced_description">Atur setiap area secara terpisah, termasuk permukaan yang sudah memakai glass.</string>
 </resources>
