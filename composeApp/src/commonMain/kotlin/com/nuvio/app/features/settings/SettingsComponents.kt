@@ -1,5 +1,9 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.bottomHairline
+import com.nuvio.app.core.ui.appBackgroundHeaderGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
 import com.nuvio.app.core.ui.nuvioFieldContainerColor
 import com.nuvio.app.core.ui.AppBackgroundImage
 import androidx.compose.animation.AnimatedVisibility
@@ -300,34 +304,48 @@ internal fun TabletPageHeader(
     Box(
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(tokens.colors.background)
-                .nuvioConsumePointerEvents(),
-        )
-        if (glassEnabled) {
-            Box(
+        val appBackgroundActive = LocalAppBackgroundActive.current
+        when {
+            appBackgroundActive -> Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .liquidGlassBackdropUnderlay(backdrop),
+                    .appBackgroundHeaderGlass(extendToWindow = false)
+                    .nuvioConsumePointerEvents(),
             )
-            Box(
+            glassEnabled -> {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(tokens.colors.background)
+                        .nuvioConsumePointerEvents(),
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .liquidGlassBackdropUnderlay(backdrop),
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .liquidGlassForSurface(
+                            surface = LiquidGlassSurface.SETTINGS,
+                            shape = shape,
+                            tint = tokens.colors.surface.copy(alpha = 0.18f),
+                            fallback = tokens.colors.surface,
+                            blurRadius = 12.dp,
+                            refractionHeight = 6.dp,
+                            refractionAmount = 9.dp,
+                            // Page header: no rim highlight and no box outline, just a hairline.
+                            withHighlight = false,
+                        )
+                        .bottomHairline(),
+                )
+            }
+            else -> Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .liquidGlassForSurface(
-                        surface = LiquidGlassSurface.SETTINGS,
-                        shape = shape,
-                        tint = tokens.colors.surface.copy(alpha = 0.18f),
-                        fallback = tokens.colors.surface,
-                        blurRadius = 12.dp,
-                        refractionHeight = 6.dp,
-                        refractionAmount = 9.dp,
-                    )
-                    .border(
-                        BorderStroke(tokens.borders.hairline, tokens.colors.borderSubtle),
-                        shape,
-                    ),
+                    .background(tokens.colors.background)
+                    .nuvioConsumePointerEvents(),
             )
         }
         LiquidGlassTextContrastScope(enabled = glassEnabled) {
