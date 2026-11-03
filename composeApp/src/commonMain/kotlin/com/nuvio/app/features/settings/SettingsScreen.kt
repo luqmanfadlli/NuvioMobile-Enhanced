@@ -1,5 +1,13 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.appBackgroundGlass
+import com.nuvio.app.core.ui.LocalAppBackgroundActive
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import com.nuvio.app.core.ui.AppBackgroundImage
 import com.nuvio.app.features.whatsnew.WhatsNewSettingsScreen
 import com.nuvio.app.navigation.LocalUseNativeNavigation
@@ -1068,25 +1076,53 @@ private fun TabletSettingsScreen(
 
     val saveableStateHolder = rememberSaveableStateHolder()
 
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val compactHeight = windowHeight < 500.dp
+    val sidebarTopOffset = if (compactHeight) statusBarPadding + 16.dp else topOffset
+    val sidebarAppGlass = LocalAppBackgroundActive.current
     Row(modifier = Modifier.fillMaxSize()) {
         Surface(
             modifier = Modifier
                 .width(280.dp)
-                .fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
+                .fillMaxSize()
+                .then(
+                    if (sidebarAppGlass) {
+                        Modifier
+                            .appBackgroundGlass(RectangleShape, outline = false)
+                            .drawWithContent {
+                                drawContent()
+                                val edge = 1.dp.toPx()
+                                drawRect(
+                                    color = Color.White.copy(alpha = 0.12f),
+                                    topLeft = Offset(size.width - edge, 0f),
+                                    size = Size(edge, size.height),
+                                )
+                            }
+                    } else {
+                        Modifier
+                    },
+                ),
+            color = if (sidebarAppGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = topOffset),
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = sidebarTopOffset)
+                    .padding(bottom = LocalNuvioBottomNavigationOverlayPadding.current + 16.dp),
             ) {
                 Text(
                     text = stringResource(Res.string.compose_settings_page_root),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
-                        .padding(bottom = 20.dp),
-                    style = MaterialTheme.typography.displayLarge,
+                        .padding(bottom = if (compactHeight) 12.dp else 20.dp),
+                    style = if (compactHeight) {
+                        MaterialTheme.typography.headlineMedium
+                    } else {
+                        MaterialTheme.typography.displayLarge
+                    },
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                 )
