@@ -112,3 +112,11 @@ fun AppRouteBackground(
         }
     }
 }
+
+@Composable
+fun nuvioFieldContainerColor(solid: Color): Color =
+    if (LocalAppBackgroundActive.current) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    } else {
+        solid
+    }

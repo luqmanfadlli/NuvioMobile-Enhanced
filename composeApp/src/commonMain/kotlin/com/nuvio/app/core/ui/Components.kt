@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.material3.contentColorFor
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
 import com.nuvio.app.core.ui.glass.liquidGlassSurface
@@ -145,12 +146,16 @@ fun NuvioSurfaceCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
+    val appGlass = LocalAppBackgroundActive.current
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = tokens.colors.surface,
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (appGlass) Modifier.appBackgroundGlass(tokens.shapes.card) else Modifier),
+        color = if (appGlass) Color.Transparent else tokens.colors.surface,
+        contentColor = if (appGlass) MaterialTheme.colorScheme.onSurface else contentColorFor(tokens.colors.surface),
         shape = tokens.shapes.card,
-        tonalElevation = tonalElevation.dp,
-        shadowElevation = tokens.elevation.flat,
+        tonalElevation = if (appGlass) 0.dp else tonalElevation.dp,
+        shadowElevation = if (appGlass) 0.dp else tokens.elevation.flat,
     ) {
         Column(
             modifier = Modifier.padding(tokens.spacing.cardPadding),
@@ -498,7 +503,7 @@ fun NuvioInfoBadge(
     Box(
         modifier = modifier
             .background(
-                color = tokens.colors.surfaceCard,
+                color = nuvioFieldContainerColor(tokens.colors.surfaceCard),
                 shape = tokens.shapes.chip,
             )
             .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s6),
