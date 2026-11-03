@@ -391,3 +391,6 @@ private fun boxBlur(pixels: IntArray, width: Int, height: Int, radius: Int) {
     pass(pixels, temp, horizontal = true)
     pass(temp, pixels, horizontal = false)
 }
+
+@Composable
+internal fun isGlassUiActive(): Boolean = LocalAppGlass.current?.glassEnabled == true
