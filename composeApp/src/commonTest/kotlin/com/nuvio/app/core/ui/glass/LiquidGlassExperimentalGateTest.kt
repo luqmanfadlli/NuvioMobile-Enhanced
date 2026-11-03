@@ -2,7 +2,6 @@ package com.nuvio.app.core.ui.glass
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LiquidGlassExperimentalGateTest {
@@ -12,56 +11,56 @@ class LiquidGlassExperimentalGateTest {
     @Test
     fun experimentalSurfacesAreOffByDefault() {
         val settings = LiquidGlassSurfacesSettings()
-        assertFalse(settings.experimentalEnabled)
         experimental.forEach { surface ->
             assertEquals(false, liquidGlassRuntimeOverrides(surface, settings).enabled, surface.name)
         }
     }
 
     @Test
-    fun shippedSurfacesAlwaysPassThroughUnlessCustomizedInAdvanced() {
-        val customized = LiquidGlassSurfaceOverrides(blurRadiusDp = 3f)
-        legacy.forEach { surface ->
-            val withCustomization = LiquidGlassSurfacesSettings().withSurface(surface, customized)
-            // Off, on, and on+general: the original call-site recipe is used.
-            assertTrue(isLiquidGlassLegacyPassthrough(surface, withCustomization), surface.name)
-            assertTrue(
-                isLiquidGlassLegacyPassthrough(surface, withCustomization.copy(experimentalEnabled = true)),
-                surface.name,
-            )
-            // Only an explicit Advanced customization opts a shipped surface into the new renderer.
-            assertFalse(
-                isLiquidGlassLegacyPassthrough(
-                    surface,
-                    withCustomization.copy(experimentalEnabled = true, advancedEnabled = true),
-                ),
-                surface.name,
-            )
-            assertTrue(
-                isLiquidGlassLegacyPassthrough(
-                    surface,
-                    LiquidGlassSurfacesSettings(experimentalEnabled = true, advancedEnabled = true),
-                ),
-                surface.name,
-            )
+    fun turningTheExperimentOnEnablesEverySurfaceIncludingSettings() {
+        val settings = LiquidGlassSurfacesSettings(experimentalEnabled = true)
+        experimental.forEach { surface ->
+            assertEquals(true, liquidGlassRuntimeOverrides(surface, settings).enabled, surface.name)
+        }
+        assertEquals(true, liquidGlassRuntimeOverrides(LiquidGlassSurface.SETTINGS, settings).enabled)
+    }
+
+    @Test
+    fun shippedSurfacesAlwaysKeepTheirOriginalRecipe() {
+        LiquidGlassGeneralStyle.entries.forEach { style ->
+            listOf(false, true).forEach { experimentalOn ->
+                val settings = LiquidGlassSurfacesSettings(experimentalEnabled = experimentalOn, generalStyle = style)
+                legacy.forEach { surface ->
+                    assertTrue(isLiquidGlassLegacyPassthrough(surface, settings), surface.name)
+                    assertEquals(LiquidGlassSurfaceOverrides(), liquidGlassRuntimeOverrides(surface, settings))
+                }
+            }
         }
     }
 
     @Test
-    fun generalStyleAppliesUntilAdvancedIsOn() {
+    fun theSelectedStyleDrivesEveryExperimentalSurface() {
+        LiquidGlassGeneralStyle.entries.forEach { style ->
+            val settings = LiquidGlassSurfacesSettings(experimentalEnabled = true, generalStyle = style)
+            experimental.forEach { surface ->
+                assertEquals(
+                    style.baseOverrides(surface).copy(enabled = true),
+                    liquidGlassRuntimeOverrides(surface, settings),
+                    "${style.name} ${surface.name}",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun savedPerSurfaceValuesAreIgnored() {
         val surface = LiquidGlassSurface.SEARCH
-        val perSurface = LiquidGlassSurfaceOverrides(tintOpacity = 0.9f)
-        val base = LiquidGlassSurfacesSettings(
-            experimentalEnabled = true,
-            generalStyle = LiquidGlassGeneralStyle.VIVID,
-        ).withSurface(surface, perSurface)
-
-        val general = liquidGlassRuntimeOverrides(surface, base)
-        assertEquals(LiquidGlassGeneralStyle.VIVID.baseOverrides(surface), general)
-
-        val advanced = liquidGlassRuntimeOverrides(surface, base.copy(advancedEnabled = true))
-        assertEquals(0.9f, advanced.tintOpacity)
-        assertEquals(LiquidGlassMaterial.LIQUID, advanced.material)
+        val settings = LiquidGlassSurfacesSettings(experimentalEnabled = true)
+            .withSurface(surface, LiquidGlassSurfaceOverrides(enabled = false, tintOpacity = 0.9f))
+        assertEquals(
+            settings.generalStyle.baseOverrides(surface).copy(enabled = true),
+            liquidGlassRuntimeOverrides(surface, settings),
+        )
     }
 
     @Test
@@ -78,8 +77,7 @@ class LiquidGlassExperimentalGateTest {
     fun generalChoicesRoundTripThroughStorage() {
         val settings = LiquidGlassSurfacesSettings(
             experimentalEnabled = true,
-            advancedEnabled = true,
-            generalStyle = LiquidGlassGeneralStyle.BALANCED,
+            generalStyle = LiquidGlassGeneralStyle.VIVID,
         )
         assertEquals(settings, decodeLiquidGlassSurfaceSettings(encodeLiquidGlassSurfaceSettings(settings)))
     }

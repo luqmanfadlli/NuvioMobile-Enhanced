@@ -48,13 +48,11 @@ class SettingsGlassChromeTest {
         LiquidGlassSettings.enabled = true
         LiquidGlassSettings.surfaceOverrides = LiquidGlassSurfacesSettings(
             experimentalEnabled = true,
-            advancedEnabled = true,
         ).withSurface(
             LiquidGlassSurface.SETTINGS,
             LiquidGlassSurfaceOverrides(
                 enabled = true,
                 cornerRadiusPercent = 50f,
-                // Use Frosted material to avoid runtime-shader lens dependencies in the host test.
                 material = LiquidGlassMaterial.FROSTED,
             ),
         )
@@ -83,7 +81,6 @@ class SettingsGlassChromeTest {
                                 .background(Color.Green),
                         )
                     }
-                    // A red sibling simulates scrolling Settings content passing behind a sticky header.
                     Box(
                         Modifier
                             .fillMaxWidth()

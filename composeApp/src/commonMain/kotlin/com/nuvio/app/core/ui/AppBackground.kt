@@ -1,5 +1,9 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import com.nuvio.app.core.ui.glass.LiquidGlassSettings
+import com.nuvio.app.core.ui.glass.LiquidGlassGeneralStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -116,7 +120,29 @@ fun AppRouteBackground(
 @Composable
 fun nuvioFieldContainerColor(solid: Color): Color =
     if (LocalAppBackgroundActive.current) {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+        MaterialTheme.colorScheme.onSurface.copy(alpha = appGlassStyledFieldAlpha())
     } else {
         solid
     }
+
+internal fun appGlassStyle(): LiquidGlassGeneralStyle {
+    val settings = LiquidGlassSettings.surfaceOverrides
+    return if (settings.experimentalEnabled) settings.generalStyle else LiquidGlassGeneralStyle.BALANCED
+}
+
+internal fun appGlassStyledTint(base: Float): Float = when (appGlassStyle()) {
+    LiquidGlassGeneralStyle.READABLE -> (base * 1.35f + 0.10f).coerceAtMost(0.85f)
+    LiquidGlassGeneralStyle.BALANCED -> base
+    LiquidGlassGeneralStyle.VIVID -> base * 0.6f
+}
+
+internal fun appGlassStyledBlur(base: Dp): Dp = when (appGlassStyle()) {
+    LiquidGlassGeneralStyle.READABLE -> base + 6.dp
+    LiquidGlassGeneralStyle.BALANCED, LiquidGlassGeneralStyle.VIVID -> base
+}
+
+private fun appGlassStyledFieldAlpha(): Float = when (appGlassStyle()) {
+    LiquidGlassGeneralStyle.READABLE -> 0.10f
+    LiquidGlassGeneralStyle.BALANCED -> 0.06f
+    LiquidGlassGeneralStyle.VIVID -> 0.04f
+}

@@ -735,9 +735,9 @@ internal fun Modifier.appBackgroundHeaderGlass(
         .liquidGlassSurface(
             backdrop = backdrop,
             shape = RectangleShape,
-            tint = colors.surface.copy(alpha = 0.45f),
+            tint = colors.surface.copy(alpha = appGlassStyledTint(0.45f)),
             fallback = colors.background.copy(alpha = 0.88f),
-            blurRadius = 24.dp,
+            blurRadius = appGlassStyledBlur(24.dp),
             withHighlight = false,
         )
         .then(if (hairline) Modifier.bottomHairline() else Modifier)
@@ -755,9 +755,9 @@ internal fun Modifier.appBackgroundGlass(
         .liquidGlassSurface(
             backdrop = LocalAppBackgroundBackdrop.current,
             shape = shape,
-            tint = colors.surface.copy(alpha = tintAlpha),
+            tint = colors.surface.copy(alpha = appGlassStyledTint(tintAlpha)),
             fallback = colors.surface.copy(alpha = 0.72f),
-            blurRadius = blurRadius,
+            blurRadius = appGlassStyledBlur(blurRadius),
             refractionHeight = 8.dp,
             refractionAmount = 12.dp,
             withHighlight = true,

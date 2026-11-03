@@ -21,10 +21,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/**
- * Independently configurable app areas. Navigation-bar glass intentionally remains on its existing
- * settings/model so its per-piece defaults and preview are not changed by these preferences.
- */
 @Serializable
 enum class LiquidGlassSurface {
     PLAYER,
@@ -57,11 +53,6 @@ enum class LiquidGlassSurface {
     val defaultWithHighlight: Boolean
         get() = this != DETAIL_HEADER
 
-    /**
-     * Surfaces that already shipped with Liquid Glass before the experimental surfaces work. They
-     * always keep their original call-site recipe unless the user explicitly customizes them in
-     * Advanced mode, so turning the experiment on never changes their look by itself.
-     */
     val isLegacyGlass: Boolean
         get() = when (this) {
             PLAYER,
@@ -73,14 +64,9 @@ enum class LiquidGlassSurface {
             else -> false
         }
 
-    /** Keep the one existing shadowed card recipe consistent between Studio and runtime. */
     val defaultWithShadow: Boolean
         get() = this == LIBRARY_CLOUD_CARDS
 
-    /**
-     * Use refraction only where it adds value without competing with text or dense content.
-     * FROSTED remains the safe, legible default for forms, menus, cards, and grouped controls.
-     */
     val defaultMaterial: LiquidGlassMaterial
         get() = when (this) {
             PLAYER,
@@ -95,7 +81,6 @@ enum class LiquidGlassSurface {
     val supportsLens: Boolean
         get() = this != DETAIL_HEADER
 
-    /** Only surfaces with live icon-tint consumers expose the per-surface custom icon-color control. */
     val supportsIconTint: Boolean
         get() = when (this) {
             PLAYER, DETAILS, DETAIL_HEADER, DETAIL_PRIMARY_ACTION, DETAIL_TRAILER_SELECTOR,
@@ -138,10 +123,6 @@ enum class LiquidGlassSurface {
         }
 }
 
-/**
- * A saved Clear material must not become an invisible/no-refraction surface when its target cannot
- * run the lens shader. Fall back to Liquid blur instead of silently losing both blur and lens.
- */
 internal fun effectiveLiquidGlassMaterial(
     surface: LiquidGlassSurface,
     material: LiquidGlassMaterial?,
@@ -159,10 +140,6 @@ internal fun effectiveLiquidGlassMaterial(
     }
 }
 
-/**
- * Nullable values inherit this surface's shared default recipe. The recipe is resolved identically
- * by Studio previews and the runtime renderer, so an untouched slider still describes the live look.
- */
 @Serializable
 internal data class LiquidGlassSurfaceOverrides(
     val enabled: Boolean? = null,
@@ -176,9 +153,7 @@ internal data class LiquidGlassSurfaceOverrides(
     val withShadow: Boolean? = null,
     val chromaticAberration: Boolean? = null,
     val depthEffect: Boolean? = null,
-    /** Opaque ARGB. A null value means use the screen's original icon color. */
     val defaultIconColorArgb: Int? = null,
-    /** Null preserves the original liquid/refraction recipe for this surface. */
     val material: LiquidGlassMaterial? = null,
 ) {
     fun sanitized(): LiquidGlassSurfaceOverrides = copy(
@@ -194,10 +169,6 @@ internal data class LiquidGlassSurfaceOverrides(
     private fun Float?.inheritOrClamp(minimum: Float, maximum: Float): Float? =
         this?.takeIf { it.isFinite() }?.coerceIn(minimum, maximum)
 
-    /**
-     * Links material behavior while deliberately preserving component-specific geometry and icon
-     * color. Play buttons, chips, cards, and rectangular headers keep their original silhouettes.
-     */
     fun withGlassEffectFrom(shared: LiquidGlassSurfaceOverrides): LiquidGlassSurfaceOverrides = copy(
         enabled = shared.enabled,
         material = shared.material,
@@ -213,7 +184,6 @@ internal data class LiquidGlassSurfaceOverrides(
     ).sanitized()
 }
 
-/** One source of truth for starting slider values and runtime rendering. */
 @Serializable
 internal data class LiquidGlassSurfaceRecipe(
     val cornerRadiusPercent: Float,
@@ -223,10 +193,6 @@ internal data class LiquidGlassSurfaceRecipe(
     val tintOpacity: Float,
 )
 
-/**
- * Resolve the same per-surface recipe for Studio and live rendering. Nullable user overrides
- * inherit these defaults; they do not silently fall back to a different value at each call site.
- */
 internal fun liquidGlassSurfaceRecipe(
     surface: LiquidGlassSurface,
     overrides: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
@@ -269,7 +235,6 @@ internal fun liquidGlassSurfaceRecipe(
     )
 }
 
-/** A composite, production-shaped preview that lets users tune related surfaces together. */
 internal enum class LiquidGlassSurfaceGroup(val surfaces: List<LiquidGlassSurface>) {
     DETAIL_PAGE(
         listOf(
@@ -311,10 +276,6 @@ internal enum class LiquidGlassSurfaceGroup(val surfaces: List<LiquidGlassSurfac
     ),
 }
 
-/**
- * Surfaces already represented by a grouped preview are shown inside that group's expandable
- * controls, not repeated in the root list.
- */
 internal fun liquidGlassStandaloneSurfaces(
     surfaces: List<LiquidGlassSurface>,
     groups: List<LiquidGlassSurfaceGroup> = LiquidGlassSurfaceGroup.entries,
@@ -323,34 +284,25 @@ internal fun liquidGlassStandaloneSurfaces(
     return surfaces.filterNot { it in groupedSurfaces }
 }
 
-/** One-tap look for every experimental surface when Advanced mode is off. */
 @Serializable
 enum class LiquidGlassGeneralStyle {
-    /** More tint and frost: text stays readable over bright artwork. */
     READABLE,
     BALANCED,
-    /** Less tint and more refraction for a more transparent look. */
     VIVID,
 }
 
 @Serializable
 internal data class LiquidGlassSurfacesSettings(
-    /** Master switch for the experimental surfaces. Off keeps the app exactly as it shipped. */
     val experimentalEnabled: Boolean = false,
-    /** Off: every experimental surface follows [generalStyle]. On: per-surface overrides apply. */
-    val advancedEnabled: Boolean = false,
     val generalStyle: LiquidGlassGeneralStyle = LiquidGlassGeneralStyle.READABLE,
     val player: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
-    // Provider chips already used glass by default; this separate setting preserves that behavior.
     val streamFilters: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val streamSelection: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val details: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
-    // Missing fields in existing saved JSON inherit the old shared recipe during deserialization.
     val detailHeader: LiquidGlassSurfaceOverrides = details,
     val detailChips: LiquidGlassSurfaceOverrides = details,
     val detailContentCards: LiquidGlassSurfaceOverrides = details,
     val detailPrimaryAction: LiquidGlassSurfaceOverrides = details,
-    // Added control surfaces default to inherited recipes, preserving compatibility with older JSON.
     val detailTrailerSelector: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val detailTrailerMenu: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val detailEpisodeSearch: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
@@ -361,13 +313,11 @@ internal data class LiquidGlassSurfacesSettings(
     val streamResults: LiquidGlassSurfaceOverrides = streamSelection,
     val search: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val library: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
-    // New Library controls inherit old Library settings when older saved JSON omits these fields.
     val librarySavedTypeFilter: LiquidGlassSurfaceOverrides = library,
     val librarySavedSortFilter: LiquidGlassSurfaceOverrides = library,
     val libraryCloudFilters: LiquidGlassSurfaceOverrides = library,
     val libraryCloudSearch: LiquidGlassSurfaceOverrides = library,
     val libraryCloudCards: LiquidGlassSurfaceOverrides = library,
-    // Legacy Library overrides also seed the new calendar surface, while future edits stay independent.
     val libraryCalendar: LiquidGlassSurfaceOverrides = library,
     val settings: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
     val bottomSheets: LiquidGlassSurfaceOverrides = LiquidGlassSurfaceOverrides(),
@@ -438,7 +388,6 @@ internal data class LiquidGlassSurfacesSettings(
 
     fun sanitized(): LiquidGlassSurfacesSettings = LiquidGlassSurfacesSettings(
         experimentalEnabled = experimentalEnabled,
-        advancedEnabled = advancedEnabled,
         generalStyle = generalStyle,
         player = player.sanitized(),
         streamFilters = streamFilters.sanitized(),
@@ -469,16 +418,8 @@ internal data class LiquidGlassSurfacesSettings(
     )
 }
 
-/**
- * Non-persistent preview-only overrides let production controls render their exact shapes and
- * material values inside the editor without mutating the real app-wide settings.
- */
 internal val LocalLiquidGlassPreviewOverrides = staticCompositionLocalOf<LiquidGlassSurfaceOverrides?> { null }
 
-/**
- * Complete preview-only settings for an interactive layout. Each production component resolves its
- * own surface from this value, so tuning one region does not leak into neighboring preview regions.
- */
 internal val LocalLiquidGlassPreviewSettings = staticCompositionLocalOf<LiquidGlassSurfacesSettings?> { null }
 
 private val liquidGlassSettingsJson = Json {
@@ -497,7 +438,6 @@ internal fun decodeLiquidGlassSurfaceSettings(raw: String?): LiquidGlassSurfaces
     }.getOrElse { LiquidGlassSurfacesSettings() }
 }
 
-/** Base overrides a General style applies on top of a surface's own default recipe. */
 internal fun LiquidGlassGeneralStyle.baseOverrides(surface: LiquidGlassSurface): LiquidGlassSurfaceOverrides {
     val defaults = liquidGlassSurfaceRecipe(surface)
     return when (this) {
@@ -514,7 +454,6 @@ internal fun LiquidGlassGeneralStyle.baseOverrides(surface: LiquidGlassSurface):
     }.sanitized()
 }
 
-/** Non-null fields of [this] win; null fields fall back to [base]. */
 internal fun LiquidGlassSurfaceOverrides.over(base: LiquidGlassSurfaceOverrides): LiquidGlassSurfaceOverrides =
     LiquidGlassSurfaceOverrides(
         enabled = enabled ?: base.enabled,
@@ -532,34 +471,21 @@ internal fun LiquidGlassSurfaceOverrides.over(base: LiquidGlassSurfaceOverrides)
         material = material ?: base.material,
     )
 
-/**
- * True when [surface] must render its original pre-experiment recipe from the call site. This is
- * the case for every shipped glass surface unless Advanced mode holds a customization for it.
- */
+@Suppress("UNUSED_PARAMETER")
 internal fun isLiquidGlassLegacyPassthrough(
     surface: LiquidGlassSurface,
     settings: LiquidGlassSurfacesSettings = LiquidGlassSettings.surfaceOverrides,
-): Boolean = surface.isLegacyGlass && !(
-    settings.experimentalEnabled &&
-        settings.advancedEnabled &&
-        settings.forSurface(surface) != LiquidGlassSurfaceOverrides()
-    )
+): Boolean = surface.isLegacyGlass
 
-/**
- * Overrides the live renderer honours for [surface]. The editor keeps reading the raw saved values
- * through [LiquidGlassSurfacesSettings.forSurface]; everything else goes through this resolver.
- */
 internal fun liquidGlassRuntimeOverrides(
     surface: LiquidGlassSurface,
     settings: LiquidGlassSurfacesSettings = LiquidGlassSettings.surfaceOverrides,
 ): LiquidGlassSurfaceOverrides {
     if (isLiquidGlassLegacyPassthrough(surface, settings)) return LiquidGlassSurfaceOverrides()
     if (!settings.experimentalEnabled) return LiquidGlassSurfaceOverrides(enabled = false)
-    val base = if (surface.isLegacyGlass) LiquidGlassSurfaceOverrides() else settings.generalStyle.baseOverrides(surface)
-    return if (settings.advancedEnabled) settings.forSurface(surface).over(base) else base
+    return settings.generalStyle.baseOverrides(surface).copy(enabled = true)
 }
 
-/** Overrides for a component, preferring editor preview drafts over the live runtime resolution. */
 @Composable
 private fun resolvedLiquidGlassOverrides(
     surface: LiquidGlassSurface,
@@ -578,11 +504,6 @@ private fun resolvedLiquidGlassOverrides(
     return isPreview to overrides
 }
 
-/**
- * Resolves the per-surface toggle consistently for runtime and editor rendering.
- * Preview mode ignores the app-wide master switch so a component can be inspected on any device,
- * but it never overrides the user's per-surface enabled/disabled choice.
- */
 internal fun shouldRenderLiquidGlassSurface(
     surface: LiquidGlassSurface,
     overrides: LiquidGlassSurfaceOverrides,
@@ -592,10 +513,6 @@ internal fun shouldRenderLiquidGlassSurface(
 ): Boolean = (overrides.enabled ?: surface.defaultEnabled) &&
     (preview || (masterEnabled && platformSupported))
 
-/**
- * Resolve corner geometry from the same per-surface recipe used by the renderer and Studio preview.
- * Disabled surfaces and shapes without per-corner geometry retain their original shape.
- */
 @Composable
 internal fun liquidGlassShape(
     surface: LiquidGlassSurface,
@@ -608,20 +525,13 @@ internal fun liquidGlassShape(
         return defaultShape
     }
     val recipe = liquidGlassSurfaceRecipe(surface, overrides)
-    // Full-width scroll-edge headers remain rectangular. Scale each component's own native corners
-    // using the same resolved recipe that supplies Studio's initial slider values and render effects.
     if (defaultShape === RectangleShape || defaultShape !is CornerBasedShape) return defaultShape
     return scaleLiquidGlassCornerShape(defaultShape, recipe.cornerRadiusPercent)
 }
 
-/** Slider range matches the navigation bar: 0 = square, 50 = original pill/corner shape. */
 internal fun effectiveLiquidGlassCornerRadiusScale(percent: Float): Float =
     effectiveLiquidGlassCornerRadiusPercent(percent) / 50f
 
-/**
- * Value equality is important for Backdrop's shape cache: equal radii should reuse the same
- * outline, while a changed scale must invalidate it and update the live glass edge.
- */
 private data class ScaledLiquidGlassCornerSize(
     val original: CornerSize,
     private val scale: Float,
@@ -630,7 +540,6 @@ private data class ScaledLiquidGlassCornerSize(
         original.toPx(shapeSize, density) * scale
 }
 
-/** Remove an earlier preview scaling before applying the newest slider value. */
 private fun CornerSize.unscaledForLiquidGlass(): CornerSize =
     if (this is ScaledLiquidGlassCornerSize) original.unscaledForLiquidGlass() else this
 
@@ -655,8 +564,6 @@ internal fun scaleLiquidGlassCornerShape(shape: Shape, percent: Float): Shape {
     )
     if (scale >= 1f) return originalCorners
     if (scale <= 0f) {
-        // Keep the source corner sizes attached even at zero so moving the slider back upward
-        // can restore rounding without relying on a fresh call-site Shape instance.
         return originalCorners.copy(
             topStart = ScaledLiquidGlassCornerSize(originalCorners.topStart, 0f),
             topEnd = ScaledLiquidGlassCornerSize(originalCorners.topEnd, 0f),
@@ -672,7 +579,6 @@ internal fun scaleLiquidGlassCornerShape(shape: Shape, percent: Float): Shape {
     )
 }
 
-/** Clamp Kyant lens parameters only after the real radius and drawing bounds are known. */
 internal data class LiquidGlassLensParameters(
     val refractionHeightPx: Float,
     val refractionAmountPx: Float,
@@ -714,7 +620,6 @@ internal fun Modifier.liquidGlassForSurface(
 ): Modifier {
     val (isPreview, overrides) = resolvedLiquidGlassOverrides(surface, preview)
     if (!isPreview && isLiquidGlassLegacyPassthrough(surface)) {
-        // Shipped surfaces: render exactly the original call-site recipe.
         return if (useExplicitBackdrop) {
             val host = explicitBackdrop as? LiquidGlassBackdropHost
             if (host != null) {
@@ -764,8 +669,6 @@ internal fun Modifier.liquidGlassForSurface(
     )
     val enabled = shouldRenderLiquidGlassSurface(surface, overrides, isPreview, LiquidGlassSettings.enabled) &&
         materialStyle.usesBackdrop
-    // Apply the resolved recipe even when the user has not saved an explicit radius override.
-    // Unwrap prior preview scaling before applying the selected value to avoid scaling twice.
     val effectiveShape = effectiveLiquidGlassSurfaceShape(
         shape = shape,
         cornerRadiusPercent = recipe.cornerRadiusPercent,
@@ -871,11 +774,6 @@ internal fun liquidGlassIconTint(
     return overrides.defaultIconColorArgb?.let { Color(it).copy(alpha = default.alpha) } ?: default
 }
 
-/**
- * Returns the effective per-surface enabled state for branches choosing between glass and a
- * native fallback. Preview rendering reads preview-local overrides and ignores the app-wide
- * master switch, while respecting the individual surface toggle.
- */
 @Composable
 internal fun isLiquidGlassSurfaceEffectivelyEnabled(
     surface: LiquidGlassSurface,
@@ -892,7 +790,6 @@ internal fun isLiquidGlassSurfaceEffectivelyEnabled(
     )
 }
 
-/** Used by components that need to fall back to their original control when a surface is disabled. */
 internal fun isLiquidGlassSurfacePreferenceEnabled(surface: LiquidGlassSurface): Boolean {
     val overrides = liquidGlassRuntimeOverrides(surface)
     return overrides.enabled ?: surface.defaultEnabled
