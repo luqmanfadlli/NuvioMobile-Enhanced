@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -66,7 +65,8 @@ internal fun StyledSubtitleText(
     BoxWithConstraints(modifier) {
         val paddingX = with(density) { (8.dp * scale).toPx() }
         val paddingY = with(density) { (4.dp * scale).toPx() }
-        val maxTextWidth = (constraints.maxWidth - paddingX * 2).toInt().coerceAtLeast(1)
+        val availableWidth = constraints.maxWidth.toFloat()
+        val maxTextWidth = (availableWidth - paddingX * 2).toInt().coerceAtLeast(1)
         val layout = measurer.measure(
             text = AnnotatedString(text),
             style = TextStyle(
@@ -97,9 +97,9 @@ internal fun StyledSubtitleText(
                 .semantics { this.text = AnnotatedString(text) },
         ) {
             val boxWidth = layout.size.width + paddingX * 2
-            val left = (constraints.maxWidth - boxWidth).coerceAtLeast(0f) / 2f
+            val left = (availableWidth - boxWidth).coerceAtLeast(0f) / 2f
             val origin = Offset(left + paddingX, paddingY + outlineBlurPx)
-            Canvas(Modifier.matchParentSize()) {
+            Canvas(Modifier.fillMaxSize()) {
                 drawRoundRect(
                     color = style.backgroundColor,
                     topLeft = Offset(left, outlineBlurPx),
@@ -116,7 +116,7 @@ internal fun StyledSubtitleText(
                 } else {
                     Modifier
                 }
-                Canvas(Modifier.matchParentSize().then(outlineModifier)) {
+                Canvas(Modifier.fillMaxSize().then(outlineModifier)) {
                     val outlineColor = style.outlineColor.copy(
                         alpha = style.outlineColor.alpha * style.textColor.alpha,
                     )
@@ -152,7 +152,7 @@ internal fun StyledSubtitleText(
                     }
                 }
             }
-            Canvas(Modifier.matchParentSize()) {
+            Canvas(Modifier.fillMaxSize()) {
                 drawText(
                     layout, color = style.textColor, topLeft = origin, drawStyle = Fill,
                     shadow = if (style.appearance.shadowEnabled) Shadow(
