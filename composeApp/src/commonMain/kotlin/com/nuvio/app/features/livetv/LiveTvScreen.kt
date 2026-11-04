@@ -1,5 +1,6 @@
 package com.nuvio.app.features.livetv
 
+import com.nuvio.app.core.ui.nuvioScreenSideBleed
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.animation.AnimatedVisibility
@@ -227,6 +228,7 @@ fun LiveTvScreen(
         NuvioScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalPadding = LiveTvScreenHorizontalPadding,
+            topPadding = 0.dp,
             listState = listState,
             autoHidesNativeTabBar = true,
         ) {
@@ -234,9 +236,11 @@ fun LiveTvScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .nuvioScreenSideBleed()
                         .appBackgroundCover(screenBackground)
                         .nuvioConsumePointerEvents()
-                        .padding(top = controlsTopPadding),
+                        .padding(horizontal = LiveTvScreenHorizontalPadding)
+                        .padding(top = listTopPadding),
                 ) {
                     NuvioScreenHeader(
                         title = stringResource(Res.string.live_tv_title),
