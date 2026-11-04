@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -88,17 +89,24 @@ internal fun StyledSubtitleText(
         val outlineBlurPx = with(density) { outlineBlurDp.toPx() }
         val useNativeBlur = supportsNativeSubtitleBlur()
         val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
+        val outlinePadding = outlineBlurDp
         Box(
-            Modifier.fillMaxWidth().height(textHeight).semantics { this.text = AnnotatedString(text) },
+            Modifier.fillMaxWidth()
+                .height(textHeight + outlinePadding * 2)
+                .offset(y = outlinePadding)
+                .semantics { this.text = AnnotatedString(text) },
         ) {
             val boxWidth = layout.size.width + paddingX * 2
             val left = (constraints.maxWidth - boxWidth).coerceAtLeast(0f) / 2f
-            val origin = Offset(left + paddingX, paddingY)
+            val origin = Offset(left + paddingX, paddingY + outlineBlurPx)
             Canvas(Modifier.matchParentSize()) {
                 drawRoundRect(
                     color = style.backgroundColor,
-                    topLeft = Offset(left, 0f),
-                    size = androidx.compose.ui.geometry.Size(boxWidth, size.height),
+                    topLeft = Offset(left, outlineBlurPx),
+                    size = androidx.compose.ui.geometry.Size(
+                        boxWidth,
+                        (size.height - outlineBlurPx * 2).coerceAtLeast(0f),
+                    ),
                     cornerRadius = CornerRadius(radius),
                 )
             }
