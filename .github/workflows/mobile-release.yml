@@ -36,7 +36,7 @@ on:
         required: false
         type: string
       ios_disable_phases:
-        description: "iOS Release: Kotlin/Native phases to skip. full = no skip (most optimized, most RAM); skip-static-init = skip RemoveRedundantCallsToStaticInitializersPhase; skip-devirtualization = skip DevirtualizationAnalysis+Devirtualization; skip-both = skip all three (fits free runner)."
+        description: "iOS Release: Kotlin/Native phases to skip."
         required: false
         type: choice
         default: skip-both
