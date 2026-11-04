@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -90,7 +91,7 @@ internal fun StyledSubtitleText(
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
         val paddingX = with(density) { (8.dp * scale).toPx() }
         val paddingY = with(density) { (4.dp * scale).toPx() }
         val availableWidth = constraints.maxWidth.toFloat()
