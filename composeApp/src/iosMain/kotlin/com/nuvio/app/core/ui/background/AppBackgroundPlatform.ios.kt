@@ -2,6 +2,9 @@
 
 package com.nuvio.app.core.ui.background
 
+import platform.darwin.DISPATCH_TIME_NOW
+import platform.darwin.dispatch_time
+import platform.darwin.dispatch_after
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,10 +79,11 @@ internal actual fun rememberAppBackgroundImagePicker(
     val currentOnError = rememberUpdatedState(onError)
     return remember {
         {
-            val presenter = topViewController()
-            if (presenter == null) {
-                currentOnError.value("Unable to present the photo picker.")
-            } else {
+            presentWhenReady(attemptsLeft = 10) { presenter ->
+                if (presenter == null) {
+                    currentOnError.value("Unable to present the photo picker.")
+                    return@presentWhenReady
+                }
                 val configuration = PHPickerConfiguration().apply {
                     filter = PHPickerFilter.imagesFilter
                     selectionLimit = 1
@@ -101,6 +105,21 @@ internal actual fun rememberAppBackgroundImagePicker(
                 presenter.presentViewController(picker, animated = true, completion = null)
             }
         }
+    }
+}
+
+private fun presentWhenReady(attemptsLeft: Int, present: (UIViewController?) -> Unit) {
+    val top = topViewController()
+    val busy = top != null && (top.isBeingDismissed() || top.isBeingPresented())
+    if (!busy || attemptsLeft <= 0) {
+        present(top)
+        return
+    }
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, 200_000_000L),
+        dispatch_get_main_queue(),
+    ) {
+        presentWhenReady(attemptsLeft - 1, present)
     }
 }
 
@@ -136,8 +155,10 @@ private fun storePickedImage(data: NSData, isGif: Boolean): String? {
 
 private fun topViewController(): UIViewController? {
     var controller = UIApplication.sharedApplication.keyWindow?.rootViewController
-    while (controller?.presentedViewController != null) {
-        controller = controller.presentedViewController
+    while (true) {
+        val presented = controller?.presentedViewController ?: break
+        if (presented.isBeingDismissed()) break
+        controller = presented
     }
     return controller
 }

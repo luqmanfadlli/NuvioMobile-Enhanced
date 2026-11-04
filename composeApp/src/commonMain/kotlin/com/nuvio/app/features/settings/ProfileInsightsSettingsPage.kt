@@ -619,6 +619,13 @@ private fun ProfileInsightsHeroCinematic(
             .aspectRatio(1f),
     ) {
         BoxWithConstraints(modifier = Modifier.matchParentSize()) {
+            if (profile != null) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .appBackgroundCover(Color.Transparent),
+                )
+            }
             val leftInset = tokens.spacing.screenHorizontal + 40.dp
             val rightInset = tokens.spacing.screenHorizontal + 160.dp
             val bleedWidth = maxWidth + leftInset + rightInset
@@ -632,11 +639,6 @@ private fun ProfileInsightsHeroCinematic(
                     .offset(x = -leftInset, y = -topExtension),
             ) {
                 if (profile != null) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .appBackgroundCover(Color.Transparent),
-                    )
                 } else {
                     Box(
                         modifier = Modifier
