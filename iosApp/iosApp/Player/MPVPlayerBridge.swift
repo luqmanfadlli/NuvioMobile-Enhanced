@@ -2040,14 +2040,15 @@ final class MPVPlayerViewController: UIViewController {
         }
     }
 
-    private func syncNowPlayingPlaybackState(isPlaying: Bool) {
+    private func syncNowPlayingPlaybackState(isPlaying: Bool, force: Bool = false) {
         let start = CACurrentMediaTime()
         pictureInPictureController?.updatePlaybackState()
         nowPlayingController.syncPlayback(
             positionMs: positionMs,
             durationMs: durationMs,
             isPlaying: isPlaying,
-            playbackSpeed: currentSpeed
+            playbackSpeed: currentSpeed,
+            force: force
         )
         let elapsedMs = (CACurrentMediaTime() - start) * 1000
         if elapsedMs >= 100 {
@@ -2427,6 +2428,7 @@ final class MPVPlayerViewController: UIViewController {
                         self.updateState()
                         if !self.isEmbeddedPreviewMode {
                             self.publishNowPlayingForPlaybackSession()
+                            self.syncNowPlayingPlaybackState(isPlaying: self.isPlayerPlaying, force: true)
                         }
                     }
                 case MPV_EVENT_END_FILE:
