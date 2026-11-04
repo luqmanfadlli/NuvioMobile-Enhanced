@@ -1,5 +1,7 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.background.LocalAppBackgroundActive
+import com.nuvio.app.core.ui.background.appBackgroundCover
 import com.nuvio.app.core.ui.background.appGlassBackdrop
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.drawWithContent
@@ -630,6 +632,11 @@ private fun ProfileInsightsHeroCinematic(
                     .offset(x = -leftInset, y = -topExtension),
             ) {
                 if (profile != null) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .appBackgroundCover(Color.Transparent),
+                    )
                 } else {
                     Box(
                         modifier = Modifier
@@ -645,7 +652,7 @@ private fun ProfileInsightsHeroCinematic(
                             ),
                     )
                 }
-                Box(
+                if (!LocalAppBackgroundActive.current) Box(
                     modifier = Modifier
                         .matchParentSize()
                         .background(
@@ -960,7 +967,7 @@ private fun ProfileMetricPill(
 private fun ProfileWatchTimeRow(stats: ProfileInsightsStats) {
     val tokens = MaterialTheme.nuvio
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().appGlassBackdrop(tokens.shapes.card),
         color = tokens.colors.surface,
         shape = tokens.shapes.card,
         border = BorderStroke(1.dp, tokens.colors.borderSubtle),
