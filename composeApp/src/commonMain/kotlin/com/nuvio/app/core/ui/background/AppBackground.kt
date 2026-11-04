@@ -72,9 +72,9 @@ internal data class GlassUiStyle(
 )
 
 internal fun GlassUiPreset.style(): GlassUiStyle = when (this) {
-    GlassUiPreset.DARK -> GlassUiStyle(cardAlpha = 0.74f, overlayAlpha = 0.90f, dim = 0.62f, hairlineAlpha = 0.08f)
-    GlassUiPreset.BALANCED -> GlassUiStyle(cardAlpha = 0.58f, overlayAlpha = 0.84f, dim = 0.50f, hairlineAlpha = 0.12f)
-    GlassUiPreset.VIVID -> GlassUiStyle(cardAlpha = 0.44f, overlayAlpha = 0.76f, dim = 0.38f, hairlineAlpha = 0.16f)
+    GlassUiPreset.DARK -> GlassUiStyle(cardAlpha = 0.72f, overlayAlpha = 0.88f, dim = 0.50f, hairlineAlpha = 0.08f)
+    GlassUiPreset.BALANCED -> GlassUiStyle(cardAlpha = 0.54f, overlayAlpha = 0.80f, dim = 0.35f, hairlineAlpha = 0.12f)
+    GlassUiPreset.VIVID -> GlassUiStyle(cardAlpha = 0.36f, overlayAlpha = 0.70f, dim = 0.22f, hairlineAlpha = 0.18f)
 }
 
 private const val DefaultBackgroundDim = 0.40f
