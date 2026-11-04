@@ -240,6 +240,9 @@ val appVersionConfigFile = rootProject.file("iosApp/Configuration/Version.xcconf
 val releaseAppVersionName = providers.gradleProperty("nuvio.app.versionName").orNull
     ?: readXcconfigValue(appVersionConfigFile, "MARKETING_VERSION")
     ?: error("MARKETING_VERSION is missing from ${appVersionConfigFile.path}")
+val iosReleaseDisabledPhases = providers.gradleProperty("nuvio.ios.releaseDisablePhases").orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
 val releaseAppVersionCode = readXcconfigValue(appVersionConfigFile, "CURRENT_PROJECT_VERSION")
     ?.toIntOrNull()
     ?: error("CURRENT_PROJECT_VERSION is missing or invalid in ${appVersionConfigFile.path}")
@@ -410,6 +413,11 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
             freeCompilerArgs += listOf("-Xbinary=bundleId=$iosFrameworkBundleId")
+            iosReleaseDisabledPhases?.let { phases ->
+                if (buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE) {
+                    freeCompilerArgs += listOf("-Xdisable-phases=$phases")
+                }
+            }
 
             // Biometric authentication and the profile PIN cache use Apple Security,
             // LocalAuthentication, and CoreFoundation APIs on every iOS distribution.
@@ -449,6 +457,7 @@ kotlin {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.documentfile)
+                implementation(libs.androidx.exifinterface)
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.core.splashscreen)
                 implementation(libs.androidx.work.runtime)
@@ -487,8 +496,8 @@ kotlin {
         val androidHostTest by getting {
             dependencies {
                 implementation("org.robolectric:robolectric:4.16")
-                implementation("androidx.compose.ui:ui-test-junit4:${libs.versions.composeMultiplatform.get()}")
-                implementation("androidx.compose.ui:ui-test-manifest:${libs.versions.composeMultiplatform.get()}")
+                implementation("androidx.compose.ui:ui-test-junit4:${libs.versions.composeAndroidxTest.get()}")
+                implementation("androidx.compose.ui:ui-test-manifest:${libs.versions.composeAndroidxTest.get()}")
                 implementation("androidx.work:work-testing:${libs.versions.androidx.work.get()}")
                 implementation("com.squareup.okhttp3:mockwebserver:5.3.2")
             }
