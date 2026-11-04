@@ -457,7 +457,6 @@ kotlin {
                 implementation(libs.compose.uiToolingPreview)
                 implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.documentfile)
-                implementation(libs.androidx.exifinterface)
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.core.splashscreen)
                 implementation(libs.androidx.work.runtime)
@@ -496,8 +495,8 @@ kotlin {
         val androidHostTest by getting {
             dependencies {
                 implementation("org.robolectric:robolectric:4.16")
-                implementation("androidx.compose.ui:ui-test-junit4:${libs.versions.composeAndroidxTest.get()}")
-                implementation("androidx.compose.ui:ui-test-manifest:${libs.versions.composeAndroidxTest.get()}")
+                implementation("androidx.compose.ui:ui-test-junit4:${libs.versions.composeMultiplatform.get()}")
+                implementation("androidx.compose.ui:ui-test-manifest:${libs.versions.composeMultiplatform.get()}")
                 implementation("androidx.work:work-testing:${libs.versions.androidx.work.get()}")
                 implementation("com.squareup.okhttp3:mockwebserver:5.3.2")
             }
