@@ -24,6 +24,34 @@ class SubtitleAppearanceTest {
     }
 
     @Test
+    fun outlineBlurDefaultsToZeroAndIsBounded() {
+        assertEquals(0, SubtitleAppearance().outlineBlur)
+        assertEquals(0, SubtitleAppearance(outlineBlur = -5).normalized().outlineBlur)
+        assertEquals(10, SubtitleAppearance(outlineBlur = 50).normalized().outlineBlur)
+    }
+
+    @Test
+    fun legacyAppearancePayloadDefaultsOutlineBlurToZeroAndNewValueRoundTrips() {
+        val legacy = decodeSubtitleAppearance(
+            """{"fontId":"serif","backgroundRadius":4,"shadowEnabled":true,"shadowOpacity":65,"shadowSize":3}""",
+        )
+        assertEquals(0, legacy.outlineBlur)
+        val current = SubtitleAppearance(fontId = "serif", outlineBlur = 7)
+        assertEquals(current, decodeSubtitleAppearance(current.encode()))
+    }
+
+    @Test
+    fun outlineBlurActivatesStyledOverlayOnlyWhileOutlineIsEnabled() {
+        assertTrue(SubtitleStyleState(appearance = SubtitleAppearance(outlineBlur = 4)).usesStyledOverlay)
+        assertFalse(
+            SubtitleStyleState(
+                outlineEnabled = false,
+                appearance = SubtitleAppearance(outlineBlur = 4),
+            ).usesStyledOverlay,
+        )
+    }
+
+    @Test
     fun resetKeepsSubtitleSelectionPreferences() {
         val reset = SubtitleStyleState(
             stripSdh = true, useForcedSubtitles = true, showOnlyPreferredLanguages = true,
