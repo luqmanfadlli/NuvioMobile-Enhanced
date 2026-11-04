@@ -26,6 +26,14 @@ data class SubtitleAppearance(
 const val SUBTITLE_OUTLINE_BLUR_MIN = 0
 const val SUBTITLE_OUTLINE_BLUR_MAX = 10
 
+internal const val SUBTITLE_OUTLINE_BLUR_RADIUS_DP_PER_LEVEL = 1.5f
+internal const val SUBTITLE_OUTLINE_BLUR_SHADOW_ALPHA = 0.65f
+internal const val SUBTITLE_OUTLINE_BLUR_BLEED_FACTOR = 2.5f
+
+internal fun subtitleOutlineBlurRadiusDp(level: Int): Float =
+    level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX) *
+        SUBTITLE_OUTLINE_BLUR_RADIUS_DP_PER_LEVEL
+
 internal val BuiltInSubtitleFonts = listOf("default", "sans", "serif", "mono")
 private val subtitleAppearanceJson = Json { ignoreUnknownKeys = true }
 
@@ -38,8 +46,6 @@ internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encode
 internal val SubtitleStyleState.usesStyledOverlay: Boolean
     get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled ||
         (outlineEnabled && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
-
-internal expect fun supportsNativeSubtitleBlur(): Boolean
 
 object SubtitleRendering {
     fun supportsTextOverlay(codec: String): Boolean = codec.lowercase() in setOf(
