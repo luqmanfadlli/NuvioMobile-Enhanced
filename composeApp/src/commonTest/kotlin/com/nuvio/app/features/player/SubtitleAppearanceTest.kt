@@ -31,14 +31,40 @@ class SubtitleAppearanceTest {
     }
 
     @Test
-    fun outlineBlurUsesTheLibassGaussianSigmaMapping() {
-        assertEquals(0f, subtitleOutlineBlurSigmaPx(0, 720f))
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaPx(1, 720f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaPx(1, 1080f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaPx(10, 720f), 0.0001f)
-        assertEquals(0f, subtitleOutlineBlurSigmaPx(-1, 720f))
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaPx(11, 720f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaPx(1, 0f), 0.0001f)
+    fun outlineBlurUsesIndependentLibassHorizontalAndVerticalScales() {
+        assertEquals(0f, subtitleOutlineBlurSigmaXPx(0, 1280f))
+        assertEquals(0f, subtitleOutlineBlurSigmaYPx(0, 720f))
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaXPx(1, 1280f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaYPx(1, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaXPx(1, 1920f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaYPx(1, 1080f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 3f, subtitleOutlineBlurSigmaXPx(1, 3840f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 3f, subtitleOutlineBlurSigmaYPx(1, 2160f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaXPx(10, 1280f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaYPx(10, 720f), 0.0001f)
+        assertEquals(0f, subtitleOutlineBlurSigmaXPx(-1, 1280f))
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaYPx(11, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaXPx(1, 0f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaYPx(1, Float.NaN), 0.0001f)
+    }
+
+    @Test
+    fun subtitleVideoBoundsRespectFitFillAndZoomModes() {
+        val fit = subtitleVideoBoundsPx(1920f, 1080f, 4f / 3f, PlayerResizeMode.Fit)
+        assertEquals(1440f, fit.width, 0.001f)
+        assertEquals(1080f, fit.height, 0.001f)
+
+        val fill = subtitleVideoBoundsPx(1920f, 1080f, 4f / 3f, PlayerResizeMode.Fill)
+        assertEquals(1920f, fill.width, 0.001f)
+        assertEquals(1080f, fill.height, 0.001f)
+
+        val zoom = subtitleVideoBoundsPx(1920f, 1080f, 4f / 3f, PlayerResizeMode.Zoom)
+        assertEquals(1920f, zoom.width, 0.001f)
+        assertEquals(1440f, zoom.height, 0.001f)
+
+        val unknown = subtitleVideoBoundsPx(0f, 0f, 0f, PlayerResizeMode.Fit)
+        assertEquals(0f, unknown.width)
+        assertEquals(0f, unknown.height)
     }
 
     @Test
