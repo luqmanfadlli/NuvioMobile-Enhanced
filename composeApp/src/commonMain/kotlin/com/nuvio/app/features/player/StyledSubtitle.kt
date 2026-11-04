@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -77,33 +80,80 @@ internal fun StyledSubtitleText(
         val textHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
         val radius = with(density) { (style.appearance.backgroundRadius.dp * scale).toPx() }
         val outline = with(density) { (style.outlineWidth.dp * scale).toPx() }
+        val outlineBlur = style.appearance.outlineBlur.coerceIn(
+            SUBTITLE_OUTLINE_BLUR_MIN,
+            SUBTITLE_OUTLINE_BLUR_MAX,
+        )
+        val outlineBlurDp = outlineBlur.dp * scale
+        val outlineBlurPx = with(density) { outlineBlurDp.toPx() }
+        val useNativeBlur = supportsNativeSubtitleBlur()
         val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
-        Canvas(
+        Box(
             Modifier.fillMaxWidth().height(textHeight).semantics { this.text = AnnotatedString(text) },
         ) {
             val boxWidth = layout.size.width + paddingX * 2
-            val left = (size.width - boxWidth) / 2f
+            val left = (constraints.maxWidth - boxWidth).coerceAtLeast(0f) / 2f
             val origin = Offset(left + paddingX, paddingY)
-            drawRoundRect(
-                color = style.backgroundColor,
-                topLeft = Offset(left, 0f),
-                size = androidx.compose.ui.geometry.Size(boxWidth, size.height),
-                cornerRadius = CornerRadius(radius),
-            )
-            if (style.outlineEnabled && outline > 0) {
-                drawText(
-                    layout, color = style.outlineColor.copy(alpha = style.outlineColor.alpha * style.textColor.alpha),
-                    topLeft = origin, drawStyle = Stroke(outline * 2), shadow = Shadow.None,
+            Canvas(Modifier.matchParentSize()) {
+                drawRoundRect(
+                    color = style.backgroundColor,
+                    topLeft = Offset(left, 0f),
+                    size = androidx.compose.ui.geometry.Size(boxWidth, size.height),
+                    cornerRadius = CornerRadius(radius),
                 )
             }
-            drawText(
-                layout, color = style.textColor, topLeft = origin, drawStyle = Fill,
-                shadow = if (style.appearance.shadowEnabled) Shadow(
-                    color = Color.Black.copy(alpha = style.appearance.shadowOpacity / 100f * style.textColor.alpha),
-                    offset = Offset(shadowSize, shadowSize),
-                    blurRadius = shadowSize * 2,
-                ) else Shadow.None,
-            )
+            if (style.outlineEnabled && outline > 0f) {
+                val outlineModifier = if (outlineBlur > 0 && useNativeBlur) {
+                    Modifier.blur(outlineBlurDp, BlurredEdgeTreatment.Unbounded)
+                } else {
+                    Modifier
+                }
+                Canvas(Modifier.matchParentSize().then(outlineModifier)) {
+                    val outlineColor = style.outlineColor.copy(
+                        alpha = style.outlineColor.alpha * style.textColor.alpha,
+                    )
+                    if (outlineBlur > 0 && !useNativeBlur) {
+                        // Fallback below Android 12: low-opacity outline passes approximate a soft
+                        // Gaussian edge while keeping the foreground subtitle glyphs crisp.
+                        val samples = 16
+                        val rings = 3
+                        val ringAlpha = 0.72f / rings / samples
+                        for (ring in 1..rings) {
+                            val distance = outlineBlurPx * ring / rings
+                            for (sample in 0 until samples) {
+                                val angle = sample * (2f * Math.PI.toFloat() / samples)
+                                val dx = kotlin.math.cos(angle) * distance
+                                val dy = kotlin.math.sin(angle) * distance
+                                drawText(
+                                    layout,
+                                    color = outlineColor.copy(alpha = outlineColor.alpha * ringAlpha),
+                                    topLeft = Offset(origin.x + dx, origin.y + dy),
+                                    drawStyle = Stroke(outline * 2f),
+                                    shadow = Shadow.None,
+                                )
+                            }
+                        }
+                    } else {
+                        drawText(
+                            layout,
+                            color = outlineColor,
+                            topLeft = origin,
+                            drawStyle = Stroke(outline * 2f),
+                            shadow = Shadow.None,
+                        )
+                    }
+                }
+            }
+            Canvas(Modifier.matchParentSize()) {
+                drawText(
+                    layout, color = style.textColor, topLeft = origin, drawStyle = Fill,
+                    shadow = if (style.appearance.shadowEnabled) Shadow(
+                        color = Color.Black.copy(alpha = style.appearance.shadowOpacity / 100f * style.textColor.alpha),
+                        offset = Offset(shadowSize, shadowSize),
+                        blurRadius = shadowSize * 2,
+                    ) else Shadow.None,
+                )
+            }
         }
     }
 }
