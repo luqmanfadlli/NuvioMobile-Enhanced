@@ -900,7 +900,11 @@ private fun ExoPlayerSurface(
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 InAppLogger.info("ExoPlayer/Android", "videoSize=${videoSize.toLogSummary()}")
                 if (videoSize.width > 0 && videoSize.height > 0) {
-                    videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                    // Include anamorphic pixel width so fitted subtitle geometry follows
+                    // the display aspect ratio reported by Media3.
+                    videoAspectRatio = (
+                        videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio
+                    ) / videoSize.height.toFloat()
                 }
                 dispatchExoPlayerSnapshot()
                 playerViewRef?.post {
@@ -1508,6 +1512,7 @@ private fun ExoPlayerSurface(
             subtitlePresenter.text,
             currentSubtitleStyle,
             videoAspectRatio = videoAspectRatio,
+            videoResizeMode = resizeMode,
         )
     }
 }
@@ -1844,6 +1849,7 @@ private fun LibmpvPlayerSurface(
                 view.subtitleText,
                 view.subtitleStyle,
                 videoAspectRatio = view.subtitleVideoAspectRatio,
+                videoResizeMode = resizeMode,
             )
         }
     }
