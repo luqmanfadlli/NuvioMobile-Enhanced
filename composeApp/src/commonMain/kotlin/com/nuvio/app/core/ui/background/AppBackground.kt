@@ -240,7 +240,15 @@ private fun Color.glass(alpha: Float): Color = copy(alpha = this.alpha * alpha)
 private fun NuvioThemeTokens.withAppBackground(hasImage: Boolean, glass: GlassUiStyle?): NuvioThemeTokens {
     if (!hasImage && glass == null) return this
     var c = colors
-    if (hasImage) c = c.copy(background = Color.Transparent, backgroundAmoled = Color.Transparent)
+    if (hasImage) {
+        c = c.copy(
+            background = Color.Transparent,
+            backgroundAmoled = Color.Transparent,
+            textSecondary = Color.White.copy(alpha = 0.88f),
+            textMuted = Color.White.copy(alpha = 0.78f),
+            textDisabled = Color.White.copy(alpha = 0.55f),
+        )
+    }
     if (glass != null) {
         c = c.copy(
             surface = c.surface.glass(glass.cardAlpha),
@@ -257,7 +265,12 @@ private fun NuvioThemeTokens.withAppBackground(hasImage: Boolean, glass: GlassUi
 private fun ColorScheme.withAppBackground(hasImage: Boolean, glass: GlassUiStyle?): ColorScheme {
     if (!hasImage && glass == null) return this
     var s = this
-    if (hasImage) s = s.copy(background = Color.Transparent)
+    if (hasImage) {
+        s = s.copy(
+            background = Color.Transparent,
+            onSurfaceVariant = Color.White.copy(alpha = 0.85f),
+        )
+    }
     if (glass != null) {
         s = s.copy(
             surface = surface.glass(glass.cardAlpha),
