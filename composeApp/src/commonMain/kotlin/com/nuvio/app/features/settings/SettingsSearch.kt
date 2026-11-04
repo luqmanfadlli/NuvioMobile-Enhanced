@@ -415,7 +415,7 @@ internal fun settingsSearchEntries(
         key = "app-background",
         title = stringResource(Res.string.settings_app_background),
         pageLabel = appearancePage,
-        section = stringResource(Res.string.settings_appearance_section_background),
+        section = stringResource(Res.string.settings_glass_ui_section),
     )
     addRow(
         page = SettingsPage.Appearance,
@@ -423,7 +423,7 @@ internal fun settingsSearchEntries(
         title = stringResource(Res.string.settings_glass_ui),
         description = stringResource(Res.string.settings_glass_ui_description),
         pageLabel = appearancePage,
-        section = stringResource(Res.string.settings_appearance_section_background),
+        section = stringResource(Res.string.settings_glass_ui_section),
     )
     addRow(
         page = SettingsPage.Appearance,

@@ -3018,7 +3018,7 @@
     <string name="subtitle_shadow_opacity">Shadow opacity</string>
     <string name="subtitle_shadow_size">Shadow size</string>
     <string name="subtitle_reset_appearance">Reset appearance</string>
-    <string name="settings_appearance_section_background">App background</string>
+    <string name="settings_glass_ui_section">Glass UI</string>
     <string name="settings_app_background">Background</string>
     <string name="settings_app_background_none">Default</string>
     <string name="settings_app_background_local">Photo from gallery</string>

@@ -69,9 +69,9 @@ internal data class GlassUiStyle(
 )
 
 internal fun GlassUiPreset.style(): GlassUiStyle = when (this) {
-    GlassUiPreset.DARK -> GlassUiStyle(cardAlpha = 0.72f, overlayAlpha = 0.88f, dim = 0.50f, hairlineAlpha = 0.08f)
-    GlassUiPreset.BALANCED -> GlassUiStyle(cardAlpha = 0.54f, overlayAlpha = 0.80f, dim = 0.35f, hairlineAlpha = 0.12f)
-    GlassUiPreset.VIVID -> GlassUiStyle(cardAlpha = 0.36f, overlayAlpha = 0.70f, dim = 0.22f, hairlineAlpha = 0.18f)
+    GlassUiPreset.DARK -> GlassUiStyle(cardAlpha = 0.74f, overlayAlpha = 0.90f, dim = 0.62f, hairlineAlpha = 0.08f)
+    GlassUiPreset.BALANCED -> GlassUiStyle(cardAlpha = 0.58f, overlayAlpha = 0.84f, dim = 0.50f, hairlineAlpha = 0.12f)
+    GlassUiPreset.VIVID -> GlassUiStyle(cardAlpha = 0.44f, overlayAlpha = 0.76f, dim = 0.38f, hairlineAlpha = 0.16f)
 }
 
 private const val DefaultBackgroundDim = 0.40f
@@ -107,7 +107,9 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
         AppBackgroundRepository.config
     }.collectAsStateWithLifecycle()
     val suspendCount by AppBackgroundRepository.suspended.collectAsStateWithLifecycle()
-    val model = remember(config.source, config.url, config.localFile) { config.imageModel() }
+    val model = remember(config.glassEnabled, config.source, config.url, config.localFile) {
+        if (config.glassEnabled) config.imageModel() else null
+    }
     val glassStyle = if (config.glassEnabled) config.glassPreset.style() else null
     val dim = glassStyle?.dim ?: DefaultBackgroundDim
     val baseTokens = MaterialTheme.nuvio
@@ -178,12 +180,12 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun OpaqueAppSurfaces(content: @Composable () -> Unit) {
-    val original = LocalOriginalTheme.current
+internal fun OpaqueAppSurfaces(enabled: Boolean = true, content: @Composable () -> Unit) {
+    val original = LocalOriginalTheme.current?.takeIf { enabled }
     CompositionLocalProvider(
         LocalNuvioThemeTokens provides (original?.tokens ?: MaterialTheme.nuvio),
-        LocalAppGlass provides null,
-        LocalAppBackgroundActive provides false,
+        LocalAppGlass provides if (original != null) null else LocalAppGlass.current,
+        LocalAppBackgroundActive provides if (original != null) false else LocalAppBackgroundActive.current,
     ) {
         MaterialTheme(
             colorScheme = original?.colorScheme ?: MaterialTheme.colorScheme,
@@ -259,16 +261,23 @@ fun Modifier.appBackgroundCover(fallback: Color): Modifier {
     return this
         .onGloballyPositioned { origin.value = it.positionOnScreen() }
         .drawBehind {
-            clipRect { drawBlurredSlice(glass, origin.value) }
-            drawRect(Color.Black.copy(alpha = 0.18f))
-            drawLine(
-                color = Color.White.copy(alpha = glass.hairlineAlpha),
-                start = Offset(0f, size.height - 0.5f),
-                end = Offset(size.width, size.height - 0.5f),
-                strokeWidth = 1f,
-            )
+            val position = origin.value
+            if (position.isUnspecified) return@drawBehind
+            val left = -(position.x - glass.geometry.origin.x)
+            val top = -(position.y - glass.geometry.origin.y)
+            val right = left + glass.geometry.size.width
+            clipRect(left = left, top = top, right = right, bottom = size.height) {
+                drawBlurredSlice(glass, position)
+                drawRect(
+                    color = Color.Black.copy(alpha = HeaderExtraDim),
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, size.height - top),
+                )
+            }
         }
 }
+
+private const val HeaderExtraDim = 0.28f
 
 private fun DrawScope.drawBlurredSlice(glass: AppGlass, position: Offset) {
     val image = glass.blurred ?: return

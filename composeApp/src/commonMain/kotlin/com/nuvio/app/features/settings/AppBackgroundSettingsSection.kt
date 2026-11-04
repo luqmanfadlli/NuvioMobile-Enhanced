@@ -46,7 +46,7 @@ import nuvio.composeapp.generated.resources.settings_app_background_remove
 import nuvio.composeapp.generated.resources.settings_app_background_url
 import nuvio.composeapp.generated.resources.settings_app_background_url_hint
 import nuvio.composeapp.generated.resources.settings_app_background_use_url
-import nuvio.composeapp.generated.resources.settings_appearance_section_background
+import nuvio.composeapp.generated.resources.settings_glass_ui_section
 import nuvio.composeapp.generated.resources.settings_glass_ui
 import nuvio.composeapp.generated.resources.settings_glass_ui_description
 import nuvio.composeapp.generated.resources.settings_glass_ui_style
@@ -86,17 +86,10 @@ internal fun LazyListScope.appBackgroundSettingsItem(isTablet: Boolean) {
         )
 
         SettingsSection(
-            title = stringResource(Res.string.settings_appearance_section_background),
+            title = stringResource(Res.string.settings_glass_ui_section),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_app_background),
-                    description = stringResource(config.source.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showSourceSheet = true },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_glass_ui),
                     description = stringResource(Res.string.settings_glass_ui_description),
@@ -105,6 +98,13 @@ internal fun LazyListScope.appBackgroundSettingsItem(isTablet: Boolean) {
                     onCheckedChange = AppBackgroundRepository::setGlassEnabled,
                 )
                 if (config.glassEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_app_background),
+                        description = stringResource(config.source.labelRes),
+                        isTablet = isTablet,
+                        onClick = { showSourceSheet = true },
+                    )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_glass_ui_style),
