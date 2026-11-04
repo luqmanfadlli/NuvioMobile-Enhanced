@@ -15,16 +15,16 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -37,15 +37,16 @@ internal fun StyledSubtitleOverlay(text: String, style: SubtitleStyleState, modi
     val fontFamily = rememberSubtitleFontFamily(style.appearance.fontId)
     if (text.isBlank()) return
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val scale = (maxHeight / 360.dp).coerceAtMost(1f)
+        // Scale layout margins for short viewports, but keep the user's font size unchanged.
+        val layoutScale = (maxHeight / 360.dp).coerceAtMost(1f)
         Box(
             Modifier.fillMaxSize().padding(
-                horizontal = 16.dp * scale,
+                horizontal = 16.dp * layoutScale,
                 vertical = maxHeight * (0.0533f + style.bottomOffset.coerceIn(0, 200) / 1000f),
             ),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            StyledSubtitleText(text, style, scale = scale, fontFamily = fontFamily)
+            StyledSubtitleText(text, style, scale = layoutScale, fontFamily = fontFamily)
         }
     }
 }
@@ -64,33 +65,18 @@ internal fun StyledSubtitleText(
         val paddingX = with(density) { (8.dp * scale).toPx() }
         val paddingY = with(density) { (4.dp * scale).toPx() }
         val availableWidth = constraints.maxWidth.toFloat()
-        val maxTextWidth = (availableWidth - paddingX * 2).toInt().coerceAtLeast(1)
-        val layout = measurer.measure(
-            text = AnnotatedString(text),
-            style = TextStyle(
-                fontFamily = fontFamily,
-                // Font size is a user preference in sp. Do not shrink it when the
-                // subtitle switches from the native renderer to this styled overlay.
-                fontSize = style.fontSizeSp.sp,
-                fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                textDirection = TextDirection.ContentOrLtr,
-            ),
-            constraints = Constraints(maxWidth = maxTextWidth),
-        )
-        val textHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
-        val radius = with(density) { style.appearance.backgroundRadius.dp.toPx() }
+
         val outline = with(density) { style.outlineWidth.dp.toPx() }
+        val outlineEnabled = style.outlineEnabled && outline > 0f
         val outlineBlur = style.appearance.outlineBlur.coerceIn(
             SUBTITLE_OUTLINE_BLUR_MIN,
             SUBTITLE_OUTLINE_BLUR_MAX,
         )
-        // Blur is a soft halo around the outline, not a larger outline stroke.
+        // The blur is a soft, low-opacity halo around the outline stroke. It does not
+        // enlarge the stroke itself or blur the foreground glyph fill.
         val outlineBlurRadiusPx = with(density) {
             subtitleOutlineBlurRadiusDp(outlineBlur).dp.toPx()
         }
-        val shadowSize = with(density) { style.appearance.shadowSize.dp.toPx() }
-        val outlineEnabled = style.outlineEnabled && outline > 0f
         val blurBleedPx = if (outlineEnabled && outlineBlur > 0) {
             outlineBlurRadiusPx * SUBTITLE_OUTLINE_BLUR_BLEED_FACTOR
         } else {
@@ -99,13 +85,16 @@ internal fun StyledSubtitleText(
         // Reserve room for both the actual stroke and its soft edge so neither is clipped.
         val edgePaddingPx = if (outlineEnabled) outline + blurBleedPx else 0f
         val edgePadding = with(density) { edgePaddingPx.toDp() }
-        val availableTextWidth = (availableWidth - paddingX * 2 - edgePaddingPx * 2)
-            .toInt()
-            .coerceAtLeast(1)
+
+        val availableTextWidth = (
+            availableWidth - paddingX * 2 - edgePaddingPx * 2
+        ).coerceAtLeast(1f).toInt()
         val layout = measurer.measure(
             text = AnnotatedString(text),
             style = TextStyle(
                 fontFamily = fontFamily,
+                // Match the native subtitle renderer: fontSizeSp is an exact SP preference,
+                // not a value to scale with the player container height.
                 fontSize = style.fontSizeSp.sp,
                 fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
@@ -114,30 +103,35 @@ internal fun StyledSubtitleText(
             constraints = Constraints(maxWidth = availableTextWidth),
         )
         val contentHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
+        val contentWidth = layout.size.width.toFloat() + paddingX * 2
+        val boxWidth = contentWidth + edgePaddingPx * 2
+        val left = (availableWidth - boxWidth).coerceAtLeast(0f) / 2f
+        val origin = Offset(
+            left + edgePaddingPx + paddingX,
+            paddingY + edgePaddingPx,
+        )
+        val radius = with(density) { style.appearance.backgroundRadius.dp.toPx() }
+        val shadowSize = with(density) { style.appearance.shadowSize.dp.toPx() }
+
         Box(
             Modifier.fillMaxWidth()
                 .height(contentHeight + edgePadding * 2)
+                // Keep the visible subtitle baseline stable as the outline reserves extra space.
                 .offset(y = edgePadding)
                 .semantics { this.text = AnnotatedString(text) },
         ) {
-            val contentWidth = layout.size.width + paddingX * 2
-            val boxWidth = contentWidth + edgePaddingPx * 2
-            val left = (availableWidth - boxWidth).coerceAtLeast(0f) / 2f
-            val origin = Offset(
-                left + edgePaddingPx + paddingX,
-                paddingY + edgePaddingPx,
-            )
             Canvas(Modifier.fillMaxSize()) {
                 drawRoundRect(
                     color = style.backgroundColor,
                     topLeft = Offset(left + edgePaddingPx, edgePaddingPx),
                     size = androidx.compose.ui.geometry.Size(
-                        contentWidth.toFloat(),
+                        contentWidth,
                         (size.height - edgePaddingPx * 2).coerceAtLeast(0f),
                     ),
                     cornerRadius = CornerRadius(radius),
                 )
             }
+
             if (outlineEnabled) {
                 Canvas(Modifier.fillMaxSize()) {
                     val outlineColor = style.outlineColor.copy(
@@ -163,14 +157,25 @@ internal fun StyledSubtitleText(
                     )
                 }
             }
+
+            // Draw the subtitle fill separately so outline blur can never soften the glyphs.
             Canvas(Modifier.fillMaxSize()) {
                 drawText(
-                    layout, color = style.textColor, topLeft = origin, drawStyle = Fill,
-                    shadow = if (style.appearance.shadowEnabled) Shadow(
-                        color = Color.Black.copy(alpha = style.appearance.shadowOpacity / 100f * style.textColor.alpha),
-                        offset = Offset(shadowSize, shadowSize),
-                        blurRadius = shadowSize * 2,
-                    ) else Shadow.None,
+                    layout,
+                    color = style.textColor,
+                    topLeft = origin,
+                    drawStyle = Fill,
+                    shadow = if (style.appearance.shadowEnabled) {
+                        Shadow(
+                            color = Color.Black.copy(
+                                alpha = style.appearance.shadowOpacity / 100f * style.textColor.alpha,
+                            ),
+                            offset = Offset(shadowSize, shadowSize),
+                            blurRadius = shadowSize * 2,
+                        )
+                    } else {
+                        Shadow.None
+                    },
                 )
             }
         }
