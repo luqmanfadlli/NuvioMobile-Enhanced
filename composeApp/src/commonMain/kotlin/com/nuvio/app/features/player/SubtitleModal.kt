@@ -134,8 +134,8 @@ fun SubtitleModal(
     val selectedOptionId = pendingOptionId ?: playbackOptionId
     val languageListState = rememberLazyListState()
     val optionsListState = rememberLazyListState()
-    val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
-        selectedOptionId != null && options.any { it.id == selectedOptionId }
+    // Keep appearance controls accessible even when subtitles are off or no track is selected.
+    val styleVisible = visible
 
     LaunchedEffect(visible) {
         if (!visible) return@LaunchedEffect
