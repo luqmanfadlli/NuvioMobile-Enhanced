@@ -357,14 +357,6 @@ fun LiveTvScreen(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(listTopPadding)
-                .background(screenBackground),
-        )
-
         AnimatedVisibility(
             visible = showBackToTop,
             enter = fadeIn(),

@@ -348,7 +348,11 @@ private fun DrawScope.drawBlurredSlice(glass: AppGlass, position: Offset) {
         dstSize = IntSize(drawnWidth.roundToInt(), drawnHeight.roundToInt()),
         filterQuality = FilterQuality.Low,
     )
-    drawRect(Color.Black.copy(alpha = glass.dim))
+    drawRect(
+        color = Color.Black.copy(alpha = glass.dim),
+        topLeft = Offset(left, top),
+        size = Size(drawnWidth, drawnHeight),
+    )
 }
 
 private const val BlurWidthPx = 40
