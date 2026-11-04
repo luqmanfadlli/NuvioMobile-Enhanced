@@ -148,6 +148,7 @@ internal class SoftwareVideoDecoder(
             when (mimeType) {
                 MimeTypes.VIDEO_H264 -> "h264"
                 MimeTypes.VIDEO_H265 -> "hevc"
+                MimeTypes.VIDEO_VC1 -> "vc1"
                 else -> null
             }
 
@@ -155,6 +156,7 @@ internal class SoftwareVideoDecoder(
             when (format.sampleMimeType) {
                 MimeTypes.VIDEO_H264 -> avcProfile(format) in HIGH_BIT_DEPTH_AVC_PROFILES
                 MimeTypes.VIDEO_H265 -> hevcProfile(format) == HEVC_PROFILE_RANGE_EXTENSIONS
+                MimeTypes.VIDEO_VC1 -> true
                 else -> false
             }
 
