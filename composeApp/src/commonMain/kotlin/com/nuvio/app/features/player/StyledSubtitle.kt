@@ -13,8 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -71,7 +69,9 @@ internal fun StyledSubtitleText(
             text = AnnotatedString(text),
             style = TextStyle(
                 fontFamily = fontFamily,
-                fontSize = (style.fontSizeSp * scale).sp,
+                // Font size is a user preference in sp. Do not shrink it when the
+                // subtitle switches from the native renderer to this styled overlay.
+                fontSize = style.fontSizeSp.sp,
                 fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 textDirection = TextDirection.ContentOrLtr,
@@ -79,77 +79,88 @@ internal fun StyledSubtitleText(
             constraints = Constraints(maxWidth = maxTextWidth),
         )
         val textHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
-        val radius = with(density) { (style.appearance.backgroundRadius.dp * scale).toPx() }
-        val outline = with(density) { (style.outlineWidth.dp * scale).toPx() }
+        val radius = with(density) { style.appearance.backgroundRadius.dp.toPx() }
+        val outline = with(density) { style.outlineWidth.dp.toPx() }
         val outlineBlur = style.appearance.outlineBlur.coerceIn(
             SUBTITLE_OUTLINE_BLUR_MIN,
             SUBTITLE_OUTLINE_BLUR_MAX,
         )
-        val outlineBlurDp = outlineBlur.dp * scale
-        val outlineBlurPx = with(density) { outlineBlurDp.toPx() }
-        val useNativeBlur = supportsNativeSubtitleBlur()
-        val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
-        val outlinePadding = outlineBlurDp
+        // Blur is a soft halo around the outline, not a larger outline stroke.
+        val outlineBlurRadiusPx = with(density) {
+            subtitleOutlineBlurRadiusDp(outlineBlur).dp.toPx()
+        }
+        val shadowSize = with(density) { style.appearance.shadowSize.dp.toPx() }
+        val outlineEnabled = style.outlineEnabled && outline > 0f
+        val blurBleedPx = if (outlineEnabled && outlineBlur > 0) {
+            outlineBlurRadiusPx * SUBTITLE_OUTLINE_BLUR_BLEED_FACTOR
+        } else {
+            0f
+        }
+        // Reserve room for both the actual stroke and its soft edge so neither is clipped.
+        val edgePaddingPx = if (outlineEnabled) outline + blurBleedPx else 0f
+        val edgePadding = with(density) { edgePaddingPx.toDp() }
+        val availableTextWidth = (availableWidth - paddingX * 2 - edgePaddingPx * 2)
+            .toInt()
+            .coerceAtLeast(1)
+        val layout = measurer.measure(
+            text = AnnotatedString(text),
+            style = TextStyle(
+                fontFamily = fontFamily,
+                fontSize = style.fontSizeSp.sp,
+                fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
+                textAlign = TextAlign.Center,
+                textDirection = TextDirection.ContentOrLtr,
+            ),
+            constraints = Constraints(maxWidth = availableTextWidth),
+        )
+        val contentHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
         Box(
             Modifier.fillMaxWidth()
-                .height(textHeight + outlinePadding * 2)
-                .offset(y = outlinePadding)
+                .height(contentHeight + edgePadding * 2)
+                .offset(y = edgePadding)
                 .semantics { this.text = AnnotatedString(text) },
         ) {
-            val boxWidth = layout.size.width + paddingX * 2
+            val contentWidth = layout.size.width + paddingX * 2
+            val boxWidth = contentWidth + edgePaddingPx * 2
             val left = (availableWidth - boxWidth).coerceAtLeast(0f) / 2f
-            val origin = Offset(left + paddingX, paddingY + outlineBlurPx)
+            val origin = Offset(
+                left + edgePaddingPx + paddingX,
+                paddingY + edgePaddingPx,
+            )
             Canvas(Modifier.fillMaxSize()) {
                 drawRoundRect(
                     color = style.backgroundColor,
-                    topLeft = Offset(left, outlineBlurPx),
+                    topLeft = Offset(left + edgePaddingPx, edgePaddingPx),
                     size = androidx.compose.ui.geometry.Size(
-                        boxWidth,
-                        (size.height - outlineBlurPx * 2).coerceAtLeast(0f),
+                        contentWidth.toFloat(),
+                        (size.height - edgePaddingPx * 2).coerceAtLeast(0f),
                     ),
                     cornerRadius = CornerRadius(radius),
                 )
             }
-            if (style.outlineEnabled && outline > 0f) {
-                val outlineModifier = if (outlineBlur > 0 && useNativeBlur) {
-                    Modifier.blur(outlineBlurDp, BlurredEdgeTreatment.Unbounded)
-                } else {
-                    Modifier
-                }
-                Canvas(Modifier.fillMaxSize().then(outlineModifier)) {
+            if (outlineEnabled) {
+                Canvas(Modifier.fillMaxSize()) {
                     val outlineColor = style.outlineColor.copy(
                         alpha = style.outlineColor.alpha * style.textColor.alpha,
                     )
-                    if (outlineBlur > 0 && !useNativeBlur) {
-                        // Fallback below Android 12: low-opacity outline passes approximate a soft
-                        // Gaussian edge while keeping the foreground subtitle glyphs crisp.
-                        val samples = 16
-                        val rings = 3
-                        val ringAlpha = 0.72f / rings / samples
-                        for (ring in 1..rings) {
-                            val distance = outlineBlurPx * ring / rings
-                            for (sample in 0 until samples) {
-                                val angle = sample * (2f * Math.PI.toFloat() / samples)
-                                val dx = kotlin.math.cos(angle) * distance
-                                val dy = kotlin.math.sin(angle) * distance
-                                drawText(
-                                    layout,
-                                    color = outlineColor.copy(alpha = outlineColor.alpha * ringAlpha),
-                                    topLeft = Offset(origin.x + dx, origin.y + dy),
-                                    drawStyle = Stroke(outline * 2f),
-                                    shadow = Shadow.None,
-                                )
-                            }
-                        }
-                    } else {
-                        drawText(
-                            layout,
-                            color = outlineColor,
-                            topLeft = origin,
-                            drawStyle = Stroke(outline * 2f),
-                            shadow = Shadow.None,
+                    val outlineShadow = if (outlineBlurRadiusPx > 0f) {
+                        Shadow(
+                            color = outlineColor.copy(
+                                alpha = outlineColor.alpha * SUBTITLE_OUTLINE_BLUR_SHADOW_ALPHA,
+                            ),
+                            offset = Offset.Zero,
+                            blurRadius = outlineBlurRadiusPx,
                         )
+                    } else {
+                        Shadow.None
                     }
+                    drawText(
+                        layout,
+                        color = outlineColor,
+                        topLeft = origin,
+                        drawStyle = Stroke(outline * 2f),
+                        shadow = outlineShadow,
+                    )
                 }
             }
             Canvas(Modifier.fillMaxSize()) {

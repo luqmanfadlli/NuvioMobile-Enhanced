@@ -31,6 +31,15 @@ class SubtitleAppearanceTest {
     }
 
     @Test
+    fun outlineBlurMapsToASeparateSoftShadowRadius() {
+        assertEquals(0f, subtitleOutlineBlurRadiusDp(0))
+        assertEquals(1.5f, subtitleOutlineBlurRadiusDp(1))
+        assertEquals(15f, subtitleOutlineBlurRadiusDp(10))
+        assertEquals(0f, subtitleOutlineBlurRadiusDp(-1))
+        assertEquals(15f, subtitleOutlineBlurRadiusDp(11))
+    }
+
+    @Test
     fun legacyAppearancePayloadDefaultsOutlineBlurToZeroAndNewValueRoundTrips() {
         val legacy = decodeSubtitleAppearance(
             """{"fontId":"serif","backgroundRadius":4,"shadowEnabled":true,"shadowOpacity":65,"shadowSize":3}""",
