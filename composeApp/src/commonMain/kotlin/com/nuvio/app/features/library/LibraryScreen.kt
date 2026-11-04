@@ -1,5 +1,6 @@
 package com.nuvio.app.features.library
 
+import androidx.compose.material.icons.rounded.CalendarMonth
 import com.nuvio.app.core.ui.background.isGlassUiActive
 import com.nuvio.app.core.ui.background.appGlassBackdrop
 import com.nuvio.app.core.ui.background.appBackgroundCover
@@ -447,7 +448,7 @@ fun LibraryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().appBackgroundCover(Color.Transparent)) {
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -518,10 +519,11 @@ fun LibraryScreen(
                                 .size(40.dp)
                                 .semantics { contentDescription = openCalendarLabel },
                         ) {
-                            LibraryCalendarGlyph(
-                                modifier = Modifier.size(19.dp),
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                cutoutColor = MaterialTheme.colorScheme.background,
                             )
                         }
                     }
@@ -842,25 +844,29 @@ private fun LazyListScope.cloudLibraryContent(
                     )
                 }
             } else {
-                item {
-                    CloudLibraryToolbar(
-                        uiState = uiState,
-                        selectedProviderId = selectedProviderId,
-                        selectedType = effectiveSelectedType,
-                        availableTypes = availableTypes,
-                        onProviderSelected = onProviderSelected,
-                        onTypeSelected = onTypeSelected,
-                        onRefresh = onRefresh,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-
-                item(key = "cloud-library-search") {
-                    CloudLibrarySearchField(
-                        query = searchQuery,
-                        onQueryChange = onSearchQueryChange,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                stickyHeader(key = "cloud-library-search") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .appBackgroundCover(MaterialTheme.colorScheme.background)
+                            .nuvioConsumePointerEvents(),
+                    ) {
+                        CloudLibraryToolbar(
+                            uiState = uiState,
+                            selectedProviderId = selectedProviderId,
+                            selectedType = effectiveSelectedType,
+                            availableTypes = availableTypes,
+                            onProviderSelected = onProviderSelected,
+                            onTypeSelected = onTypeSelected,
+                            onRefresh = onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        CloudLibrarySearchField(
+                            query = searchQuery,
+                            onQueryChange = onSearchQueryChange,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
 
                 val visibleProviderStates = uiState.providers.filter { providerState ->

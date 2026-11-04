@@ -1,5 +1,6 @@
 package com.nuvio.app.features.search
 
+import androidx.compose.ui.graphics.Color
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -246,7 +247,7 @@ fun SearchScreen(
         }
 
         androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.fillMaxWidth().appBackgroundCover(Color.Transparent)) {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -292,7 +293,9 @@ fun SearchScreen(
             ) {
                 if (query.isBlank()) {
                     item {
-                        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
+                        Box(modifier = Modifier.fillMaxWidth().appBackgroundCover(Color.Transparent)) {
+                            DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
+                        }
                     }
                     stickyHeader {
                         Box(modifier = Modifier.fillMaxWidth()) {
