@@ -3013,6 +3013,8 @@
     <string name="subtitle_font_remove">Remove %1$s</string>
     <string name="subtitle_background_opacity">Background opacity</string>
     <string name="subtitle_background_roundness">Corner roundness</string>
+    <string name="subtitle_outline_blur">Outline blur</string>
+    <string name="subtitle_outline_blur_description">Softens only the outline. Subtitle text stays sharp.</string>
     <string name="subtitle_shadow">Drop shadow</string>
     <string name="subtitle_shadow_description">Separate the text from bright scenes.</string>
     <string name="subtitle_shadow_opacity">Shadow opacity</string>
