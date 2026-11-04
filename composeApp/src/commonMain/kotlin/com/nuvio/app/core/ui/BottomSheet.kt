@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import com.nuvio.app.core.ui.background.isGlassUiActive
 import com.nuvio.app.core.ui.background.appGlassBackdrop
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -102,7 +103,7 @@ fun NuvioModalBottomSheet(
     fullHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (usesNativeNuvioBottomSheet) {
+    if (usesNativeNuvioBottomSheet && !isGlassUiActive()) {
         NuvioNativeModalBottomSheet(
             onDismissRequest = onDismissRequest,
             modifier = modifier,
