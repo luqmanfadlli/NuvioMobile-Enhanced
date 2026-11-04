@@ -31,12 +31,33 @@ class SubtitleAppearanceTest {
     }
 
     @Test
-    fun outlineBlurMapsToASeparateSoftShadowRadius() {
-        assertEquals(0f, subtitleOutlineBlurRadiusDp(0))
-        assertEquals(1.5f, subtitleOutlineBlurRadiusDp(1))
-        assertEquals(15f, subtitleOutlineBlurRadiusDp(10))
-        assertEquals(0f, subtitleOutlineBlurRadiusDp(-1))
-        assertEquals(15f, subtitleOutlineBlurRadiusDp(11))
+    fun outlineBlurUsesTheLibassGaussianSigmaMapping() {
+        assertEquals(0f, subtitleOutlineBlurSigmaPx(0, 720f))
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaPx(1, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaPx(1, 1080f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaPx(10, 720f), 0.0001f)
+        assertEquals(0f, subtitleOutlineBlurSigmaPx(-1, 720f))
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaPx(11, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaPx(1, 0f), 0.0001f)
+    }
+
+    @Test
+    fun mpvUsesNativeBlurUnlessOtherStyleSettingsNeedTheComposeOverlay() {
+        val blurOnly = SubtitleStyleState(appearance = SubtitleAppearance(outlineBlur = 4))
+        assertTrue(blurOnly.usesStyledOverlay)
+        assertFalse(blurOnly.requiresComposeStyledOverlay)
+        assertEquals(4, blurOnly.mpvNativeOutlineBlurLevel)
+
+        val customFont = blurOnly.copy(appearance = blurOnly.appearance.copy(fontId = "serif"))
+        assertTrue(customFont.requiresComposeStyledOverlay)
+        assertEquals(4, customFont.mpvNativeOutlineBlurLevel)
+
+        val outlineOff = blurOnly.copy(outlineEnabled = false)
+        assertEquals(0, outlineOff.mpvNativeOutlineBlurLevel)
+        assertEquals(4, outlineOff.appearance.outlineBlur)
+
+        val zeroWidth = blurOnly.copy(outlineWidth = 0)
+        assertEquals(0, zeroWidth.mpvNativeOutlineBlurLevel)
     }
 
     @Test
