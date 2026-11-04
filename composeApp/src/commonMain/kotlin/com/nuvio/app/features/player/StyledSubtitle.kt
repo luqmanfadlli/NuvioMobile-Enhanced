@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -33,10 +35,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun StyledSubtitleOverlay(text: String, style: SubtitleStyleState, modifier: Modifier = Modifier) {
+internal fun StyledSubtitleOverlay(
+    text: String,
+    style: SubtitleStyleState,
+    modifier: Modifier = Modifier,
+    videoAspectRatio: Float = 0f,
+) {
     val fontFamily = rememberSubtitleFontFamily(style.appearance.fontId)
     if (text.isBlank()) return
+    val density = LocalDensity.current
     BoxWithConstraints(modifier.fillMaxSize()) {
+        // Use the fitted video height as the 720-line reference scale. This keeps blur visually
+        // consistent when portrait or letterboxed video is displayed inside a larger surface.
+        val containerWidthPx = with(density) { maxWidth.toPx() }
+        val containerHeightPx = with(density) { maxHeight.toPx() }
+        val fittedVideoHeightPx = if (videoAspectRatio.isFinite() && videoAspectRatio > 0f) {
+            minOf(containerHeightPx, containerWidthPx / videoAspectRatio)
+        } else {
+            containerHeightPx
+        }
         // Scale layout margins for short viewports, but keep the user's font size unchanged.
         val layoutScale = (maxHeight / 360.dp).coerceAtMost(1f)
         Box(
@@ -46,7 +63,13 @@ internal fun StyledSubtitleOverlay(text: String, style: SubtitleStyleState, modi
             ),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            StyledSubtitleText(text, style, scale = layoutScale, fontFamily = fontFamily)
+            StyledSubtitleText(
+                text = text,
+                style = style,
+                scale = layoutScale,
+                videoHeightPx = fittedVideoHeightPx,
+                fontFamily = fontFamily,
+            )
         }
     }
 }
@@ -57,6 +80,7 @@ internal fun StyledSubtitleText(
     style: SubtitleStyleState,
     modifier: Modifier = Modifier,
     scale: Float = 1f,
+    videoHeightPx: Float = SUBTITLE_BLUR_REFERENCE_HEIGHT_PX,
     fontFamily: FontFamily = rememberSubtitleFontFamily(style.appearance.fontId),
 ) {
     val measurer = rememberTextMeasurer()
@@ -72,13 +96,13 @@ internal fun StyledSubtitleText(
             SUBTITLE_OUTLINE_BLUR_MIN,
             SUBTITLE_OUTLINE_BLUR_MAX,
         )
-        // The blur is a soft, low-opacity halo around the outline stroke. It does not
-        // enlarge the stroke itself or blur the foreground glyph fill.
-        val outlineBlurRadiusPx = with(density) {
-            subtitleOutlineBlurRadiusDp(outlineBlur).dp.toPx()
-        }
+        // Convert the mpv/libass blur factor to the same Gaussian sigma at the fitted
+        // video height. Blur the outline as its own layer, never as an added shadow.
+        val outlineBlurSigmaPx = subtitleOutlineBlurSigmaPx(outlineBlur, videoHeightPx)
+        val outlineBlurSigmaDp = with(density) { outlineBlurSigmaPx.toDp() }
+        val useNativeBlur = supportsNativeSubtitleBlur()
         val blurBleedPx = if (outlineEnabled && outlineBlur > 0) {
-            outlineBlurRadiusPx * SUBTITLE_OUTLINE_BLUR_BLEED_FACTOR
+            outlineBlurSigmaPx * SUBTITLE_BLUR_OUTSET_SIGMAS
         } else {
             0f
         }
@@ -133,17 +157,24 @@ internal fun StyledSubtitleText(
             }
 
             if (outlineEnabled) {
-                Canvas(Modifier.fillMaxSize()) {
+                val blurModifier = if (outlineBlur > 0 && useNativeBlur) {
+                    Modifier.blur(outlineBlurSigmaDp, BlurredEdgeTreatment.Unbounded)
+                } else {
+                    Modifier
+                }
+                Canvas(Modifier.fillMaxSize().then(blurModifier)) {
                     val outlineColor = style.outlineColor.copy(
                         alpha = style.outlineColor.alpha * style.textColor.alpha,
                     )
-                    val outlineShadow = if (outlineBlurRadiusPx > 0f) {
+                    // Android versions before API 31 cannot use RenderEffect-backed Modifier.blur.
+                    // Use a restrained zero-offset Gaussian halo as the compatibility fallback.
+                    val fallbackShadow = if (outlineBlur > 0 && !useNativeBlur) {
                         Shadow(
                             color = outlineColor.copy(
-                                alpha = outlineColor.alpha * SUBTITLE_OUTLINE_BLUR_SHADOW_ALPHA,
+                                alpha = outlineColor.alpha * SUBTITLE_BLUR_FALLBACK_ALPHA,
                             ),
                             offset = Offset.Zero,
-                            blurRadius = outlineBlurRadiusPx,
+                            blurRadius = outlineBlurSigmaPx,
                         )
                     } else {
                         Shadow.None
@@ -153,7 +184,7 @@ internal fun StyledSubtitleText(
                         color = outlineColor,
                         topLeft = origin,
                         drawStyle = Stroke(outline * 2f),
-                        shadow = outlineShadow,
+                        shadow = fallbackShadow,
                     )
                 }
             }

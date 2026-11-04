@@ -26,13 +26,20 @@ data class SubtitleAppearance(
 const val SUBTITLE_OUTLINE_BLUR_MIN = 0
 const val SUBTITLE_OUTLINE_BLUR_MAX = 10
 
-internal const val SUBTITLE_OUTLINE_BLUR_RADIUS_DP_PER_LEVEL = 1.5f
-internal const val SUBTITLE_OUTLINE_BLUR_SHADOW_ALPHA = 0.65f
-internal const val SUBTITLE_OUTLINE_BLUR_BLEED_FACTOR = 2.5f
+// libass maps the mpv sub-blur factor to Gaussian sigma using 2 / sqrt(ln(256))
+// and scales that value against the subtitle render height relative to PlayResY=720.
+internal const val SUBTITLE_BLUR_REFERENCE_HEIGHT_PX = 720f
+internal const val SUBTITLE_BLUR_SIGMA_FACTOR = 0.8493218f
+internal const val SUBTITLE_BLUR_OUTSET_SIGMAS = 3f
+internal const val SUBTITLE_BLUR_FALLBACK_ALPHA = 0.25f
 
-internal fun subtitleOutlineBlurRadiusDp(level: Int): Float =
-    level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX) *
-        SUBTITLE_OUTLINE_BLUR_RADIUS_DP_PER_LEVEL
+internal fun subtitleOutlineBlurSigmaPx(level: Int, videoHeightPx: Float): Float {
+    val safeVideoHeight = videoHeightPx.takeIf { it.isFinite() && it > 0f }
+        ?: SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
+    return level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX) *
+        SUBTITLE_BLUR_SIGMA_FACTOR *
+        safeVideoHeight / SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
+}
 
 internal val BuiltInSubtitleFonts = listOf("default", "sans", "serif", "mono")
 private val subtitleAppearanceJson = Json { ignoreUnknownKeys = true }
@@ -43,9 +50,26 @@ internal fun decodeSubtitleAppearance(value: String?): SubtitleAppearance =
 
 internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encodeToString(normalized())
 
+// MPV can render blur natively through libass. These are the features that still need
+// the Compose overlay when MPV is the active engine.
+internal val SubtitleStyleState.requiresComposeStyledOverlay: Boolean
+    get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled
+
+// ExoPlayer has no native subtitle-border blur property, so its text cues use the Compose overlay.
 internal val SubtitleStyleState.usesStyledOverlay: Boolean
-    get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled ||
-        (outlineEnabled && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
+    get() = requiresComposeStyledOverlay ||
+        (outlineEnabled && outlineWidth > 0 && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
+
+// Mirrors the value sent to mpv's native sub-blur property. Keep the stored preference unchanged
+// while an outline is disabled, but send zero to the renderer until the outline is visible again.
+internal val SubtitleStyleState.mpvNativeOutlineBlurLevel: Int
+    get() = if (outlineEnabled && outlineWidth > 0) {
+        appearance.outlineBlur.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX)
+    } else {
+        SUBTITLE_OUTLINE_BLUR_MIN
+    }
+
+internal expect fun supportsNativeSubtitleBlur(): Boolean
 
 object SubtitleRendering {
     fun supportsTextOverlay(codec: String): Boolean = codec.lowercase() in setOf(
