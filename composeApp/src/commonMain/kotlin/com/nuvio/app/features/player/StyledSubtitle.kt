@@ -90,7 +90,9 @@ internal fun StyledSubtitleText(
         val paddingY = with(density) { (4.dp * scale).toPx() }
         val availableWidth = constraints.maxWidth.toFloat()
 
-        val outline = with(density) { style.outlineWidth.dp.toPx() }
+        // Match the outline's video-relative sizing used by MPV/libass and Umbra's preview.
+        // Device density must not make the same outline preference look thicker on one tablet.
+        val outline = subtitleOutlineWidthPx(style.outlineWidth, videoHeightPx)
         val outlineEnabled = style.outlineEnabled && outline > 0f
         val outlineBlur = style.appearance.outlineBlur.coerceIn(
             SUBTITLE_OUTLINE_BLUR_MIN,
@@ -157,34 +159,58 @@ internal fun StyledSubtitleText(
             }
 
             if (outlineEnabled) {
-                val blurModifier = if (outlineBlur > 0 && useNativeBlur) {
-                    Modifier.blur(outlineBlurSigmaDp, BlurredEdgeTreatment.Unbounded)
-                } else {
-                    Modifier
-                }
-                Canvas(Modifier.fillMaxSize().then(blurModifier)) {
-                    val outlineColor = style.outlineColor.copy(
-                        alpha = style.outlineColor.alpha * style.textColor.alpha,
+                val outlineColor = style.outlineColor.copy(
+                    alpha = style.outlineColor.alpha * style.textColor.alpha,
+                )
+                if (outlineBlur > 0) {
+                    // Render a restrained, low-opacity copy as the soft Gaussian halo. Keeping
+                    // this pass separate prevents blur from thickening the actual outline.
+                    val haloColor = outlineColor.copy(
+                        alpha = outlineColor.alpha * SUBTITLE_BLUR_HALO_ALPHA,
                     )
-                    // Android versions before API 31 cannot use RenderEffect-backed Modifier.blur.
-                    // Use a restrained zero-offset Gaussian halo as the compatibility fallback.
-                    val fallbackShadow = if (outlineBlur > 0 && !useNativeBlur) {
-                        Shadow(
-                            color = outlineColor.copy(
-                                alpha = outlineColor.alpha * SUBTITLE_BLUR_FALLBACK_ALPHA,
+                    if (useNativeBlur) {
+                        // Android 12+: hardware-accelerated RenderEffect blur on the halo only.
+                        Canvas(
+                            Modifier.fillMaxSize().blur(
+                                outlineBlurSigmaDp,
+                                BlurredEdgeTreatment.Unbounded,
                             ),
-                            offset = Offset.Zero,
-                            blurRadius = outlineBlurSigmaPx,
-                        )
+                        ) {
+                            drawText(
+                                layout,
+                                color = haloColor,
+                                topLeft = origin,
+                                drawStyle = Stroke(outline * 2f),
+                                shadow = Shadow.None,
+                            )
+                        }
                     } else {
-                        Shadow.None
+                        // Older Android and other Compose targets: keep the same halo geometry
+                        // with a zero-offset Canvas text shadow. This is not a stack of expanded
+                        // outline strokes, so it cannot accumulate into a bold border.
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawText(
+                                layout,
+                                color = haloColor,
+                                topLeft = origin,
+                                drawStyle = Stroke(outline * 2f),
+                                shadow = Shadow(
+                                    color = haloColor,
+                                    offset = Offset.Zero,
+                                    blurRadius = outlineBlurSigmaPx,
+                                ),
+                            )
+                        }
                     }
+                }
+                // Preserve the original edge at full opacity. Only the halo is softened.
+                Canvas(Modifier.fillMaxSize()) {
                     drawText(
                         layout,
                         color = outlineColor,
                         topLeft = origin,
                         drawStyle = Stroke(outline * 2f),
-                        shadow = fallbackShadow,
+                        shadow = Shadow.None,
                     )
                 }
             }

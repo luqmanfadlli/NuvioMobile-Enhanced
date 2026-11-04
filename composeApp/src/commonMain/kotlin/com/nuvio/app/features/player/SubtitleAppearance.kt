@@ -31,7 +31,9 @@ const val SUBTITLE_OUTLINE_BLUR_MAX = 10
 internal const val SUBTITLE_BLUR_REFERENCE_HEIGHT_PX = 720f
 internal const val SUBTITLE_BLUR_SIGMA_FACTOR = 0.8493218f
 internal const val SUBTITLE_BLUR_OUTSET_SIGMAS = 3f
-internal const val SUBTITLE_BLUR_FALLBACK_ALPHA = 0.25f
+// The halo is deliberately softer than the crisp outline beneath it. This gives level 1
+// the subtle shadow-like edge of libass without making the border itself look heavier.
+internal const val SUBTITLE_BLUR_HALO_ALPHA = 0.45f
 
 internal fun subtitleOutlineBlurSigmaPx(level: Int, videoHeightPx: Float): Float {
     val safeVideoHeight = videoHeightPx.takeIf { it.isFinite() && it > 0f }
@@ -39,6 +41,14 @@ internal fun subtitleOutlineBlurSigmaPx(level: Int, videoHeightPx: Float): Float
     return level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX) *
         SUBTITLE_BLUR_SIGMA_FACTOR *
         safeVideoHeight / SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
+}
+
+// Umbra maps outline width to the fitted video height relative to a 720-line reference.
+// Return the half-width because Compose Stroke receives the full width (2 × half-width).
+internal fun subtitleOutlineWidthPx(width: Int, videoHeightPx: Float): Float {
+    val safeVideoHeight = videoHeightPx.takeIf { it.isFinite() && it > 0f }
+        ?: SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
+    return width.coerceAtLeast(0) * safeVideoHeight / SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
 }
 
 internal val BuiltInSubtitleFonts = listOf("default", "sans", "serif", "mono")
