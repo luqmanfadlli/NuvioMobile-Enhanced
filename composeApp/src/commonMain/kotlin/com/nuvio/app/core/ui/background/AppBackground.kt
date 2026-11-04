@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -96,7 +99,11 @@ internal val LocalAppGlass = staticCompositionLocalOf<AppGlass?> { null }
 val LocalAppBackgroundActive = staticCompositionLocalOf { false }
 
 @Immutable
-private data class OriginalTheme(val tokens: NuvioThemeTokens, val colorScheme: ColorScheme)
+private data class OriginalTheme(
+    val tokens: NuvioThemeTokens,
+    val colorScheme: ColorScheme,
+    val typography: Typography,
+)
 
 private val LocalOriginalTheme = staticCompositionLocalOf<OriginalTheme?> { null }
 
@@ -133,7 +140,13 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
             )
         }
     }
-    val original = remember(baseTokens, baseScheme) { OriginalTheme(baseTokens, baseScheme) }
+    val baseTypography = MaterialTheme.typography
+    val original = remember(baseTokens, baseScheme, baseTypography) {
+        OriginalTheme(baseTokens, baseScheme, baseTypography)
+    }
+    val typography = remember(baseTypography, hasImage) {
+        if (hasImage) baseTypography.withTextShadow() else baseTypography
+    }
 
     Box(
         modifier = Modifier
@@ -171,7 +184,7 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
         ) {
             MaterialTheme(
                 colorScheme = scheme,
-                typography = MaterialTheme.typography,
+                typography = typography,
                 shapes = MaterialTheme.shapes,
                 content = content,
             )
@@ -189,12 +202,38 @@ internal fun OpaqueAppSurfaces(enabled: Boolean = true, content: @Composable () 
     ) {
         MaterialTheme(
             colorScheme = original?.colorScheme ?: MaterialTheme.colorScheme,
-            typography = MaterialTheme.typography,
+            typography = original?.typography ?: MaterialTheme.typography,
             shapes = MaterialTheme.shapes,
             content = content,
         )
     }
 }
+
+private val ReadableTextShadow = Shadow(
+    color = Color.Black.copy(alpha = 0.55f),
+    offset = Offset(0f, 1f),
+    blurRadius = 6f,
+)
+
+private fun TextStyle.shadowed(): TextStyle = copy(shadow = ReadableTextShadow)
+
+private fun Typography.withTextShadow(): Typography = copy(
+    displayLarge = displayLarge.shadowed(),
+    displayMedium = displayMedium.shadowed(),
+    displaySmall = displaySmall.shadowed(),
+    headlineLarge = headlineLarge.shadowed(),
+    headlineMedium = headlineMedium.shadowed(),
+    headlineSmall = headlineSmall.shadowed(),
+    titleLarge = titleLarge.shadowed(),
+    titleMedium = titleMedium.shadowed(),
+    titleSmall = titleSmall.shadowed(),
+    bodyLarge = bodyLarge.shadowed(),
+    bodyMedium = bodyMedium.shadowed(),
+    bodySmall = bodySmall.shadowed(),
+    labelLarge = labelLarge.shadowed(),
+    labelMedium = labelMedium.shadowed(),
+    labelSmall = labelSmall.shadowed(),
+)
 
 private fun Color.glass(alpha: Float): Color = copy(alpha = this.alpha * alpha)
 
