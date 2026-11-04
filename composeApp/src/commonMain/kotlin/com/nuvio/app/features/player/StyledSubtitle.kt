@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.sqrt
 
 @Composable
 internal fun StyledSubtitleOverlay(
@@ -40,6 +41,7 @@ internal fun StyledSubtitleOverlay(
     style: SubtitleStyleState,
     modifier: Modifier = Modifier,
     videoAspectRatio: Float = 0f,
+    videoResizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
 ) {
     val fontFamily = rememberSubtitleFontFamily(style.appearance.fontId)
     if (text.isBlank()) return
@@ -49,11 +51,12 @@ internal fun StyledSubtitleOverlay(
         // consistent when portrait or letterboxed video is displayed inside a larger surface.
         val containerWidthPx = with(density) { maxWidth.toPx() }
         val containerHeightPx = with(density) { maxHeight.toPx() }
-        val fittedVideoHeightPx = if (videoAspectRatio.isFinite() && videoAspectRatio > 0f) {
-            minOf(containerHeightPx, containerWidthPx / videoAspectRatio)
-        } else {
-            containerHeightPx
-        }
+        val fittedVideoBounds = subtitleVideoBoundsPx(
+            containerWidthPx = containerWidthPx,
+            containerHeightPx = containerHeightPx,
+            videoAspectRatio = videoAspectRatio,
+            resizeMode = videoResizeMode,
+        )
         // Scale layout margins for short viewports, but keep the user's font size unchanged.
         val layoutScale = (maxHeight / 360.dp).coerceAtMost(1f)
         Box(
@@ -67,7 +70,8 @@ internal fun StyledSubtitleOverlay(
                 text = text,
                 style = style,
                 scale = layoutScale,
-                videoHeightPx = fittedVideoHeightPx,
+                videoWidthPx = fittedVideoBounds.width,
+                videoHeightPx = fittedVideoBounds.height,
                 fontFamily = fontFamily,
             )
         }
@@ -80,6 +84,7 @@ internal fun StyledSubtitleText(
     style: SubtitleStyleState,
     modifier: Modifier = Modifier,
     scale: Float = 1f,
+    videoWidthPx: Float = SUBTITLE_BLUR_REFERENCE_WIDTH_PX,
     videoHeightPx: Float = SUBTITLE_BLUR_REFERENCE_HEIGHT_PX,
     fontFamily: FontFamily = rememberSubtitleFontFamily(style.appearance.fontId),
 ) {
@@ -100,11 +105,16 @@ internal fun StyledSubtitleText(
         )
         // Convert the mpv/libass blur factor to the same Gaussian sigma at the fitted
         // video height. Blur the outline as its own layer, never as an added shadow.
-        val outlineBlurSigmaPx = subtitleOutlineBlurSigmaPx(outlineBlur, videoHeightPx)
-        val outlineBlurSigmaDp = with(density) { outlineBlurSigmaPx.toDp() }
+        val outlineBlurSigmaXPx = subtitleOutlineBlurSigmaXPx(outlineBlur, videoWidthPx)
+        val outlineBlurSigmaYPx = subtitleOutlineBlurSigmaYPx(outlineBlur, videoHeightPx)
+        val outlineBlurSigmaXDp = with(density) { outlineBlurSigmaXPx.toDp() }
+        val outlineBlurSigmaYDp = with(density) { outlineBlurSigmaYPx.toDp() }
+        // Paint.setShadowLayer only accepts one radius, so the legacy fallback uses the
+        // geometric-mean radius to keep the blur energy balanced between both axes.
+        val legacyBlurRadiusPx = sqrt(outlineBlurSigmaXPx * outlineBlurSigmaYPx)
         val useNativeBlur = supportsNativeSubtitleBlur()
         val blurBleedPx = if (outlineEnabled && outlineBlur > 0) {
-            outlineBlurSigmaPx * SUBTITLE_BLUR_OUTSET_SIGMAS
+            maxOf(outlineBlurSigmaXPx, outlineBlurSigmaYPx) * SUBTITLE_BLUR_OUTSET_SIGMAS
         } else {
             0f
         }
@@ -112,9 +122,8 @@ internal fun StyledSubtitleText(
         val edgePaddingPx = if (outlineEnabled) outline + blurBleedPx else 0f
         val edgePadding = with(density) { edgePaddingPx.toDp() }
 
-        val availableTextWidth = (
-            availableWidth - paddingX * 2 - edgePaddingPx * 2
-        ).coerceAtLeast(1f).toInt()
+        // Blur affects only the painted edge, never the text's layout constraints or wrapping.
+        val availableTextWidth = (availableWidth - paddingX * 2).coerceAtLeast(1f).toInt()
         val layout = measurer.measure(
             text = AnnotatedString(text),
             style = TextStyle(
@@ -130,26 +139,30 @@ internal fun StyledSubtitleText(
         )
         val contentHeight = with(density) { (layout.size.height + paddingY * 2).toDp() }
         val contentWidth = layout.size.width.toFloat() + paddingX * 2
-        val boxWidth = contentWidth + edgePaddingPx * 2
-        val left = (availableWidth - boxWidth).coerceAtLeast(0f) / 2f
+        val boxWidthPx = contentWidth + edgePaddingPx * 2
+        val boxWidth = with(density) { boxWidthPx.toDp() }
+        // Center the expanded visual bounds, including negative space for blur bleed. This
+        // lets long cues retain their original wrapping without clipping the blurred edge.
+        val left = with(density) { ((availableWidth - boxWidthPx) / 2f).toDp() }
         val origin = Offset(
-            left + edgePaddingPx + paddingX,
+            edgePaddingPx + paddingX,
             paddingY + edgePaddingPx,
         )
         val radius = with(density) { style.appearance.backgroundRadius.dp.toPx() }
         val shadowSize = with(density) { style.appearance.shadowSize.dp.toPx() }
 
         Box(
-            Modifier.fillMaxWidth()
+            Modifier.requiredWidth(boxWidth)
                 .height(contentHeight + edgePadding * 2)
-                // Keep the visible subtitle baseline stable as the outline reserves extra space.
-                .offset(y = edgePadding)
+                // Keep the visible text centered and its baseline stable as the outline reserves
+                // extra horizontal and vertical rendering bounds.
+                .offset(x = left, y = edgePadding)
                 .semantics { this.text = AnnotatedString(text) },
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 drawRoundRect(
                     color = style.backgroundColor,
-                    topLeft = Offset(left + edgePaddingPx, edgePaddingPx),
+                    topLeft = Offset(edgePaddingPx, edgePaddingPx),
                     size = androidx.compose.ui.geometry.Size(
                         contentWidth,
                         (size.height - edgePaddingPx * 2).coerceAtLeast(0f),
@@ -163,55 +176,59 @@ internal fun StyledSubtitleText(
                     alpha = style.outlineColor.alpha * style.textColor.alpha,
                 )
                 if (outlineBlur > 0) {
-                    // Render a restrained, low-opacity copy as the soft Gaussian halo. Keeping
-                    // this pass separate prevents blur from thickening the actual outline.
-                    val haloColor = outlineColor.copy(
-                        alpha = outlineColor.alpha * SUBTITLE_BLUR_HALO_ALPHA,
-                    )
                     if (useNativeBlur) {
-                        // Android 12+: hardware-accelerated RenderEffect blur on the halo only.
+                        // Android 12+: blur the outline layer itself. There is deliberately no
+                        // sharp-outline redraw above this result.
                         Canvas(
                             Modifier.fillMaxSize().blur(
-                                outlineBlurSigmaDp,
-                                BlurredEdgeTreatment.Unbounded,
+                                radiusX = outlineBlurSigmaXDp,
+                                radiusY = outlineBlurSigmaYDp,
+                                edgeTreatment = BlurredEdgeTreatment.Unbounded,
                             ),
                         ) {
                             drawText(
                                 layout,
-                                color = haloColor,
+                                color = outlineColor,
                                 topLeft = origin,
                                 drawStyle = Stroke(outline * 2f),
                                 shadow = Shadow.None,
                             )
                         }
                     } else {
-                        // Older Android and other Compose targets: keep the same halo geometry
-                        // with a zero-offset Canvas text shadow. This is not a stack of expanded
-                        // outline strokes, so it cannot accumulate into a bold border.
+                        // Android 7–11: draw only the zero-offset blurred stroke mask. A
+                        // transparent foreground prevents the original hard stroke from being
+                        // composited alongside its shadow. The shadow color is the outline color.
+                        // Keep shadow alpha independent of the transparent mask paint.
+                        // Android Paint otherwise inherits the paint alpha when shadowColor is
+                        // fully opaque, which would make this mask disappear.
+                        val maskShadowColor = outlineColor.copy(
+                            alpha = outlineColor.alpha.coerceAtMost(0.999f),
+                        )
                         Canvas(Modifier.fillMaxSize()) {
                             drawText(
                                 layout,
-                                color = haloColor,
+                                color = Color.Transparent,
                                 topLeft = origin,
                                 drawStyle = Stroke(outline * 2f),
                                 shadow = Shadow(
-                                    color = haloColor,
+                                    color = maskShadowColor,
                                     offset = Offset.Zero,
-                                    blurRadius = outlineBlurSigmaPx,
+                                    blurRadius = legacyBlurRadiusPx,
                                 ),
                             )
                         }
                     }
-                }
-                // Preserve the original edge at full opacity. Only the halo is softened.
-                Canvas(Modifier.fillMaxSize()) {
-                    drawText(
-                        layout,
-                        color = outlineColor,
-                        topLeft = origin,
-                        drawStyle = Stroke(outline * 2f),
-                        shadow = Shadow.None,
-                    )
+                } else {
+                    // Level 0 keeps the original crisp outline exactly as before.
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawText(
+                            layout,
+                            color = outlineColor,
+                            topLeft = origin,
+                            drawStyle = Stroke(outline * 2f),
+                            shadow = Shadow.None,
+                        )
+                    }
                 }
             }
 
