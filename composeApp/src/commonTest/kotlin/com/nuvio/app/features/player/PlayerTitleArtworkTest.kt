@@ -8,8 +8,8 @@ import kotlin.test.assertTrue
 class PlayerTitleArtworkTest {
 
     @Test
-    fun `title logo setting defaults off to preserve the existing title`() {
-        assertFalse(PlayerSettingsUiState().showPlayerTitleLogo)
+    fun `title logo setting defaults on for new profiles`() {
+        assertTrue(PlayerSettingsUiState().showPlayerTitleLogo)
     }
 
     @Test
