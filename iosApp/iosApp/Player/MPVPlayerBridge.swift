@@ -545,6 +545,9 @@ final class MPVPlayerViewController: UIViewController {
         }
         let pip = PlayerPictureInPictureController(owner: self, metalLayer: metalLayer)
         pictureInPictureController = pip
+        if mpv != nil {
+            pip.setSubtitleText(getString("sub-text") ?? "", bold: lastSubtitleStyle?.bold ?? false)
+        }
         view.layer.addSublayer(pip.displayLayer)
         view.layer.addSublayer(metalLayer)
         layoutPlayerSurfaces()
@@ -1735,7 +1738,9 @@ final class MPVPlayerViewController: UIViewController {
             setStringProperty("sub-visibility", styled ? "no" : "yes")
             styledSubtitleVisible = styled
         }
-        let text = styled ? (getString("sub-text") ?? "") : ""
+        let cueText = getString("sub-text") ?? ""
+        pictureInPictureController?.setSubtitleText(cueText, bold: lastSubtitleStyle?.bold ?? false)
+        let text = styled ? cueText : ""
         if text != lastSubtitleText {
             lastSubtitleText = text
             subtitleTextHandler?.onTextChanged(text: text)
