@@ -62,19 +62,21 @@ internal fun PlayerTimelineDetails(
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
-    releaseInfo: String?,
     metrics: PlayerLayoutMetrics,
     badges: List<StreamBadge> = emptyList(),
     modifier: Modifier = Modifier,
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
+    showTitleArtwork: Boolean = true,
+    imageLoadedState: androidx.compose.runtime.MutableState<Boolean>? = null,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
-        PlayerTitleArtwork(
+        if (showTitleArtwork) PlayerTitleArtwork(
             title = title,
             logoUrl = titleLogo,
             showLogo = showTitleLogo,
+            imageLoadedState = imageLoadedState,
             textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
@@ -98,15 +100,6 @@ internal fun PlayerTimelineDetails(
         }
         if (badges.isNotEmpty()) {
             PlayerBadges(badges = badges, modifier = Modifier.padding(vertical = 4.dp))
-        }
-        if (!releaseInfo.isNullOrBlank()) {
-            Text(
-                text = releaseInfo,
-                style = typeScale.labelSm.copy(fontSize = metrics.metadataSize),
-                color = Color.White.copy(alpha = 0.68f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

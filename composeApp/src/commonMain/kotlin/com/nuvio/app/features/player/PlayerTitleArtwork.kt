@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,10 +35,12 @@ internal fun PlayerTitleArtwork(
     maxLogoHeight: Dp,
     maxLogoWidth: Dp,
     modifier: Modifier = Modifier,
+    imageLoadedState: MutableState<Boolean>? = null,
 ) {
     val url = logoUrl?.takeIf { it.isNotBlank() }
-    var imageLoaded by remember(url, showLogo) { mutableStateOf(false) }
-    val showArtwork = showPlayerTitleLogoArtwork(showLogo, url, imageLoaded)
+    val localImageLoaded = remember(url, showLogo) { mutableStateOf(false) }
+    val loadedState = imageLoadedState ?: localImageLoaded
+    val showArtwork = showPlayerTitleLogoArtwork(showLogo, url, loadedState.value)
 
     if (showLogo && url != null) {
         Box(
@@ -59,9 +62,7 @@ internal fun PlayerTitleArtwork(
                 contentDescription = if (showArtwork) title else null,
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                onLoading = { imageLoaded = false },
-                onSuccess = { imageLoaded = true },
-                onError = { imageLoaded = false },
+                onSuccess = { loadedState.value = true },
                 modifier = Modifier
                     .wrapContentSize(Alignment.CenterStart)
                     .sizeIn(
