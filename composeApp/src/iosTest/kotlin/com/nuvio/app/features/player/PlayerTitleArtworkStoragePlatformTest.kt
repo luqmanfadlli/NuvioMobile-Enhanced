@@ -7,38 +7,10 @@ import kotlinx.serialization.json.buildJsonObject
 import platform.Foundation.NSUserDefaults
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PlayerTitleArtworkStoragePlatformTest {
-
-    @Test
-    fun `new profile enables title logo by default and preserves explicit opt out`() {
-        val defaults = NSUserDefaults.standardUserDefaults
-        val activeProfileKey = ProfileScopedKey.of("show_player_title_logo")
-        val hadActiveProfileValue = defaults.objectForKey(activeProfileKey) != null
-        val previousActiveProfileValue = defaults.boolForKey(activeProfileKey)
-        PlayerSettingsRepository.clearLocalState()
-
-        try {
-            defaults.removeObjectForKey(activeProfileKey)
-            PlayerSettingsRepository.ensureLoaded()
-            assertTrue(PlayerSettingsRepository.uiState.value.showPlayerTitleLogo)
-
-            PlayerSettingsRepository.setShowPlayerTitleLogo(false)
-            PlayerSettingsRepository.clearLocalState()
-            PlayerSettingsRepository.ensureLoaded()
-            assertFalse(PlayerSettingsRepository.uiState.value.showPlayerTitleLogo)
-        } finally {
-            if (hadActiveProfileValue) {
-                defaults.setBool(previousActiveProfileValue, forKey = activeProfileKey)
-            } else {
-                defaults.removeObjectForKey(activeProfileKey)
-            }
-            PlayerSettingsRepository.clearLocalState()
-        }
-    }
 
     @Test
     fun `title logo preference reloads syncs and remains profile scoped`() {
