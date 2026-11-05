@@ -499,6 +499,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val partyActive = partyState.party != null
     val playerBadges = rememberPlayerBadges()
+    // Keep this state outside AnimatedVisibility so controls fading out cannot reset a loaded logo.
     val playerTitleLogo = if (isLiveTvPlayback) activeLogo else logo
     val showPlayerTitleLogo = playerSettingsUiState.showPlayerTitleLogo
     val titleLogoImageLoaded = rememberPlayerTitleArtworkLoadedState(

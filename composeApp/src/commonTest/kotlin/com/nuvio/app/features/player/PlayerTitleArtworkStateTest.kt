@@ -9,7 +9,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class PlayerTitleArtworkStateTest {
 
     @Test
-    fun `loaded artwork state survives controls leaving and re-entering composition`() = runBlocking {
+    fun `loaded artwork state survives controls leaving and re-entering composition`() = runTest {
         val frameClock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + frameClock)
         val composition = Composition(EmptyApplier(), recomposer)
@@ -63,7 +63,7 @@ class PlayerTitleArtworkStateTest {
     }
 
     @Test
-    fun `loaded artwork state resets when its source or setting changes`() = runBlocking {
+    fun `loaded artwork state resets when its source or setting changes`() = runTest {
         val frameClock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + frameClock)
         val composition = Composition(EmptyApplier(), recomposer)

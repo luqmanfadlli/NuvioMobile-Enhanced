@@ -32,12 +32,35 @@ class PlayerTitleArtworkLayoutTest {
 
     @Test
     fun `logo bounds change only at the established player width boundaries`() {
-        assertEquals(34.dp, PlayerLayoutMetrics.fromWidth(767.dp).timelineLogoMaxHeight)
-        assertEquals(40.dp, PlayerLayoutMetrics.fromWidth(768.dp).timelineLogoMaxHeight)
-        assertEquals(40.dp, PlayerLayoutMetrics.fromWidth(1023.dp).timelineLogoMaxHeight)
-        assertEquals(44.dp, PlayerLayoutMetrics.fromWidth(1024.dp).timelineLogoMaxHeight)
-        assertEquals(44.dp, PlayerLayoutMetrics.fromWidth(1439.dp).timelineLogoMaxHeight)
-        assertEquals(48.dp, PlayerLayoutMetrics.fromWidth(1440.dp).timelineLogoMaxHeight)
+        val phone = PlayerLayoutMetrics.fromWidth(767.dp)
+        assertEquals(48.dp, phone.titleLogoMaxHeight)
+        assertEquals(34.dp, phone.timelineLogoMaxHeight)
+        assertEquals(280.dp, phone.logoMaxWidth)
+
+        val medium = PlayerLayoutMetrics.fromWidth(768.dp)
+        assertEquals(56.dp, medium.titleLogoMaxHeight)
+        assertEquals(40.dp, medium.timelineLogoMaxHeight)
+        assertEquals(320.dp, medium.logoMaxWidth)
+
+        val mediumEnd = PlayerLayoutMetrics.fromWidth(1023.dp)
+        assertEquals(56.dp, mediumEnd.titleLogoMaxHeight)
+        assertEquals(40.dp, mediumEnd.timelineLogoMaxHeight)
+        assertEquals(320.dp, mediumEnd.logoMaxWidth)
+
+        val expanded = PlayerLayoutMetrics.fromWidth(1024.dp)
+        assertEquals(60.dp, expanded.titleLogoMaxHeight)
+        assertEquals(44.dp, expanded.timelineLogoMaxHeight)
+        assertEquals(360.dp, expanded.logoMaxWidth)
+
+        val expandedEnd = PlayerLayoutMetrics.fromWidth(1439.dp)
+        assertEquals(60.dp, expandedEnd.titleLogoMaxHeight)
+        assertEquals(44.dp, expandedEnd.timelineLogoMaxHeight)
+        assertEquals(360.dp, expandedEnd.logoMaxWidth)
+
+        val wide = PlayerLayoutMetrics.fromWidth(1440.dp)
+        assertEquals(64.dp, wide.titleLogoMaxHeight)
+        assertEquals(48.dp, wide.timelineLogoMaxHeight)
+        assertEquals(380.dp, wide.logoMaxWidth)
     }
 
     @Test
