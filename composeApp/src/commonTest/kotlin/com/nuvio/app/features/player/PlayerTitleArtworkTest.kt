@@ -13,24 +13,12 @@ class PlayerTitleArtworkTest {
 
     @Test
     fun `keeps the original title visible while the logo is loading`() {
-        assertFalse(
-            showPlayerTitleLogoArtwork(
-                enabled = true,
-                logoUrl = "https://image.example/logo.png",
-                imageLoaded = false,
-            ),
-        )
+        assertFalse(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
     }
 
     @Test
     fun `uses title artwork only after a successful image request`() {
-        assertTrue(
-            showPlayerTitleLogoArtwork(
-                enabled = true,
-                logoUrl = "https://image.example/logo.png",
-                imageLoaded = true,
-            ),
-        )
+        assertTrue(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", true))
     }
 
     @Test
@@ -42,12 +30,6 @@ class PlayerTitleArtworkTest {
 
     @Test
     fun `falls back to the title when the image request fails`() {
-        assertFalse(
-            showPlayerTitleLogoArtwork(
-                enabled = true,
-                logoUrl = "https://image.example/logo.png",
-                imageLoaded = false,
-            ),
-        )
+        assertFalse(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
     }
 }
