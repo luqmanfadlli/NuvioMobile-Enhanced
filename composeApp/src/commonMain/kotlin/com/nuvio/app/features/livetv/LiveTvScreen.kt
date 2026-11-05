@@ -105,6 +105,12 @@ import nuvio.composeapp.generated.resources.live_tv_search_placeholder
 import nuvio.composeapp.generated.resources.live_tv_title
 import nuvio.composeapp.generated.resources.live_tv_action_clear_recents
 import nuvio.composeapp.generated.resources.live_tv_action_search
+import nuvio.composeapp.generated.resources.live_tv_action_grid_view
+import nuvio.composeapp.generated.resources.live_tv_action_list_view
+import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import nuvio.composeapp.generated.resources.live_tv_filter_recents
 import nuvio.composeapp.generated.resources.live_tv_section_channels
 import nuvio.composeapp.generated.resources.live_tv_section_coming_soon_message
@@ -263,7 +269,10 @@ fun LiveTvScreen(
         !(!uiState.errorMessage.isNullOrBlank() && uiState.channels.isEmpty()) &&
         uiState.channels.isNotEmpty()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val gridColumns = ((maxWidth - LiveTvScreenHorizontalPadding * 2) / LiveTvGridMinCellWidth)
+        .toInt()
+        .coerceIn(3, 8)
         NuvioScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalPadding = LiveTvScreenHorizontalPadding,
@@ -292,6 +301,25 @@ fun LiveTvScreen(
                                     onClick = {
                                         if (isSearchVisible) searchQuery = ""
                                         isSearchVisible = !isSearchVisible
+                                    },
+                                )
+                            }
+                            if (showChannelControls && section == LiveTvSection.Channels) {
+                                NuvioIconActionButton(
+                                    icon = if (uiState.isChannelGridEnabled) {
+                                        Icons.AutoMirrored.Rounded.ViewList
+                                    } else {
+                                        Icons.Rounded.GridView
+                                    },
+                                    contentDescription = stringResource(
+                                        if (uiState.isChannelGridEnabled) {
+                                            Res.string.live_tv_action_list_view
+                                        } else {
+                                            Res.string.live_tv_action_grid_view
+                                        },
+                                    ),
+                                    onClick = {
+                                        LiveTvRepository.setChannelGridEnabled(!uiState.isChannelGridEnabled)
                                     },
                                 )
                             }
@@ -408,6 +436,16 @@ fun LiveTvScreen(
                                 message = stringResource(Res.string.live_tv_no_matching_channels_message),
                             )
                         }
+                    } else if (uiState.isChannelGridEnabled) {
+                        liveTvChannelGrid(
+                            channels = visibleChannels,
+                            columns = gridColumns,
+                            favoriteChannelIds = uiState.favoriteChannelIds,
+                            onFavoriteClick = { channel -> LiveTvRepository.toggleFavoriteChannel(channel.id) },
+                            onPlayClick = playChannel,
+                            epgPrograms = uiState.epgPrograms,
+                            nowMillis = epgNowMillis,
+                        )
                     } else {
                         liveTvChannelList(
                             channels = visibleChannels,
@@ -460,6 +498,110 @@ fun LiveTvScreen(
 private const val ChannelControlsKey = "channel-controls"
 
 private val LiveTvScreenHorizontalPadding = 16.dp
+private val LiveTvGridMinCellWidth = 108.dp
+private val LiveTvGridGap = 10.dp
+
+private fun LazyListScope.liveTvChannelGrid(
+    channels: List<LiveTvChannel>,
+    columns: Int,
+    favoriteChannelIds: Set<String>,
+    onFavoriteClick: (LiveTvChannel) -> Unit,
+    onPlayClick: (LiveTvChannel) -> Unit,
+    epgPrograms: Map<String, List<LiveTvEpgProgram>>,
+    nowMillis: Long,
+) {
+    val rows = channels.chunked(columns)
+    items(
+        count = rows.size,
+        key = { index -> "channel-grid:$columns:${rows[index].first().id}" },
+    ) { index ->
+        val row = rows[index]
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LiveTvGridGap),
+        ) {
+            row.forEach { channel ->
+                LiveTvChannelGridCell(
+                    channel = channel,
+                    isFavorite = channel.id in favoriteChannelIds,
+                    currentProgramTitle = epgPrograms[channel.id]
+                        ?.firstOrNull { it.isAiringAt(nowMillis) }
+                        ?.title,
+                    onFavoriteClick = { onFavoriteClick(channel) },
+                    onPlayClick = { onPlayClick(channel) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            repeat(columns - row.size) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveTvChannelGridCell(
+    channel: LiveTvChannel,
+    isFavorite: Boolean,
+    currentProgramTitle: String?,
+    onFavoriteClick: () -> Unit,
+    onPlayClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        modifier = modifier,
+        onClick = onPlayClick,
+        color = tokens.colors.surface,
+        shape = tokens.shapes.compactCard,
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box {
+                ChannelLogo(
+                    channel = channel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable(onClick = onFavoriteClick),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isFavorite) tokens.colors.warning else Color.White,
+                    )
+                }
+            }
+            Text(
+                text = channel.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = tokens.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = currentProgramTitle.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 @Composable
 private fun LiveTvSectionTabs(

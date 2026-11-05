@@ -11,6 +11,8 @@ internal expect object LiveTvStorage {
     fun saveLastWatchedChannelId(channelId: String)
     fun loadRecentChannelIdsBlob(): String?
     fun saveRecentChannelIdsBlob(blob: String)
+    fun loadChannelViewMode(): String?
+    fun saveChannelViewMode(mode: String)
     fun loadNavigationEnabled(): Boolean?
     fun saveNavigationEnabled(enabled: Boolean)
     fun loadStalkerSettings(): LiveTvStalkerSettings
