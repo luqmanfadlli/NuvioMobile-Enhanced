@@ -140,7 +140,6 @@ internal fun FoldControls(
     modifier: Modifier = Modifier,
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
-    titleLogoImageLoaded: androidx.compose.runtime.MutableState<Boolean>? = null,
 ) {
     val currentOnWake by rememberUpdatedState(onWake)
     val contentAlpha by animateFloatAsState(
@@ -213,7 +212,6 @@ internal fun FoldControls(
                 title = title,
                 titleLogo = titleLogo,
                 showTitleLogo = showTitleLogo,
-                imageLoadedState = titleLogoImageLoaded,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
                 episodeTitle = episodeTitle,
@@ -362,7 +360,6 @@ private fun NowPlayingTile(
     title: String,
     titleLogo: String?,
     showTitleLogo: Boolean,
-    imageLoadedState: androidx.compose.runtime.MutableState<Boolean>?,
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
@@ -380,7 +377,6 @@ private fun NowPlayingTile(
                     title = title,
                     logoUrl = titleLogo,
                     showLogo = showTitleLogo,
-                    imageLoadedState = imageLoadedState,
                     textStyle = typeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
                     textColor = Color.White,
                     maxLines = 1,
