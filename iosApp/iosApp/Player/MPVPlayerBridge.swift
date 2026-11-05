@@ -113,7 +113,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         saturation: Int32,
         gamma: Int32
     ) {
-        playerVC?.configureVideoOutput(
+        ensurePlayerViewController().configureVideoOutput(
             hardwareDecoder: hardwareDecoder,
             targetColorspaceHint: targetColorspaceHint,
             toneMapping: toneMapping,
@@ -130,7 +130,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         )
     }
     func configureAudioOutput(audioOutput: String) {
-        playerVC?.configureAudioOutput(audioOutput: audioOutput)
+        ensurePlayerViewController().configureAudioOutput(audioOutput: audioOutput)
     }
     func isNightModeSupported() -> Bool { MPVPlayerViewController.nightModeSupported }
     func setNightMode(enabled: Bool, filter: String, label: String) {
@@ -526,7 +526,7 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
-        metalLayer.wantsExtendedDynamicRangeContent = true
+        metalLayer.wantsExtendedDynamicRangeContent = lastVideoOutputSettings?.extendedDynamicRange ?? true
         metalLayer.anchorPoint = CGPoint(x: 0, y: 0)
         metalLayer.position = .zero
         metalLayer.onRenderingSuspensionChanged = { suspended, reason in
@@ -553,6 +553,24 @@ final class MPVPlayerViewController: UIViewController {
         layoutPlayerSurfaces()
 
         setupMpv()
+        if let settings = lastVideoOutputSettings {
+            configureVideoOutput(
+                hardwareDecoder: settings.hardwareDecoder,
+                targetColorspaceHint: settings.targetColorspaceHint,
+                toneMapping: settings.toneMapping,
+                hdrComputePeak: settings.hdrComputePeak,
+                targetPrimaries: settings.targetPrimaries,
+                targetTransfer: settings.targetTransfer,
+                extendedDynamicRange: settings.extendedDynamicRange,
+                deband: settings.deband,
+                interpolation: settings.interpolation,
+                brightness: settings.brightness,
+                contrast: settings.contrast,
+                saturation: settings.saturation,
+                gamma: settings.gamma
+            )
+        }
+        if let audioOutput = lastAudioOutput { setStringProperty("ao", audioOutput) }
         if !isEmbeddedPreviewMode {
             activateAudioSessionForPlayback()
         }
