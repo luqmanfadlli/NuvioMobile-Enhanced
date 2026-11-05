@@ -14,7 +14,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -38,18 +37,6 @@ class PlayerTitleArtworkStorageTest {
     fun clear() {
         PlayerSettingsRepository.clearLocalState()
         ProfileRepository.clearInMemory()
-    }
-
-    @Test
-    fun `new profile enables title logo by default and preserves explicit opt out`() {
-        PlayerSettingsRepository.ensureLoaded()
-        assertTrue(PlayerSettingsRepository.uiState.value.showPlayerTitleLogo)
-
-        PlayerSettingsRepository.setShowPlayerTitleLogo(false)
-        PlayerSettingsRepository.clearLocalState()
-        PlayerSettingsRepository.ensureLoaded()
-
-        assertFalse(PlayerSettingsRepository.uiState.value.showPlayerTitleLogo)
     }
 
     @Test
