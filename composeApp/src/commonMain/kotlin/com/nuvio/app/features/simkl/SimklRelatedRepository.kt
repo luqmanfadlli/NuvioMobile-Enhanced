@@ -1,5 +1,6 @@
 package com.nuvio.app.features.simkl
 
+import com.nuvio.app.core.logging.InAppLogger
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
@@ -104,11 +105,16 @@ object SimklRelatedRepository {
             SimklApiRequest(
                 method = SimklHttpMethod.GET,
                 path = "/$type/$simklId",
-                requiresAuthentication = false,
+                requiresAuthentication = SimklAuthRepository.isAuthenticated.value,
                 retryPolicy = SimklRetryPolicy.TRANSIENT_FAILURES,
             ),
         )
-        if (response.status in 200..299) json.decodeFromString(response.body) else null
+        if (response.status in 200..299) {
+            json.decodeFromString(response.body)
+        } else {
+            InAppLogger.warn("Simkl/Related", "Detail $type/$simklId failed status=${response.status}")
+            null
+        }
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         log.w { "Failed to fetch Simkl detail $type/$simklId: ${e.message}" }
