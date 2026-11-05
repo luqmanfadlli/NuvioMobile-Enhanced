@@ -164,6 +164,57 @@ internal fun PlaybackStreamSettings(
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = "Dead-link auto fallback",
+                    description = "Skip sources that remain stuck buffering after the timeout.",
+                    checked = settings.deadLinkTimeoutEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setDeadLinkTimeoutEnabled,
+                )
+                if (settings.deadLinkTimeoutEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (isTablet) 18.dp else 16.dp, vertical = 10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(
+                                    text = stringResource(Res.string.settings_playback_dead_link_timeout),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = stringResource(Res.string.settings_playback_dead_link_timeout_description),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            ValueBox(
+                                text = stringResource(Res.string.settings_playback_seconds, settings.deadLinkTimeoutSeconds),
+                                modifier = Modifier.wrapContentWidth(),
+                            )
+                        }
+                        var deadLinkTimeoutSlider by remember(settings.deadLinkTimeoutSeconds) {
+                            mutableFloatStateOf(settings.deadLinkTimeoutSeconds.toFloat())
+                        }
+                        Slider(
+                            value = deadLinkTimeoutSlider,
+                            onValueChange = { deadLinkTimeoutSlider = it.toInt().coerceIn(5, 60).toFloat() },
+                            onValueChangeFinished = {
+                                PlayerSettingsRepository.setDeadLinkTimeoutSeconds(deadLinkTimeoutSlider.toInt())
+                            },
+                            valueRange = 5f..60f,
+                            steps = 54,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_source_scope),
                     description = stringResource(settings.streamAutoPlaySource.labelRes(pluginsEnabled)),

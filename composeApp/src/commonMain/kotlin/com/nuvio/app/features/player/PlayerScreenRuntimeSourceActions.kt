@@ -128,7 +128,7 @@ internal fun PlayerScreenRuntime.openExternalSourceUrl(stream: StreamItem): Bool
 internal fun StreamItem.playerSourceIdentityKey(): String? {
     serverTarget?.let { target -> return "server:${target.item.encode()}:${target.mediaSourceId.orEmpty()}" }
     p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
-        return "torrent:$hash:${p2pFileIdx ?: -1}"
+        return "torrent:$addonId:$hash:${p2pFileIdx ?: -1}"
     }
 
     clientResolve?.let { resolve ->
@@ -160,7 +160,7 @@ internal fun StreamItem.playerSourceIdentityKey(): String? {
     }
 
     playableDirectUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
-        return "url:$url"
+        return "url:$addonId:$url"
     }
 
     val fallbackParts = listOf(
@@ -176,6 +176,17 @@ internal fun StreamItem.playerSourceIdentityKey(): String? {
     return fallbackParts
         .takeIf { parts -> parts.any { it.isNotBlank() } }
         ?.joinToString(separator = "|", prefix = "meta:")
+}
+
+internal fun StreamItem.playerPlaybackDeduplicationKey(): String? {
+    serverTarget?.let { target -> return "server:${target.item.encode()}:${target.mediaSourceId.orEmpty()}" }
+    p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
+        return "torrent:$hash:${p2pFileIdx ?: -1}"
+    }
+    playableDirectUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
+        return "url:$url"
+    }
+    return playerSourceIdentityKey()
 }
 
 internal fun PlayerScreenRuntime.stopActiveP2pStream() {
@@ -411,39 +422,52 @@ private fun PlayerScreenRuntime.switchToPreparedLiveChannel(channel: LiveTvChann
 internal fun PlayerScreenRuntime.switchToSource(
     stream: StreamItem,
     saveForReuse: Boolean = true,
+    attemptToken: Long? = null,
+    originIdentityKey: String? = null,
 ) {
-    if (prepareServerForPlayer(stream) { switchToSource(it) }) return
-    // The resolved URL expires after a few hours, so it isn't kept for reuse.
-    if (resolveYouTubeForPlayer(stream) { switchToSource(it, saveForReuse = false) }) return
+    // Async resolvers may complete after a later user selection or fallback.
+    // Keep the original provider entry identity while the playable URL changes.
+    val stableOriginIdentityKey = originIdentityKey ?: stream.playerSourceIdentityKey()
+    val switchToken = attemptToken ?: (++sourceSwitchGeneration)
+    if (switchToken != sourceSwitchGeneration) return
+    fun isCurrentSwitch(): Boolean = switchToken == sourceSwitchGeneration
+
+    if (prepareServerForPlayer(stream) {
+            if (isCurrentSwitch()) switchToSource(it, saveForReuse, switchToken, stableOriginIdentityKey)
+        }) return
+    if (resolveYouTubeForPlayer(stream) {
+            if (isCurrentSwitch()) switchToSource(it, saveForReuse = false, attemptToken = switchToken, originIdentityKey = stableOriginIdentityKey)
+        }) return
     if (
         resolveDebridForPlayer(
             stream = stream,
             season = activeSeasonNumber,
             episode = activeEpisodeNumber,
-            onResolved = { switchToSource(it) },
+            onResolved = { if (isCurrentSwitch()) switchToSource(it, saveForReuse, switchToken, stableOriginIdentityKey) },
             onStale = {
-                val vid = activeVideoId
-                if (vid != null) {
-                    PlayerStreamsRepository.loadSources(
-                        type = contentType ?: parentMetaType,
-                        videoId = vid,
-                        season = activeSeasonNumber,
-                        episode = activeEpisodeNumber,
-                        forceRefresh = true,
-                    )
+                if (isCurrentSwitch()) {
+                    val vid = activeVideoId
+                    if (vid != null) {
+                        PlayerStreamsRepository.loadSources(
+                            type = contentType ?: parentMetaType,
+                            videoId = vid,
+                            season = activeSeasonNumber,
+                            episode = activeEpisodeNumber,
+                            forceRefresh = true,
+                        )
+                    }
                 }
             },
         )
     ) return
+    if (!isCurrentSwitch()) return
     if (isP2pStream(stream)) {
         switchToP2pSourceStream(stream)
         return
     }
     if (openExternalSourceUrl(stream)) return
     val url = stream.playableDirectUrl ?: return
-    val sourceIdentityKey = stream.playerSourceIdentityKey()
     if (url == activeSourceUrl) {
-        activeSourceIdentityKey = sourceIdentityKey ?: activeSourceIdentityKey
         InAppLogger.debug(
             "Player/Source",
             "selected source already active addon=${stream.addonName} stream=${stream.streamLabel} " +
@@ -464,7 +488,7 @@ internal fun PlayerScreenRuntime.switchToSource(
     activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     activeStreamType = stream.streamType
-    activeSourceIdentityKey = sourceIdentityKey
+    activeSourceIdentityKey = stableOriginIdentityKey ?: stream.playerSourceIdentityKey()
     activeSourceFilename = stream.behaviorHints.filename
     activeStreamTitle = stream.streamLabel
     activeStreamSubtitle = stream.streamSubtitle

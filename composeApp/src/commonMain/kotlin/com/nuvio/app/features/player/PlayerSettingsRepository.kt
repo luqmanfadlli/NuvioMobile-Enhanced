@@ -92,6 +92,8 @@ data class PlayerSettingsUiState(
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
+    val deadLinkTimeoutEnabled: Boolean = true,
+    val deadLinkTimeoutSeconds: Int = 10,
     val skipIntroEnabled: Boolean = true,
     val skipIntroOffsetSeconds: Int = 0,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
@@ -195,6 +197,8 @@ object PlayerSettingsRepository {
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
     private var streamAutoPlayRegex = ""
     private var streamAutoPlayTimeoutSeconds = 3
+    private var deadLinkTimeoutEnabled = true
+    private var deadLinkTimeoutSeconds = 10
     private var skipIntroEnabled = true
     private var skipIntroOffsetSeconds = 0
     private var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
@@ -303,6 +307,8 @@ object PlayerSettingsRepository {
         streamAutoPlaySelectedPlugins = emptySet()
         streamAutoPlayRegex = ""
         streamAutoPlayTimeoutSeconds = 3
+        deadLinkTimeoutEnabled = true
+        deadLinkTimeoutSeconds = 10
         skipIntroEnabled = true
         skipIntroOffsetSeconds = 0
         autoSkipSegmentTypes = emptySet()
@@ -456,6 +462,10 @@ object PlayerSettingsRepository {
         }
         streamAutoPlayRegex = PlayerSettingsStorage.loadStreamAutoPlayRegex() ?: ""
         streamAutoPlayTimeoutSeconds = PlayerSettingsStorage.loadStreamAutoPlayTimeoutSeconds() ?: 3
+        deadLinkTimeoutEnabled = PlayerSettingsStorage.loadDeadLinkTimeoutEnabled() ?: true
+        deadLinkTimeoutSeconds = DeadLinkTimeoutPolicy.normalizeSeconds(
+            PlayerSettingsStorage.loadDeadLinkTimeoutSeconds() ?: DeadLinkTimeoutPolicy.DEFAULT_SECONDS,
+        )
         // Legacy migration: 11 was the old sentinel for "unlimited"
         if (streamAutoPlayTimeoutSeconds == 11) {
             streamAutoPlayTimeoutSeconds = Int.MAX_VALUE
@@ -1025,6 +1035,23 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlayTimeoutSeconds(seconds)
     }
 
+    fun setDeadLinkTimeoutEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (deadLinkTimeoutEnabled == enabled) return
+        deadLinkTimeoutEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveDeadLinkTimeoutEnabled(enabled)
+    }
+
+    fun setDeadLinkTimeoutSeconds(seconds: Int) {
+        ensureLoaded()
+        val normalized = DeadLinkTimeoutPolicy.normalizeSeconds(seconds)
+        if (deadLinkTimeoutSeconds == normalized) return
+        deadLinkTimeoutSeconds = normalized
+        publish()
+        PlayerSettingsStorage.saveDeadLinkTimeoutSeconds(normalized)
+    }
+
     fun setSkipIntroOffsetSeconds(seconds: Int) {
         ensureLoaded()
         val normalized = normalizeSkipIntroOffsetSeconds(seconds)
@@ -1429,6 +1456,8 @@ object PlayerSettingsRepository {
             streamAutoPlaySelectedPlugins = streamAutoPlaySelectedPlugins,
             streamAutoPlayRegex = streamAutoPlayRegex,
             streamAutoPlayTimeoutSeconds = streamAutoPlayTimeoutSeconds,
+            deadLinkTimeoutEnabled = deadLinkTimeoutEnabled,
+            deadLinkTimeoutSeconds = deadLinkTimeoutSeconds,
             skipIntroEnabled = skipIntroEnabled,
             skipIntroOffsetSeconds = skipIntroOffsetSeconds,
             autoSkipSegmentTypes = autoSkipSegmentTypes,
