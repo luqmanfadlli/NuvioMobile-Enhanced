@@ -499,13 +499,9 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val partyActive = partyState.party != null
     val playerBadges = rememberPlayerBadges()
-    // Keep this state outside AnimatedVisibility so controls fading out cannot reset a loaded logo.
-    val playerTitleLogo = if (isLiveTvPlayback) activeLogo else logo
-    val showPlayerTitleLogo = playerSettingsUiState.showPlayerTitleLogo
-    val titleLogoImageLoaded = rememberPlayerTitleArtworkLoadedState(
-        logoUrl = playerTitleLogo,
-        enabled = showPlayerTitleLogo,
-    )
+    // Live TV channel artwork is not a title logo; retain the program title text instead.
+    val playerTitleLogo = if (isLiveTvPlayback) null else logo
+    val showPlayerTitleLogo = playerSettingsUiState.showPlayerTitleLogo && !isLiveTvPlayback
     LaunchedEffect(folded) {
         if (folded) {
             controlsVisible = true
@@ -531,7 +527,6 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             title = title,
             titleLogo = playerTitleLogo,
             showTitleLogo = showPlayerTitleLogo,
-            titleLogoImageLoaded = titleLogoImageLoaded,
             streamTitle = activeStreamTitle,
             providerName = liveTvNowProgramTitle?.let { programTitle -> "$activeProviderName · $programTitle" } ?: activeProviderName,
             seasonNumber = activeSeasonNumber,
