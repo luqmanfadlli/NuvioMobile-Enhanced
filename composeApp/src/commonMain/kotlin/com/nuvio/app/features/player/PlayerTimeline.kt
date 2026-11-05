@@ -82,6 +82,8 @@ internal fun PlayerTimelineDetails(
             ),
             textColor = Color.White,
             maxLines = 1,
+            maxLogoHeight = metrics.timelineLogoMaxHeight,
+            maxLogoWidth = metrics.logoMaxWidth,
         )
         if (seasonNumber != null && episodeNumber != null) {
             val episodeCode = stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)

@@ -1,25 +1,27 @@
 package com.nuvio.app.features.player
 
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 
 /**
- * Reuses artwork already resolved by player metadata. Text remains the default and fallback.
+ * Reuses artwork already resolved by player metadata. The title stays visible until
+ * Coil confirms that the replacement artwork has loaded successfully.
  */
 @Composable
 internal fun PlayerTitleArtwork(
@@ -29,22 +31,48 @@ internal fun PlayerTitleArtwork(
     textStyle: TextStyle,
     textColor: Color,
     maxLines: Int,
+    maxLogoHeight: Dp,
+    maxLogoWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
-    var imageLoadFailed by remember(logoUrl, showLogo) { mutableStateOf(false) }
     val url = logoUrl?.takeIf { it.isNotBlank() }
-    if (showPlayerTitleLogoArtwork(showLogo, url, imageLoadFailed)) {
-        val maxLogoHeight = with(LocalDensity.current) { textStyle.fontSize.toDp() * 2.4f }
-        AsyncImage(
-            model = url,
-            contentDescription = title,
-            contentScale = ContentScale.Fit,
-            alignment = Alignment.CenterStart,
-            onError = { imageLoadFailed = true },
-            modifier = modifier
-                .height(maxLogoHeight)
-                .widthIn(max = 280.dp),
-        )
+    var imageLoaded by remember(url, showLogo) { mutableStateOf(false) }
+    val showArtwork = showPlayerTitleLogoArtwork(showLogo, url, imageLoaded)
+
+    if (showLogo && url != null) {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (!showArtwork) {
+                Text(
+                    text = title,
+                    style = textStyle,
+                    color = textColor,
+                    maxLines = maxLines,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            AsyncImage(
+                model = url,
+                contentDescription = if (showArtwork) title else null,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                onLoading = { imageLoaded = false },
+                onSuccess = { imageLoaded = true },
+                onError = { imageLoaded = false },
+                modifier = Modifier
+                    .sizeIn(
+                        maxWidth = maxLogoWidth,
+                        maxHeight = maxLogoHeight,
+                    )
+                    .wrapContentSize(Alignment.CenterStart)
+                    .graphicsLayer {
+                        alpha = if (showArtwork) 1f else 0f
+                    },
+            )
+        }
     } else {
         Text(
             text = title,
@@ -60,5 +88,5 @@ internal fun PlayerTitleArtwork(
 internal fun showPlayerTitleLogoArtwork(
     enabled: Boolean,
     logoUrl: String?,
-    imageLoadFailed: Boolean,
-): Boolean = enabled && !logoUrl.isNullOrBlank() && !imageLoadFailed
+    imageLoaded: Boolean,
+): Boolean = enabled && !logoUrl.isNullOrBlank() && imageLoaded

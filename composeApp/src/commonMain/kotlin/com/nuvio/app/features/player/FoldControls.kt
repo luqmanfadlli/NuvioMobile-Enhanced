@@ -380,6 +380,8 @@ private fun NowPlayingTile(
                     textStyle = typeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
                     textColor = Color.White,
                     maxLines = 1,
+                    maxLogoHeight = 26.dp,
+                    maxLogoWidth = 140.dp,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (seasonNumber != null && episodeNumber != null) {
