@@ -497,6 +497,9 @@ kotlin {
                 implementation(libs.mpv.android.lib)
                 implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
                 if (androidDistribution == "full") {
+                    implementation("com.github.capullo-tech:lib-tdlib-android:11850efeb5791d4fd386c0eeec1ebce4c5080435")
+                    implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
+                    implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(libs.ksoup)
                 }

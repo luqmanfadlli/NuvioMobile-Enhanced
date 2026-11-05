@@ -20,6 +20,8 @@ import nuvio.composeapp.generated.resources.settings_integrations_live_tv_descri
 import nuvio.composeapp.generated.resources.settings_integrations_mdblist_description
 import nuvio.composeapp.generated.resources.settings_integrations_omdb_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
+import nuvio.composeapp.generated.resources.settings_telegram_title
+import nuvio.composeapp.generated.resources.settings_telegram_description
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
 import org.jetbrains.compose.resources.stringResource
 
@@ -31,6 +33,7 @@ internal fun LazyListScope.integrationsContent(
     onOmdbClick: () -> Unit,
     onLiveTvClick: () -> Unit,
     onDiscordClick: () -> Unit,
+    onTelegramClick: (() -> Unit)? = null,
 ) {
     item {
         SettingsSection(
@@ -85,6 +88,15 @@ internal fun LazyListScope.integrationsContent(
                         icon = Icons.Rounded.Forum,
                         isTablet = isTablet,
                         onClick = onDiscordClick,
+                    )
+                }
+                if (onTelegramClick != null) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_telegram_title),
+                        description = stringResource(Res.string.settings_telegram_description),
+                        isTablet = isTablet,
+                        onClick = onTelegramClick,
                     )
                 }
             }

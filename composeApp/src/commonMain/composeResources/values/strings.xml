@@ -3037,4 +3037,6 @@
     <string name="settings_glass_ui_style_dark">Dark</string>
     <string name="settings_glass_ui_style_balanced">Balanced</string>
     <string name="settings_glass_ui_style_vivid">Vivid</string>
+    <string name="settings_telegram_title">Telegram</string>
+    <string name="settings_telegram_description">Find playable video files in your selected Telegram channels and groups.</string>
 </resources>
