@@ -66,7 +66,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -89,6 +88,8 @@ import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
+import androidx.compose.ui.graphics.SolidColor
+import com.nuvio.app.core.ui.ArtworkBackdrop
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.verticalBarWidth
@@ -101,6 +102,7 @@ import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.rememberArtworkBackdrop
 import com.nuvio.app.core.ui.rememberHeroStretchState
 import com.kyant.backdrop.Backdrop
 import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
@@ -1158,6 +1160,12 @@ fun MetaDetailsScreen(
                     val contentMaxWidth = detailTabletContentMaxWidth(maxWidth, isTablet)
                     val backdropUrl = meta.background ?: meta.poster
                     val backgroundMode = metaScreenSettingsUiState.backgroundMode
+                    val cinematicBackground = backgroundMode == MetaScreenBackgroundMode.Cinematic &&
+                        !backdropUrl.isNullOrBlank()
+                    val cinematicBackdrop = rememberArtworkBackdrop(
+                        imageUrl = backdropUrl.takeIf { cinematicBackground },
+                        enabled = deferredMetaWorkAllowed,
+                    )
                     val dominantColorEnabled = backgroundMode == MetaScreenBackgroundMode.DominantColor &&
                         !backdropUrl.isNullOrBlank()
                     val extractedDominantColor = rememberArtworkDominantColor(
@@ -1220,7 +1228,8 @@ fun MetaDetailsScreen(
                                     ) {
                                         TabletDetailBackdrop(
                                             meta = meta,
-                                            cinematic = backgroundMode == MetaScreenBackgroundMode.Cinematic,
+                                            cinematic = cinematicBackground,
+                                            backdropImage = cinematicBackdrop,
                                             scrollOffsetPx = detailScrollOffsetPx,
                                             heroHeightPx = { heroHeightPx.intValue },
                                             heroTrailerSourceUrl = heroTrailerSourceUrl,
@@ -1236,31 +1245,13 @@ fun MetaDetailsScreen(
                                     }
                                 } else when (backgroundMode) {
                                     MetaScreenBackgroundMode.Normal -> Unit
-                                    MetaScreenBackgroundMode.Cinematic -> if (backdropUrl != null) {
-                                        val cinematicModifier = Modifier
-                                            .fillMaxSize()
-                                            .blur(16.dp)
-                                            .nuvioBackdropSource(cinematicArtworkBackdrop)
-                                        val heroPainter = heroBackdropPainter
-                                        if (heroPainter != null) {
-                                            Image(
-                                                painter = heroPainter,
-                                                contentDescription = null,
-                                                modifier = cinematicModifier,
-                                                contentScale = ContentScale.Crop,
-                                            )
-                                        } else if (deferredMetaWorkAllowed) {
-                                            AsyncImage(
-                                                model = backdropUrl,
-                                                contentDescription = null,
-                                                modifier = cinematicModifier,
-                                                contentScale = ContentScale.Crop,
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(colorScheme.background.copy(alpha = 0.72f)),
+                                    MetaScreenBackgroundMode.Cinematic -> if (cinematicBackground) {
+                                        // Upstream's pre-blurred artwork backdrop, with the fork's
+                                        // glass source and its lighter background-tinted scrim.
+                                        ArtworkBackdrop(
+                                            image = cinematicBackdrop,
+                                            modifier = Modifier.nuvioBackdropSource(cinematicArtworkBackdrop),
+                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.72f)),
                                         )
                                     }
                                     MetaScreenBackgroundMode.DominantColor -> {
@@ -1332,6 +1323,7 @@ fun MetaDetailsScreen(
                                                 heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
                                                 heroTrailerMuted = heroTrailerMuted,
                                                 heroGradientColor = heroGradientColor,
+                                                cinematicBackground = cinematicBackground,
                                                 onBackdropLoaded = onBackdropLoaded,
                                                 onHeroTrailerMuteToggle = { HeroTrailerAudioState.toggleMuted(HeroTrailerSurface.Details) },
                                                 onHeroTrailerReady = onHeroTrailerReady,
