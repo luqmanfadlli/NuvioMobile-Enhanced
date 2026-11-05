@@ -41,8 +41,9 @@ class WeTrakrWatchedSyncAdapter internal constructor(
         }.distinctUntilChanged()
 
     override suspend fun push(profileId: Int, items: Collection<WatchedItem>) {
-        if (items.isEmpty()) return
-        writes.addToHistory(profileId, items.map { TrackingHistoryItem(it.reference(), it.markedAtEpochMs) })
+        val pushable = items.filterNot(WatchedItem::isWholeSeriesMark)
+        if (pushable.isEmpty()) return
+        writes.addToHistory(profileId, pushable.map { TrackingHistoryItem(it.reference(), it.markedAtEpochMs) })
     }
 
     override suspend fun delete(profileId: Int, items: Collection<WatchedItem>) {
@@ -64,3 +65,6 @@ class WeTrakrWatchedSyncAdapter internal constructor(
         episodeNumber = episode,
     )
 }
+
+private fun WatchedItem.isWholeSeriesMark(): Boolean =
+    season == null && episode == null && type.trim().lowercase() !in setOf("movie", "film")
