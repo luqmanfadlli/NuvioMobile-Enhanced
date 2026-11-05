@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -72,11 +73,14 @@ internal fun PlayerTimelineDetails(
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
-        if (showTitleArtwork) PlayerTitleArtwork(
+        PlayerTitleArtwork(
             title = title,
             logoUrl = titleLogo,
             showLogo = showTitleLogo,
             imageLoadedState = imageLoadedState,
+            modifier = Modifier.graphicsLayer {
+                alpha = playerTitleArtworkVisibilityAlpha(showTitleArtwork)
+            },
             textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
