@@ -568,7 +568,12 @@ private fun PlayerHeader(
                 modifier = Modifier.weight(1f),
             ) {
                 Column(
-                    modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
+                    modifier = Modifier.graphicsLayer {
+                        alpha = playerTitleArtworkVisibilityAlpha(
+                            showTitleArtwork = !showParentalGuide,
+                            animatedAlpha = metadataAlpha,
+                        )
+                    },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     PlayerTitleArtwork(
