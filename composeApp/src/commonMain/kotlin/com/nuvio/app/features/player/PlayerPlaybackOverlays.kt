@@ -3,8 +3,35 @@ package com.nuvio.app.features.player
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -66,6 +93,10 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     movieRecommendationStage: Int = 0,
     onOpenMovieRecommendation: (MetaPreview) -> Unit = {},
     onDismissMovieRecommendations: () -> Unit = {},
+    moreLikeThisItems: List<MetaPreview> = emptyList(),
+    showMoreLikeThis: Boolean = false,
+    onOpenMoreLikeThis: (MetaPreview) -> Unit = {},
+    onDismissMoreLikeThis: () -> Unit = {},
     errorMessage: String?,
     onDismissError: () -> Unit,
 ) {
@@ -166,10 +197,139 @@ internal fun BoxScope.PlayerPlaybackOverlays(
         )
     }
 
+    if (showMoreLikeThis && moreLikeThisItems.isNotEmpty()) {
+        MoreLikeThisOverlay(
+            items = moreLikeThisItems,
+            onItemClick = onOpenMoreLikeThis,
+            onDismiss = onDismissMoreLikeThis,
+        )
+    }
+
     if (errorMessage != null) {
         ErrorModal(
             message = errorMessage,
             onDismiss = onDismissError,
         )
+    }
+}
+
+
+internal fun shouldShowMoreLikeThisOverlay(
+    isPlaybackEnded: Boolean,
+    hasRecommendations: Boolean,
+    isSeries: Boolean,
+    hasNextEpisode: Boolean,
+    controlsLocked: Boolean,
+    dismissed: Boolean,
+    hasPlaybackError: Boolean,
+    isInPip: Boolean,
+    completionPromptVisible: Boolean,
+): Boolean =
+    isPlaybackEnded &&
+        hasRecommendations &&
+        !controlsLocked &&
+        !dismissed &&
+        !hasPlaybackError &&
+        !isInPip &&
+        !completionPromptVisible &&
+        (!isSeries || !hasNextEpisode)
+
+@Composable
+private fun BoxScope.MoreLikeThisOverlay(
+    items: List<MetaPreview>,
+    onItemClick: (MetaPreview) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp)
+            .widthIn(max = 980.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xE91B1B24),
+        contentColor = Color.White,
+        border = null,
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "More Like This",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Dismiss recommendations",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                items.forEach { item ->
+                    Column(
+                        modifier = Modifier
+                            .width(184.dp)
+                            .clickable { onItemClick(item) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(104.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                        ) {
+                            AsyncImage(
+                                model = item.banner ?: item.landscapePoster ?: item.poster,
+                                contentDescription = item.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            item.logo?.takeIf(String::isNotBlank)?.let { logo ->
+                                AsyncImage(
+                                    model = logo,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(7.dp)
+                                        .widthIn(max = 112.dp)
+                                        .height(28.dp),
+                                )
+                            }
+                        }
+                        Text(
+                            text = item.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.94f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
