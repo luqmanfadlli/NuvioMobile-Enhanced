@@ -78,7 +78,7 @@ internal fun parseAppDeepLink(url: String): AppDeepLink? {
         }
     }
     val host = parsedUrl.host.lowercase()
-    val pathSegments = parsedUrl.pathSegments.map(String::trim).filter(String::isNotBlank)
+    val pathSegments = parsedUrl.segments.map(String::trim).filter(String::isNotBlank)
     if (scheme == "https") {
         return if (host == "nuvio.tv" && pathSegments.firstOrNull() == "party") partyDeepLink(pathSegments.getOrNull(1)) else null
     }

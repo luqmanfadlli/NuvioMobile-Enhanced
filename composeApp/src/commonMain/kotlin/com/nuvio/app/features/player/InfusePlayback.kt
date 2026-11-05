@@ -57,7 +57,7 @@ internal class InfusePlaybackCallbacks(
     fun handleUrl(value: String): Boolean {
         val url = runCatching { Url(value) }.getOrNull() ?: return false
         if (url.protocol.name != "nuvio" || url.host != "external-player") return false
-        val path = url.pathSegments.filter(String::isNotEmpty)
+        val path = url.segments.filter(String::isNotEmpty)
         if (path.size != 3 || path[0] != "infuse") return false
         val session = storedSession() ?: return true
         if (path[1] != session.id || session.returnedPositionMs != null || session.failed) return true
@@ -84,7 +84,7 @@ internal class InfusePlaybackCallbacks(
     fun cancelLaunch(value: String) {
         val url = runCatching { Url(value) }.getOrNull() ?: return
         val callback = url.parameters["x-success"]?.let { runCatching { Url(it) }.getOrNull() } ?: return
-        callback.pathSegments.filter(String::isNotEmpty).getOrNull(1)?.let(::consume)
+        callback.segments.filter(String::isNotEmpty).getOrNull(1)?.let(::consume)
     }
 }
 

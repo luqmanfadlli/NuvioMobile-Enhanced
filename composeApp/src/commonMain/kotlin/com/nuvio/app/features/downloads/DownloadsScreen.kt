@@ -467,7 +467,7 @@ private fun DownloadRow(
             if (item.status == DownloadStatus.Downloading) {
                 if (item.totalBytes != null && item.totalBytes > 0L) {
                     LinearProgressIndicator(
-                        progress = item.progressFraction,
+                        progress = { item.progressFraction },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
