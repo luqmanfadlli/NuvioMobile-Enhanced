@@ -5,6 +5,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PlayerTitleArtworkTest {
+
+    @Test
+    fun `title logo setting defaults off to preserve the existing title`() {
+        assertFalse(PlayerSettingsUiState().showPlayerTitleLogo)
+    }
+
     @Test
     fun `uses title artwork only when enabled and a URL exists`() {
         assertTrue(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
