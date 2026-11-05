@@ -12,15 +12,42 @@ class PlayerTitleArtworkTest {
     }
 
     @Test
-    fun `uses title artwork only when enabled and a URL exists`() {
-        assertTrue(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
-        assertFalse(showPlayerTitleLogoArtwork(false, "https://image.example/logo.png", false))
-        assertFalse(showPlayerTitleLogoArtwork(true, null, false))
-        assertFalse(showPlayerTitleLogoArtwork(true, "   ", false))
+    fun `keeps the original title visible while the logo is loading`() {
+        assertFalse(
+            showPlayerTitleLogoArtwork(
+                enabled = true,
+                logoUrl = "https://image.example/logo.png",
+                imageLoaded = false,
+            ),
+        )
     }
 
     @Test
-    fun `falls back to text after the logo request fails`() {
-        assertFalse(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", true))
+    fun `uses title artwork only after a successful image request`() {
+        assertTrue(
+            showPlayerTitleLogoArtwork(
+                enabled = true,
+                logoUrl = "https://image.example/logo.png",
+                imageLoaded = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `does not use artwork when disabled or when the URL is missing`() {
+        assertFalse(showPlayerTitleLogoArtwork(false, "https://image.example/logo.png", true))
+        assertFalse(showPlayerTitleLogoArtwork(true, null, true))
+        assertFalse(showPlayerTitleLogoArtwork(true, "   ", true))
+    }
+
+    @Test
+    fun `falls back to the title when the image request fails`() {
+        assertFalse(
+            showPlayerTitleLogoArtwork(
+                enabled = true,
+                logoUrl = "https://image.example/logo.png",
+                imageLoaded = false,
+            ),
+        )
     }
 }
