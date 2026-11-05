@@ -4,8 +4,6 @@ import com.nuvio.app.core.ui.nuvioScreenSideBleed
 import androidx.compose.ui.input.pointer.pointerInput
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -36,7 +34,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -87,7 +84,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
-import nuvio.composeapp.generated.resources.live_tv_action_back_to_top
 import nuvio.composeapp.generated.resources.live_tv_button_continue
 import nuvio.composeapp.generated.resources.live_tv_empty_message
 import nuvio.composeapp.generated.resources.live_tv_empty_title
@@ -153,12 +149,6 @@ fun LiveTvScreen(
         LiveTvRepository.uiState
     }.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val showBackToTop by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 320
-        }
-    }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchVisible by rememberSaveable { mutableStateOf(false) }
     var section by rememberSaveable { mutableStateOf(LiveTvSection.Channels) }
@@ -751,23 +741,6 @@ fun LiveTvScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = showBackToTop,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = liveTvBackToTopBottomPadding),
-        ) {
-            LiveTvBackToTopButton(
-                onClick = {
-                    coroutineScope.launch {
-                        listState.animateScrollToItem(0)
-                    }
-                },
-            )
-        }
-
         val guideChannel = guideChannelId?.let { channelId -> uiState.channels.firstOrNull { it.id == channelId } }
         if (guideChannel != null) {
             LiveTvEpgGuideSheet(
@@ -1055,29 +1028,6 @@ private fun LiveTvChannelControls(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun LiveTvBackToTopButton(
-    onClick: () -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-    Surface(
-        modifier = Modifier.size(48.dp),
-        onClick = onClick,
-        color = tokens.colors.overlaySelected,
-        shape = RoundedCornerShape(18.dp),
-        shadowElevation = 8.dp,
-        border = BorderStroke(NuvioTokens.Border.thin, tokens.colors.borderSubtle),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Rounded.KeyboardArrowUp,
-                contentDescription = stringResource(Res.string.live_tv_action_back_to_top),
-                tint = tokens.colors.accent,
-            )
         }
     }
 }
