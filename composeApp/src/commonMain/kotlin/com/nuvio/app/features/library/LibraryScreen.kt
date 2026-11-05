@@ -1,5 +1,9 @@
 package com.nuvio.app.features.library
 
+import androidx.compose.material.icons.rounded.CalendarMonth
+import com.nuvio.app.core.ui.background.isGlassUiActive
+import com.nuvio.app.core.ui.background.appGlassBackdrop
+import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.animation.Crossfade
@@ -444,7 +448,7 @@ fun LibraryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().appBackgroundCover(Color.Transparent)) {
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -515,10 +519,11 @@ fun LibraryScreen(
                                 .size(40.dp)
                                 .semantics { contentDescription = openCalendarLabel },
                         ) {
-                            LibraryCalendarGlyph(
-                                modifier = Modifier.size(19.dp),
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                cutoutColor = MaterialTheme.colorScheme.background,
                             )
                         }
                     }
@@ -672,7 +677,7 @@ fun LibraryScreen(
                                 Box(
                                     modifier = Modifier
                                         .matchParentSize()
-                                        .background(MaterialTheme.colorScheme.background)
+                                        .appBackgroundCover(MaterialTheme.colorScheme.background)
                                         .nuvioConsumePointerEvents(),
                                 )
                                 LibrarySavedControls(
@@ -839,25 +844,29 @@ private fun LazyListScope.cloudLibraryContent(
                     )
                 }
             } else {
-                item {
-                    CloudLibraryToolbar(
-                        uiState = uiState,
-                        selectedProviderId = selectedProviderId,
-                        selectedType = effectiveSelectedType,
-                        availableTypes = availableTypes,
-                        onProviderSelected = onProviderSelected,
-                        onTypeSelected = onTypeSelected,
-                        onRefresh = onRefresh,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-
-                item(key = "cloud-library-search") {
-                    CloudLibrarySearchField(
-                        query = searchQuery,
-                        onQueryChange = onSearchQueryChange,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                stickyHeader(key = "cloud-library-search") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .appBackgroundCover(MaterialTheme.colorScheme.background)
+                            .nuvioConsumePointerEvents(),
+                    ) {
+                        CloudLibraryToolbar(
+                            uiState = uiState,
+                            selectedProviderId = selectedProviderId,
+                            selectedType = effectiveSelectedType,
+                            availableTypes = availableTypes,
+                            onProviderSelected = onProviderSelected,
+                            onTypeSelected = onTypeSelected,
+                            onRefresh = onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        CloudLibrarySearchField(
+                            query = searchQuery,
+                            onQueryChange = onSearchQueryChange,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
 
                 val visibleProviderStates = uiState.providers.filter { providerState ->
@@ -1608,10 +1617,11 @@ private fun LibraryReleaseCalendarPanel(
                     .widthIn(max = 760.dp)
                     .fillMaxWidth()
                     .height(panelHeight)
+                    .appGlassBackdrop(RoundedCornerShape(28.dp))
                     .clickable(onClick = {}),
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(28.dp),
-                shadowElevation = 18.dp,
+                shadowElevation = if (isGlassUiActive()) 0.dp else 18.dp,
             ) {
                 Column(
                     modifier = Modifier
@@ -2689,7 +2699,6 @@ private object LibraryReleaseCalendarCache {
                 if (latest.cacheKey == cacheKey) {
                     _state.value = latest.copy(
                         events = (latest.events + result.events).sortedLibraryCalendarEvents(),
-                        // Leave the month unloaded when a series failed, so it is requested again.
                         loadedMonthKeys = if (result.failedSeriesKeys.isEmpty()) {
                             latest.loadedMonthKeys + monthKey
                         } else {
@@ -2869,7 +2878,6 @@ private object LibraryReleaseCalendarCache {
                 .collect { signature ->
                     if (signature == null) return@collect
                     if (_state.value.addonSignature != signature) {
-                        // Addons became ready or changed: failures may now succeed.
                         resetRetry()
                         refreshIfStale()
                     }
@@ -3245,7 +3253,6 @@ private class LibraryDisintegrationHolder {
     }
 }
 
-/** An episode from the Library release calendar, exposed for other screens (Profile Insight). */
 internal data class LibraryUpcomingEpisode(
     val key: String,
     val item: LibraryItem,
@@ -3260,10 +3267,6 @@ internal suspend fun warmLibraryReleaseSchedule(items: List<LibraryItem>) {
     if (items.isNotEmpty()) LibraryReleaseCalendarCache.warm(items)
 }
 
-/**
- * Episodes of saved series airing from today through the next [days] days (today included),
- * read from the same release-calendar cache the Library calendar shows, so both always agree.
- */
 internal fun libraryUpcomingEpisodesFlow(days: Int = 7): Flow<List<LibraryUpcomingEpisode>> =
     LibraryReleaseCalendarCache.state.map { state -> state.events.upcomingEpisodes(days) }
 

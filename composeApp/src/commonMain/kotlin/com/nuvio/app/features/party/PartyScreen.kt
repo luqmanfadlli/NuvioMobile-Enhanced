@@ -1,5 +1,7 @@
 package com.nuvio.app.features.party
 
+import com.nuvio.app.core.ui.background.LocalAppBackgroundActive
+import com.nuvio.app.core.ui.background.appGlassBackdrop
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -349,10 +351,22 @@ private fun JoinContent(
         }
     }
 
+    val onAppBackground = LocalAppBackgroundActive.current
+    val joinCardShape = tokens.shapes.card
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 24.dp),
+            .padding(top = 8.dp, bottom = 24.dp)
+            .then(
+                if (onAppBackground) {
+                    Modifier
+                        .appGlassBackdrop(joinCardShape)
+                        .background(tokens.colors.surface, joinCardShape)
+                        .padding(horizontal = 20.dp, vertical = 24.dp)
+                } else {
+                    Modifier
+                },
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

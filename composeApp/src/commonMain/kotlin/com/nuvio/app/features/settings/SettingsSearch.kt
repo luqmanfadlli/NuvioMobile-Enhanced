@@ -412,6 +412,21 @@ internal fun settingsSearchEntries(
     )
     addRow(
         page = SettingsPage.Appearance,
+        key = "app-background",
+        title = stringResource(Res.string.settings_app_background),
+        pageLabel = appearancePage,
+        section = stringResource(Res.string.settings_glass_ui_section),
+    )
+    addRow(
+        page = SettingsPage.Appearance,
+        key = "glass-ui",
+        title = stringResource(Res.string.settings_glass_ui),
+        description = stringResource(Res.string.settings_glass_ui_description),
+        pageLabel = appearancePage,
+        section = stringResource(Res.string.settings_glass_ui_section),
+    )
+    addRow(
+        page = SettingsPage.Appearance,
         key = "amoled",
         title = stringResource(Res.string.settings_appearance_amoled_black),
         description = stringResource(Res.string.settings_appearance_amoled_description),
@@ -419,12 +434,20 @@ internal fun settingsSearchEntries(
         section = stringResource(Res.string.settings_appearance_section_display),
     )
     addRow(
-        page = SettingsPage.Appearance,
+        page = SettingsPage.Layout,
         key = "dynamic-artwork-background",
         title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
         description = stringResource(Res.string.settings_appearance_dynamic_artwork_background_description),
         pageLabel = layoutPage,
-        section = stringResource(Res.string.settings_appearance_section_display),
+        section = stringResource(Res.string.settings_appearance_section_home),
+    )
+    addRow(
+        page = SettingsPage.Layout,
+        key = "catalog-accent",
+        title = stringResource(Res.string.settings_appearance_catalog_accent),
+        description = stringResource(Res.string.settings_appearance_catalog_accent_description),
+        pageLabel = layoutPage,
+        section = stringResource(Res.string.settings_appearance_section_home),
     )
     if (liquidGlassNativeTabBarSupported) {
         addRow(

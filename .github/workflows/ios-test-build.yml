@@ -11,6 +11,16 @@ on:
           - Debug
           - Release
         default: Release
+      disable_phases:
+        description: "iOS Release: Kotlin/Native phases to skip."
+        required: false
+        type: choice
+        default: skip-both
+        options:
+          - full
+          - skip-static-init
+          - skip-devirtualization
+          - skip-both
 
 permissions:
   contents: read
@@ -28,6 +38,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
       IOS_CONFIGURATION: ${{ inputs.configuration }}
+      NUVIO_IOS_PHASE_PROFILE: ${{ inputs.disable_phases }}
       KOTLIN_DAEMON_JVMARGS: -Xmx1024M
       NUVIO_GRADLE_JVMARGS: -Xmx2048M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M -XX:+UseG1GC
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M -XX:+UseG1GC
@@ -80,6 +91,15 @@ jobs:
             echo "org.gradle.parallel=false"
             echo "org.gradle.workers.max=1"
             echo "kotlin.native.disableCompilerDaemon=true"
+            case "${NUVIO_IOS_PHASE_PROFILE:-skip-both}" in
+              full) NUVIO_IOS_DISABLE_PHASES="" ;;
+              skip-static-init) NUVIO_IOS_DISABLE_PHASES="RemoveRedundantCallsToStaticInitializersPhase" ;;
+              skip-devirtualization) NUVIO_IOS_DISABLE_PHASES="DevirtualizationAnalysis,Devirtualization" ;;
+              *) NUVIO_IOS_DISABLE_PHASES="DevirtualizationAnalysis,Devirtualization,RemoveRedundantCallsToStaticInitializersPhase" ;;
+            esac
+            if [ -n "${NUVIO_IOS_DISABLE_PHASES}" ]; then
+              echo "nuvio.ios.releaseDisablePhases=${NUVIO_IOS_DISABLE_PHASES}"
+            fi
           } >> "${gradle_user_home}/gradle.properties"
           cat "${gradle_user_home}/gradle.properties"
 

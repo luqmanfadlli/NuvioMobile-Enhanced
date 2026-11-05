@@ -105,7 +105,8 @@ final class PlayerNowPlayingController {
         positionMs: Int64,
         durationMs: Int64,
         isPlaying: Bool,
-        playbackSpeed: Float
+        playbackSpeed: Float,
+        force: Bool = false
     ) {
         let nextState = PlaybackState(
             isPlaying: isPlaying,
@@ -130,7 +131,7 @@ final class PlayerNowPlayingController {
         let expectedPositionMs = Double(published.positionMs) + elapsedSincePublish * 1_000 * rate
         let drifted = abs(Double(nextState.positionMs) - expectedPositionMs) > Self.positionDriftToleranceMs
 
-        guard stateChanged || drifted else { return }
+        guard force || stateChanged || drifted else { return }
         applyNowPlayingInfo()
     }
 

@@ -1,5 +1,12 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.layout.layout
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.Stable
+import com.nuvio.app.core.ui.background.appBackgroundCover
+import com.nuvio.app.core.ui.background.appGlassBackdrop
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -73,6 +80,31 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.nuvio.app.navigation.LocalNativeNavigationBarHidden
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 
+@Stable
+internal class NuvioScreenMetrics(val horizontalPadding: Dp) {
+    var hasPinnedHeader by mutableStateOf(false)
+}
+
+internal val LocalNuvioScreenMetrics = staticCompositionLocalOf<NuvioScreenMetrics?> { null }
+
+@Composable
+internal fun Modifier.nuvioScreenSideBleed(): Modifier {
+    val bleed = LocalNuvioScreenMetrics.current?.horizontalPadding ?: return this
+    if (bleed <= NuvioTokens.Space.none) return this
+    return layout { measurable, constraints ->
+        val extra = (bleed * 2).roundToPx()
+        val placeable = measurable.measure(
+            constraints.copy(
+                minWidth = constraints.minWidth + extra,
+                maxWidth = constraints.maxWidth + extra,
+            ),
+        )
+        layout(placeable.width - extra, placeable.height) {
+            placeable.place(-extra / 2, 0)
+        }
+    }
+}
+
 @Composable
 fun NuvioScreen(
     modifier: Modifier = Modifier,
@@ -90,20 +122,28 @@ fun NuvioScreen(
     } else {
         tokens.colors.background
     }
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .background(screenBackground),
-        contentPadding = PaddingValues(
-            start = horizontalPadding,
-            top = topPadding ?: tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding,
-            end = horizontalPadding,
-            bottom = nuvioSafeBottomPadding(tokens.spacing.screenBottom),
-        ).withVerticalBar(),
-        verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
-        content = content,
-    )
+    val metrics = remember(horizontalPadding) { NuvioScreenMetrics(horizontalPadding) }
+    val resolvedTopPadding = topPadding ?: if (metrics.hasPinnedHeader) {
+        NuvioTokens.Space.none
+    } else {
+        tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding
+    }
+    CompositionLocalProvider(LocalNuvioScreenMetrics provides metrics) {
+        LazyColumn(
+            state = listState,
+            modifier = modifier
+                .fillMaxSize()
+                .background(screenBackground),
+            contentPadding = PaddingValues(
+                start = horizontalPadding,
+                top = resolvedTopPadding,
+                end = horizontalPadding,
+                bottom = nuvioSafeBottomPadding(tokens.spacing.screenBottom),
+            ).withVerticalBar(),
+            verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
+            content = content,
+        )
+    }
 }
 
 internal fun Modifier.nuvioConsumePointerEvents(): Modifier =
@@ -125,7 +165,7 @@ fun NuvioSurfaceCard(
 ) {
     val tokens = MaterialTheme.nuvio
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().appGlassBackdrop(tokens.shapes.card),
         color = tokens.colors.surface,
         shape = tokens.shapes.card,
         tonalElevation = tonalElevation.dp,
@@ -164,18 +204,29 @@ fun NuvioScreenHeader(
         return
     }
     val resolvedTopPadding = topPadding ?: if (includeStatusBarPadding) statusBarTop else NuvioTokens.Space.none
+    val screenMetrics = LocalNuvioScreenMetrics.current
+    if (screenMetrics != null && includeStatusBarPadding && topPadding == null) {
+        DisposableEffect(screenMetrics) {
+            screenMetrics.hasPinnedHeader = true
+            onDispose { screenMetrics.hasPinnedHeader = false }
+        }
+    }
+    val sideBleed = screenMetrics?.horizontalPadding ?: NuvioTokens.Space.none
     Box(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .nuvioScreenSideBleed(),
     ) {
         Row(
             modifier = Modifier
                 .matchParentSize()
-                .background(tokens.colors.background)
+                .appBackgroundCover(tokens.colors.background)
                 .nuvioConsumePointerEvents(),
         ) {}
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = sideBleed)
                 .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,

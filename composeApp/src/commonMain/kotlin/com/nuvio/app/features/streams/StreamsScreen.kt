@@ -106,6 +106,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.ui.graphics.compositeOver
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
+import com.nuvio.app.core.i18n.localizedEpisodeTitle
 
 // ---------------------------------------------------------------------------
 // Streams Screen
@@ -762,7 +763,7 @@ private fun EpisodeHeroBlock(
             Spacer(modifier = Modifier.height(2.dp))
             // Episode title
             Text(
-                text = episodeTitle,
+                text = localizedEpisodeTitle(episodeTitle, episodeNumber) ?: episodeTitle,
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,

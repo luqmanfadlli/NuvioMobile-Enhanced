@@ -220,6 +220,14 @@ private fun trimDiskCache(directory: String) {
 private suspend fun fetchSourceBytes(url: String): ByteArray? = loadSemaphore.withPermit {
     cachedSourceBytes(url)?.let { return@withPermit it }
 
+    if (url.startsWith("file://")) {
+        val local = withContext(Dispatchers.Default) {
+            NSFileManager.defaultManager.contentsAtPath(url.removePrefix("file://"))?.toByteArray()
+        } ?: return@withPermit null
+        storeSourceBytes(url, local)
+        return@withPermit local
+    }
+
     withContext(Dispatchers.Default) { diskCacheRead(url) }?.let { fromDisk ->
         storeSourceBytes(url, fromDisk)
         return@withPermit fromDisk

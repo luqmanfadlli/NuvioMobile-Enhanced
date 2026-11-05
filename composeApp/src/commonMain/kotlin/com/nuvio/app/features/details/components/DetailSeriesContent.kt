@@ -104,6 +104,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import com.nuvio.app.core.ui.glass.ambientLiquidGlass
+import com.nuvio.app.core.i18n.localizedEpisodeTitle
 
 private val log = Logger.withTag("SeriesContent")
 
@@ -1049,7 +1050,7 @@ private fun EpisodeHorizontalCard(
             )
 
             Text(
-                text = video.title,
+                text = localizedEpisodeTitle(video.title, video.episode) ?: video.title,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = metrics.titleTextSize,
                     fontWeight = FontWeight.ExtraBold,
@@ -1409,8 +1410,10 @@ private fun EpisodeListCard(
     onLongPress: (() -> Unit)? = null,
 ) {
     val matchStyle = episodeMatchStyle()
-    val titleText = remember(video.title, highlightQuery, matchStyle) {
-        highlightEpisodeMatches(video.title, highlightQuery, matchStyle)
+    // Localized title from upstream, with the fork's search-match highlighting on top.
+    val displayTitle = localizedEpisodeTitle(video.title, video.episode) ?: video.title
+    val titleText = remember(displayTitle, highlightQuery, matchStyle) {
+        highlightEpisodeMatches(displayTitle, highlightQuery, matchStyle)
     }
     val overviewText = remember(video.overview, highlightQuery, matchStyle) {
         video.overview?.let { highlightEpisodeMatches(it, highlightQuery, matchStyle) }
