@@ -115,8 +115,6 @@ import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
 @Composable
 internal fun PlayerControlsShell(
     title: String,
-    titleLogo: String? = null,
-    showTitleLogo: Boolean = false,
     streamTitle: String,
     providerName: String,
     seasonNumber: Int?,
@@ -186,6 +184,8 @@ internal fun PlayerControlsShell(
     foldLayout: Boolean = false,
     gestureController: PlayerGestureController? = null,
     onWake: () -> Unit = {},
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
 ) {
     if (foldLayout) {
         FoldControls(

@@ -59,8 +59,6 @@ internal val PlayerChapterMarkColor = Color.Black.copy(alpha = 0.6f)
 @Composable
 internal fun PlayerTimelineDetails(
     title: String,
-    titleLogo: String? = null,
-    showTitleLogo: Boolean = false,
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
@@ -68,6 +66,8 @@ internal fun PlayerTimelineDetails(
     metrics: PlayerLayoutMetrics,
     badges: List<StreamBadge> = emptyList(),
     modifier: Modifier = Modifier,
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
