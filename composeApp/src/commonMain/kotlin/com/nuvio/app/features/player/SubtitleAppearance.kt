@@ -11,7 +11,6 @@ data class SubtitleAppearance(
     val shadowEnabled: Boolean = false,
     val shadowOpacity: Int = 75,
     val shadowSize: Int = 2,
-    // Softens only the outline layer; zero keeps the existing crisp outline.
     val outlineBlur: Int = 0,
 ) {
     fun normalized(): SubtitleAppearance = copy(
@@ -26,9 +25,6 @@ data class SubtitleAppearance(
 const val SUBTITLE_OUTLINE_BLUR_MIN = 0
 const val SUBTITLE_OUTLINE_BLUR_MAX = 10
 
-// libass converts the sub-blur factor to Gaussian sigma with 2 / sqrt(ln(256)).
-// A 1280×720 output is the normalization reference for this text-cue overlay. The exact
-// libass scale also depends on the subtitle track's layout resolution, which Exo cues do not expose.
 internal const val SUBTITLE_BLUR_REFERENCE_HEIGHT_PX = 720f
 internal const val SUBTITLE_BLUR_REFERENCE_WIDTH_PX = 1280f
 internal const val SUBTITLE_BLUR_SIGMA_FACTOR = 0.8493218f
@@ -85,14 +81,6 @@ internal fun subtitleVideoBoundsPx(
     }
 }
 
-// Umbra maps outline width to the fitted video height relative to a 720-line reference.
-// Return the half-width because Compose Stroke receives the full width (2 × half-width).
-internal fun subtitleOutlineWidthPx(width: Int, videoHeightPx: Float): Float {
-    val safeVideoHeight = videoHeightPx.takeIf { it.isFinite() && it > 0f }
-        ?: SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
-    return width.coerceAtLeast(0) * safeVideoHeight / SUBTITLE_BLUR_REFERENCE_HEIGHT_PX
-}
-
 internal val BuiltInSubtitleFonts = listOf("default", "sans", "serif", "mono")
 private val subtitleAppearanceJson = Json { ignoreUnknownKeys = true }
 
@@ -102,18 +90,13 @@ internal fun decodeSubtitleAppearance(value: String?): SubtitleAppearance =
 
 internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encodeToString(normalized())
 
-// MPV can render blur natively through libass. These are the features that still need
-// the Compose overlay when MPV is the active engine.
 internal val SubtitleStyleState.requiresComposeStyledOverlay: Boolean
     get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled
 
-// ExoPlayer has no native subtitle-border blur property, so its text cues use the Compose overlay.
 internal val SubtitleStyleState.usesStyledOverlay: Boolean
     get() = requiresComposeStyledOverlay ||
         (outlineEnabled && outlineWidth > 0 && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
 
-// Mirrors the value sent to mpv's native sub-blur property. Keep the stored preference unchanged
-// while an outline is disabled, but send zero to the renderer until the outline is visible again.
 internal val SubtitleStyleState.mpvNativeOutlineBlurLevel: Int
     get() = if (outlineEnabled && outlineWidth > 0) {
         appearance.outlineBlur.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX)

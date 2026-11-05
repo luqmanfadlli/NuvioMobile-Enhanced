@@ -48,8 +48,6 @@ internal fun StyledSubtitleOverlay(
     if (text.isBlank()) return
     val density = LocalDensity.current
     BoxWithConstraints(modifier.fillMaxSize()) {
-        // Use the fitted video height as the 720-line reference scale. This keeps blur visually
-        // consistent when portrait or letterboxed video is displayed inside a larger surface.
         val containerWidthPx = with(density) { maxWidth.toPx() }
         val containerHeightPx = with(density) { maxHeight.toPx() }
         val fittedVideoBounds = subtitleVideoBoundsPx(
@@ -58,7 +56,6 @@ internal fun StyledSubtitleOverlay(
             videoAspectRatio = videoAspectRatio,
             resizeMode = videoResizeMode,
         )
-        // Scale layout margins for short viewports, but keep the user's font size unchanged.
         val layoutScale = (maxHeight / 360.dp).coerceAtMost(1f)
         Box(
             Modifier.fillMaxSize().padding(
@@ -96,22 +93,16 @@ internal fun StyledSubtitleText(
         val paddingY = with(density) { (4.dp * scale).toPx() }
         val availableWidth = constraints.maxWidth.toFloat()
 
-        // Match the outline's video-relative sizing used by MPV/libass and Umbra's preview.
-        // Device density must not make the same outline preference look thicker on one tablet.
-        val outline = subtitleOutlineWidthPx(style.outlineWidth, videoHeightPx)
+        val outline = with(density) { (style.outlineWidth.dp * scale).toPx() }
         val outlineEnabled = style.outlineEnabled && outline > 0f
         val outlineBlur = style.appearance.outlineBlur.coerceIn(
             SUBTITLE_OUTLINE_BLUR_MIN,
             SUBTITLE_OUTLINE_BLUR_MAX,
         )
-        // Convert the mpv/libass blur factor to the same Gaussian sigma at the fitted
-        // video height. Blur the outline as its own layer, never as an added shadow.
         val outlineBlurSigmaXPx = subtitleOutlineBlurSigmaXPx(outlineBlur, videoWidthPx)
         val outlineBlurSigmaYPx = subtitleOutlineBlurSigmaYPx(outlineBlur, videoHeightPx)
         val outlineBlurSigmaXDp = with(density) { outlineBlurSigmaXPx.toDp() }
         val outlineBlurSigmaYDp = with(density) { outlineBlurSigmaYPx.toDp() }
-        // Paint.setShadowLayer only accepts one radius, so the legacy fallback uses the
-        // geometric-mean radius to keep the blur energy balanced between both axes.
         val legacyBlurRadiusPx = sqrt(outlineBlurSigmaXPx * outlineBlurSigmaYPx)
         val useNativeBlur = supportsNativeSubtitleBlur()
         val blurBleedPx = if (outlineEnabled && outlineBlur > 0) {
@@ -119,19 +110,15 @@ internal fun StyledSubtitleText(
         } else {
             0f
         }
-        // Reserve room for both the actual stroke and its soft edge so neither is clipped.
         val edgePaddingPx = if (outlineEnabled) outline + blurBleedPx else 0f
         val edgePadding = with(density) { edgePaddingPx.toDp() }
 
-        // Blur affects only the painted edge, never the text's layout constraints or wrapping.
         val availableTextWidth = (availableWidth - paddingX * 2).coerceAtLeast(1f).toInt()
         val layout = measurer.measure(
             text = AnnotatedString(text),
             style = TextStyle(
                 fontFamily = fontFamily,
-                // Match the native subtitle renderer: fontSizeSp is an exact SP preference,
-                // not a value to scale with the player container height.
-                fontSize = style.fontSizeSp.sp,
+                fontSize = (style.fontSizeSp * scale).sp,
                 fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 textDirection = TextDirection.ContentOrLtr,
@@ -142,21 +129,17 @@ internal fun StyledSubtitleText(
         val contentWidth = layout.size.width.toFloat() + paddingX * 2
         val boxWidthPx = contentWidth + edgePaddingPx * 2
         val boxWidth = with(density) { boxWidthPx.toDp() }
-        // Center the expanded visual bounds, including negative space for blur bleed. This
-        // lets long cues retain their original wrapping without clipping the blurred edge.
         val left = with(density) { ((availableWidth - boxWidthPx) / 2f).toDp() }
         val origin = Offset(
             edgePaddingPx + paddingX,
             paddingY + edgePaddingPx,
         )
-        val radius = with(density) { style.appearance.backgroundRadius.dp.toPx() }
-        val shadowSize = with(density) { style.appearance.shadowSize.dp.toPx() }
+        val radius = with(density) { (style.appearance.backgroundRadius.dp * scale).toPx() }
+        val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
 
         Box(
             Modifier.requiredWidth(boxWidth)
                 .height(contentHeight + edgePadding * 2)
-                // Keep the visible text centered and its baseline stable as the outline reserves
-                // extra horizontal and vertical rendering bounds.
                 .offset(x = left, y = edgePadding)
                 .semantics { this.text = AnnotatedString(text) },
         ) {
@@ -178,8 +161,6 @@ internal fun StyledSubtitleText(
                 )
                 if (outlineBlur > 0) {
                     if (useNativeBlur) {
-                        // Android 12+: blur the outline layer itself. There is deliberately no
-                        // sharp-outline redraw above this result.
                         Canvas(
                             Modifier.fillMaxSize().blur(
                                 radiusX = outlineBlurSigmaXDp,
@@ -196,12 +177,6 @@ internal fun StyledSubtitleText(
                             )
                         }
                     } else {
-                        // Android 7–11: draw only the zero-offset blurred stroke mask. A
-                        // transparent foreground prevents the original hard stroke from being
-                        // composited alongside its shadow. The shadow color is the outline color.
-                        // Keep shadow alpha independent of the transparent mask paint.
-                        // Android Paint otherwise inherits the paint alpha when shadowColor is
-                        // fully opaque, which would make this mask disappear.
                         val maskShadowColor = outlineColor.copy(
                             alpha = outlineColor.alpha.coerceAtMost(0.999f),
                         )
@@ -220,7 +195,6 @@ internal fun StyledSubtitleText(
                         }
                     }
                 } else {
-                    // Level 0 keeps the original crisp outline exactly as before.
                     Canvas(Modifier.fillMaxSize()) {
                         drawText(
                             layout,
@@ -233,7 +207,6 @@ internal fun StyledSubtitleText(
                 }
             }
 
-            // Draw the subtitle fill separately so outline blur can never soften the glyphs.
             Canvas(Modifier.fillMaxSize()) {
                 drawText(
                     layout,

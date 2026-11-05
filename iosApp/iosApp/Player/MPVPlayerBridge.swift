@@ -215,7 +215,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         fontSize: Float,
         subPos: Int32,
         stripSdh: Bool,
-        styledOverlay: Bool
+        styledOverlay: Bool,
+        outlineBlur: Int32
     ) {
         playerVC?.applySubtitleStyle(
             textColor: textColor,
@@ -226,7 +227,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
             fontSize: fontSize,
             subPos: Int(subPos),
             stripSdh: stripSdh,
-            styledOverlay: styledOverlay
+            styledOverlay: styledOverlay,
+            outlineBlur: Int(outlineBlur)
         )
     }
 
@@ -422,6 +424,7 @@ final class MPVPlayerViewController: UIViewController {
         let subPos: Int
         let stripSdh: Bool
         let styledOverlay: Bool
+        let outlineBlur: Int
     }
 
     private var lastLoadRequest: PendingLoadRequest?
@@ -1379,7 +1382,8 @@ final class MPVPlayerViewController: UIViewController {
                 fontSize: style.fontSize,
                 subPos: style.subPos,
                 stripSdh: style.stripSdh,
-                styledOverlay: style.styledOverlay
+                styledOverlay: style.styledOverlay,
+                outlineBlur: style.outlineBlur
             )
         }
         setSpeed(currentSpeed)
@@ -1683,7 +1687,8 @@ final class MPVPlayerViewController: UIViewController {
         fontSize: Float,
         subPos: Int,
         stripSdh: Bool,
-        styledOverlay: Bool
+        styledOverlay: Bool,
+        outlineBlur: Int
     ) {
         lastSubtitleStyle = SubtitleStyleSettings(
             textColor: textColor,
@@ -1694,7 +1699,8 @@ final class MPVPlayerViewController: UIViewController {
             fontSize: fontSize,
             subPos: subPos,
             stripSdh: stripSdh,
-            styledOverlay: styledOverlay
+            styledOverlay: styledOverlay,
+            outlineBlur: outlineBlur
         )
         guard mpv != nil else { return }
 
@@ -1712,6 +1718,7 @@ final class MPVPlayerViewController: UIViewController {
         setStringProperty("sub-border-style", hasBackground ? "opaque-box" : "outline-and-shadow")
         setStringProperty("sub-bold", bold ? "yes" : "no")
         setDoubleProperty("sub-outline-size", effectiveOutlineSize)
+        setDoubleProperty("sub-blur", Double(outlineBlur))
         setDoubleProperty("sub-font-size", Double(fontSize))
         setIntProperty("sub-pos", Int64(subPos))
         setStringProperty("sub-filter-sdh", stripSdh ? "yes" : "no")

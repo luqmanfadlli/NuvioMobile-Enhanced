@@ -68,16 +68,6 @@ class SubtitleAppearanceTest {
     }
 
     @Test
-    fun outlineWidthUsesTheSameVideoRelativeScaleAsLibass() {
-        assertEquals(0f, subtitleOutlineWidthPx(0, 720f))
-        assertEquals(2f, subtitleOutlineWidthPx(2, 720f))
-        assertEquals(3f, subtitleOutlineWidthPx(2, 1080f))
-        assertEquals(6f, subtitleOutlineWidthPx(2, 2160f))
-        assertEquals(0f, subtitleOutlineWidthPx(-2, 720f))
-        assertEquals(2f, subtitleOutlineWidthPx(2, 0f))
-    }
-
-    @Test
     fun mpvUsesNativeBlurUnlessOtherStyleSettingsNeedTheComposeOverlay() {
         val blurOnly = SubtitleStyleState(appearance = SubtitleAppearance(outlineBlur = 4))
         assertTrue(blurOnly.usesStyledOverlay)

@@ -372,7 +372,8 @@ actual fun PlatformPlayerSurface(
                     fontSize = style.toMpvSubtitleFontSize(),
                     subPos = style.toMpvSubtitlePosition(),
                     stripSdh = style.stripSdh,
-                    styledOverlay = style.usesStyledOverlay,
+                    styledOverlay = style.requiresComposeStyledOverlay,
+                    outlineBlur = style.mpvNativeOutlineBlurLevel,
                 )
             }
 
