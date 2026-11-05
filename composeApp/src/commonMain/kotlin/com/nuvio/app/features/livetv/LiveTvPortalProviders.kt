@@ -50,8 +50,13 @@ internal fun xtreamEpgUrl(settings: LiveTvXtreamSettings): String {
     return "${normalized.serverUrl}/xmltv.php?username=${normalized.username.encodeURLParameter()}&password=${normalized.password.encodeURLParameter()}"
 }
 
-private suspend fun xtreamRequest(settings: LiveTvXtreamSettings, action: String): JsonElement {
-    val url = "${settings.serverUrl}/player_api.php?username=${settings.username.encodeURLParameter()}&password=${settings.password.encodeURLParameter()}&action=${action.encodeURLParameter()}"
+private suspend fun xtreamRequest(
+    settings: LiveTvXtreamSettings,
+    action: String,
+    params: Map<String, String> = emptyMap(),
+): JsonElement {
+    val extra = params.entries.joinToString("") { (key, value) -> "&${key.encodeURLParameter()}=${value.encodeURLParameter()}" }
+    val url = "${settings.serverUrl}/player_api.php?username=${settings.username.encodeURLParameter()}&password=${settings.password.encodeURLParameter()}&action=${action.encodeURLParameter()}$extra"
     return portalJson.parseToJsonElement(httpGetTextWithHeaders(url, playlistRequestHeaders))
 }
 
@@ -201,3 +206,97 @@ private fun JsonObject.js() = (this["js"] as? JsonObject) ?: this
 private fun JsonObject.string(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
 private fun JsonObject.array(key: String) = (this[key] as? JsonArray)?.toList().orEmpty()
 private fun JsonElement.arrayOrEmpty() = (this as? JsonArray)?.toList() ?: (this as? JsonObject)?.array("data").orEmpty()
+
+
+internal suspend fun fetchXtreamVodCatalog(
+    settings: LiveTvXtreamSettings,
+    kind: LiveTvVodKind,
+): LiveTvVodCatalog {
+    val normalized = settings.normalized()
+    val (categoryAction, listAction) = when (kind) {
+        LiveTvVodKind.Movies -> "get_vod_categories" to "get_vod_streams"
+        LiveTvVodKind.Series -> "get_series_categories" to "get_series"
+    }
+    val categories = xtreamRequest(normalized, categoryAction).arrayOrEmpty().mapNotNull { element ->
+        val item = element as? JsonObject ?: return@mapNotNull null
+        val id = item.string("category_id") ?: return@mapNotNull null
+        LiveTvVodCategory(id = id, name = item.string("category_name") ?: id)
+    }
+    val items = xtreamRequest(normalized, listAction).arrayOrEmpty().mapNotNull { element ->
+        val item = element as? JsonObject ?: return@mapNotNull null
+        val name = item.string("name") ?: item.string("title") ?: return@mapNotNull null
+        val remoteId = when (kind) {
+            LiveTvVodKind.Movies -> item.string("stream_id")
+            LiveTvVodKind.Series -> item.string("series_id")
+        } ?: return@mapNotNull null
+        LiveTvVodItem(
+            id = "xtream-${kind.name.lowercase()}:$remoteId",
+            remoteId = remoteId,
+            kind = kind,
+            name = name,
+            posterUrl = item.string("stream_icon") ?: item.string("cover"),
+            categoryId = item.string("category_id"),
+            rating = item.string("rating")?.toDoubleOrNull()?.takeIf { it > 0.0 },
+            plot = item.string("plot"),
+            year = (item.string("year") ?: item.string("releaseDate") ?: item.string("release_date"))
+                ?.take(4)
+                ?.takeIf { year -> year.all(Char::isDigit) },
+            extension = item.string("container_extension")?.trim()?.trimStart('.')?.ifBlank { null },
+            addedSeconds = item.string("added")?.toLongOrNull() ?: item.string("last_modified")?.toLongOrNull(),
+        )
+    }.distinctBy { it.id }
+    val usedCategoryIds = items.mapNotNull { it.categoryId }.toSet()
+    return LiveTvVodCatalog(
+        categories = categories.filter { it.id in usedCategoryIds },
+        items = items,
+    )
+}
+
+internal suspend fun fetchXtreamSeriesEpisodes(
+    settings: LiveTvXtreamSettings,
+    seriesId: String,
+): List<LiveTvVodEpisode> {
+    val normalized = settings.normalized()
+    val root = xtreamRequest(normalized, "get_series_info", mapOf("series_id" to seriesId)) as? JsonObject
+        ?: return emptyList()
+    val episodes = root["episodes"]
+    val groups: List<Pair<String?, JsonElement>> = when (episodes) {
+        is JsonObject -> episodes.entries.map { (season, value) -> season to value }
+        is JsonArray -> episodes.map { null to it }
+        else -> emptyList()
+    }
+    return groups.flatMap { (seasonKey, value) ->
+        val list = (value as? JsonArray)?.toList() ?: listOf(value)
+        list.mapNotNull { element ->
+            val item = element as? JsonObject ?: return@mapNotNull null
+            val id = item.string("id") ?: return@mapNotNull null
+            val info = item["info"] as? JsonObject
+            val season = item.string("season")?.toIntOrNull() ?: seasonKey?.toIntOrNull() ?: 1
+            val number = item.string("episode_num")?.toIntOrNull() ?: 0
+            val extension = item.string("container_extension")?.trim()?.trimStart('.')?.ifBlank { null } ?: "mp4"
+            LiveTvVodEpisode(
+                id = id,
+                season = season,
+                episodeNumber = number,
+                title = item.string("title")?.takeIf(String::isNotBlank) ?: "Episode $number",
+                plot = info?.string("plot"),
+                imageUrl = info?.string("movie_image"),
+                durationText = info?.string("duration"),
+                streamUrl = item.string("direct_source")?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                    ?: normalized.seriesStreamUrl(id, extension),
+                extension = extension,
+            )
+        }
+    }.sortedWith(compareBy({ it.season }, { it.episodeNumber }))
+}
+
+internal fun xtreamMovieStreamUrl(settings: LiveTvXtreamSettings, item: LiveTvVodItem): String {
+    val normalized = settings.normalized()
+    val extension = item.extension ?: "mp4"
+    return "${normalized.serverUrl}/movie/${normalized.username.encodeURLParameter()}/${normalized.password.encodeURLParameter()}/${item.remoteId.encodeURLParameter()}.${extension.encodeURLParameter()}"
+}
+
+internal val liveTvVodRequestHeaders: Map<String, String> get() = streamRequestHeaders
+
+private fun LiveTvXtreamSettings.seriesStreamUrl(id: String, extension: String) =
+    "$serverUrl/series/${username.encodeURLParameter()}/${password.encodeURLParameter()}/${id.encodeURLParameter()}.${extension.encodeURLParameter()}"

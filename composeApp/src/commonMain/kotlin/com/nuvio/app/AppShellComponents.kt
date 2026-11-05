@@ -77,6 +77,7 @@ import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
 import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvScreen
+import com.nuvio.app.features.livetv.LiveTvVodPlayback
 import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
@@ -158,6 +159,7 @@ internal data class AppTabActions(
     val onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     val onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     val onLiveTvChannelClick: (LiveTvChannel) -> Unit = {},
+    val onLiveTvVodClick: (LiveTvVodPlayback) -> Unit = {},
     val onSwitchProfile: (() -> Unit)? = null,
     val onEditProfile: (() -> Unit)? = null,
     val onSettingsPageClick: ((pageName: String, title: String) -> Unit)? = null,
@@ -248,6 +250,7 @@ internal fun AppTabHost(
                 LiveTvScreen(
                     scrollToTopRequests = requests.liveTvScrollToTopRequests,
                     onChannelClick = actions.onLiveTvChannelClick,
+                    onVodClick = actions.onLiveTvVodClick,
                 )
             }
 
