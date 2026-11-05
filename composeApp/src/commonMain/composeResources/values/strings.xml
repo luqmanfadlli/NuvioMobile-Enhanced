@@ -544,6 +544,7 @@
     <string name="compose_settings_page_notifications">Notifications</string>
     <string name="compose_settings_page_playback">Playback</string>
     <string name="compose_settings_page_plugins">Plugins</string>
+    <string name="compose_settings_page_cloudstream">CloudStream / CS3</string>
     <string name="compose_settings_page_poster_customization">Poster Card Style</string>
     <string name="compose_settings_page_privacy_policy">Privacy Policy</string>
     <string name="compose_settings_page_root">Settings</string>
@@ -938,6 +939,7 @@
     <string name="settings_content_discovery_addons_description">Install, remove, refresh, and sort your content sources.</string>
     <string name="settings_content_discovery_addons_description_appstore">Add and manage the addons you use with Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Install JavaScript scraper repositories and test providers internally.</string>
+    <string name="settings_content_discovery_cloudstream_description">Install CloudStream CS3 repositories, search providers, and manage CloudStream sources.</string>
     <string name="settings_content_discovery_homescreen_description">Adjust home layout, content visibility, and poster behavior</string>
     <string name="settings_content_discovery_meta_screen_description">Settings for the detail and episode screens.</string>
     <string name="settings_content_discovery_collections_description">Create custom catalog groupings with folders shown on Home.</string>
