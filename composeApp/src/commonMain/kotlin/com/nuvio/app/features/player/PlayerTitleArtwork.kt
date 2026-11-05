@@ -61,6 +61,7 @@ internal fun PlayerTitleArtwork(
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
                 onSuccess = { loadedState.value = true },
+                onError = { loadedState.value = false },
                 modifier = Modifier
                     .height(maxLogoHeight)
                     .widthIn(max = maxLogoWidth)
