@@ -186,7 +186,6 @@ internal fun PlayerControlsShell(
     onWake: () -> Unit = {},
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
-    titleLogoImageLoaded: androidx.compose.runtime.MutableState<Boolean>,
 ) {
     if (foldLayout) {
         FoldControls(
@@ -231,7 +230,6 @@ internal fun PlayerControlsShell(
             modifier = modifier,
             titleLogo = titleLogo,
             showTitleLogo = showTitleLogo,
-            titleLogoImageLoaded = titleLogoImageLoaded,
         )
         return
     }
@@ -289,7 +287,6 @@ internal fun PlayerControlsShell(
                     title = title,
                     titleLogo = titleLogo,
                     showTitleLogo = showTitleLogo,
-                    imageLoadedState = titleLogoImageLoaded,
                     streamTitle = streamTitle,
                     providerName = providerName,
                     seasonNumber = seasonNumber,
@@ -438,8 +435,7 @@ internal fun PlayerControlsShell(
                             metrics = metrics,
                             badges = badges,
                             showTitleArtwork = !showParentalGuide,
-                            imageLoadedState = titleLogoImageLoaded,
-                        )
+                                )
                     }
                     Row(
                         modifier = Modifier
@@ -523,7 +519,6 @@ private fun PlayerHeader(
     title: String,
     titleLogo: String?,
     showTitleLogo: Boolean,
-    imageLoadedState: androidx.compose.runtime.MutableState<Boolean>,
     streamTitle: String,
     providerName: String,
     seasonNumber: Int?,
@@ -585,7 +580,6 @@ private fun PlayerHeader(
                         title = title,
                         logoUrl = titleLogo,
                         showLogo = showTitleLogo,
-                        imageLoadedState = imageLoadedState,
                         textStyle = typeScale.titleLg.copy(
                             fontSize = metrics.titleSize,
                             lineHeight = metrics.titleSize * 1.16f,
