@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.takeOrElse
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
