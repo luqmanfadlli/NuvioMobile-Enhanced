@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -38,6 +39,7 @@ internal fun PlayerTitleArtwork(
             model = url,
             contentDescription = title,
             contentScale = ContentScale.Fit,
+            alignment = Alignment.CenterStart,
             onError = { imageLoadFailed = true },
             modifier = modifier
                 .height(maxLogoHeight)
