@@ -133,7 +133,10 @@ object LiveTvSportsRepository {
     private val log = Logger.withTag("LiveTvSports")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val headers = mapOf("Accept" to "application/json", "User-Agent" to "Nuvio/1.0")
+    private val headers = mapOf(
+        "Accept" to "application/json",
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36",
+    )
     private val _uiState = MutableStateFlow(LiveTvSportsUiState())
     val uiState: StateFlow<LiveTvSportsUiState> = _uiState.asStateFlow()
     private var job: Job? = null
@@ -192,9 +195,21 @@ object LiveTvSportsRepository {
     }
 
     private suspend fun fetchLeague(league: LiveTvSportsLeague, dateRange: String): List<LiveTvSportsEvent> {
-        val url = "https://site.api.espn.com/apis/site/v2/sports/${league.path}/scoreboard?dates=$dateRange&limit=200"
-        val root = json.parseToJsonElement(httpGetTextWithHeaders(url, headers)) as? JsonObject ?: return emptyList()
-        return root.arr("events").mapNotNull { element -> parseEvent(element as? JsonObject ?: return@mapNotNull null, league) }
+        val base = "https://site.api.espn.com/apis/site/v2/sports/${league.path}/scoreboard"
+        val ranged = fetchScoreboard(league, "$base?dates=$dateRange&limit=1000")
+        if (ranged.isNotEmpty()) return ranged
+        return fetchScoreboard(league, "$base?limit=1000")
+    }
+
+    private suspend fun fetchScoreboard(league: LiveTvSportsLeague, url: String): List<LiveTvSportsEvent> {
+        val text = httpGetTextWithHeaders(url, headers)
+        val root = json.parseToJsonElement(text) as? JsonObject ?: return emptyList()
+        return root.arr("events").mapNotNull { element ->
+            val event = element as? JsonObject ?: return@mapNotNull null
+            runCatching { parseEvent(event, league) }
+                .onFailure { log.w { "ESPN ${league.id} event parse failed: ${it.message}" } }
+                .getOrNull()
+        }
     }
 
     private fun parseEvent(event: JsonObject, league: LiveTvSportsLeague): LiveTvSportsEvent? {
