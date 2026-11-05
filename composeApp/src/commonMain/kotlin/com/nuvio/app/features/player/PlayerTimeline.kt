@@ -70,7 +70,6 @@ internal fun PlayerTimelineDetails(
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
     showTitleArtwork: Boolean = true,
-    imageLoadedState: androidx.compose.runtime.MutableState<Boolean>? = null,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
@@ -78,7 +77,6 @@ internal fun PlayerTimelineDetails(
             title = title,
             logoUrl = titleLogo,
             showLogo = showTitleLogo,
-            imageLoadedState = imageLoadedState,
             modifier = Modifier
                 .graphicsLayer {
                     alpha = playerTitleArtworkVisibilityAlpha(showTitleArtwork)
