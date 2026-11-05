@@ -164,6 +164,9 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 PlayerStreamsRepository.pruneDeadSource(failed, stableIdentityKey)
                 deadLinkStatusMessage = "Skipping unavailable source · ${failed.addonName} · ${failed.streamLabel}"
             },
+            // Semi-auto candidates are already ranked by quality tier and provider preference.
+            // Preserve that order during dead-link recovery instead of re-sorting by add-on type.
+            preserveCandidateOrder = { args.semiAutoSelectedQuality != null },
         )
     }
     DisposableEffect(deadLinkMonitor) { onDispose { deadLinkMonitor.close() } }
