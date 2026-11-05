@@ -128,7 +128,6 @@ internal fun PlayerControlsShell(
     useLegacyLayout: Boolean = false,
     showRemainingTime: Boolean = false,
     onRuntimeClick: () -> Unit = {},
-    releaseInfo: String? = null,
     badges: List<StreamBadge> = emptyList(),
     hideDetails: Boolean = false,
     onNextEpisodeClick: (() -> Unit)? = null,
