@@ -186,7 +186,7 @@ internal fun PlayerControlsShell(
     onWake: () -> Unit = {},
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
- ) {
+) {
     val titleLogoImageLoaded = remember(titleLogo, showTitleLogo) { mutableStateOf(false) }
     if (foldLayout) {
         FoldControls(
@@ -434,9 +434,10 @@ internal fun PlayerControlsShell(
                             seasonNumber = seasonNumber,
                             episodeNumber = episodeNumber,
                             episodeTitle = episodeTitle,
-                            releaseInfo = releaseInfo,
                             metrics = metrics,
                             badges = badges,
+                            showTitleArtwork = !showParentalGuide,
+                            imageLoadedState = titleLogoImageLoaded,
                         )
                     }
                     Row(
