@@ -59,6 +59,8 @@ internal val PlayerChapterMarkColor = Color.Black.copy(alpha = 0.6f)
 @Composable
 internal fun PlayerTimelineDetails(
     title: String,
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
@@ -69,16 +71,17 @@ internal fun PlayerTimelineDetails(
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
-        Text(
-            text = title,
-            style = typeScale.titleLg.copy(
+        PlayerTitleArtwork(
+            title = title,
+            logoUrl = titleLogo,
+            showLogo = showTitleLogo,
+            textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = Color.White,
+            textColor = Color.White,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         if (seasonNumber != null && episodeNumber != null) {
             val episodeCode = stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)

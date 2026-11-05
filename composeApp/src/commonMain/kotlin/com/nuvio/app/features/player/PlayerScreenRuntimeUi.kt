@@ -507,6 +507,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             playerController?.isPictureInPictureSupported() == true
         PlayerControlsShell(
             title = title,
+            titleLogo = if (isLiveTvPlayback) activeLogo else logo,
+            showTitleLogo = playerSettingsUiState.showPlayerTitleLogo,
             streamTitle = activeStreamTitle,
             providerName = liveTvNowProgramTitle?.let { programTitle -> "$activeProviderName · $programTitle" } ?: activeProviderName,
             seasonNumber = activeSeasonNumber,
