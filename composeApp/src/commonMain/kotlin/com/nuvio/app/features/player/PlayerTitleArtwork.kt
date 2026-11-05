@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
@@ -21,6 +22,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.size.Scale
+import coil3.size.Size
 
 /**
  * Replaces the title only after Coil has loaded the artwork successfully.
@@ -47,7 +49,7 @@ internal fun PlayerTitleArtwork(
         val imageRequest = remember(url, requestWidth, requestHeight, platformContext) {
             ImageRequest.Builder(platformContext)
                 .data(url)
-                .size(requestWidth, requestHeight)
+                .size(Size(requestWidth, requestHeight))
                 .scale(Scale.FIT)
                 .build()
         }
