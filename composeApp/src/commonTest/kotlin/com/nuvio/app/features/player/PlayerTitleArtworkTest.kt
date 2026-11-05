@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -31,5 +32,21 @@ class PlayerTitleArtworkTest {
     @Test
     fun `falls back to the title when the image request fails`() {
         assertFalse(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
+    }
+ 
+    @Test
+    fun `hides title artwork immediately while parental warnings are visible`() {
+        assertEquals(
+            0f,
+            playerTitleArtworkVisibilityAlpha(showTitleArtwork = false, animatedAlpha = 0.95f),
+        )
+    }
+
+    @Test
+    fun `preserves the normal metadata fade when parental warnings are hidden`() {
+        assertEquals(
+            0.35f,
+            playerTitleArtworkVisibilityAlpha(showTitleArtwork = true, animatedAlpha = 0.35f),
+        )
     }
 }
