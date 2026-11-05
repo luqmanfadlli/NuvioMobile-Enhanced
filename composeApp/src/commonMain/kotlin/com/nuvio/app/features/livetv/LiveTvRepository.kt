@@ -43,6 +43,7 @@ object LiveTvRepository {
             xtreamSettings = LiveTvStorage.loadXtreamSettings(),
             favoriteChannelIds = loadFavoriteChannelIds(),
             lastWatchedChannelId = LiveTvStorage.loadLastWatchedChannelId(),
+            recentChannelIds = loadRecentChannelIds(),
             isNavigationEnabled = LiveTvStorage.loadNavigationEnabled() ?: true,
             epgSources = decodeEpgSources(LiveTvStorage.loadEpgSourcesBlob().orEmpty()),
             isEpgAutoDetectEnabled = LiveTvStorage.loadEpgAutoDetectEnabled() ?: true,
@@ -589,8 +590,30 @@ object LiveTvRepository {
     fun markChannelWatched(channel: LiveTvChannel) {
         ensureLoaded()
         LiveTvStorage.saveLastWatchedChannelId(channel.id)
-        _uiState.value = _uiState.value.copy(lastWatchedChannelId = channel.id)
+        val recents = (listOf(channel.id) + _uiState.value.recentChannelIds.filterNot { it == channel.id })
+            .take(LIVE_TV_MAX_RECENT_CHANNELS)
+        LiveTvStorage.saveRecentChannelIdsBlob(recents.joinToString("\n"))
+        _uiState.value = _uiState.value.copy(
+            lastWatchedChannelId = channel.id,
+            recentChannelIds = recents,
+        )
     }
+
+    fun clearRecentChannels() {
+        ensureLoaded()
+        LiveTvStorage.saveRecentChannelIdsBlob("")
+        _uiState.value = _uiState.value.copy(recentChannelIds = emptyList())
+    }
+
+    private fun loadRecentChannelIds(): List<String> =
+        LiveTvStorage.loadRecentChannelIdsBlob()
+            .orEmpty()
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(LIVE_TV_MAX_RECENT_CHANNELS)
+            .toList()
 
     private fun publishNavigationVisibility() {
         LiveTvStorage.publishNavigationVisibility(_uiState.value.showInNavigation)
@@ -621,6 +644,8 @@ object LiveTvRepository {
         LiveTvStorage.saveFavoriteChannelIdsBlob(channelIds.sorted().joinToString("\n"))
     }
 }
+
+private const val LIVE_TV_MAX_RECENT_CHANNELS = 30
 
 private const val LIVE_TV_EPG_CACHE_TTL_MILLIS = 24L * 60L * 60L * 1000L
 

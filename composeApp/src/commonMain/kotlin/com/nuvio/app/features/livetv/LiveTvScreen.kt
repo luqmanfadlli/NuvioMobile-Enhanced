@@ -103,6 +103,16 @@ import nuvio.composeapp.generated.resources.live_tv_no_playlist_message
 import nuvio.composeapp.generated.resources.live_tv_no_playlist_title
 import nuvio.composeapp.generated.resources.live_tv_search_placeholder
 import nuvio.composeapp.generated.resources.live_tv_title
+import nuvio.composeapp.generated.resources.live_tv_action_clear_recents
+import nuvio.composeapp.generated.resources.live_tv_action_search
+import nuvio.composeapp.generated.resources.live_tv_filter_recents
+import nuvio.composeapp.generated.resources.live_tv_section_channels
+import nuvio.composeapp.generated.resources.live_tv_section_coming_soon_message
+import nuvio.composeapp.generated.resources.live_tv_section_coming_soon_title
+import nuvio.composeapp.generated.resources.live_tv_section_guide
+import nuvio.composeapp.generated.resources.live_tv_section_on_demand
+import nuvio.composeapp.generated.resources.live_tv_section_sports
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -124,6 +134,8 @@ fun LiveTvScreen(
         }
     }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var isSearchVisible by rememberSaveable { mutableStateOf(false) }
+    var section by rememberSaveable { mutableStateOf(LiveTvSection.Channels) }
     var filterMode by rememberSaveable { mutableStateOf(LiveTvChannelFilterMode.All) }
     var selectedCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
     var guideChannelId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -151,6 +163,7 @@ fun LiveTvScreen(
     val visibleChannels = remember(
         uiState.channels,
         uiState.favoriteChannelIds,
+        uiState.recentChannelIds,
         filterMode,
         selectedCategoryName,
         searchQuery,
@@ -159,6 +172,7 @@ fun LiveTvScreen(
         filterLiveTvChannels(
             channels = uiState.channels,
             favoriteChannelIds = uiState.favoriteChannelIds,
+            recentChannelIds = uiState.recentChannelIds,
             filterMode = filterMode,
             selectedCategoryName = selectedCategoryName,
             searchQuery = searchQuery,
@@ -169,6 +183,31 @@ fun LiveTvScreen(
     val lastWatchedChannel = remember(uiState.channels, uiState.lastWatchedChannelId) {
         uiState.lastWatchedChannelId?.let { channelId ->
             uiState.channels.firstOrNull { it.id == channelId }
+        }
+    }
+
+    val hasRecents = remember(uiState.channels, uiState.recentChannelIds) {
+        val ids = uiState.recentChannelIds.toSet()
+        ids.isNotEmpty() && uiState.channels.any { it.id in ids }
+    }
+    val hasFavorites = remember(uiState.channels, uiState.favoriteChannelIds) {
+        uiState.favoriteChannelIds.isNotEmpty() &&
+            uiState.channels.any { it.id in uiState.favoriteChannelIds }
+    }
+    val categoryChips = remember(categoryOptions, uiState.channels, uncategorizedLabel) {
+        val hasUncategorized = uiState.channels.any { it.group.isNullOrBlank() }
+        categoryOptions
+            .filter { it.mode == LiveTvChannelFilterMode.Category }
+            .filter { hasUncategorized || it.categoryName != uncategorizedLabel }
+            .mapNotNull { it.categoryName }
+    }
+
+    LaunchedEffect(hasRecents, hasFavorites, filterMode) {
+        if ((filterMode == LiveTvChannelFilterMode.Recents && !hasRecents) ||
+            (filterMode == LiveTvChannelFilterMode.Favorites && !hasFavorites)
+        ) {
+            filterMode = LiveTvChannelFilterMode.All
+            selectedCategoryName = null
         }
     }
 
@@ -183,7 +222,7 @@ fun LiveTvScreen(
         }
     }
 
-    LaunchedEffect(searchQuery, filterMode, selectedCategoryName) {
+    LaunchedEffect(searchQuery, filterMode, selectedCategoryName, section) {
         listState.scrollToItem(0)
     }
 
@@ -246,6 +285,16 @@ fun LiveTvScreen(
                         title = stringResource(Res.string.live_tv_title),
                         includeStatusBarPadding = false,
                         actions = {
+                            if (showChannelControls && section == LiveTvSection.Channels) {
+                                NuvioIconActionButton(
+                                    icon = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                                    contentDescription = stringResource(Res.string.live_tv_action_search),
+                                    onClick = {
+                                        if (isSearchVisible) searchQuery = ""
+                                        isSearchVisible = !isSearchVisible
+                                    },
+                                )
+                            }
                             if (uiState.hasPlaylist) {
                                 NuvioIconActionButton(
                                     icon = Icons.Rounded.Refresh,
@@ -255,23 +304,34 @@ fun LiveTvScreen(
                             }
                         },
                     )
-                    if (showChannelControls) {
+                    if (uiState.hasPlaylist) {
+                        LiveTvSectionTabs(
+                            selected = section,
+                            onSelected = { section = it },
+                        )
+                    }
+                    if (showChannelControls && section == LiveTvSection.Channels) {
                         LiveTvChannelControls(
-                            topPadding = 0.dp,
+                            searchVisible = isSearchVisible,
                             searchQuery = searchQuery,
                             onSearchQueryChange = { searchQuery = it },
-                            categoryOptions = categoryOptions,
-                            selectedCategoryName = selectedCategoryName,
                             filterMode = filterMode,
+                            selectedCategoryName = selectedCategoryName,
                             allLabel = allChannelsLabel,
                             favoritesLabel = favoritesLabel,
-                            categoryLabel = chooseCategoryLabel,
+                            showRecents = hasRecents,
+                            showFavorites = hasFavorites,
+                            categories = categoryChips,
                             channelCount = visibleChannels.size,
-                            background = Color.Transparent,
                             onAllSelected = {
                                 filterMode = LiveTvChannelFilterMode.All
                                 selectedCategoryName = null
                             },
+                            onRecentsSelected = {
+                                filterMode = LiveTvChannelFilterMode.Recents
+                                selectedCategoryName = null
+                            },
+                            onClearRecents = LiveTvRepository::clearRecentChannels,
                             onFavoritesSelected = {
                                 filterMode = LiveTvChannelFilterMode.Favorites
                                 selectedCategoryName = null
@@ -285,7 +345,14 @@ fun LiveTvScreen(
                 }
             }
 
-            when {
+            if (uiState.hasPlaylist && section != LiveTvSection.Channels) {
+                item {
+                    HomeEmptyStateCard(
+                        title = stringResource(Res.string.live_tv_section_coming_soon_title),
+                        message = stringResource(Res.string.live_tv_section_coming_soon_message),
+                    )
+                }
+            } else when {
                 uiState.isLoading && uiState.channels.isEmpty() -> {
                     item {
                         Box(
@@ -395,19 +462,64 @@ private const val ChannelControlsKey = "channel-controls"
 private val LiveTvScreenHorizontalPadding = 16.dp
 
 @Composable
+private fun LiveTvSectionTabs(
+    selected: LiveTvSection,
+    onSelected: (LiveTvSection) -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(top = 4.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LiveTvSection.entries.forEach { item ->
+            val isSelected = item == selected
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onSelected(item) }
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(item.label),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) tokens.colors.textPrimary else tokens.colors.textMuted,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .width(24.dp)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (isSelected) tokens.colors.accent else Color.Transparent),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LiveTvChannelControls(
+    searchVisible: Boolean,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    categoryOptions: List<LiveTvCategoryFilterOption>,
-    selectedCategoryName: String?,
     filterMode: LiveTvChannelFilterMode,
+    selectedCategoryName: String?,
     allLabel: String,
     favoritesLabel: String,
-    categoryLabel: String,
+    showRecents: Boolean,
+    showFavorites: Boolean,
+    categories: List<String>,
     channelCount: Int,
-    background: Color,
-    topPadding: Dp,
     onAllSelected: () -> Unit,
+    onRecentsSelected: () -> Unit,
+    onClearRecents: () -> Unit,
     onFavoritesSelected: () -> Unit,
     onGroupSelected: (String) -> Unit,
 ) {
@@ -415,32 +527,61 @@ private fun LiveTvChannelControls(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(background)
-            .padding(top = topPadding + 4.dp, bottom = 4.dp),
+            .padding(bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
     ) {
-        LiveTvSearchField(
-            query = searchQuery,
-            onQueryChange = onSearchQueryChange,
-        )
+        AnimatedVisibility(visible = searchVisible) {
+            LiveTvSearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LiveTvFilterPanelRow(
-                modifier = Modifier.weight(1f),
-                groups = categoryOptions
-                    .filter { option -> option.mode == LiveTvChannelFilterMode.Category }
-                    .map { option -> option.label },
-                selectedGroup = selectedCategoryName,
-                favoritesOnly = filterMode == LiveTvChannelFilterMode.Favorites,
-                allLabel = allLabel,
-                favoritesLabel = favoritesLabel,
-                categoryLabel = categoryLabel,
-                onAllSelected = onAllSelected,
-                onFavoritesSelected = onFavoritesSelected,
-                onGroupSelected = onGroupSelected,
-            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LiveTvPanelFilterChip(
+                    label = allLabel,
+                    selected = filterMode == LiveTvChannelFilterMode.All,
+                    onClick = onAllSelected,
+                )
+                if (showRecents) {
+                    LiveTvPanelFilterChip(
+                        label = stringResource(Res.string.live_tv_filter_recents),
+                        selected = filterMode == LiveTvChannelFilterMode.Recents,
+                        onClick = onRecentsSelected,
+                    )
+                    if (filterMode == LiveTvChannelFilterMode.Recents) {
+                        LiveTvPanelFilterChip(
+                            label = stringResource(Res.string.live_tv_action_clear_recents),
+                            selected = false,
+                            onClick = onClearRecents,
+                        )
+                    }
+                }
+                if (showFavorites) {
+                    LiveTvPanelFilterChip(
+                        label = favoritesLabel,
+                        selected = filterMode == LiveTvChannelFilterMode.Favorites,
+                        onClick = onFavoritesSelected,
+                    )
+                }
+                categories.forEach { category ->
+                    LiveTvPanelFilterChip(
+                        label = category,
+                        selected = filterMode == LiveTvChannelFilterMode.Category &&
+                            selectedCategoryName.equals(category, ignoreCase = true),
+                        onClick = { onGroupSelected(category) },
+                    )
+                }
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = channelCount.toString(),
@@ -898,8 +1039,16 @@ private fun ChannelLogo(
     }
 }
 
+private enum class LiveTvSection(val label: StringResource) {
+    Channels(Res.string.live_tv_section_channels),
+    Guide(Res.string.live_tv_section_guide),
+    Sports(Res.string.live_tv_section_sports),
+    OnDemand(Res.string.live_tv_section_on_demand),
+}
+
 private enum class LiveTvChannelFilterMode {
     All,
+    Recents,
     Favorites,
     Category,
 }
@@ -939,17 +1088,20 @@ private fun buildLiveTvCategoryFilterOptions(
 private fun filterLiveTvChannels(
     channels: List<LiveTvChannel>,
     favoriteChannelIds: Set<String>,
+    recentChannelIds: List<String>,
     filterMode: LiveTvChannelFilterMode,
     selectedCategoryName: String?,
     searchQuery: String,
     uncategorizedGroupName: String,
 ): List<LiveTvChannel> {
     val normalizedQuery = searchQuery.trim().lowercase()
-    return channels
+    val recentOrder = recentChannelIds.withIndex().associate { (index, id) -> id to index }
+    val filtered = channels
         .asSequence()
         .filter { channel ->
             when (filterMode) {
                 LiveTvChannelFilterMode.All -> true
+                LiveTvChannelFilterMode.Recents -> channel.id in recentOrder
                 LiveTvChannelFilterMode.Favorites -> channel.id in favoriteChannelIds
                 LiveTvChannelFilterMode.Category -> selectedCategoryName == null ||
                     categoryNameForChannel(channel, uncategorizedGroupName).equals(selectedCategoryName, ignoreCase = true)
@@ -961,8 +1113,11 @@ private fun filterLiveTvChannels(
                 categoryNameForChannel(channel, uncategorizedGroupName).lowercase().contains(normalizedQuery) ||
                 channel.playlistName.orEmpty().lowercase().contains(normalizedQuery)
         }
-        .sortedBy { it.name.lowercase() }
-        .toList()
+    return if (filterMode == LiveTvChannelFilterMode.Recents) {
+        filtered.sortedBy { recentOrder[it.id] ?: Int.MAX_VALUE }.toList()
+    } else {
+        filtered.sortedBy { it.name.lowercase() }.toList()
+    }
 }
 
 private fun categoryNameForChannel(
