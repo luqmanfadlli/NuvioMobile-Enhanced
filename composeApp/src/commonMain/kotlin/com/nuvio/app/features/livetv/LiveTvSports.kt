@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
@@ -50,9 +51,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -166,6 +165,7 @@ object LiveTvSportsRepository {
                             throw error
                         } catch (error: Throwable) {
                             log.w { "ESPN ${league.id} failed: ${error.message}" }
+                            InAppLogger.warn(SPORTS_LOG_TAG, "ESPN ${league.id} failed: ${error.message ?: error::class.simpleName}")
                             Result.failure(error)
                         }
                     }
@@ -184,10 +184,23 @@ object LiveTvSportsRepository {
                 .distinctBy { "${it.league.id}:${it.id}" }
                 .sortedWith(liveTvSportsEventOrder)
             val allFailed = results.isNotEmpty() && results.all { it.isFailure }
+            val failures = results.mapIndexedNotNull { index, result ->
+                result.exceptionOrNull()?.let { "${liveTvSportsLeagues[index].label}: ${it.message ?: it::class.simpleName}" }
+            }
+            val rawCount = results.sumOf { it.getOrNull()?.size ?: 0 }
+            InAppLogger.info(
+                SPORTS_LOG_TAG,
+                "ESPN refresh: ${events.size} shown, $rawCount parsed, ${failures.size} leagues failed, range=$range",
+            )
+            val emptyReason = when {
+                events.isNotEmpty() -> null
+                failures.isNotEmpty() -> failures.take(3).joinToString("\n")
+                else -> null
+            }
             _uiState.value = LiveTvSportsUiState(
                 isLoading = false,
                 hasLoaded = true,
-                errorMessage = if (allFailed) results.first().exceptionOrNull()?.message ?: "Network error" else null,
+                errorMessage = emptyReason ?: if (allFailed) results.first().exceptionOrNull()?.message ?: "Network error" else null,
                 events = if (allFailed) _uiState.value.events else events,
                 updatedAtMillis = nowMillis,
             )
@@ -204,17 +217,25 @@ object LiveTvSportsRepository {
     private suspend fun fetchScoreboard(league: LiveTvSportsLeague, url: String): List<LiveTvSportsEvent> {
         val text = httpGetTextWithHeaders(url, headers)
         val root = json.parseToJsonElement(text) as? JsonObject ?: return emptyList()
-        return root.arr("events").mapNotNull { element ->
+        val raw = root.arr("events")
+        var firstFailure: String? = null
+        val parsed = raw.mapNotNull { element ->
             val event = element as? JsonObject ?: return@mapNotNull null
             runCatching { parseEvent(event, league) }
-                .onFailure { log.w { "ESPN ${league.id} event parse failed: ${it.message}" } }
+                .onFailure { if (firstFailure == null) firstFailure = it.message ?: it::class.simpleName }
                 .getOrNull()
         }
+        if (raw.isNotEmpty() && parsed.isEmpty()) {
+            val reason = firstFailure?.let { failure -> " ($failure)" }.orEmpty()
+            error("0 of " + raw.size + " events readable" + reason)
+        }
+        return parsed
     }
 
     private fun parseEvent(event: JsonObject, league: LiveTvSportsLeague): LiveTvSportsEvent? {
         val id = event.str("id") ?: return null
-        val startMillis = event.str("date")?.let(::parseEspnDate) ?: return null
+        val rawDate = event.str("date")
+        val startMillis = rawDate?.let(::parseEspnDate) ?: error("unreadable date: " + rawDate)
         val statusType = (event.obj("status") ?: event.arr("competitions").firstObj()?.obj("status"))?.obj("type")
         val state = when (statusType?.str("state")) {
             "in" -> LiveTvSportsState.Live
@@ -264,6 +285,7 @@ object LiveTvSportsRepository {
 }
 
 private const val HOUR_MILLIS = 60L * 60L * 1000L
+private const val SPORTS_LOG_TAG = "LiveTvSports"
 
 private val liveTvSportsEventOrder = Comparator<LiveTvSportsEvent> { a, b ->
     val rank = { event: LiveTvSportsEvent ->
@@ -293,13 +315,21 @@ private val espnDateRegex = Regex("""(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::
 
 private fun parseEspnDate(value: String): Long? {
     val match = espnDateRegex.find(value) ?: return null
-    val (y, mo, d, h, mi) = match.destructured
-    val seconds = match.groupValues.getOrNull(6)?.toIntOrNull() ?: 0
-    return runCatching {
-        LocalDateTime(y.toInt(), mo.toInt(), d.toInt(), h.toInt(), mi.toInt(), seconds)
-            .toInstant(TimeZone.UTC)
-            .toEpochMilliseconds()
-    }.getOrNull()
+    val g = match.groupValues
+    val year = g[1].toInt()
+    val month = g[2].toInt()
+    val day = g[3].toInt()
+    val hour = g[4].toInt()
+    val minute = g[5].toInt()
+    val second = g.getOrNull(6)?.toIntOrNull() ?: 0
+    val y = if (month <= 2) year - 1 else year
+    val era = (if (y >= 0) y else y - 399) / 400
+    val yoe = y - era * 400
+    val mp = if (month > 2) month - 3 else month + 9
+    val doy = (153 * mp + 2) / 5 + day - 1
+    val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    val days = era * 146097L + doe - 719468L
+    return ((days * 24 + hour) * 60 + minute) * 60_000L + second * 1000L
 }
 
 private fun JsonObject.str(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
