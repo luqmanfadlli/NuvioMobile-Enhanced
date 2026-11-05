@@ -424,7 +424,11 @@
     <string name="compose_nav_live_tv">TV ao vivo</string>
     <string name="compose_nav_profile">Perfil</string>
     <string name="compose_nav_search">Busca</string>
-    <string name="compose_player_audio_tracks">Faixas de áudio</string>
+    <string name="compose_player_audio_tracks">Faixas de Áudio</string>
+    <string name="compose_player_audio_delay">Atraso do Áudio</string>
+    <string name="compose_player_audio_amplification">Amplificação</string>
+    <string name="compose_player_audio_amplification_keep">Manter nos Próximos Vídeos</string>
+    <string name="compose_player_center_mix">Nível do Canal Central</string>
     <string name="compose_player_audio">Áudio</string>
     <string name="compose_player_auto_sync">Sincronização automática</string>
     <string name="compose_player_bold">Negrito</string>
@@ -594,7 +598,7 @@
     <string name="settings_advanced_debugging_no_filter_matches">Nenhum log corresponde aos filtros selecionados.</string>
     <string name="settings_advanced_debugging_showing_logs">Exibindo os %1$d logs mais recentes de %2$d filtrados · %3$d/%4$d mantidos</string>
     <string name="settings_advanced_remember_last_profile">Lembrar último perfil</string>
-    <string name="settings_advanced_remember_last_profile_description">Lembra o último perfil selecionado ao iniciar.</string>
+    <string name="settings_advanced_remember_last_profile_description">Lembra o último perfil selecionado ao iniciar</string>
     <string name="settings_advanced_sentry_reports">Relatórios de falhas do Sentry</string>
     <string name="settings_advanced_sentry_reports_subtitle">Envie relatórios de falhas e ANR com contexto seguro. Ativado por padrão.</string>
     <string name="sentry_enable_dialog_title">Ativar relatórios de falhas?</string>
@@ -611,7 +615,7 @@
     <string name="sentry_turn_off">Desativar</string>
     <string name="sentry_turn_on">Ativar</string>
     <string name="settings_advanced_clear_cw_cache">Limpar cache do Continuar assistindo</string>
-    <string name="settings_advanced_clear_cw_cache_subtitle">Remove os dados em cache do Continuar assistindo e atualiza o progresso de reprodução.</string>
+    <string name="settings_advanced_clear_cw_cache_subtitle">Remove os dados em cache do Continuar assistindo e atualiza o progresso de reprodução</string>
     <string name="settings_advanced_clear_cw_cache_done">Cache limpo</string>
     <string name="settings_advanced_clear_metadata_cache">Limpar cache de metadados</string>
     <string name="settings_advanced_clear_metadata_cache_subtitle">Remove do cache os gêneros, as durações e os dados do calendário de lançamentos e os carrega novamente.</string>
@@ -1491,6 +1495,14 @@
     <string name="settings_tmdb_personal_api_key">Chave de API pessoal</string>
     <string name="settings_playback_exo_chapters">Mostrar Capítulos</string>
     <string name="settings_playback_exo_chapters_description">Lê os capítulos dos arquivos MKV para marcá-los na barra de progresso e listá-los no player. Faz algumas pequenas requisições extras quando a reprodução começa. O libmpv sempre mostra os capítulos</string>
+    <string name="settings_playback_remember_audio_delay">Lembrar Atraso do Áudio por Dispositivo</string>
+    <string name="settings_playback_remember_audio_delay_description">Restaura o atraso do áudio definido no player sempre que a mesma saída tocar de novo, como o alto-falante do celular, fones com fio ou cada dispositivo Bluetooth</string>
+    <string name="settings_playback_downmix_section">Downmix</string>
+    <string name="settings_playback_downmix">Ativar Downmix</string>
+    <string name="settings_playback_downmix_description">Mixa o áudio surround para o número de canais abaixo com o decodificador FFmpeg do app. Requer a prioridade do decodificador de Vídeo “Preferir decodificadores do app (FFmpeg)”. A saída Bluetooth sempre recebe um downmix 2.0.</string>
+    <string name="settings_playback_downmix_channels">Número de Canais</string>
+    <string name="settings_playback_downmix_maintain_volume">Manter Áudio Original no Downmix</string>
+    <string name="settings_playback_downmix_maintain_volume_description">Quando desativado, a normalização do downmix pode reduzir o volume geral.</string>
     <string name="settings_tmdb_enable_enrichment">Ativar Enriquecimento do TMDB</string>
     <string name="settings_tmdb_enable_enrichment_description">Usar o TMDB como fonte de metadados para aprimorar dados de addons</string>
     <string name="settings_tmdb_language_code_label">Código de idioma</string>
