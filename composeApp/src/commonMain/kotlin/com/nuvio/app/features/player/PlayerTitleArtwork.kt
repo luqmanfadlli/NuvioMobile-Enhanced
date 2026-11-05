@@ -1,6 +1,6 @@
 package com.nuvio.app.features.player
 
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +30,7 @@ internal fun PlayerTitleArtwork(
     maxLines: Int,
     modifier: Modifier = Modifier,
 ) {
-    var imageLoadFailed by remember(logoUrl) { mutableStateOf(false) }
+    var imageLoadFailed by remember(logoUrl, showLogo) { mutableStateOf(false) }
     val url = logoUrl?.takeIf { it.isNotBlank() }
     if (showPlayerTitleLogoArtwork(showLogo, url, imageLoadFailed)) {
         val maxLogoHeight = with(LocalDensity.current) { textStyle.fontSize.toDp() * 2.4f }
@@ -40,7 +40,7 @@ internal fun PlayerTitleArtwork(
             contentScale = ContentScale.Fit,
             onError = { imageLoadFailed = true },
             modifier = modifier
-                .heightIn(max = maxLogoHeight)
+                .height(maxLogoHeight)
                 .widthIn(max = 280.dp),
         )
     } else {
