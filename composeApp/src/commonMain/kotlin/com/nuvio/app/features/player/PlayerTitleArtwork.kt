@@ -2,6 +2,7 @@ package com.nuvio.app.features.player
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
@@ -17,6 +18,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.isUnspecified
+import androidx.compose.ui.unit.takeOrElse
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -44,6 +48,14 @@ internal fun PlayerTitleArtwork(
     if (showLogo && url != null) {
         val platformContext = LocalPlatformContext.current
         val density = LocalDensity.current
+        val fallbackLineHeight = textStyle.lineHeight.takeOrElse {
+            textStyle.fontSize.takeOrElse { 18.sp } * 1.2f
+        }
+        val titleSlotHeight = playerTitleArtworkSlotHeight(
+            maxLogoHeight = maxLogoHeight,
+            textLineHeight = with(density) { fallbackLineHeight.toDp() },
+            maxLines = maxLines,
+        )
         val requestWidth = with(density) { maxLogoWidth.roundToPx() }
         val requestHeight = with(density) { maxLogoHeight.roundToPx() }
         val imageRequest = remember(url, requestWidth, requestHeight, platformContext) {
@@ -64,7 +76,7 @@ internal fun PlayerTitleArtwork(
             imageLoaded = painterState is AsyncImagePainter.State.Success,
         )
         Box(
-            modifier = modifier,
+            modifier = modifier.fillMaxWidth().height(titleSlotHeight),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (showArtwork) {
@@ -114,6 +126,12 @@ private fun PlayerTitleText(
         modifier = modifier,
     )
 }
+
+internal fun playerTitleArtworkSlotHeight(
+    maxLogoHeight: Dp,
+    textLineHeight: Dp,
+    maxLines: Int,
+): Dp = maxOf(maxLogoHeight, textLineHeight * maxLines.toFloat())
 
 internal fun showPlayerTitleLogoArtwork(
     enabled: Boolean,
