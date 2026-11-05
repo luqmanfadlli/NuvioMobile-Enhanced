@@ -210,6 +210,9 @@ internal class WeTrakrProjection(val snapshot: WeTrakrSyncSnapshot) {
         listEntries
             .filter { it.media.isMovie && it.status.equals(WeTrakrStatus.WATCHED, ignoreCase = true) }
             .forEach { entry -> entry.media.ids.aliases().forEach { alias -> keys += watchedItemKeys("movie", alias) } }
+        listEntries
+            .filter { !it.media.isMovie && it.status.equals(WeTrakrStatus.WATCHED, ignoreCase = true) }
+            .forEach { entry -> entry.media.ids.aliases().forEach { alias -> keys += watchedItemKeys("series", alias) } }
         snapshot.watchedEpisodes.forEach { episode ->
             val aliases = (showFor(episode)?.ids?.aliases().orEmpty() + episode.showIds.aliases()).distinct()
             aliases.forEach { alias -> keys += watchedItemKeys("series", alias, episode.season, episode.number) }

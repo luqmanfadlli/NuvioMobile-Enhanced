@@ -2,7 +2,7 @@ package com.nuvio.app.core.network
 
 import io.ktor.client.HttpClient
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.errors.IOException
+import kotlinx.io.IOException
 import io.ktor.utils.io.readAvailable
 
 internal expect fun createApiHttpClient(): HttpClient

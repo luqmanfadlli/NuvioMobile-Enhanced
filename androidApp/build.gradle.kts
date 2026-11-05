@@ -90,7 +90,7 @@ android {
         jniLibs.directories.add("../composeApp/src/full/jniLibs")
     }
 
-    sourceSets.getByName("androidTest").assets.srcDir("../testFixtures")
+    sourceSets.getByName("androidTest").assets.directories.add("../testFixtures")
 
     packaging {
         resources {

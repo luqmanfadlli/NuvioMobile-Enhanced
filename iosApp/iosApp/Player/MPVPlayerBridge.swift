@@ -113,7 +113,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         saturation: Int32,
         gamma: Int32
     ) {
-        playerVC?.configureVideoOutput(
+        ensurePlayerViewController().configureVideoOutput(
             hardwareDecoder: hardwareDecoder,
             targetColorspaceHint: targetColorspaceHint,
             toneMapping: toneMapping,
@@ -130,7 +130,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         )
     }
     func configureAudioOutput(audioOutput: String) {
-        playerVC?.configureAudioOutput(audioOutput: audioOutput)
+        ensurePlayerViewController().configureAudioOutput(audioOutput: audioOutput)
     }
     func isNightModeSupported() -> Bool { MPVPlayerViewController.nightModeSupported }
     func setNightMode(enabled: Bool, filter: String, label: String) {
@@ -215,7 +215,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         fontSize: Float,
         subPos: Int32,
         stripSdh: Bool,
-        styledOverlay: Bool
+        styledOverlay: Bool,
+        outlineBlur: Int32
     ) {
         playerVC?.applySubtitleStyle(
             textColor: textColor,
@@ -226,7 +227,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
             fontSize: fontSize,
             subPos: Int(subPos),
             stripSdh: stripSdh,
-            styledOverlay: styledOverlay
+            styledOverlay: styledOverlay,
+            outlineBlur: Int(outlineBlur)
         )
     }
 
@@ -422,6 +424,7 @@ final class MPVPlayerViewController: UIViewController {
         let subPos: Int
         let stripSdh: Bool
         let styledOverlay: Bool
+        let outlineBlur: Int
     }
 
     private var lastLoadRequest: PendingLoadRequest?
@@ -523,7 +526,7 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
-        metalLayer.wantsExtendedDynamicRangeContent = true
+        metalLayer.wantsExtendedDynamicRangeContent = lastVideoOutputSettings?.extendedDynamicRange ?? true
         metalLayer.anchorPoint = CGPoint(x: 0, y: 0)
         metalLayer.position = .zero
         metalLayer.onRenderingSuspensionChanged = { suspended, reason in
@@ -542,11 +545,32 @@ final class MPVPlayerViewController: UIViewController {
         }
         let pip = PlayerPictureInPictureController(owner: self, metalLayer: metalLayer)
         pictureInPictureController = pip
+        if mpv != nil {
+            pip.setSubtitleText(getString("sub-text") ?? "", bold: lastSubtitleStyle?.bold ?? false)
+        }
         view.layer.addSublayer(pip.displayLayer)
         view.layer.addSublayer(metalLayer)
         layoutPlayerSurfaces()
 
         setupMpv()
+        if let settings = lastVideoOutputSettings {
+            configureVideoOutput(
+                hardwareDecoder: settings.hardwareDecoder,
+                targetColorspaceHint: settings.targetColorspaceHint,
+                toneMapping: settings.toneMapping,
+                hdrComputePeak: settings.hdrComputePeak,
+                targetPrimaries: settings.targetPrimaries,
+                targetTransfer: settings.targetTransfer,
+                extendedDynamicRange: settings.extendedDynamicRange,
+                deband: settings.deband,
+                interpolation: settings.interpolation,
+                brightness: settings.brightness,
+                contrast: settings.contrast,
+                saturation: settings.saturation,
+                gamma: settings.gamma
+            )
+        }
+        if let audioOutput = lastAudioOutput { setStringProperty("ao", audioOutput) }
         if !isEmbeddedPreviewMode {
             activateAudioSessionForPlayback()
         }
@@ -1379,7 +1403,8 @@ final class MPVPlayerViewController: UIViewController {
                 fontSize: style.fontSize,
                 subPos: style.subPos,
                 stripSdh: style.stripSdh,
-                styledOverlay: style.styledOverlay
+                styledOverlay: style.styledOverlay,
+                outlineBlur: style.outlineBlur
             )
         }
         setSpeed(currentSpeed)
@@ -1683,7 +1708,8 @@ final class MPVPlayerViewController: UIViewController {
         fontSize: Float,
         subPos: Int,
         stripSdh: Bool,
-        styledOverlay: Bool
+        styledOverlay: Bool,
+        outlineBlur: Int
     ) {
         lastSubtitleStyle = SubtitleStyleSettings(
             textColor: textColor,
@@ -1694,7 +1720,8 @@ final class MPVPlayerViewController: UIViewController {
             fontSize: fontSize,
             subPos: subPos,
             stripSdh: stripSdh,
-            styledOverlay: styledOverlay
+            styledOverlay: styledOverlay,
+            outlineBlur: outlineBlur
         )
         guard mpv != nil else { return }
 
@@ -1712,6 +1739,7 @@ final class MPVPlayerViewController: UIViewController {
         setStringProperty("sub-border-style", hasBackground ? "opaque-box" : "outline-and-shadow")
         setStringProperty("sub-bold", bold ? "yes" : "no")
         setDoubleProperty("sub-outline-size", effectiveOutlineSize)
+        setDoubleProperty("sub-blur", Double(outlineBlur))
         setDoubleProperty("sub-font-size", Double(fontSize))
         setIntProperty("sub-pos", Int64(subPos))
         setStringProperty("sub-filter-sdh", stripSdh ? "yes" : "no")
@@ -1728,7 +1756,9 @@ final class MPVPlayerViewController: UIViewController {
             setStringProperty("sub-visibility", styled ? "no" : "yes")
             styledSubtitleVisible = styled
         }
-        let text = styled ? (getString("sub-text") ?? "") : ""
+        let cueText = getString("sub-text") ?? ""
+        pictureInPictureController?.setSubtitleText(cueText, bold: lastSubtitleStyle?.bold ?? false)
+        let text = styled ? cueText : ""
         if text != lastSubtitleText {
             lastSubtitleText = text
             subtitleTextHandler?.onTextChanged(text: text)

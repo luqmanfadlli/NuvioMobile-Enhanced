@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.NewReleases
-import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -839,7 +839,7 @@ private fun ReleaseNotes(
                                 onClick = { uriHandler.openUri(url) },
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.OpenInNew,
+                                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                                     contentDescription = null,
                                     modifier = Modifier.size(NuvioTokens.Icon.sm),
                                 )
@@ -884,7 +884,7 @@ private fun ReleaseNotes(
                                 onClick = { uriHandler.openUri(url) },
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.OpenInNew,
+                                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                                     contentDescription = null,
                                     modifier = Modifier.size(NuvioTokens.Icon.sm),
                                 )

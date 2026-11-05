@@ -34,7 +34,7 @@ class SubtitleAppearanceStorageTest {
     fun appearanceSurvivesRestartAndProfileSync() {
         val style = SubtitleStyleState(
             backgroundColor = Color.Black.copy(alpha = 0.6f),
-            appearance = SubtitleAppearance("serif", 12, true, 65, 4),
+            appearance = SubtitleAppearance("serif", 12, true, 65, 4, outlineBlur = 6),
         )
         PlayerSettingsRepository.setSubtitleStyle(style)
         PlayerSettingsRepository.clearLocalState()

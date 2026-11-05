@@ -1,5 +1,9 @@
 package com.nuvio.app.features.settings
 
+import nuvio.composeapp.generated.resources.settings_tracking_privacy_section
+import nuvio.composeapp.generated.resources.settings_playback_private_viewing_description
+import nuvio.composeapp.generated.resources.settings_playback_private_viewing
+import com.nuvio.app.features.player.PlayerSettingsRepository
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -150,6 +154,27 @@ internal fun LazyListScope.trackingSettingsContent(
                 traktUiState = traktUiState,
                 simklUiState = simklUiState,
             )
+        }
+    }
+
+    item {
+        val playerSettings by remember {
+            PlayerSettingsRepository.ensureLoaded()
+            PlayerSettingsRepository.uiState
+        }.collectAsStateWithLifecycle()
+        SettingsSection(
+            title = stringResource(Res.string.settings_tracking_privacy_section),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_private_viewing),
+                    description = stringResource(Res.string.settings_playback_private_viewing_description),
+                    checked = playerSettings.privateViewingEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setPrivateViewingEnabled,
+                )
+            }
         }
     }
 

@@ -1339,6 +1339,7 @@
     <string name="settings_playback_mini_player_description">Shows the mini player button in the player so you can keep watching in a floating window while you browse. Picture in Picture when leaving the app works either way.</string>
     <string name="settings_playback_private_viewing">Private Viewing</string>
     <string name="settings_playback_private_viewing_description">Don\'t save watch progress, Continue Watching or watched status, and don\'t sync playback to connected trackers.</string>
+    <string name="settings_tracking_privacy_section">Privacy</string>
     <string name="mini_player_play">Play</string>
     <string name="mini_player_pause">Pause</string>
     <string name="mini_player_close">Close mini player</string>
@@ -3015,6 +3016,8 @@
     <string name="subtitle_font_remove">Remove %1$s</string>
     <string name="subtitle_background_opacity">Background opacity</string>
     <string name="subtitle_background_roundness">Corner roundness</string>
+    <string name="subtitle_outline_blur">Outline blur</string>
+    <string name="subtitle_outline_blur_description">Softens only the outline. Subtitle text stays sharp.</string>
     <string name="subtitle_shadow">Drop shadow</string>
     <string name="subtitle_shadow_description">Separate the text from bright scenes.</string>
     <string name="subtitle_shadow_opacity">Shadow opacity</string>

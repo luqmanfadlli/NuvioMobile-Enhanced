@@ -5,6 +5,7 @@ import platform.Foundation.NSString
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.NSUUID
+import platform.Foundation.create
 import platform.Foundation.writeToFile
 
 @OptIn(ExperimentalForeignApi::class)
@@ -12,7 +13,7 @@ internal actual fun writeTemporaryHlsPlaylist(playlistText: String): String? {
     val directory = NSTemporaryDirectory().trimEnd('/')
     val filename = "nuvio_player_quality_${NSUUID().UUIDString}.m3u8"
     val path = "$directory/$filename"
-    val success = (playlistText as NSString).writeToFile(
+    val success = NSString.create(string = playlistText).writeToFile(
         path,
         atomically = true,
         encoding = NSUTF8StringEncoding,
