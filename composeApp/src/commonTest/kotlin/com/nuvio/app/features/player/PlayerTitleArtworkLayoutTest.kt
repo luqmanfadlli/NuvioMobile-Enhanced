@@ -31,6 +31,16 @@ class PlayerTitleArtworkLayoutTest {
     }
 
     @Test
+    fun `logo bounds change only at the established player width boundaries`() {
+        assertEquals(34.dp, PlayerLayoutMetrics.fromWidth(767.dp).timelineLogoMaxHeight)
+        assertEquals(40.dp, PlayerLayoutMetrics.fromWidth(768.dp).timelineLogoMaxHeight)
+        assertEquals(40.dp, PlayerLayoutMetrics.fromWidth(1023.dp).timelineLogoMaxHeight)
+        assertEquals(44.dp, PlayerLayoutMetrics.fromWidth(1024.dp).timelineLogoMaxHeight)
+        assertEquals(44.dp, PlayerLayoutMetrics.fromWidth(1439.dp).timelineLogoMaxHeight)
+        assertEquals(48.dp, PlayerLayoutMetrics.fromWidth(1440.dp).timelineLogoMaxHeight)
+    }
+
+    @Test
     fun `single line timeline artwork is shorter than the main title artwork`() {
         listOf(390.dp, 800.dp, 1280.dp, 1600.dp).forEach { width ->
             val metrics = PlayerLayoutMetrics.fromWidth(width)

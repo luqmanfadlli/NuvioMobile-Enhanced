@@ -1,8 +1,8 @@
 package com.nuvio.app.features.player
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -36,7 +36,7 @@ internal fun PlayerTitleArtwork(
     imageLoadedState: MutableState<Boolean>? = null,
 ) {
     val url = logoUrl?.takeIf { it.isNotBlank() }
-    val localImageLoaded = remember(url, showLogo) { mutableStateOf(false) }
+    val localImageLoaded = rememberPlayerTitleArtworkLoadedState(url, showLogo)
     val loadedState = imageLoadedState ?: localImageLoaded
     val showArtwork = showPlayerTitleLogoArtwork(showLogo, url, loadedState.value)
 
@@ -62,11 +62,8 @@ internal fun PlayerTitleArtwork(
                 alignment = Alignment.CenterStart,
                 onSuccess = { loadedState.value = true },
                 modifier = Modifier
-                    .wrapContentSize(Alignment.CenterStart)
-                    .sizeIn(
-                        maxWidth = maxLogoWidth,
-                        maxHeight = maxLogoHeight,
-                    )
+                    .height(maxLogoHeight)
+                    .widthIn(max = maxLogoWidth)
                     .graphicsLayer {
                         alpha = if (showArtwork) 1f else 0f
                     },
@@ -83,6 +80,12 @@ internal fun PlayerTitleArtwork(
         )
     }
 }
+
+@Composable
+internal fun rememberPlayerTitleArtworkLoadedState(
+    logoUrl: String?,
+    enabled: Boolean,
+): MutableState<Boolean> = remember(logoUrl, enabled) { mutableStateOf(false) }
 
 internal fun showPlayerTitleLogoArtwork(
     enabled: Boolean,

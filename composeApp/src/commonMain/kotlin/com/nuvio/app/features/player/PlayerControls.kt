@@ -185,8 +185,8 @@ internal fun PlayerControlsShell(
     onWake: () -> Unit = {},
     titleLogo: String? = null,
     showTitleLogo: Boolean = false,
+    titleLogoImageLoaded: androidx.compose.runtime.MutableState<Boolean>,
 ) {
-    val titleLogoImageLoaded = remember(titleLogo, showTitleLogo) { mutableStateOf(false) }
     if (foldLayout) {
         FoldControls(
             title = title,
@@ -230,6 +230,7 @@ internal fun PlayerControlsShell(
             modifier = modifier,
             titleLogo = titleLogo,
             showTitleLogo = showTitleLogo,
+            titleLogoImageLoaded = titleLogoImageLoaded,
         )
         return
     }
