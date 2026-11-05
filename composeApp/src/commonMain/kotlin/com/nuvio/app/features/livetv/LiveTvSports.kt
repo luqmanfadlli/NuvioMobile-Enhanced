@@ -351,7 +351,7 @@ internal fun LiveTvSportsControls(
     leagues: List<LiveTvSportsLeague>,
     hasLive: Boolean,
     selectedFilter: String,
-    eventCount: Int,
+    counts: Map<String, Int>,
     onFilterSelected: (String) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -371,12 +371,14 @@ internal fun LiveTvSportsControls(
                 label = allLabel,
                 selected = selectedFilter == LIVE_TV_SPORTS_FILTER_ALL,
                 onClick = { onFilterSelected(LIVE_TV_SPORTS_FILTER_ALL) },
+                count = counts[LIVE_TV_SPORTS_FILTER_ALL],
             )
             if (hasLive) {
                 LiveTvPanelFilterChip(
                     label = liveLabel,
                     selected = selectedFilter == LIVE_TV_SPORTS_FILTER_LIVE,
                     onClick = { onFilterSelected(LIVE_TV_SPORTS_FILTER_LIVE) },
+                    count = counts[LIVE_TV_SPORTS_FILTER_LIVE],
                 )
             }
             leagues.forEach { league ->
@@ -384,15 +386,10 @@ internal fun LiveTvSportsControls(
                     label = league.label,
                     selected = selectedFilter == league.id,
                     onClick = { onFilterSelected(league.id) },
+                    count = counts[league.id],
                 )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = eventCount.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = tokens.colors.textMuted,
-        )
     }
 }
 

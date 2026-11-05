@@ -246,6 +246,33 @@ fun LiveTvScreen(
         }
     }
 
+    val channelChipCounts = remember(
+        uiState.channels,
+        uiState.favoriteChannelIds,
+        uiState.recentChannelIds,
+        searchQuery,
+        uncategorizedLabel,
+    ) {
+        val searched = filterLiveTvChannels(
+            channels = uiState.channels,
+            favoriteChannelIds = uiState.favoriteChannelIds,
+            recentChannelIds = uiState.recentChannelIds,
+            filterMode = LiveTvChannelFilterMode.All,
+            selectedCategoryName = null,
+            searchQuery = searchQuery,
+            uncategorizedGroupName = uncategorizedLabel,
+        )
+        val recentIds = uiState.recentChannelIds.toSet()
+        LiveTvChannelChipCounts(
+            all = searched.size,
+            recents = searched.count { it.id in recentIds },
+            favorites = searched.count { it.id in uiState.favoriteChannelIds },
+            categories = searched
+                .groupingBy { categoryNameForChannel(it, uncategorizedLabel).lowercase() }
+                .eachCount(),
+        )
+    }
+
     val playChannel: (LiveTvChannel) -> Unit = { channel ->
         LiveTvRepository.markChannelWatched(channel)
         onChannelClick(channel)
@@ -293,6 +320,13 @@ fun LiveTvScreen(
         val present = sportsState.events.map { it.league.id }.toSet()
         liveTvSportsLeagues.filter { it.id in present }
     }
+    val sportsChipCounts = remember(sportsState.events) {
+        buildMap {
+            put(LIVE_TV_SPORTS_FILTER_ALL, sportsState.events.size)
+            put(LIVE_TV_SPORTS_FILTER_LIVE, sportsState.events.count { it.state == LiveTvSportsState.Live })
+            sportsState.events.groupingBy { it.league.id }.eachCount().forEach { (id, count) -> put(id, count) }
+        }
+    }
     val hasLiveSports = sportsState.events.any { it.state == LiveTvSportsState.Live }
     val visibleSports = remember(sportsState.events, sportsFilter) {
         sportsState.events.filter { event ->
@@ -316,6 +350,10 @@ fun LiveTvScreen(
         if (section == LiveTvSection.OnDemand && hasVodProvider) LiveTvOnDemandRepository.ensureLoaded(vodKind)
     }
     val vodCatalog = onDemandState.catalog(vodKind)
+    val vodChipCounts = remember(vodCatalog.catalog.items, searchQuery) {
+        val searched = filterLiveTvVodItems(vodCatalog.catalog.items, null, searchQuery)
+        searched.groupingBy { it.categoryId.orEmpty() }.eachCount() + (LIVE_TV_VOD_COUNT_ALL to searched.size)
+    }
     val visibleVod = remember(vodCatalog.catalog.items, vodCategoryId, searchQuery) {
         filterLiveTvVodItems(vodCatalog.catalog.items, vodCategoryId, searchQuery)
     }
@@ -471,7 +509,7 @@ fun LiveTvScreen(
                             showRecents = hasRecents,
                             showFavorites = hasFavorites,
                             categories = categoryChips,
-                            channelCount = visibleChannels.size,
+                            counts = channelChipCounts,
                             onAllSelected = {
                                 filterMode = LiveTvChannelFilterMode.All
                                 selectedCategoryName = null
@@ -505,7 +543,7 @@ fun LiveTvScreen(
                             leagues = sportsLeagues,
                             hasLive = hasLiveSports,
                             selectedFilter = sportsFilter,
-                            eventCount = visibleSports.size,
+                            counts = sportsChipCounts,
                             onFilterSelected = { sportsFilter = it },
                         )
                     }
@@ -525,7 +563,7 @@ fun LiveTvScreen(
                             allLabel = allChannelsLabel,
                             categories = vodCatalog.catalog.categories,
                             selectedCategoryId = vodCategoryId,
-                            itemCount = visibleVod.size,
+                            counts = vodChipCounts,
                             onKindSelected = { kind ->
                                 if (kind != vodKind) {
                                     vodKind = kind
@@ -947,7 +985,7 @@ private fun LiveTvChannelControls(
     showRecents: Boolean,
     showFavorites: Boolean,
     categories: List<String>,
-    channelCount: Int,
+    counts: LiveTvChannelChipCounts,
     onAllSelected: () -> Unit,
     onRecentsSelected: () -> Unit,
     onClearRecents: () -> Unit,
@@ -982,12 +1020,14 @@ private fun LiveTvChannelControls(
                     label = allLabel,
                     selected = filterMode == LiveTvChannelFilterMode.All,
                     onClick = onAllSelected,
+                    count = counts.all,
                 )
                 if (showRecents) {
                     LiveTvPanelFilterChip(
                         label = stringResource(Res.string.live_tv_filter_recents),
                         selected = filterMode == LiveTvChannelFilterMode.Recents,
                         onClick = onRecentsSelected,
+                        count = counts.recents,
                     )
                     if (filterMode == LiveTvChannelFilterMode.Recents) {
                         LiveTvPanelFilterChip(
@@ -1002,6 +1042,7 @@ private fun LiveTvChannelControls(
                         label = favoritesLabel,
                         selected = filterMode == LiveTvChannelFilterMode.Favorites,
                         onClick = onFavoritesSelected,
+                        count = counts.favorites,
                     )
                 }
                 categories.forEach { category ->
@@ -1010,15 +1051,10 @@ private fun LiveTvChannelControls(
                         selected = filterMode == LiveTvChannelFilterMode.Category &&
                             selectedCategoryName.equals(category, ignoreCase = true),
                         onClick = { onGroupSelected(category) },
+                        count = counts.categories[category.lowercase()] ?: 0,
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = channelCount.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = tokens.colors.textMuted,
-            )
         }
     }
 }
@@ -1477,6 +1513,13 @@ private enum class LiveTvSection(val label: StringResource) {
     Sports(Res.string.live_tv_section_sports),
     OnDemand(Res.string.live_tv_section_on_demand),
 }
+
+private data class LiveTvChannelChipCounts(
+    val all: Int,
+    val recents: Int,
+    val favorites: Int,
+    val categories: Map<String, Int>,
+)
 
 private enum class LiveTvChannelFilterMode {
     All,

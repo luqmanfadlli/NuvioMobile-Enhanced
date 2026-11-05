@@ -110,6 +110,7 @@ internal fun LiveTvPanelFilterChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    count: Int? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     Row(
@@ -140,6 +141,14 @@ internal fun LiveTvPanelFilterChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (count != null) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) tokens.colors.accent.copy(alpha = 0.75f) else tokens.colors.textMuted,
+                maxLines = 1,
+            )
+        }
     }
 }
 

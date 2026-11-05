@@ -288,6 +288,8 @@ internal fun filterLiveTvVodItems(
 
 internal val LiveTvVodMinCellWidth = 104.dp
 
+internal const val LIVE_TV_VOD_COUNT_ALL = " all"
+
 @Composable
 internal fun LiveTvOnDemandControls(
     kind: LiveTvVodKind,
@@ -296,7 +298,7 @@ internal fun LiveTvOnDemandControls(
     allLabel: String,
     categories: List<LiveTvVodCategory>,
     selectedCategoryId: String?,
-    itemCount: Int,
+    counts: Map<String, Int>,
     onKindSelected: (LiveTvVodKind) -> Unit,
     onCategorySelected: (String?) -> Unit,
 ) {
@@ -334,21 +336,17 @@ internal fun LiveTvOnDemandControls(
                         label = allLabel,
                         selected = selectedCategoryId == null,
                         onClick = { onCategorySelected(null) },
+                        count = counts[LIVE_TV_VOD_COUNT_ALL],
                     )
                     categories.forEach { category ->
                         LiveTvPanelFilterChip(
                             label = category.name,
                             selected = selectedCategoryId == category.id,
                             onClick = { onCategorySelected(category.id) },
+                            count = counts[category.id] ?: 0,
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = itemCount.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = tokens.colors.textMuted,
-                )
             }
         }
     }
