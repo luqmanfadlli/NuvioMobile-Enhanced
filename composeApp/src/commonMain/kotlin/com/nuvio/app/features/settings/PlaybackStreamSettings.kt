@@ -51,6 +51,7 @@ internal fun PlaybackStreamSettings(
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
+    var showAutoPlayAddonPriorityDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayRegexDialog by remember { mutableStateOf(false) }
     val pluginsEnabled = AppFeaturePolicy.pluginsEnabled
@@ -237,6 +238,31 @@ internal fun PlaybackStreamSettings(
                         isTablet = isTablet,
                         onClick = { showAutoPlayAddonSelectionDialog = true },
                     )
+                    if (settings.streamAutoPlayMode == StreamAutoPlayMode.SEMI_AUTOMATIC) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        val priorityAddonNames = addonUiState.addons
+                            .enabledAddons()
+                            .mapNotNull { addon ->
+                                addon.manifest
+                                    ?.takeIf { manifest ->
+                                        manifest.resources.any { resource -> resource.name == "stream" }
+                                    }
+                                    ?.name
+                            }
+                            .distinct()
+                        val configuredPriority = settings.streamAutoPlayAddonPriority
+                            .filter { it in priorityAddonNames }
+                        SettingsNavigationRow(
+                            title = "Semi-auto add-on priority",
+                            description = if (configuredPriority.isEmpty()) {
+                                "Use enabled add-on order; tap to customise"
+                            } else {
+                                configuredPriority.take(3).joinToString(" → ")
+                            },
+                            isTablet = isTablet,
+                            onClick = { showAutoPlayAddonPriorityDialog = true },
+                        )
+                    }
                 }
                 if (pluginsEnabled && settings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
                     SettingsGroupDivider(isTablet = isTablet)
@@ -333,6 +359,26 @@ internal fun PlaybackStreamSettings(
         )
     }
 
+    if (showAutoPlayAddonPriorityDialog) {
+        val addonNames = addonUiState.addons
+            .enabledAddons()
+            .mapNotNull { addon ->
+                addon.manifest
+                    ?.takeIf { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+                    ?.name
+            }
+            .distinct()
+        StreamAutoPlayProviderPriorityDialog(
+            items = addonNames,
+            currentOrder = settings.streamAutoPlayAddonPriority,
+            onOrderSaved = {
+                PlayerSettingsRepository.setStreamAutoPlayAddonPriority(it)
+                showAutoPlayAddonPriorityDialog = false
+            },
+            onDismiss = { showAutoPlayAddonPriorityDialog = false },
+        )
+    }
+
     if (showAutoPlayRegexDialog) {
         StreamAutoPlayRegexDialog(
             initialRegex = settings.streamAutoPlayRegex,
@@ -406,4 +452,5 @@ internal val StreamAutoPlayMode.labelRes: StringResource
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
+        StreamAutoPlayMode.SEMI_AUTOMATIC -> Res.string.settings_playback_stream_selection_mode_semi_automatic
     }

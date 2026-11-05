@@ -26,6 +26,7 @@ internal class DeadLinkStartupMonitor(
     private val onExhausted: () -> Unit,
     private val sourceDiscoveryLoading: () -> Boolean = { false },
     private val onDeadLink: (StreamItem, String) -> Unit = { _, _ -> },
+    private val preserveCandidateOrder: () -> Boolean = { false },
 ) {
     private val log = Logger.withTag("DeadLinkStartupMonitor")
     private var timer: Job? = null
@@ -216,7 +217,7 @@ internal class DeadLinkStartupMonitor(
             if (!isCurrent(key, expectedGeneration)) return
 
             val debridEnabled = DebridSettingsRepository.snapshot().canResolvePlayableLinks
-            val next = discovered.asSequence()
+            val eligibleCandidates = discovered.asSequence()
                 // Do not auto-open an external app: it has no in-player startup
                 // signal, so the watchdog cannot know whether it succeeded.
                 .filter { !it.shouldOpenExternally && it.isSelectableForPlayback(debridEnabled) }
@@ -225,8 +226,15 @@ internal class DeadLinkStartupMonitor(
                     val candidateKey = candidate.playerSourceIdentityKey()
                     candidateKey != null && candidateKey !in attemptedKeys
                 }
-                .sortedBy(::deadLinkSourcePriority)
-                .firstOrNull()
+                .toList()
+            // Semi-auto supplies an explicit tier/provider order. Sorting here would
+            // undo the quality ceiling and could promote a higher-quality source
+            // after a lower-quality fallback has already been requested.
+            val next = if (preserveCandidateOrder()) {
+                eligibleCandidates.firstOrNull()
+            } else {
+                eligibleCandidates.sortedBy(::deadLinkSourcePriority).firstOrNull()
+            }
 
             if (next != null) {
                 val nextKey = next.playerSourceIdentityKey()

@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.p2p.P2pStreamRequest
 import com.nuvio.app.features.p2p.P2pStreamingEngine
@@ -102,10 +103,49 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                         season = activeSeasonNumber,
                         episode = activeEpisodeNumber,
                     )
-                    if (P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled) {
-                        discovered
+                    val requestedQuality = args.semiAutoSelectedQuality
+                    if (requestedQuality == null) {
+                        if (P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled) {
+                            discovered
+                        } else {
+                            discovered.filterNot { it.p2pInfoHash != null }
+                        }
                     } else {
-                        discovered.filterNot { it.p2pInfoHash != null }
+                        AddonRepository.initialize()
+                        val settings = PlayerSettingsRepository.uiState.value
+                        val installedAddonNames = AddonRepository.uiState.value.addons
+                            .enabledAddons()
+                            .mapNotNull { it.manifest?.name }
+                            .toSet()
+                        val sourceScoped = when (settings.streamAutoPlaySource) {
+                            StreamAutoPlaySource.ALL_SOURCES -> discovered
+                            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
+                                discovered.filter { it.serverTarget != null || it.addonName in installedAddonNames }
+                            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+                                discovered.filter { it.addonName !in installedAddonNames }
+                        }
+                        val selectedSources = sourceScoped.filter { stream ->
+                            when {
+                                stream.serverTarget != null -> true
+                                stream.addonName in installedAddonNames ->
+                                    settings.streamAutoPlaySelectedAddons.isEmpty() ||
+                                        stream.addonName in settings.streamAutoPlaySelectedAddons
+                                else ->
+                                    settings.streamAutoPlaySelectedPlugins.isEmpty() ||
+                                        stream.addonName in settings.streamAutoPlaySelectedPlugins
+                            }
+                        }
+                        val availableSourceNames = selectedSources.map { it.addonName }.distinct()
+                        val preferredSourceOrder = settings.streamAutoPlayAddonPriority
+                            .filter { it in availableSourceNames } +
+                            availableSourceNames.filterNot { it in settings.streamAutoPlayAddonPriority }
+                        QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                            streams = selectedSources,
+                            requestedQuality = requestedQuality,
+                            debridEnabled = DebridSettingsRepository.snapshot().canResolvePlayableLinks,
+                            preferredSourceOrder = preferredSourceOrder,
+                            p2pEnabled = P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled,
+                        )
                     }
                 }
             },

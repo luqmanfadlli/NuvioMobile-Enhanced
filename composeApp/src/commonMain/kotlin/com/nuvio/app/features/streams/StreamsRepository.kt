@@ -47,10 +47,12 @@ object StreamsRepository {
         season: Int? = null,
         episode: Int? = null,
         manualSelection: Boolean = false,
+        qualitySelectionMode: Boolean = false,
     ): String =
-        "$type::$videoId::$season::$episode::$manualSelection"
+        if (qualitySelectionMode) "$type::$videoId::$season::$episode::$manualSelection::quality-first"
+        else "$type::$videoId::$season::$episode::$manualSelection"
 
-    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, qualitySelectionMode: Boolean = false) {
         PluginRepository.setLocalPluginSearchPaused(false)
         load(
             type = type,
@@ -60,10 +62,11 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = false,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 
-    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, qualitySelectionMode: Boolean = false) {
         PluginRepository.setLocalPluginSearchPaused(false)
         load(
             type = type,
@@ -73,10 +76,11 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = true,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 
-    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
+    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean, qualitySelectionMode: Boolean) {
         val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.uiState.value
@@ -89,6 +93,7 @@ object StreamsRepository {
             season = season,
             episode = episode,
             manualSelection = manualSelection,
+            qualitySelectionMode = qualitySelectionMode,
         )
         val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
         val currentState = _uiState.value
@@ -115,7 +120,9 @@ object StreamsRepository {
                 "manual=$manualSelection force=$forceRefresh",
         )
         val autoPlayMode = playerSettings.streamAutoPlayMode
-        val isAutoPlayEnabled = !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
+        val isAutoPlayEnabled = !qualitySelectionMode && !manualSelection &&
+            autoPlayMode != StreamAutoPlayMode.MANUAL &&
+            autoPlayMode != StreamAutoPlayMode.SEMI_AUTOMATIC &&
             !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
                 !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
 
@@ -135,7 +142,7 @@ object StreamsRepository {
 
         // Enable direct auto-play flow if normal auto-play is enabled,
         // OR if we have a persisted binge group in MANUAL mode
-        val bingeGroupDirectFlow = !manualSelection &&
+        val bingeGroupDirectFlow = !qualitySelectionMode && !manualSelection &&
             persistedBingeGroup != null &&
             autoPlayMode == StreamAutoPlayMode.MANUAL
         val isDirectAutoPlayFlow = isAutoPlayEnabled || bingeGroupDirectFlow
@@ -749,6 +756,35 @@ object StreamsRepository {
 
     fun selectFilter(addonId: String?) {
         _uiState.update { it.copy(selectedFilter = addonId) }
+    }
+
+    /**
+     * Starts quality-first autoplay from an ordered snapshot of selectable sources.
+     * Provider fetches may continue in the background while normal playback fallback
+     * advances through the selected candidate list.
+     */
+    fun beginQualityFirstAutoPlay(
+        expectedRequestToken: String,
+        candidates: List<StreamItem>,
+    ): Boolean {
+        if (candidates.isEmpty()) return false
+        var started = false
+        _uiState.update { current ->
+            if (current.requestToken != expectedRequestToken) {
+                current
+            } else {
+                started = true
+                current.copy(
+                    autoPlayDecided = true,
+                    autoPlayStream = candidates.first(),
+                    autoPlayCandidates = candidates,
+                    isDirectAutoPlayFlow = true,
+                    showDirectAutoPlayOverlay = true,
+                    overlayMessage = null,
+                )
+            }
+        }
+        return started
     }
 
     fun consumeAutoPlay() {
