@@ -63,11 +63,11 @@ internal fun PlayerTitleArtwork(
                 onSuccess = { imageLoaded = true },
                 onError = { imageLoaded = false },
                 modifier = Modifier
+                    .wrapContentSize(Alignment.CenterStart)
                     .sizeIn(
                         maxWidth = maxLogoWidth,
                         maxHeight = maxLogoHeight,
                     )
-                    .wrapContentSize(Alignment.CenterStart)
                     .graphicsLayer {
                         alpha = if (showArtwork) 1f else 0f
                     },
