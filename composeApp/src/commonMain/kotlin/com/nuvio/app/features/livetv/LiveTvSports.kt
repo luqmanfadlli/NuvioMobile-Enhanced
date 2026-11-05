@@ -155,7 +155,7 @@ object LiveTvSportsRepository {
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
         job = scope.launch {
             val now = Clock.System.now()
-            val range = espnDateRange(now.toEpochMilliseconds())
+            val range = espnDates(now.toEpochMilliseconds())
             val results = withContext(Dispatchers.Default) {
                 liveTvSportsLeagues.map { league ->
                     async {
@@ -190,7 +190,7 @@ object LiveTvSportsRepository {
             val rawCount = results.sumOf { it.getOrNull()?.size ?: 0 }
             InAppLogger.info(
                 SPORTS_LOG_TAG,
-                "ESPN refresh: ${events.size} shown, $rawCount parsed, ${failures.size} leagues failed, range=$range",
+                "ESPN refresh: ${events.size} shown, $rawCount parsed, ${failures.size} leagues failed, range=${range.range}",
             )
             val emptyReason = when {
                 events.isNotEmpty() -> null
@@ -207,11 +207,34 @@ object LiveTvSportsRepository {
         }
     }
 
-    private suspend fun fetchLeague(league: LiveTvSportsLeague, dateRange: String): List<LiveTvSportsEvent> {
+    private suspend fun fetchLeague(league: LiveTvSportsLeague, dates: LiveTvSportsDates): List<LiveTvSportsEvent> {
         val base = "https://site.api.espn.com/apis/site/v2/sports/${league.path}/scoreboard"
-        val ranged = fetchScoreboard(league, "$base?dates=$dateRange&limit=1000")
-        if (ranged.isNotEmpty()) return ranged
-        return fetchScoreboard(league, "$base?limit=1000")
+        var lastError: Throwable? = null
+        suspend fun attempt(url: String): List<LiveTvSportsEvent>? = try {
+            fetchScoreboard(league, url)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            lastError = error
+            InAppLogger.warn(SPORTS_LOG_TAG, "ESPN ${league.id} ${error.message ?: error::class.simpleName} for $url")
+            null
+        }
+
+        attempt("$base?dates=${dates.range}&limit=1000")?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        val perDay = mutableListOf<LiveTvSportsEvent>()
+        var anyDaySucceeded = false
+        for (day in dates.days) {
+            attempt("$base?dates=$day")?.let { events ->
+                anyDaySucceeded = true
+                perDay += events
+            }
+        }
+        if (perDay.isNotEmpty()) return perDay
+
+        attempt(base)?.let { return it }
+        if (anyDaySucceeded) return emptyList()
+        throw lastError ?: IllegalStateException("No scoreboard response")
     }
 
     private suspend fun fetchScoreboard(league: LiveTvSportsLeague, url: String): List<LiveTvSportsEvent> {
@@ -243,7 +266,6 @@ object LiveTvSportsRepository {
             else -> LiveTvSportsState.Upcoming
         }
         val competitions = event.arr("competitions").mapNotNull { it as? JsonObject }
-        // Fight cards list every bout as a competition; the main event comes last.
         val competition = if (league.id == "ufc") competitions.lastOrNull() else competitions.firstOrNull()
         val competitors = competition?.arr("competitors").orEmpty().mapNotNull { element ->
             val item = element as? JsonObject ?: return@mapNotNull null
@@ -303,12 +325,20 @@ private val liveTvSportsEventOrder = Comparator<LiveTvSportsEvent> { a, b ->
     }
 }
 
-private fun espnDateRange(nowMillis: Long): String {
+internal class LiveTvSportsDates(val range: String, val days: List<String>)
+
+/**
+ * ESPN scoreboards are keyed by US Eastern calendar days. Covers yesterday through the day after
+ * tomorrow, in Eastern time (fixed UTC-5; the one-hour DST error only shifts the window edges).
+ */
+private fun espnDates(nowMillis: Long): LiveTvSportsDates {
+    val easternOffsetMillis = -5 * HOUR_MILLIS
     fun ymd(millis: Long): String {
-        val date = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date
+        val date = Instant.fromEpochMilliseconds(millis + easternOffsetMillis).toLocalDateTime(TimeZone.UTC).date
         return "${date.year}${date.monthNumber.toString().padStart(2, '0')}${date.dayOfMonth.toString().padStart(2, '0')}"
     }
-    return "${ymd(nowMillis - 24 * HOUR_MILLIS)}-${ymd(nowMillis + 48 * HOUR_MILLIS)}"
+    val days = (-1..2).map { offset -> ymd(nowMillis + offset * 24 * HOUR_MILLIS) }
+    return LiveTvSportsDates(range = "${days.first()}-${days.last()}", days = days)
 }
 
 private val espnDateRegex = Regex("""(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?""")
