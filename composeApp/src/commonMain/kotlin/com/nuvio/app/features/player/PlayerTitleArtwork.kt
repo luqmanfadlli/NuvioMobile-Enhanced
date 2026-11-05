@@ -92,3 +92,13 @@ internal fun showPlayerTitleLogoArtwork(
     logoUrl: String?,
     imageLoaded: Boolean,
 ): Boolean = enabled && !logoUrl.isNullOrBlank() && imageLoaded
+
+/**
+ * Hides title artwork immediately while parental warnings are on screen without
+ * removing the image composable from composition. This lets Coil finish loading
+ * and preserves the loaded logo for the next visible frame.
+ */
+internal fun playerTitleArtworkVisibilityAlpha(
+    showTitleArtwork: Boolean,
+    animatedAlpha: Float = 1f,
+): Float = if (showTitleArtwork) animatedAlpha else 0f
