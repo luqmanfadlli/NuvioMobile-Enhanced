@@ -1953,7 +1953,7 @@ private tailrec fun Context.findActivity(): Activity? =
 
 private class NuvioLibmpvView(
     context: Context,
-    videoOutput: AndroidLibmpvVideoOutput,
+    private val videoOutput: AndroidLibmpvVideoOutput,
     private val hardwareDecodingEnabled: Boolean,
     private val yuv420pEnabled: Boolean,
 ) : MpvSurfaceView(context, videoOutput.mpvValue) {
