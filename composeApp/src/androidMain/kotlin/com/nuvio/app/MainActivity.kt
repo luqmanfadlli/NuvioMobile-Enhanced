@@ -28,6 +28,7 @@ import com.nuvio.app.features.addons.AddonHttpClientProvider
 import com.nuvio.app.features.addons.AddonStorage
 import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
 import com.nuvio.app.features.collection.CollectionStorage
+import com.nuvio.app.features.cloudstream.CloudStreamPlatformStorage
 import com.nuvio.app.features.debrid.DebridSettingsStorage
 import com.nuvio.app.features.discord.DiscordRpcStorage
 import com.nuvio.app.features.downloads.DownloadNetworkGuard
@@ -183,6 +184,7 @@ open class MainActivity : AppCompatActivity() {
         BingeGroupCacheStorage.initialize(applicationContext)
         ProfileTitleFactsStorage.initialize(applicationContext)
         PluginStorage.initialize(applicationContext)
+        CloudStreamPlatformStorage.initialize(applicationContext)
         CollectionMobileSettingsStorage.initialize(applicationContext)
         CollectionStorage.initialize(applicationContext)
         DownloadsStorage.initialize(applicationContext)
