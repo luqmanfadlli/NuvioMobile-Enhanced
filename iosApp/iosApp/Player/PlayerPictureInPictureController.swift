@@ -15,7 +15,10 @@ final class PlayerPictureInPictureController: NSObject,
     private let enqueueFrame: (CMSampleBuffer) -> Void
     private let clearFrameRenderer: () -> Void
     private let frameLock = NSLock()
-    private var pendingFrame: (CVPixelBuffer, Double)?
+    private var pendingFrame: (CVPixelBuffer, Double, Bool)?
+    private var subtitleText = ""
+    private var subtitleBold = false
+    private let subtitleComposer = PictureInPictureSubtitleComposer()
     private var drainScheduled = false
     private var acceptingFrames = true
     private var feedingRestoreTransition = false
@@ -150,7 +153,7 @@ final class PlayerPictureInPictureController: NSObject,
             return
         }
         lastPrimeTime = now
-        pendingFrame = (buffer, pts)
+        pendingFrame = (buffer, pts, isPictureInPictureFrame)
         let schedule = !drainScheduled
         drainScheduled = true
         frameLock.unlock()
@@ -165,8 +168,13 @@ final class PlayerPictureInPictureController: NSObject,
         pendingFrame = nil
         drainScheduled = false
         let accepts = acceptingFrames
+        let cue = subtitleText
+        let cueBold = subtitleBold
         frameLock.unlock()
-        guard accepts, let (buffer, pts) = frame, pts.isFinite else { return }
+        guard accepts, let (sourceBuffer, pts, isPictureInPictureFrame) = frame, pts.isFinite else { return }
+        let buffer = isPictureInPictureFrame && !cue.isEmpty
+            ? (subtitleComposer.compose(sourceBuffer, text: cue, bold: cueBold) ?? sourceBuffer)
+            : sourceBuffer
         guard prepareFrameRenderer() else { return }
         if cachedFormat.map({ CMVideoFormatDescriptionMatchesImageBuffer($0, imageBuffer: buffer) }) != true {
             var format: CMVideoFormatDescription?
@@ -198,6 +206,13 @@ final class PlayerPictureInPictureController: NSObject,
             }
         }
         enqueueFrame(sample)
+    }
+
+    func setSubtitleText(_ text: String, bold: Bool) {
+        frameLock.lock()
+        subtitleText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        subtitleBold = bold
+        frameLock.unlock()
     }
 
     func updatePlaybackState() {
