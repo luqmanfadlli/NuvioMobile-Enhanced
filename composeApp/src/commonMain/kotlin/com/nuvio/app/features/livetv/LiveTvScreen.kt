@@ -1,7 +1,7 @@
 package com.nuvio.app.features.livetv
 
 import com.nuvio.app.core.ui.nuvioScreenSideBleed
-import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import androidx.compose.ui.input.pointer.pointerInput
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -392,7 +392,7 @@ fun LiveTvScreen(
                         .fillMaxWidth()
                         .nuvioScreenSideBleed()
                         .appBackgroundCover(screenBackground)
-                        .nuvioConsumePointerEvents()
+                        .liveTvBlockPointerPassThrough()
                         .padding(horizontal = LiveTvScreenHorizontalPadding)
                         .padding(top = listTopPadding),
                 ) {
@@ -776,6 +776,15 @@ private fun LazyListScope.liveTvLoadingItem() {
 }
 
 private const val ChannelControlsKey = "channel-controls"
+
+private fun Modifier.liveTvBlockPointerPassThrough(): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent()
+            }
+        }
+    }
 
 private val LiveTvScreenHorizontalPadding = 16.dp
 private val LiveTvGridMinCellWidth = 108.dp
