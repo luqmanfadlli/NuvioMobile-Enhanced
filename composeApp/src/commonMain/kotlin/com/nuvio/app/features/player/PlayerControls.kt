@@ -228,6 +228,8 @@ internal fun PlayerControlsShell(
             onWake = onWake,
             horizontalSafePadding = horizontalSafePadding,
             modifier = modifier,
+            titleLogo = titleLogo,
+            showTitleLogo = showTitleLogo,
         )
         return
     }
