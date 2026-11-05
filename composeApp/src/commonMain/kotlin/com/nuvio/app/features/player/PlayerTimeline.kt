@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,9 +79,13 @@ internal fun PlayerTimelineDetails(
             logoUrl = titleLogo,
             showLogo = showTitleLogo,
             imageLoadedState = imageLoadedState,
-            modifier = Modifier.graphicsLayer {
-                alpha = playerTitleArtworkVisibilityAlpha(showTitleArtwork)
-            },
+            modifier = Modifier
+                .graphicsLayer {
+                    alpha = playerTitleArtworkVisibilityAlpha(showTitleArtwork)
+                }
+                .semantics {
+                    if (!showTitleArtwork) hideFromAccessibility()
+                },
             textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
