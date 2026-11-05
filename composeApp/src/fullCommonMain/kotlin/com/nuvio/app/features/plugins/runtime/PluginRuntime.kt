@@ -89,6 +89,18 @@ internal object PluginRuntime {
 
             try {
                 jsRuntime.use {
+                    HostApiRegistry().apply {
+                        addModule(
+                            HostFunctions(
+                                scraperId = scraperId,
+                                scraperSettingsJson = PluginStorage.loadScraperSettings(scraperId) ?: "{}",
+                                onResult = {},
+                            ),
+                        )
+                        addModule(FetchBridge())
+                        addModule(UrlBridge())
+                        addModule(CryptoBridge())
+                    }.registerAll(this)
                     evaluate<Any?>(JsBindings.staticPolyfillCode)
 
                     val wrappedCode = """
