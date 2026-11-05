@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.autosync.AutoSyncPlayerController
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -191,7 +192,13 @@ internal class PlayerCastBridge(private val hostContext: Context) {
 
     fun onLocalControllerReady(controller: PlayerEngineController) {
         delegate = controller
-        controllerSink(PlayerCastAwareController(controller, this))
+        controllerSink(
+            if (controller is AutoSyncPlayerController) {
+                AutoSyncCastAwareController(controller, this, controller)
+            } else {
+                PlayerCastAwareController(controller, this)
+            },
+        )
         if (isCasting) controller.pause()
     }
 
@@ -505,7 +512,7 @@ internal class PlayerCastBridge(private val hostContext: Context) {
     }
 }
 
-private class PlayerCastAwareController(
+private open class PlayerCastAwareController(
     private val base: PlayerEngineController,
     private val bridge: PlayerCastBridge,
 ) : PlayerEngineController by base {
@@ -596,3 +603,9 @@ private tailrec fun Context.findHostActivity(): Activity? =
         is ContextWrapper -> baseContext.findHostActivity()
         else -> null
     }
+
+private class AutoSyncCastAwareController(
+    base: PlayerEngineController,
+    bridge: PlayerCastBridge,
+    autoSync: AutoSyncPlayerController,
+) : PlayerCastAwareController(base, bridge), AutoSyncPlayerController by autoSync
