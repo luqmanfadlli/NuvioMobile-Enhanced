@@ -33,7 +33,7 @@ class PlayerTitleArtworkTest {
     fun `falls back to the title when the image request fails`() {
         assertFalse(showPlayerTitleLogoArtwork(true, "https://image.example/logo.png", false))
     }
- 
+
     @Test
     fun `hides title artwork immediately while parental warnings are visible`() {
         assertEquals(
