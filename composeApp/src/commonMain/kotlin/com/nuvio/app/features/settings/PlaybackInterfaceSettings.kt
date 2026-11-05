@@ -129,14 +129,6 @@ internal fun PlaybackInterfaceSettings(
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_private_viewing),
-                    description = stringResource(Res.string.settings_playback_private_viewing_description),
-                    checked = settings.privateViewingEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setPrivateViewingEnabled,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_seek_preview),
                     description = stringResource(Res.string.settings_playback_seek_preview_description),
                     checked = settings.seekPreviewEnabled,

@@ -1041,6 +1041,14 @@ internal fun settingsSearchEntries(
 
     addRow(
         page = SettingsPage.TraktAuthentication,
+        key = "private-viewing",
+        title = stringResource(Res.string.settings_playback_private_viewing),
+        description = stringResource(Res.string.settings_playback_private_viewing_description),
+        pageLabel = trackingPage,
+        section = stringResource(Res.string.settings_tracking_privacy_section),
+    )
+    addRow(
+        page = SettingsPage.TraktAuthentication,
         key = "trakt-authentication",
         title = stringResource(Res.string.trakt_library_source_trakt),
         description = stringResource(Res.string.settings_trakt_intro_description),
