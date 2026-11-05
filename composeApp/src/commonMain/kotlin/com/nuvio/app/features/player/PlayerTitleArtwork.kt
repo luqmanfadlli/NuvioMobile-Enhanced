@@ -1,26 +1,30 @@
 package com.nuvio.app.features.player
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
+import coil3.size.Scale
 
 /**
- * Reuses artwork already resolved by player metadata. The title stays visible until
- * Coil confirms that the replacement artwork has loaded successfully.
+ * Replaces the title only after Coil has loaded the artwork successfully.
+ * Until then (or after a failure), only the text title participates in layout.
  */
 @Composable
 internal fun PlayerTitleArtwork(
@@ -33,60 +37,81 @@ internal fun PlayerTitleArtwork(
     maxLogoHeight: Dp,
     maxLogoWidth: Dp,
     modifier: Modifier = Modifier,
-    imageLoadedState: MutableState<Boolean>? = null,
 ) {
     val url = logoUrl?.takeIf { it.isNotBlank() }
-    val localImageLoaded = rememberPlayerTitleArtworkLoadedState(url, showLogo)
-    val loadedState = imageLoadedState ?: localImageLoaded
-    val showArtwork = showPlayerTitleLogoArtwork(showLogo, url, loadedState.value)
-
     if (showLogo && url != null) {
+        val platformContext = LocalPlatformContext.current
+        val density = LocalDensity.current
+        val requestWidth = with(density) { maxLogoWidth.roundToPx() }
+        val requestHeight = with(density) { maxLogoHeight.roundToPx() }
+        val imageRequest = remember(url, requestWidth, requestHeight, platformContext) {
+            ImageRequest.Builder(platformContext)
+                .data(url)
+                .size(requestWidth, requestHeight)
+                .scale(Scale.FIT)
+                .build()
+        }
+        val painter = rememberAsyncImagePainter(
+            model = imageRequest,
+            contentScale = ContentScale.Fit,
+        )
+        val painterState by painter.state.collectAsState()
+        val showArtwork = showPlayerTitleLogoArtwork(
+            enabled = showLogo,
+            logoUrl = url,
+            imageLoaded = painterState is AsyncImagePainter.State.Success,
+        )
         Box(
             modifier = modifier,
             contentAlignment = Alignment.CenterStart,
         ) {
-            if (!showArtwork) {
-                Text(
-                    text = title,
-                    style = textStyle,
-                    color = textColor,
+            if (showArtwork) {
+                Image(
+                    painter = painter,
+                    contentDescription = title,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .height(maxLogoHeight)
+                        .widthIn(max = maxLogoWidth),
+                )
+            } else {
+                PlayerTitleText(
+                    title = title,
+                    textStyle = textStyle,
+                    textColor = textColor,
                     maxLines = maxLines,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
-
-            AsyncImage(
-                model = url,
-                contentDescription = if (showArtwork) title else null,
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.CenterStart,
-                onSuccess = { loadedState.value = true },
-                onError = { loadedState.value = false },
-                modifier = Modifier
-                    .height(maxLogoHeight)
-                    .widthIn(max = maxLogoWidth)
-                    .graphicsLayer {
-                        alpha = if (showArtwork) 1f else 0f
-                    },
-            )
         }
     } else {
-        Text(
-            text = title,
-            style = textStyle,
-            color = textColor,
+        PlayerTitleText(
+            title = title,
+            textStyle = textStyle,
+            textColor = textColor,
             maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
             modifier = modifier,
         )
     }
 }
 
 @Composable
-internal fun rememberPlayerTitleArtworkLoadedState(
-    logoUrl: String?,
-    enabled: Boolean,
-): MutableState<Boolean> = remember(logoUrl, enabled) { mutableStateOf(false) }
+private fun PlayerTitleText(
+    title: String,
+    textStyle: TextStyle,
+    textColor: Color,
+    maxLines: Int,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = title,
+        style = textStyle,
+        color = textColor,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
 
 internal fun showPlayerTitleLogoArtwork(
     enabled: Boolean,
@@ -96,8 +121,7 @@ internal fun showPlayerTitleLogoArtwork(
 
 /**
  * Hides title artwork immediately while parental warnings are on screen without
- * removing the image composable from composition. This lets Coil finish loading
- * and preserves the loaded logo for the next visible frame.
+ * changing the animated metadata fade used when the warning is hidden.
  */
 internal fun playerTitleArtworkVisibilityAlpha(
     showTitleArtwork: Boolean,
