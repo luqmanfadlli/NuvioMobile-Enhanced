@@ -930,13 +930,40 @@ final class MPVPlayerViewController: UIViewController {
             self.hwdecBeforeBackground = nil
             guard !before.isEmpty, before != "no" else { return }
             let current = self.getString("hwdec-current") ?? ""
-            InAppLogBridge.shared.warn(
-                tag: "MPV/iOS",
-                message: "Reinitialising hwdec=\(configured) after interruption (was \(before), now \(current.isEmpty ? "none" : current))"
-            )
-            self.setStringProperty("hwdec", "no")
-            self.setStringProperty("hwdec", configured)
+            if current.isEmpty || current == "no" {
+                self.reinitialiseHardwareDecoding(configured, reason: "lost (was \(before), now none)")
+                return
+            }
+            self.pendingDecoderStallCheck = configured
+            self.checkDecoderStallIfPending(generation: coreGeneration)
         }
+    }
+
+    private var pendingDecoderStallCheck: String?
+
+    private func checkDecoderStallIfPending(generation: UInt64) {
+        guard mpvGeneration == generation, mpv != nil, let configured = pendingDecoderStallCheck else { return }
+        guard !getFlag("pause") else { return }
+        let startFrame = getInt("estimated-frame-number")
+        mpvQueue.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, self.mpvGeneration == generation, self.mpv != nil,
+                  self.pendingDecoderStallCheck != nil else { return }
+            if self.getFlag("pause") { return }
+            if self.getFlag("seeking") || self.getFlag("paused-for-cache") || self.getFlag("eof-reached") {
+                self.pendingDecoderStallCheck = nil
+                return
+            }
+            self.pendingDecoderStallCheck = nil
+            let endFrame = self.getInt("estimated-frame-number")
+            guard endFrame <= startFrame else { return }
+            self.reinitialiseHardwareDecoding(configured, reason: "frames stalled at \(endFrame) after interruption")
+        }
+    }
+
+    private func reinitialiseHardwareDecoding(_ configured: String, reason: String) {
+        InAppLogBridge.shared.warn(tag: "MPV/iOS", message: "Reinitialising hwdec=\(configured): \(reason)")
+        setStringProperty("hwdec", "no")
+        setStringProperty("hwdec", configured)
     }
 
     private func resumeRenderingAfterDeviceLossIfPossible(reason: String) {
@@ -1089,6 +1116,8 @@ final class MPVPlayerViewController: UIViewController {
         setFlag("pause", false)
         isPlayerPlaying = true
         playbackStateGeneration &+= 1
+        let coreGeneration = mpvGeneration
+        mpvQueue.async { [weak self] in self?.checkDecoderStallIfPending(generation: coreGeneration) }
         if !isEmbeddedPreviewMode {
             syncNowPlayingPlaybackState(isPlaying: true)
         }
