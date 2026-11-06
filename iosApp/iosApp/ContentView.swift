@@ -1439,7 +1439,7 @@ private struct DetailDestinationView: View {
     }
 
     private var respectsNativeNavigationSafeArea: Bool {
-        wrapper.route is FolderDetailRoute
+        false
     }
 
     private var showsReadabilityFade: Bool {
