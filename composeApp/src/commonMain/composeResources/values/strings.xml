@@ -990,6 +990,10 @@
     <string name="live_tv_search_categories_placeholder">Search categories</string>
     <string name="live_tv_no_matching_categories">No matching categories</string>
     <string name="live_tv_section_channels">Channels</string>
+    <plurals name="live_tv_category_channel_count">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
     <string name="live_tv_last_watched_title">Last Watched Channel</string>
     <string name="live_tv_action_back_to_top">Back to top</string>
     <string name="live_tv_button_continue">Continue</string>
