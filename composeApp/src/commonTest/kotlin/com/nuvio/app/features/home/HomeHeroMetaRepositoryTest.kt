@@ -74,4 +74,20 @@ class HomeHeroMetaRepositoryTest {
         assertEquals("7.1", merged.imdbRating)
         assertEquals("52 min", merged.runtime)
     }
+
+    @Test
+    fun `full meta logo replaces a missing catalog logo`() {
+        val merged = preview.withHeroMeta(
+            HomeHeroMeta(
+                details = MetaDetails(
+                    id = "tt1",
+                    type = "series",
+                    name = "Show",
+                    logo = "https://image.tmdb.org/t/p/w500/logo.png",
+                ),
+            ),
+        )
+
+        assertEquals("https://image.tmdb.org/t/p/w500/logo.png", merged.logo)
+    }
 }

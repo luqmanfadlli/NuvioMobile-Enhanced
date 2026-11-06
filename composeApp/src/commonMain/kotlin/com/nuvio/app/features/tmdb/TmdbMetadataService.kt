@@ -963,7 +963,6 @@ object TmdbMetadataService {
         synchronized(enrichmentCacheLock) { enrichmentCache[cacheKey] }?.let { return@withContext it }
 
         val numericId = tmdbId.toIntOrNull() ?: return@withContext null
-        val includeImageLanguage = if (useOriginalTitle) null else tmdbImageLanguages(normalizedLanguage)
 
         val response = coroutineScope {
             val details = async {
@@ -988,7 +987,7 @@ object TmdbMetadataService {
             val images = async {
                 fetch<TmdbImagesResponse>(
                     endpoint = "$mediaType/$numericId/images",
-                    query = includeImageLanguage?.let { mapOf("include_image_language" to it) }.orEmpty(),
+                    query = emptyMap(),
                 )
             }
             val ageRating = async {
@@ -1092,9 +1091,10 @@ object TmdbMetadataService {
                 "w1280",
             ),
             logo = buildImageUrl(
-                images?.logos.orEmpty().selectOriginalOrLocalizedImagePath(
+                images?.logos.orEmpty().selectTitleLogoPath(
                     normalizedLanguage = normalizedLanguage,
-                    originalLanguage = originalArtworkLanguage,
+                    originalLanguage = originalLanguage,
+                    preferOriginal = useOriginalTitle,
                 ),
                 "w500",
             ),
