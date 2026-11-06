@@ -88,7 +88,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,6 +128,7 @@ internal fun PlayerControlsShell(
     useLegacyLayout: Boolean = false,
     showRemainingTime: Boolean = false,
     onRuntimeClick: () -> Unit = {},
+    releaseInfo: String? = null,
     badges: List<StreamBadge> = emptyList(),
     hideDetails: Boolean = false,
     onNextEpisodeClick: (() -> Unit)? = null,
@@ -432,10 +432,10 @@ internal fun PlayerControlsShell(
                             seasonNumber = seasonNumber,
                             episodeNumber = episodeNumber,
                             episodeTitle = episodeTitle,
+                            releaseInfo = releaseInfo,
                             metrics = metrics,
                             badges = badges,
-                            showTitleArtwork = !showParentalGuide,
-                                )
+                        )
                     }
                     Row(
                         modifier = Modifier
@@ -564,16 +564,7 @@ private fun PlayerHeader(
                 modifier = Modifier.weight(1f),
             ) {
                 Column(
-                    modifier = Modifier
-                        .graphicsLayer {
-                            alpha = playerTitleArtworkVisibilityAlpha(
-                                showTitleArtwork = !showParentalGuide,
-                                animatedAlpha = metadataAlpha,
-                            )
-                        }
-                        .semantics {
-                            if (showParentalGuide) hideFromAccessibility()
-                        },
+                    modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     PlayerTitleArtwork(

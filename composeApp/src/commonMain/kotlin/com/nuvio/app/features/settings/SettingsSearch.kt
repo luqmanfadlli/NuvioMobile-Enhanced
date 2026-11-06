@@ -643,6 +643,11 @@ internal fun settingsSearchEntries(
                 stringResource(Res.string.settings_playback_legacy_layout_description),
             ),
             PlaybackSearchRow(
+                "player-title-logo",
+                stringResource(Res.string.settings_playback_show_title_logo),
+                stringResource(Res.string.settings_playback_show_title_logo_description),
+            ),
+            PlaybackSearchRow(
                 "loading-overlay",
                 stringResource(Res.string.settings_playback_show_loading_overlay),
                 stringResource(Res.string.settings_playback_show_loading_overlay_description),

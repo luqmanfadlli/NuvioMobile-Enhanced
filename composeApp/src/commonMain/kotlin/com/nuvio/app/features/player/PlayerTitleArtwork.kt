@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,13 +14,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.nuvio.app.features.details.components.loadedBackdropImageBitmap
+import com.nuvio.app.core.ui.background.softwareBitmap
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.takeOrElse
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -47,14 +50,6 @@ internal fun PlayerTitleArtwork(
     if (showLogo && url != null) {
         val platformContext = LocalPlatformContext.current
         val density = LocalDensity.current
-        val fallbackLineHeight = textStyle.lineHeight.takeOrElse {
-            textStyle.fontSize.takeOrElse { 18.sp } * 1.2f
-        }
-        val titleSlotHeight = playerTitleArtworkSlotHeight(
-            maxLogoHeight = maxLogoHeight,
-            textLineHeight = with(density) { fallbackLineHeight.toDp() },
-            maxLines = maxLines,
-        )
         val requestWidth = with(density) { maxLogoWidth.roundToPx() }
         val requestHeight = with(density) { maxLogoHeight.roundToPx() }
         val imageRequest = remember(url, requestWidth, requestHeight, platformContext) {
@@ -62,6 +57,7 @@ internal fun PlayerTitleArtwork(
                 .data(url)
                 .size(Size(requestWidth, requestHeight))
                 .scale(Scale.FIT)
+                .softwareBitmap()
                 .build()
         }
         val painter = rememberAsyncImagePainter(
@@ -74,8 +70,19 @@ internal fun PlayerTitleArtwork(
             logoUrl = url,
             imageLoaded = painterState is AsyncImagePainter.State.Success,
         )
+        val loadedResult = (painterState as? AsyncImagePainter.State.Success)?.result
+        val lightenLogo = remember(loadedResult) {
+            loadedResult?.let { result ->
+                runCatching {
+                    val bitmap = loadedBackdropImageBitmap(result) ?: return@runCatching false
+                    val pixels = IntArray(bitmap.width * bitmap.height)
+                    bitmap.readPixels(pixels)
+                    isDarkTitleLogo(pixels)
+                }.getOrDefault(false)
+            } ?: false
+        }
         Box(
-            modifier = modifier.fillMaxWidth().height(titleSlotHeight),
+            modifier = modifier.fillMaxWidth().animateContentSize(),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (showArtwork) {
@@ -84,6 +91,7 @@ internal fun PlayerTitleArtwork(
                     contentDescription = title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
+                    colorFilter = if (lightenLogo) ColorFilter.tint(Color.White, BlendMode.SrcIn) else null,
                     modifier = Modifier
                         .height(maxLogoHeight)
                         .widthIn(max = maxLogoWidth),
@@ -126,12 +134,6 @@ private fun PlayerTitleText(
     )
 }
 
-internal fun playerTitleArtworkSlotHeight(
-    maxLogoHeight: Dp,
-    textLineHeight: Dp,
-    maxLines: Int,
-): Dp = maxOf(maxLogoHeight, textLineHeight * maxLines.toFloat())
-
 internal fun showPlayerTitleLogoArtwork(
     enabled: Boolean,
     logoUrl: String?,
@@ -139,10 +141,23 @@ internal fun showPlayerTitleLogoArtwork(
 ): Boolean = enabled && !logoUrl.isNullOrBlank() && imageLoaded
 
 /**
- * Hides title artwork immediately while parental warnings are on screen without
- * changing the animated metadata fade used when the warning is hidden.
+ * True when the visible (mostly opaque) pixels of a logo are dark on average, so it would be
+ * unreadable on the dark player overlay. Pixels are ARGB; a sparse grid keeps it cheap.
  */
-internal fun playerTitleArtworkVisibilityAlpha(
-    showTitleArtwork: Boolean,
-    animatedAlpha: Float = 1f,
-): Float = if (showTitleArtwork) animatedAlpha else 0f
+internal fun isDarkTitleLogo(pixels: IntArray, step: Int = 7): Boolean {
+    var luminanceSum = 0.0
+    var count = 0
+    var index = 0
+    while (index < pixels.size) {
+        val pixel = pixels[index]
+        if ((pixel ushr 24) >= 160) {
+            val red = (pixel ushr 16) and 255
+            val green = (pixel ushr 8) and 255
+            val blue = pixel and 255
+            luminanceSum += (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
+            count++
+        }
+        index += step
+    }
+    return count >= 16 && luminanceSum / count < 0.22
+}

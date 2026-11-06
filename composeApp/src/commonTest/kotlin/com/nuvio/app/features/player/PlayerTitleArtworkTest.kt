@@ -1,15 +1,13 @@
 package com.nuvio.app.features.player
 
-import androidx.compose.ui.unit.dp
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PlayerTitleArtworkTest {
 
     @Test
-    fun `artwork visibility and reserved slot sizing account for fallback text`() {
+    fun `artwork shows only once the logo has loaded`() {
         assertTrue(
             showPlayerTitleLogoArtwork(
                 enabled = true,
@@ -33,9 +31,16 @@ class PlayerTitleArtworkTest {
         )
         assertFalse(showPlayerTitleLogoArtwork(true, null, true))
         assertFalse(showPlayerTitleLogoArtwork(true, "   ", true))
+    }
 
-        assertEquals(64.dp, playerTitleArtworkSlotHeight(64.dp, 32.dp, 2))
-        assertEquals(66.dp, playerTitleArtworkSlotHeight(64.dp, 33.dp, 2))
-        assertEquals(26.dp, playerTitleArtworkSlotHeight(26.dp, 18.dp, 1))
+    @Test
+    fun `dark logos are detected and bright or transparent ones are not`() {
+        val black = 0xFF101010.toInt()
+        val white = 0xFFF0F0F0.toInt()
+        val transparent = 0x00000000
+        assertTrue(isDarkTitleLogo(IntArray(400) { black }))
+        assertFalse(isDarkTitleLogo(IntArray(400) { white }))
+        assertFalse(isDarkTitleLogo(IntArray(400) { transparent }))
+        assertFalse(isDarkTitleLogo(IntArray(400) { if (it % 2 == 0) black else white }))
     }
 }

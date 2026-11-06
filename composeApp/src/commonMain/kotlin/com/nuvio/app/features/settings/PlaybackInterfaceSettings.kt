@@ -46,6 +46,14 @@ internal fun PlaybackInterfaceSettings(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setUseLegacyPlayerLayout,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_show_title_logo),
+                    description = stringResource(Res.string.settings_playback_show_title_logo_description),
+                    checked = settings.showPlayerTitleLogo,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setShowPlayerTitleLogo,
+                )
                 if (!settings.useLegacyPlayerLayout) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
