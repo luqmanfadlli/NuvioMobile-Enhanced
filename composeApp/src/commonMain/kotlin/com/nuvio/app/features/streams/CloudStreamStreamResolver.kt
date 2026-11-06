@@ -4,6 +4,7 @@ import com.nuvio.app.features.cloudstream.CloudStreamPluginItem
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.cloudstream.CloudStreamSearchItem
 import com.nuvio.app.features.cloudstream.CloudStreamTvType
+import com.nuvio.app.features.cloudstream.sha256Hex
 import com.nuvio.app.features.cloudstream.toStreamItem
 import com.nuvio.app.features.details.MetaDetailsRepository
 
@@ -34,7 +35,7 @@ internal data class CloudStreamProviderStreams(
 )
 
 internal fun cloudStreamAddonId(providerId: String): String =
-    "cloudstream:${providerId.hashCode().toUInt().toString(16)}"
+    "cloudstream:${sha256Hex(providerId.encodeToByteArray()).take(16)}"
 
 internal fun buildCloudStreamSearchRequest(
     type: String,
@@ -104,7 +105,7 @@ internal fun cloudStreamProviderGroupsForRequest(
                 ?.takeIf(String::isNotBlank)
                 ?: entries.first().second.metadata.name
             CloudStreamProviderGroup(
-                addonId = "cloudstream-repository:${repositoryUrl.hashCode().toUInt().toString(16)}",
+                addonId = "cloudstream-repository:${sha256Hex(repositoryUrl.encodeToByteArray()).take(16)}",
                 addonName = name,
                 providers = entries.map { it.first },
             )
@@ -132,40 +133,50 @@ internal suspend fun resolveCloudStreamProviderStreams(
     val streams = mutableListOf<StreamItem>()
     var firstError: String? = null
     for (provider in providerGroup.providers) {
-        val searchResults = runCatchingUnlessCancelled {
+        val searchAttempt = runCatchingUnlessCancelled {
             CloudStreamRepository.search(request.title, provider.id)
-        }.getOrElse { error ->
-            if (firstError == null) firstError = error.message ?: "CloudStream search failed"
+        }
+        if (searchAttempt.isFailure) {
+            if (firstError == null) firstError = searchAttempt.exceptionOrNull()?.message ?: "CloudStream search failed"
             continue
         }
-        val searchItems = searchResults.firstOrNull()?.getOrElse { error ->
-            if (firstError == null) firstError = error.message ?: "CloudStream search failed"
-            emptyList()
-        }.orEmpty()
+        val searchResults = searchAttempt.getOrNull().orEmpty()
+        val searchResult = searchResults.firstOrNull()
+        if (searchResult == null) continue
+        if (searchResult.isFailure) {
+            if (firstError == null) firstError = searchResult.exceptionOrNull()?.message ?: "CloudStream search failed"
+            continue
+        }
+        val searchItems = searchResult.getOrNull().orEmpty()
         for (item in searchItems.bestCloudStreamMatches(request)) {
-            val loadedResult = runCatchingUnlessCancelled {
+            val loadAttempt = runCatchingUnlessCancelled {
                 CloudStreamRepository.load(provider.id, item.data)
-            }.getOrElse { error ->
-                if (firstError == null) firstError = error.message ?: "CloudStream title lookup failed"
+            }
+            if (loadAttempt.isFailure) {
+                if (firstError == null) firstError = loadAttempt.exceptionOrNull()?.message ?: "CloudStream title lookup failed"
                 continue
             }
-            val loaded = loadedResult.getOrElse { error ->
-                if (firstError == null) firstError = error.message ?: "CloudStream title lookup failed"
+            val loadedResult = loadAttempt.getOrNull()
+            if (loadedResult == null || loadedResult.isFailure) {
+                if (firstError == null) firstError = loadedResult?.exceptionOrNull()?.message ?: "CloudStream title lookup failed"
                 continue
             }
+            val loaded = loadedResult.getOrNull() ?: continue
             if (!loaded.matchesCloudStreamRequest(request, item, allowProviderRankedFallback = true)) continue
             val linkData = loaded.linkDataForCloudStreamRequest(request) ?: continue
-            val linksResult = runCatchingUnlessCancelled {
+            val linksAttempt = runCatchingUnlessCancelled {
                 CloudStreamRepository.loadLinks(provider.id, linkData)
-            }.getOrElse { error ->
-                if (firstError == null) firstError = error.message ?: "CloudStream link lookup failed"
+            }
+            if (linksAttempt.isFailure) {
+                if (firstError == null) firstError = linksAttempt.exceptionOrNull()?.message ?: "CloudStream link lookup failed"
                 continue
             }
-            val links = linksResult.getOrElse { error ->
-                if (firstError == null) firstError = error.message ?: "CloudStream link lookup failed"
+            val linksResult = linksAttempt.getOrNull()
+            if (linksResult == null || linksResult.isFailure) {
+                if (firstError == null) firstError = linksResult?.exceptionOrNull()?.message ?: "CloudStream link lookup failed"
                 continue
             }
-            streams += links.map { it.toStreamItem(provider.id, provider.name) }
+            streams += linksResult.getOrNull().orEmpty().map { it.toStreamItem(provider.id, provider.name) }
         }
     }
     return CloudStreamProviderStreams(streams = streams, error = firstError)
@@ -175,10 +186,14 @@ internal suspend fun resolveCloudStreamDirectRoute(
     providerId: String,
     providerName: String,
     data: String,
-): Result<List<StreamItem>> =
-    CloudStreamRepository.loadLinks(providerId, data).map { links ->
+): Result<List<StreamItem>> {
+    val loaded = CloudStreamRepository.load(providerId, data)
+    if (loaded.isFailure) return Result.failure(loaded.exceptionOrNull() ?: IllegalStateException("CloudStream title lookup failed"))
+    val item = loaded.getOrNull() ?: return Result.success(emptyList())
+    return CloudStreamRepository.loadLinks(providerId, item.data).map { links ->
         links.map { it.toStreamItem(providerId, providerName) }
     }
+}
 
 internal fun List<CloudStreamSearchItem>.bestCloudStreamMatch(
     searchTitle: String,
