@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracking_source_publicmetadb">PublicMetaDB</string>
+    <string name="settings_publicmetadb_library_description">Watchlist dan daftar kustom PublicMetaDB Anda.</string>
+    <string name="settings_publicmetadb_progress_description">Lanjutkan Menonton dan Berikutnya dari titik lanjutan dan riwayat tontonan PublicMetaDB Anda.</string>
+    <string name="library_publicmetadb_title">Pustaka PublicMetaDB</string>
+    <string name="library_publicmetadb_load_failed">Tidak dapat memuat pustaka PublicMetaDB Anda</string>
+    <string name="library_publicmetadb_empty_title">Pustaka PublicMetaDB Anda kosong</string>
+    <string name="library_publicmetadb_empty_message">Tambahkan film dan acara ke daftar PublicMetaDB Anda untuk melihatnya di sini.</string>
+    <string name="settings_publicmetadb_connect">Hubungkan PublicMetaDB</string>
+    <string name="settings_publicmetadb_connected_as">Terhubung dengan key berakhiran %1$s</string>
+    <string name="settings_publicmetadb_connected_description">Sinkronkan daftar, riwayat tontonan, rating, scrobble, dan Lanjutkan Menonton dengan PublicMetaDB.</string>
+    <string name="settings_publicmetadb_sign_in_description">Hubungkan PublicMetaDB dengan API key untuk menyinkronkan daftar, riwayat tontonan, rating, scrobble, dan Lanjutkan Menonton.</string>
+    <string name="settings_publicmetadb_finish_sign_in">Selesaikan koneksi</string>
+    <string name="settings_publicmetadb_approval_description">Masukkan API key PublicMetaDB Anda untuk menyelesaikan koneksi.</string>
+    <string name="settings_publicmetadb_open_login">Masukkan API key</string>
+    <string name="settings_publicmetadb_disconnect">Putuskan PublicMetaDB</string>
+    <string name="settings_publicmetadb_missing_credentials">Koneksi PublicMetaDB tidak tersedia di build ini.</string>
+    <string name="settings_publicmetadb_sync_now">Sinkronkan sekarang</string>
+    <string name="settings_publicmetadb_visit">Kunjungi PublicMetaDB</string>
+    <string name="settings_publicmetadb_disconnect_description">Berhenti mengirim pembaruan tontonan dari profil ini dan lupakan API key. Daftar dan riwayat PublicMetaDB Anda tetap tersimpan.</string>
+    <string name="settings_publicmetadb_account_fallback">API key Anda</string>
+    <string name="settings_publicmetadb_syncing">Menyinkronkan daftar PublicMetaDB Anda…</string>
+    <string name="settings_publicmetadb_last_synced">Terakhir disinkronkan %1$s</string>
+    <string name="settings_publicmetadb_api_key_title">Hubungkan PublicMetaDB</string>
+    <string name="settings_publicmetadb_api_key_description">Buat API key di PublicMetaDB pada Settings → API, lalu tempel di sini. Key biasanya diawali pm-.</string>
+    <string name="settings_publicmetadb_api_key_label">API key</string>
+    <string name="settings_publicmetadb_get_api_key">Dapatkan API key</string>
+    <string name="settings_publicmetadb_connect_action">Hubungkan</string>
+    <string name="settings_publicmetadb_missing_key">Masukkan API key PublicMetaDB Anda.</string>
+    <string name="settings_publicmetadb_invalid_key">PublicMetaDB tidak menerima API key ini. Periksa lalu coba lagi.</string>
+    <string name="settings_publicmetadb_request_failed">Tidak dapat menjangkau PublicMetaDB. Silakan coba lagi.</string>
+    <string name="settings_publicmetadb_rate_limited">Batas request PublicMetaDB tercapai. Coba lagi sebentar lagi.</string>
+    <string name="settings_publicmetadb_blocked">PublicMetaDB memblokir request ini. Silakan coba lagi nanti.</string>
+    <string name="settings_publicmetadb_auth_revoked">API key PublicMetaDB Anda sudah tidak berlaku. Hubungkan lagi dengan key baru.</string>
+    <string name="settings_publicmetadb_unavailable">Tidak dapat menyinkronkan dengan PublicMetaDB. Silakan coba lagi.</string>
+</resources>

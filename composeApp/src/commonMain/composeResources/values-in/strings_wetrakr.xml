@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracking_source_wetrakr">WeTrakr</string>
+    <string name="settings_wetrakr_library_description">Daftar WeTrakr Anda: Planning, Watching, Waiting, Watched, Paused, dan Dropped.</string>
+    <string name="settings_wetrakr_progress_description">Lanjutkan Menonton dan Berikutnya dari pemutaran dan episode yang sudah ditonton di WeTrakr.</string>
+    <string name="library_wetrakr_title">Pustaka WeTrakr</string>
+    <string name="library_wetrakr_load_failed">Tidak dapat memuat pustaka WeTrakr Anda</string>
+    <string name="library_wetrakr_empty_title">Pustaka WeTrakr Anda kosong</string>
+    <string name="library_wetrakr_empty_message">Tambahkan film dan acara ke daftar WeTrakr Anda untuk melihatnya di sini.</string>
+    <string name="settings_wetrakr_connect">Hubungkan WeTrakr</string>
+    <string name="settings_wetrakr_connected_as">Terhubung sebagai %1$s</string>
+    <string name="settings_wetrakr_connected_description">Sinkronkan daftar, riwayat tontonan, rating, scrobble, dan Lanjutkan Menonton dengan WeTrakr.</string>
+    <string name="settings_wetrakr_sign_in_description">Hubungkan WeTrakr untuk menyinkronkan daftar, riwayat tontonan, rating, scrobble, dan Lanjutkan Menonton.</string>
+    <string name="settings_wetrakr_finish_sign_in">Selesaikan proses masuk</string>
+    <string name="settings_wetrakr_approval_description">Buka halaman aktivasi WeTrakr dan masukkan kode ini. Nuvio terhubung otomatis setelah Anda menyetujuinya.</string>
+    <string name="settings_wetrakr_open_login">Buka halaman aktivasi</string>
+    <string name="settings_wetrakr_disconnect">Putuskan WeTrakr</string>
+    <string name="settings_wetrakr_missing_credentials">Koneksi WeTrakr tidak tersedia di build ini.</string>
+    <string name="settings_wetrakr_sync_now">Sinkronkan sekarang</string>
+    <string name="settings_wetrakr_visit">Kunjungi WeTrakr</string>
+    <string name="settings_wetrakr_disconnect_description">Berhenti mengirim pembaruan tontonan dari profil ini. Daftar dan riwayat WeTrakr Anda tetap tersimpan.</string>
+    <string name="settings_wetrakr_account_fallback">Pengguna WeTrakr</string>
+    <string name="settings_wetrakr_syncing">Menyinkronkan daftar WeTrakr Anda…</string>
+    <string name="settings_wetrakr_last_synced">Terakhir disinkronkan %1$s</string>
+    <string name="settings_wetrakr_auth_denied">Koneksi ditolak. Coba lagi untuk menghubungkan akun Anda.</string>
+    <string name="settings_wetrakr_auth_expired">Kode aktivasi kedaluwarsa. Coba lagi untuk mendapatkan kode baru.</string>
+    <string name="settings_wetrakr_auth_failed">Tidak dapat menjangkau WeTrakr untuk memulai proses masuk. Silakan coba lagi.</string>
+    <string name="settings_wetrakr_auth_rate_limited">Terlalu banyak percobaan masuk. Tunggu 15 menit lalu coba lagi.</string>
+    <string name="settings_wetrakr_app_suspended">WeTrakr menangguhkan aplikasi ini. Silakan coba lagi nanti.</string>
+    <string name="settings_wetrakr_auth_revoked">Koneksi WeTrakr Anda kedaluwarsa atau dicabut. Hubungkan lagi untuk melanjutkan sinkronisasi.</string>
+    <string name="settings_wetrakr_unavailable">Tidak dapat menyinkronkan dengan WeTrakr. Silakan coba lagi.</string>
+    <string name="settings_wetrakr_rate_limited">Batas request WeTrakr tercapai. Sinkronisasi akan berlanjut sebentar lagi.</string>
+    <string name="settings_wetrakr_plan_limit">Ini memerlukan WeTrakr VIP atau melebihi batas paket Anda.</string>
+</resources>

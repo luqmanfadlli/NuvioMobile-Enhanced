@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_backup_section">CADANGAN</string>
+    <string name="settings_backup_include_sensitive">Sertakan Info Sensitif</string>
+    <string name="settings_backup_include_sensitive_description">Tambahkan API key, debrid key, addon, Live TV, dan Application ID Discord ke file ekspor. Jaga kerahasiaan file tersebut</string>
+    <string name="settings_backup_export">Ekspor Pengaturan</string>
+    <string name="settings_backup_export_description">Simpan pengaturan dan plugin ke sebuah file. Koleksi, tracker, dan akun Nuvio Anda tidak pernah disertakan</string>
+    <string name="settings_backup_export_done">Pengaturan diekspor</string>
+    <string name="settings_backup_export_failed">Tidak dapat mengekspor pengaturan</string>
+    <string name="settings_backup_import">Impor Pengaturan</string>
+    <string name="settings_backup_import_description">Pulihkan pengaturan dari file ekspor</string>
+    <string name="settings_backup_importing">Mengimpor pengaturan…</string>
+    <string name="settings_backup_import_confirm_title">Impor Pengaturan?</string>
+    <string name="settings_backup_import_confirm_message">Pengaturan dari file ini akan menggantikan pengaturan profil ini saat ini. Plugin yang belum ada akan ditambahkan. API key, addon, dan Live TV Anda tetap tidak berubah.</string>
+    <string name="settings_backup_import_confirm_message_sensitive">Pengaturan dari file ini akan menggantikan pengaturan profil ini saat ini, termasuk API key dan debrid key. Addon, plugin, dan sumber Live TV yang belum ada akan ditambahkan.</string>
+    <string name="settings_backup_import_confirm_action">Impor</string>
+    <string name="settings_backup_import_done">Pengaturan diimpor</string>
+    <string name="settings_backup_import_partial">Pengaturan diimpor, tetapi beberapa bagian tidak dapat diterapkan</string>
+    <string name="settings_backup_import_failed">Tidak dapat mengimpor pengaturan</string>
+    <string name="settings_backup_import_invalid">File ini bukan ekspor pengaturan Nuvio</string>
+</resources>
