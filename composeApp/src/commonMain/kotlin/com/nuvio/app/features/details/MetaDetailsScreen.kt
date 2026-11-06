@@ -1251,7 +1251,7 @@ fun MetaDetailsScreen(
                                         ArtworkBackdrop(
                                             image = cinematicBackdrop,
                                             modifier = Modifier.nuvioBackdropSource(cinematicArtworkBackdrop),
-                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.72f)),
+                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.58f)),
                                         )
                                     }
                                     MetaScreenBackgroundMode.DominantColor -> {
