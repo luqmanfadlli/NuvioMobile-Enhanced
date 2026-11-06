@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.6.8",
+          "buildVersion": "151",
+          "date": "2026-11-05T22:56:54Z",
+          "localizedDescription": "- fix(ios): stop the skip ahead after Control Centre / Notification Centre (#311) @luqmanfadlli\r\n- feat(livetv): Live TV revamp with Channels, Guide, Sports and On Demand tabs, recents/favorites/category chips, grid view and collapsible search @luqmanfadlli\r\n- fix(autosync): keep AutoSync reachable behind the Cast-aware controller @luqmanfadlli\r\n- fix(wetrakr): show watched badge for completed shows and stop rewatch pushes @luqmanfadlli\r\n- ref(setting): move Private Viewing from Player Interface to Tracking @luqmanfadlli\r\n- fix(simkl): sign related-title requests and log Simkl failures @luqmanfadlli\r\n- fix(ios): apply video output presets when the player opens @luqmanfadlli\r\n- fix(settings): fix plugin settings failing to open @luqmanfadlli\r\n- feat(ios): show text subtitles in Picture in Picture and the mini player @luqmanfadlli\r\n- fix(subtitles): restore pre-blur sizing and render outline blur natively on iOS @luqmanfadlli\r\n- fix(ios): fix temporary HLS playlist write; clear safe deprecations @luqmanfadlli\r\n- feat(subtitles): outline blur for subtitles (#307) @3l-franco\r\n- fix(player): fix VC-1 content only playing audio (#309) @chrisk325\r\n- fix(player): detach mpv surfaces on the playback thread @tapframe\r\n- feat(streams): update blur @tapframe\r\n- feat(details): update blur @tapframe\r\n- fix(ios): keep an add-on subtitle selected before mpv loads the file (#2517) @skoruppa\r\n- feat(autosync): sync ASS/SSA add-on subtitles drawn by libass (#2515) @skoruppa\r\n- fix(i18n): drop trailing period from two pt-BR descriptions (#2506) @jhojhocraazy\r\n- fix(player): stop Exo/libmpv auto-switch ping-pong on the same source (#2485) @halibiram\r\n- fix(player): resume a closed torrent stream at the stalled frame (#2479) @halibiram\r\n- feat(player): audio delay, amplification, downmix and center mix on Android (#2456) @kernexshadow",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.8-beta/nuvio-0.6.8-enhanced-release.ipa",
+          "size": 74191271,
+          "sha256": "3501451fdc3e5a8439d83d805c41662b2910040c555f865b939bcb88f819892e",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.7",
           "buildVersion": "150",
           "date": "2026-11-04T12:31:13Z",
