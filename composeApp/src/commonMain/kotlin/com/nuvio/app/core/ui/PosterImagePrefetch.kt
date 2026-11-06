@@ -1,12 +1,9 @@
 package com.nuvio.app.core.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.lazy.LazyListPrefetchStrategy
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalDensity
 import coil3.PlatformContext
@@ -20,20 +17,11 @@ import kotlinx.coroutines.flow.filter
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-internal const val ShelfNestedPrefetchItemCount = 5
+internal val ShelfRowCacheWindow = LazyLayoutCacheWindow(aheadFraction = 0.5f, behindFraction = 0.25f)
 
 private const val ShelfImagePrefetchAheadCount = 6
 
 private const val ShelfImagePrefetchSkipCount = 2
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun rememberShelfRowListState(): LazyListState =
-    rememberLazyListState(
-        prefetchStrategy = remember {
-            LazyListPrefetchStrategy(nestedPrefetchItemCount = ShelfNestedPrefetchItemCount)
-        },
-    )
 
 internal fun posterImageModel(
     platformContext: PlatformContext,

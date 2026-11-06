@@ -26,7 +26,6 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
-import com.nuvio.app.core.ui.rememberShelfRowListState
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.DynamicArtworkBackground
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
@@ -150,8 +149,8 @@ fun HomeScreen(
         HomeCatalogSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val homeListState = rememberLazyListState()
-    val continueWatchingListState = rememberShelfRowListState()
-    val upcomingListState = rememberShelfRowListState()
+    val continueWatchingListState = rememberLazyListState()
+    val upcomingListState = rememberLazyListState()
     ScreenActivityEffect(homeListState, continueWatchingListState, upcomingListState) { active ->
         if (!active) {
             homeListState.stopScroll(MutatePriority.PreventUserInput)

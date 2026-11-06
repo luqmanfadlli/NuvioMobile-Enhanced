@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.stopScroll
@@ -69,7 +70,7 @@ fun <T> NuvioShelfSection(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
     key: ((T) -> Any)? = null,
     animatePlacement: Boolean = false,
-    state: LazyListState = rememberShelfRowListState(),
+    state: LazyListState = rememberLazyListState(),
     itemContent: @Composable (T) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -93,6 +94,7 @@ fun <T> NuvioShelfSection(
             state = state,
             contentPadding = rowContentPadding.withVerticalBar(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            cacheWindow = ShelfRowCacheWindow,
         ) {
             if (key != null) {
                 items(
