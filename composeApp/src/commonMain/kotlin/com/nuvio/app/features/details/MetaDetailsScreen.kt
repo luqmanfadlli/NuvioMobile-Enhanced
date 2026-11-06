@@ -1517,23 +1517,7 @@ fun MetaDetailsScreen(
                             isSaved = isSaved,
                             isHeroCollapsed = isHeroCollapsed,
                             backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
-                            headerBackground = if (cinematicBackground) {
-                                {
-                                    CinematicHeaderBackdrop(
-                                        image = cinematicBackdrop,
-                                        screenHeight = screenHeight,
-                                        alignment = if (useTabletLayout) {
-                                            TabletArtworkBackdropAlignment
-                                        } else {
-                                            Alignment.Center
-                                        },
-                                        // Fork: same lighter scrim as the cinematic page background.
-                                        scrim = if (useTabletLayout) null else SolidColor(colorScheme.background.copy(alpha = 0.48f)),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
+                            headerBackground = null,
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                             glassBackdrop = cinematicContentBackdrop.takeIf { cinematicGlassEnabled && it.isReady },
