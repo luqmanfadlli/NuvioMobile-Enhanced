@@ -97,4 +97,12 @@ internal object AppBackgroundRepository {
     fun resume() {
         _suspendCount.value = (_suspendCount.value - 1).coerceAtLeast(0)
     }
+
+    private var playerParked = false
+
+    fun setPlayerParked(parked: Boolean) {
+        if (parked == playerParked) return
+        playerParked = parked
+        if (parked) resume() else suspend()
+    }
 }
