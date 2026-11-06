@@ -951,6 +951,10 @@
     <string name="live_tv_search_categories_placeholder">Pesquisar categorias</string>
     <string name="live_tv_no_matching_categories">Nenhuma categoria encontrada</string>
     <string name="live_tv_section_channels">Canais</string>
+    <plurals name="live_tv_category_channel_count">
+        <item quantity="one">%1$d canal</item>
+        <item quantity="other">%1$d canais</item>
+    </plurals>
     <string name="live_tv_last_watched_title">Último canal assistido</string>
     <string name="live_tv_action_back_to_top">Voltar ao topo</string>
     <string name="live_tv_button_continue">Continuar</string>
