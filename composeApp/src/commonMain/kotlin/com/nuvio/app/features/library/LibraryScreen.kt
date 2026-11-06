@@ -7,6 +7,13 @@ import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInHorizontally
@@ -261,6 +268,7 @@ fun LibraryScreen(
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     var cloudSearchQuery by rememberSaveable { mutableStateOf("") }
+    var cloudSearchVisible by rememberSaveable { mutableStateOf(false) }
     val selectedType = remember(selectedTypeName) {
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
@@ -526,6 +534,25 @@ fun LibraryScreen(
                             )
                         }
                     }
+                    if (sourceMode == LibraryViewMode.Cloud) {
+                        val cloudSearchLabel = stringResource(Res.string.cloud_library_search_label)
+                        IconButton(
+                            onClick = {
+                                if (cloudSearchVisible) cloudSearchQuery = ""
+                                cloudSearchVisible = !cloudSearchVisible
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .semantics { contentDescription = cloudSearchLabel },
+                        ) {
+                            Icon(
+                                imageVector = if (cloudSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (onDownloadsClick != null) {
                         LibraryDownloadsButton(onClick = onDownloadsClick)
                     }
@@ -561,6 +588,7 @@ fun LibraryScreen(
                     selectedType = selectedType,
                     selectedCloudItemKey = selectedCloudItemKey,
                     searchQuery = cloudSearchQuery,
+                    searchVisible = cloudSearchVisible,
                     onSearchQueryChange = {
                         cloudSearchQuery = it
                         selectedCloudItemKey = null
@@ -767,6 +795,7 @@ private fun LazyListScope.cloudLibraryContent(
     selectedType: CloudLibraryItemType?,
     selectedCloudItemKey: String?,
     searchQuery: String,
+    searchVisible: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onProviderSelected: (String?) -> Unit,
     onTypeSelected: (CloudLibraryItemType?) -> Unit,
@@ -860,11 +889,21 @@ private fun LazyListScope.cloudLibraryContent(
                             onRefresh = onRefresh,
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
-                        CloudLibrarySearchField(
-                            query = searchQuery,
-                            onQueryChange = onSearchQueryChange,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
+                        AnimatedVisibility(
+                            visible = searchVisible,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut(),
+                        ) {
+                            val focusRequester = remember { FocusRequester() }
+                            LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+                            CloudLibrarySearchField(
+                                query = searchQuery,
+                                onQueryChange = onSearchQueryChange,
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .focusRequester(focusRequester),
+                            )
+                        }
                     }
                 }
 
