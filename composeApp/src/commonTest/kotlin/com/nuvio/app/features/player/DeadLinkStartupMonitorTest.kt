@@ -1,5 +1,7 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
@@ -734,6 +736,80 @@ class DeadLinkStartupMonitorTest {
         advanceTimeBy(1)
         runCurrent()
         assertEquals(listOf(secondKey), dead.map { it.second })
+        monitor.close()
+    }
+
+    @Test
+    fun semiAutomaticFallbackKeepsQualityCeilingAndWaitsForSelectedTier() = runTest {
+        val selected = stream("Selected 1080p", "addon:selected", "https://media.example/selected-1080.mp4")
+        val late1080 = stream("Late 1080p", "addon:late", "https://media.example/late-1080.mp4")
+        val early720 = stream("Early 720p", "plugin:early", "https://media.example/early-720.mp4")
+        val higher2160 = stream("Above selection 2160p", "addon:higher", "https://media.example/higher-2160.mp4")
+        var discovered = listOf(selected, early720)
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            candidates = {
+                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                    streams = discovered,
+                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                    debridEnabled = true,
+                    p2pEnabled = true,
+                )
+            },
+            onFallback = fallbacks::add,
+            sourceDiscoveryLoading = { true },
+            preserveCandidateOrder = { true },
+        )
+
+        monitor.sourceSelected(selected)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(fallbacks.isEmpty())
+
+        // A lower tier arrived first, but a slower provider can still return 1080p.
+        discovered = listOf(selected, early720, late1080, higher2160)
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(listOf(late1080), fallbacks)
+
+        monitor.close()
+    }
+
+    @Test
+    fun semiAutomaticFallbackStepsDownOnlyAfterDiscoveryCompletes() = runTest {
+        val selected = stream("Selected 1080p", "addon:selected", "https://media.example/selected-1080.mp4")
+        val lower720 = stream("Fallback 720p", "plugin:lower", "https://media.example/lower-720.mp4")
+        var loading = true
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            candidates = {
+                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                    streams = listOf(selected, lower720),
+                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                    debridEnabled = true,
+                    p2pEnabled = true,
+                )
+            },
+            onFallback = fallbacks::add,
+            sourceDiscoveryLoading = { loading },
+            preserveCandidateOrder = { true },
+        )
+
+        monitor.sourceSelected(selected)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(fallbacks.isEmpty())
+
+        loading = false
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(listOf(lower720), fallbacks)
         monitor.close()
     }
 

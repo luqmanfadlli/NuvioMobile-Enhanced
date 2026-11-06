@@ -2,6 +2,7 @@ package com.nuvio.app.features.player
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.isSelectableForPlayback
 import kotlinx.coroutines.CancellationException
@@ -35,6 +36,7 @@ internal class DeadLinkStartupMonitor(
     private val attemptedKeys = linkedSetOf<String>()
     private val deadMarkedKeys = linkedSetOf<String>()
     private var currentStream: StreamItem? = null
+    private var fallbackQualityHeight: Int? = null
     private var playbackStarted = false
     private var buffering = false
     private var awaitingActivation = false
@@ -48,6 +50,7 @@ internal class DeadLinkStartupMonitor(
         attemptedKeys.clear()
         deadMarkedKeys.clear()
         currentStream = null
+        fallbackQualityHeight = null
         playbackStarted = false
         buffering = false
         awaitingActivation = false
@@ -65,6 +68,9 @@ internal class DeadLinkStartupMonitor(
         if (closed) return
         val key = identityKeyOverride ?: stream.playerSourceIdentityKey() ?: return
         currentStream = stream
+        if (preserveCandidateOrder() && fallbackQualityHeight == null) {
+            fallbackQualityHeight = QualityFirstAutoPlayPolicy.detectQualityHeight(stream)
+        }
         if (!timeoutEnabled()) {
             cancelTimer()
             generation++
@@ -227,10 +233,26 @@ internal class DeadLinkStartupMonitor(
                     candidateKey != null && candidateKey !in attemptedKeys
                 }
                 .toList()
-            // Semi-auto supplies an explicit tier/provider order. Sorting here would
-            // undo the quality ceiling and could promote a higher-quality source
-            // after a lower-quality fallback has already been requested.
-            val next = if (preserveCandidateOrder()) {
+            // Semi-auto preserves provider order within the selected quality tier.
+            // While discovery is active, wait for slower providers at that tier before
+            // stepping down; never promote a higher tier than the user's selection.
+            val semiAuto = preserveCandidateOrder()
+            val currentTierHeight = fallbackQualityHeight
+            val next = if (semiAuto && currentTierHeight != null) {
+                eligibleCandidates.firstOrNull {
+                    QualityFirstAutoPlayPolicy.detectQualityHeight(it) == currentTierHeight
+                } ?: if (sourceDiscoveryLoading()) {
+                    null
+                } else {
+                    eligibleCandidates.firstOrNull {
+                        QualityFirstAutoPlayPolicy.detectQualityHeight(it)?.let { height ->
+                            height < currentTierHeight
+                        } == true
+                    } ?: eligibleCandidates.firstOrNull {
+                        QualityFirstAutoPlayPolicy.detectQualityHeight(it) == null
+                    }
+                }
+            } else if (semiAuto) {
                 eligibleCandidates.firstOrNull()
             } else {
                 eligibleCandidates.sortedBy(::deadLinkSourcePriority).firstOrNull()
@@ -246,6 +268,9 @@ internal class DeadLinkStartupMonitor(
                 attemptedKeys += nextKey
                 currentKey = nextKey
                 currentStream = next
+                if (semiAuto) {
+                    QualityFirstAutoPlayPolicy.detectQualityHeight(next)?.let { fallbackQualityHeight = it }
+                }
                 generation++
                 playbackStarted = false
                 buffering = false
