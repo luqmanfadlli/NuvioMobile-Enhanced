@@ -3017,6 +3017,8 @@
     <string name="compose_settings_root_layout_description">Home, cards, details, streams, and navigation</string>
     <string name="compose_settings_root_about_description">App info, updates, and acknowledgements</string>
     <string name="settings_playback_page_player">Player</string>
+    <string name="settings_playback_show_title_logo">Show title logo</string>
+    <string name="settings_playback_show_title_logo_description">Use title artwork in the player controls when available. The title text remains as a fallback.</string>
     <string name="settings_playback_page_player_description">Default player and playback engine</string>
     <string name="settings_playback_page_stream_selection">Stream selection</string>
     <string name="settings_playback_page_stream_selection_description">Choose streams automatically or reuse the last link</string>

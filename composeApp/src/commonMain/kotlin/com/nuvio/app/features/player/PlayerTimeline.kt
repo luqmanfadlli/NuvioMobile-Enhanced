@@ -33,8 +33,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,23 +64,35 @@ internal fun PlayerTimelineDetails(
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
-    releaseInfo: String?,
     metrics: PlayerLayoutMetrics,
     badges: List<StreamBadge> = emptyList(),
     modifier: Modifier = Modifier,
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
+    showTitleArtwork: Boolean = true,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
-        Text(
-            text = title,
-            style = typeScale.titleLg.copy(
+        PlayerTitleArtwork(
+            title = title,
+            logoUrl = titleLogo,
+            showLogo = showTitleLogo,
+            modifier = Modifier
+                .graphicsLayer {
+                    alpha = playerTitleArtworkVisibilityAlpha(showTitleArtwork)
+                }
+                .semantics {
+                    if (!showTitleArtwork) hideFromAccessibility()
+                },
+            textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = Color.White,
+            textColor = Color.White,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            maxLogoHeight = metrics.timelineLogoMaxHeight,
+            maxLogoWidth = metrics.logoMaxWidth,
         )
         if (seasonNumber != null && episodeNumber != null) {
             val episodeCode = stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
@@ -93,15 +107,6 @@ internal fun PlayerTimelineDetails(
         }
         if (badges.isNotEmpty()) {
             PlayerBadges(badges = badges, modifier = Modifier.padding(vertical = 4.dp))
-        }
-        if (!releaseInfo.isNullOrBlank()) {
-            Text(
-                text = releaseInfo,
-                style = typeScale.labelSm.copy(fontSize = metrics.metadataSize),
-                color = Color.White.copy(alpha = 0.68f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

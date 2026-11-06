@@ -42,6 +42,14 @@ internal fun PlaybackPlayerSettings(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_show_title_logo),
+                    description = stringResource(Res.string.settings_playback_show_title_logo_description),
+                    checked = settings.showPlayerTitleLogo,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setShowPlayerTitleLogo,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_player_preference),
                     description = if (settings.externalPlayerEnabled) {

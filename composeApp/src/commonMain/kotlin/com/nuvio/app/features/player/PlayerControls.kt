@@ -88,6 +88,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -128,7 +129,6 @@ internal fun PlayerControlsShell(
     useLegacyLayout: Boolean = false,
     showRemainingTime: Boolean = false,
     onRuntimeClick: () -> Unit = {},
-    releaseInfo: String? = null,
     badges: List<StreamBadge> = emptyList(),
     hideDetails: Boolean = false,
     onNextEpisodeClick: (() -> Unit)? = null,
@@ -184,6 +184,8 @@ internal fun PlayerControlsShell(
     foldLayout: Boolean = false,
     gestureController: PlayerGestureController? = null,
     onWake: () -> Unit = {},
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
 ) {
     if (foldLayout) {
         FoldControls(
@@ -226,6 +228,8 @@ internal fun PlayerControlsShell(
             onWake = onWake,
             horizontalSafePadding = horizontalSafePadding,
             modifier = modifier,
+            titleLogo = titleLogo,
+            showTitleLogo = showTitleLogo,
         )
         return
     }
@@ -281,6 +285,8 @@ internal fun PlayerControlsShell(
             if (useLegacyLayout) {
                 PlayerHeader(
                     title = title,
+                    titleLogo = titleLogo,
+                    showTitleLogo = showTitleLogo,
                     streamTitle = streamTitle,
                     providerName = providerName,
                     seasonNumber = seasonNumber,
@@ -421,13 +427,15 @@ internal fun PlayerControlsShell(
                         PlayerTimelineDetails(
                             modifier = Modifier.padding(horizontal = playerTextCutoutPadding(metrics)),
                             title = title,
+                            titleLogo = titleLogo,
+                            showTitleLogo = showTitleLogo,
                             seasonNumber = seasonNumber,
                             episodeNumber = episodeNumber,
                             episodeTitle = episodeTitle,
-                            releaseInfo = releaseInfo,
                             metrics = metrics,
                             badges = badges,
-                        )
+                            showTitleArtwork = !showParentalGuide,
+                                )
                     }
                     Row(
                         modifier = Modifier
@@ -509,6 +517,8 @@ internal fun PlayerControlsShell(
 @Composable
 private fun PlayerHeader(
     title: String,
+    titleLogo: String?,
+    showTitleLogo: Boolean,
     streamTitle: String,
     providerName: String,
     seasonNumber: Int?,
@@ -554,19 +564,31 @@ private fun PlayerHeader(
                 modifier = Modifier.weight(1f),
             ) {
                 Column(
-                    modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
+                    modifier = Modifier
+                        .graphicsLayer {
+                            alpha = playerTitleArtworkVisibilityAlpha(
+                                showTitleArtwork = !showParentalGuide,
+                                animatedAlpha = metadataAlpha,
+                            )
+                        }
+                        .semantics {
+                            if (showParentalGuide) hideFromAccessibility()
+                        },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text(
-                        text = title,
-                        style = typeScale.titleLg.copy(
+                    PlayerTitleArtwork(
+                        title = title,
+                        logoUrl = titleLogo,
+                        showLogo = showTitleLogo,
+                        textStyle = typeScale.titleLg.copy(
                             fontSize = metrics.titleSize,
                             lineHeight = metrics.titleSize * 1.16f,
                             fontWeight = FontWeight.Bold,
                         ),
-                        color = Color.White,
+                        textColor = Color.White,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLogoHeight = metrics.titleLogoMaxHeight,
+                        maxLogoWidth = metrics.logoMaxWidth,
                     )
                     if (seasonNumber != null && episodeNumber != null && !episodeTitle.isNullOrBlank()) {
                         val displayEpisodeTitle = localizedEpisodeTitle(episodeTitle, episodeNumber) ?: episodeTitle

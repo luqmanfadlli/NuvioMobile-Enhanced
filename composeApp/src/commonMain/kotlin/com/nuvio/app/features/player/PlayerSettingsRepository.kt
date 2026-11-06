@@ -34,6 +34,7 @@ fun snapToAllowedTimeout(value: Int): Int {
 
 data class PlayerSettingsUiState(
     val useLegacyPlayerLayout: Boolean = false,
+    val showPlayerTitleLogo: Boolean = false,
     val showLoadingOverlay: Boolean = true,
     val showPlayerLoadingStatus: Boolean = true,
     val pauseOverlayEnabled: Boolean = true,
@@ -144,6 +145,7 @@ object PlayerSettingsRepository {
 
     private var hasLoaded = false
     private var useLegacyPlayerLayout = false
+    private var showPlayerTitleLogo = false
     private var showLoadingOverlay = true
     private var showPlayerLoadingStatus = true
     private var pauseOverlayEnabled = true
@@ -259,6 +261,7 @@ object PlayerSettingsRepository {
     fun clearLocalState() {
         hasLoaded = false
         useLegacyPlayerLayout = false
+        showPlayerTitleLogo = false
         showLoadingOverlay = true
         showPlayerLoadingStatus = true
         pauseOverlayEnabled = true
@@ -367,6 +370,7 @@ object PlayerSettingsRepository {
     private fun loadFromDisk() {
         hasLoaded = true
         useLegacyPlayerLayout = PlayerSettingsStorage.loadUseLegacyPlayerLayout() ?: false
+        showPlayerTitleLogo = PlayerSettingsStorage.loadShowPlayerTitleLogo() ?: false
         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
         showPlayerLoadingStatus = PlayerSettingsStorage.loadShowPlayerLoadingStatus() ?: true
         pauseOverlayEnabled = PlayerSettingsStorage.loadPauseOverlayEnabled() ?: true
@@ -555,6 +559,14 @@ object PlayerSettingsRepository {
         useLegacyPlayerLayout = enabled
         publish()
         PlayerSettingsStorage.saveUseLegacyPlayerLayout(enabled)
+    }
+
+    fun setShowPlayerTitleLogo(enabled: Boolean) {
+        ensureLoaded()
+        if (showPlayerTitleLogo == enabled) return
+        showPlayerTitleLogo = enabled
+        publish()
+        PlayerSettingsStorage.saveShowPlayerTitleLogo(enabled)
     }
 
     fun setShowLoadingOverlay(enabled: Boolean) {
@@ -1459,6 +1471,7 @@ object PlayerSettingsRepository {
     private fun publish() {
         _uiState.value = PlayerSettingsUiState(
             useLegacyPlayerLayout = useLegacyPlayerLayout,
+            showPlayerTitleLogo = showPlayerTitleLogo,
             showLoadingOverlay = showLoadingOverlay,
             showPlayerLoadingStatus = showPlayerLoadingStatus,
             pauseOverlayEnabled = pauseOverlayEnabled,

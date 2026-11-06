@@ -492,6 +492,9 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val partyActive = partyState.party != null
     val playerBadges = rememberPlayerBadges()
+    // Live TV channel artwork is not a title logo; retain the program title text instead.
+    val playerTitleLogo = if (isLiveTvPlayback) null else logo
+    val showPlayerTitleLogo = playerSettingsUiState.showPlayerTitleLogo && !isLiveTvPlayback
     LaunchedEffect(folded) {
         if (folded) {
             controlsVisible = true
@@ -515,6 +518,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             playerController?.isPictureInPictureSupported() == true
         PlayerControlsShell(
             title = title,
+            titleLogo = playerTitleLogo,
+            showTitleLogo = showPlayerTitleLogo,
             streamTitle = activeStreamTitle,
             providerName = liveTvNowProgramTitle?.let { programTitle -> "$activeProviderName · $programTitle" } ?: activeProviderName,
             seasonNumber = activeSeasonNumber,
@@ -528,7 +533,6 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             useLegacyLayout = playerSettingsUiState.useLegacyPlayerLayout,
             showRemainingTime = showRemainingTime,
             onRuntimeClick = { showRemainingTime = !showRemainingTime },
-            releaseInfo = metaUiState.meta?.takeIf { it.id == parentMetaId }?.releaseInfo,
             badges = playerBadges,
             hideDetails = activeSkipInterval != null && !skipIntervalDismissed,
             onNextEpisodeClick = if (nextEpisodeInfo?.hasAired == true && !nextEpisodeAutoPlaySearching && nextEpisodeAutoPlayCountdown == null) {

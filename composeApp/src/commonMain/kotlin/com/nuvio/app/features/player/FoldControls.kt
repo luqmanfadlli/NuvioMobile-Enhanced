@@ -138,6 +138,8 @@ internal fun FoldControls(
     onWake: () -> Unit,
     horizontalSafePadding: Dp,
     modifier: Modifier = Modifier,
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
 ) {
     val currentOnWake by rememberUpdatedState(onWake)
     val contentAlpha by animateFloatAsState(
@@ -208,6 +210,8 @@ internal fun FoldControls(
             )
             NowPlayingTile(
                 title = title,
+                titleLogo = titleLogo,
+                showTitleLogo = showTitleLogo,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
                 episodeTitle = episodeTitle,
@@ -354,6 +358,8 @@ private fun IconTile(
 @Composable
 private fun NowPlayingTile(
     title: String,
+    titleLogo: String?,
+    showTitleLogo: Boolean,
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
@@ -367,12 +373,16 @@ private fun NowPlayingTile(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = typeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White,
+                PlayerTitleArtwork(
+                    title = title,
+                    logoUrl = titleLogo,
+                    showLogo = showTitleLogo,
+                    textStyle = typeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
+                    textColor = Color.White,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLogoHeight = 26.dp,
+                    maxLogoWidth = 140.dp,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 if (seasonNumber != null && episodeNumber != null) {
                     val episodeCode = stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
