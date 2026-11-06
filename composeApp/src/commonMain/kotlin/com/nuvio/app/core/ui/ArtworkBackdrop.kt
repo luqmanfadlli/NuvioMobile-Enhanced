@@ -32,6 +32,7 @@ import coil3.size.Precision
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val BackdropDecodeSize = 320
 private val backdropCache = linkedMapOf<String, ImageBitmap>()
 private val backdropScrim = Brush.verticalGradient(
     0f to Color.Black.copy(alpha = 0.34f),
@@ -48,7 +49,7 @@ internal fun rememberArtworkBackdrop(imageUrl: String?, enabled: Boolean = true)
         if (!enabled || imageUrl.isNullOrBlank() || image != null) return@LaunchedEffect
         val request = ImageRequest.Builder(context)
             .data(imageUrl)
-            .size(128)
+            .size(BackdropDecodeSize)
             .precision(Precision.EXACT)
             .build()
         val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult
@@ -116,7 +117,7 @@ internal expect fun prepareArtworkBackdrop(image: coil3.Image): ImageBitmap
 internal fun blurBackdropPixels(pixels: IntArray, width: Int, height: Int) {
     require(width > 0 && height > 0 && pixels.size == width * height)
     val scratch = IntArray(pixels.size)
-    val radius = (minOf(width, height) / 12).coerceAtLeast(2)
+     val radius = (minOf(width, height) / 36).coerceAtLeast(2)
     repeat(3) {
         blurBackdropPass(pixels, scratch, width, height, radius, horizontal = true)
         blurBackdropPass(scratch, pixels, width, height, radius, horizontal = false)
