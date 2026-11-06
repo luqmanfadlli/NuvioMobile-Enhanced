@@ -12,6 +12,7 @@ data class PartySource(
     @SerialName("info_hash") val infoHash: String? = null,
     @SerialName("file_idx") val fileIdx: Int? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("addon_id") val addonId: String? = null,
@@ -50,6 +51,7 @@ data class PartyStream(
     @SerialName("addon_id") val addonId: String = "",
     @SerialName("addon_logo") val addonLogo: String? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("stream_type") val streamType: String? = null,
@@ -67,6 +69,7 @@ data class PartyStream(
             bingeGroup = bingeGroup,
             videoSize = videoSize,
             filename = filename,
+            videoHash = videoHash,
             proxyHeaders = StreamProxyHeaders(request = headers, response = responseHeaders),
         ),
         badges = badges,
@@ -74,6 +77,26 @@ data class PartyStream(
 }
 
 internal fun isShareableStreamUrl(url: String): Boolean = SHAREABLE_URL.containsMatchIn(url)
+
+/**
+ * True when a guest must replace its current source with the host's shared HTTP source.
+ * The host announcement is authoritative; stream labels are not sufficient to establish
+ * that independently resolved URLs are equivalent.
+ */
+internal fun shouldFollowSharedPartyStream(
+    isHost: Boolean,
+    sharingEnabled: Boolean,
+    partyMediaKey: String?,
+    localMediaKey: String,
+    sharedStream: PartyStream?,
+    activeSourceUrl: String,
+): Boolean {
+    if (isHost || !sharingEnabled || partyMediaKey != localMediaKey) return false
+    val stream = sharedStream ?: return false
+    return stream.mediaKey == localMediaKey &&
+        isShareableStreamUrl(stream.url) &&
+        stream.url != activeSourceUrl
+}
 
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
 

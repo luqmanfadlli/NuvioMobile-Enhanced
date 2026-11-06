@@ -61,6 +61,7 @@ import com.nuvio.app.features.party.PartyRepository
 import com.nuvio.app.features.party.PartySource
 import com.nuvio.app.features.party.PartyStream
 import com.nuvio.app.features.party.isShareableStreamUrl
+import com.nuvio.app.features.party.shouldFollowSharedPartyStream
 import com.nuvio.app.features.party.PartySync
 import com.nuvio.app.features.party.UnreadBadge
 import com.nuvio.app.features.party.messageRes
@@ -161,6 +162,7 @@ internal fun PlayerScreenRuntime.currentPartyMedia(): PartyMedia = PartyMedia(
         infoHash = activeTorrentInfoHash,
         fileIdx = activeTorrentFileIdx,
         filename = activeSourceFilename ?: activeTorrentFilename,
+        videoHash = activeStream?.behaviorHints?.videoHash,
         bingeGroup = currentStreamBingeGroup,
         addonId = activeProviderAddonId,
         name = activeStreamTitle,
@@ -181,6 +183,7 @@ internal fun PlayerScreenRuntime.currentPartyStream(): PartyStream? {
         addonId = stream.addonId,
         addonLogo = stream.addonLogo,
         filename = activeSourceFilename ?: stream.behaviorHints.filename,
+        videoHash = stream.behaviorHints.videoHash,
         videoSize = stream.behaviorHints.videoSize,
         bingeGroup = stream.behaviorHints.bingeGroup,
         streamType = activeStreamType,
@@ -245,8 +248,12 @@ private fun PlayerScreenRuntime.handlePartyMediaChange(media: PartyMedia) {
 internal fun PlayerScreenRuntime.BindPartyEffects() {
     // This binding belongs to the player session, including background PiP.
     val partyState by PartyRepository.state.collectAsState()
+    val remoteSharedStream by PartyRepository.sharedStream.collectAsState()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsState()
     val partyId = partyState.party?.id
+    var lastFollowedSharedStream by remember(partyId) { mutableStateOf<PartyStream?>(null) }
     val key = partyKey
+    var waitingForSharedSource by remember(partyId, key) { mutableStateOf(false) }
     val sharing = partyState.party?.let { it.isHost && it.sharing } == true
     val sharedStream = if (sharing) currentPartyStream() else null
 
@@ -282,6 +289,114 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
     LaunchedEffect(sharing, sharedStream) {
         if (sharing) PartyRepository.shareStream(sharedStream)
+    }
+
+    // "Share my stream" is a host opt-in. A missing stream while enabled means the current
+    // host source cannot be shared; do not silently keep playing an old shared source.
+    LaunchedEffect(
+        partyId,
+        key,
+        partyState.party?.isHost,
+        partyState.party?.media?.key,
+        hostSharingEnabled,
+        remoteSharedStream,
+        activeSourceUrl,
+    ) {
+        val party = PartyRepository.state.value.party ?: return@LaunchedEffect
+        if (party.isHost) {
+            // Host ownership can change when the previous host leaves. Do not carry the
+            // guest-only unavailable-source pause into the new host role.
+            if (waitingForSharedSource) {
+                waitingForSharedSource = false
+                val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
+                if (playback != null) {
+                    val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
+                    if (!playback.paused) playerController?.seekTo(target)
+                    applyPartyPaused(playback.paused, force = true)
+                }
+            }
+            lastFollowedSharedStream = null
+            return@LaunchedEffect
+        }
+        if (party.media.key != key) return@LaunchedEffect
+
+        val incoming = remoteSharedStream
+        if (!hostSharingEnabled) {
+            lastFollowedSharedStream = null
+            if (waitingForSharedSource) {
+                waitingForSharedSource = false
+                val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
+                if (playback != null) {
+                    val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
+                    if (!playback.paused) playerController?.seekTo(target)
+                    applyPartyPaused(playback.paused, force = true)
+                }
+            }
+            return@LaunchedEffect
+        }
+
+        if (incoming == null) {
+            lastFollowedSharedStream = null
+            if (!waitingForSharedSource) {
+                waitingForSharedSource = true
+                partyBehind = false
+                partyBehindMs = null
+                clearPartyNudge()
+                playerController?.pause()
+                shouldPlay = false
+            }
+            return@LaunchedEffect
+        }
+
+        val wasWaitingForSource = waitingForSharedSource
+        waitingForSharedSource = false
+        if (lastFollowedSharedStream == incoming) return@LaunchedEffect
+
+        // If the host returns to the same URL after a temporary unavailable state, resume
+        // the existing item at the authoritative timeline instead of ignoring it as a no-op.
+        if (wasWaitingForSource && incoming.url == activeSourceUrl) {
+            lastFollowedSharedStream = incoming
+            partyBehind = false
+            partyBehindMs = null
+            clearPartyNudge()
+            val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
+            if (playback != null) {
+                shouldPlay = !playback.paused
+                val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
+                if (!playback.paused) playerController?.seekTo(target)
+                applyPartyPaused(playback.paused, force = true)
+            }
+            return@LaunchedEffect
+        }
+
+        if (!shouldFollowSharedPartyStream(
+                isHost = party.isHost,
+                sharingEnabled = hostSharingEnabled,
+                partyMediaKey = party.media.key,
+                localMediaKey = key,
+                sharedStream = incoming,
+                activeSourceUrl = activeSourceUrl,
+            )
+        ) return@LaunchedEffect
+
+        lastFollowedSharedStream = incoming
+        partyBehind = false
+        partyBehindMs = null
+        val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
+        val targetPositionMs = playback
+            ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs()) }
+            ?: playbackSnapshot.positionMs.coerceAtLeast(0L)
+        if (playback != null) shouldPlay = !playback.paused
+        clearPartyNudge()
+
+        // Keep the guest's already loaded subtitle choices where possible; the shared URL
+        // represents the video source, not the guest's selected subtitle track.
+        switchToSource(
+            stream = incoming.toStreamItem().copy(externalSubtitles = externalSubtitles),
+            saveForReuse = false,
+        )
+        activeInitialPositionMs = targetPositionMs
+        activeInitialProgressFraction = null
     }
 
     LaunchedEffect(key) {
