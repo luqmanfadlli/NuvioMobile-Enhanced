@@ -2191,8 +2191,8 @@ private class NuvioLibmpvView(
         val ended = mpv.getPropertyBoolean("eof-reached") ?: false
         val seeking = mpv.getPropertyBoolean("seeking") ?: false
         val cacheBufferingState = mpv.getPropertyInt("cache-buffering-state")
-        cacheSpeedBytesPerSecond = mpv.getPropertyDouble("cache-speed")
-            ?.takeIf { it.isFinite() && it >= 0.0 }
+        cacheSpeedBytesPerSecond = mpv.getPropertyInt("cache-speed")
+            ?.takeIf { it >= 0 }
             ?.toLong()
         val durationMs = mpv.getPropertyDouble("duration").toMillis()
         val positionMs = mpv.getPropertyDouble("time-pos").toMillis()
