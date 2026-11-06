@@ -1476,24 +1476,31 @@ fun MetaDetailsScreen(
                                 if (!useTabletLayout && backgroundMode.usesBackdropBackground && heroHeightPx.intValue > 0) {
                                     val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
                                         ?: colorScheme.background
+                                    // The blend band sits under the hero and darkens the backdrop around
+                                    // the hero's bottom edge. It used to start fully opaque exactly at that
+                                    // edge, which left a hard line and a dark box under the feathered
+                                    // artwork. Ramp it in across the artwork's feathered region and ease
+                                    // it back out below, so the artwork melts into the backdrop.
+                                    val blendFadeInPx = heroHeightPx.intValue * DETAIL_HERO_BLEND_FADE_IN_FRACTION
+                                    val blendFadeOutPx = with(density) { DETAIL_HERO_BLEND_FADE_OUT.toPx() }
+                                    val blendBandHeight = with(density) { (blendFadeInPx + blendFadeOutPx).toDp() }
+                                    val blendBrush = remember(blendColor, blendFadeInPx, blendFadeOutPx) {
+                                        detailHeroBlendBrush(
+                                            color = blendColor,
+                                            peakFraction = blendFadeInPx / (blendFadeInPx + blendFadeOutPx),
+                                        )
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .zIndex(0.5f)
                                             .fillMaxWidth()
-                                            .height(132.dp)
+                                            .height(blendBandHeight)
                                             .graphicsLayer {
-                                                translationY = heroHeightPx.intValue.toFloat() - detailScrollOffsetPx()
+                                                translationY = heroHeightPx.intValue.toFloat() -
+                                                    blendFadeInPx -
+                                                    detailScrollOffsetPx()
                                             }
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        blendColor.copy(alpha = 0.98f),
-                                                        blendColor.copy(alpha = 0.84f),
-                                                        blendColor.copy(alpha = 0.52f),
-                                                        Color.Transparent,
-                                                    ),
-                                                ),
-                                            ),
+                                            .background(blendBrush),
                                     )
                                 }
                             }
@@ -2712,6 +2719,31 @@ private fun TabbedSectionGroup(
             content(activeKey)
         }
     }
+}
+
+// Matches the region of the hero artwork that featherArtwork() fades out (its bottom 42%).
+private const val DETAIL_HERO_BLEND_FADE_IN_FRACTION = 0.42f
+private val DETAIL_HERO_BLEND_FADE_OUT = 200.dp
+private const val DETAIL_HERO_BLEND_PEAK_ALPHA = 0.96f
+
+/**
+ * A single smooth bump: transparent at the top, [DETAIL_HERO_BLEND_PEAK_ALPHA] at [peakFraction]
+ * (the hero's bottom edge) and transparent again at the bottom, using smootherstep easing on both
+ * sides so neither end of the band shows an edge.
+ */
+private fun detailHeroBlendBrush(color: Color, peakFraction: Float): Brush {
+    val peak = peakFraction.coerceIn(0.01f, 0.99f)
+    val steps = 12
+    fun ease(t: Float) = t * t * t * (t * (t * 6f - 15f) + 10f)
+    val rampIn = Array(steps) { index ->
+        val t = index / steps.toFloat()
+        (t * peak) to color.copy(alpha = DETAIL_HERO_BLEND_PEAK_ALPHA * ease(t))
+    }
+    val rampOut = Array(steps + 1) { index ->
+        val t = index / steps.toFloat()
+        (peak + t * (1f - peak)) to color.copy(alpha = DETAIL_HERO_BLEND_PEAK_ALPHA * (1f - ease(t)))
+    }
+    return Brush.verticalGradient(colorStops = rampIn + rampOut)
 }
 
 private val tabletHeroSectionKeys = setOf(
