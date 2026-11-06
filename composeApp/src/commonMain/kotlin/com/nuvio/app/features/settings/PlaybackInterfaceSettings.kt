@@ -54,6 +54,22 @@ internal fun PlaybackInterfaceSettings(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setShowPlayerTitleLogo,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_control_glass),
+                    description = stringResource(Res.string.settings_playback_control_glass_description),
+                    checked = settings.playerControlGlassEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setPlayerControlGlassEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_show_skip_buttons),
+                    description = stringResource(Res.string.settings_playback_show_skip_buttons_description),
+                    checked = settings.showSkipButtons,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setShowSkipButtons,
+                )
                 if (!settings.useLegacyPlayerLayout) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(

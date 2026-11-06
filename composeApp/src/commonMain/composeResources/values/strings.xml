@@ -3023,6 +3023,10 @@
     <string name="settings_playback_page_player">Player</string>
     <string name="settings_playback_show_title_logo">Show title logo</string>
     <string name="settings_playback_show_title_logo_description">Use title artwork in the player controls when available. The title text remains as a fallback.</string>
+    <string name="settings_playback_control_glass">Glass Backgrounds on Controls</string>
+    <string name="settings_playback_control_glass_description">Show the translucent round and pill backgrounds behind player buttons, time pills and the bottom bar. Turn off for plain icons and text.</string>
+    <string name="settings_playback_show_skip_buttons">Show Skip Buttons</string>
+    <string name="settings_playback_show_skip_buttons_description">Show the skip back and skip forward buttons next to play/pause. Double-tap seeking works either way.</string>
     <string name="settings_playback_page_player_description">Default player and playback engine</string>
     <string name="settings_playback_page_stream_selection">Stream selection</string>
     <string name="settings_playback_page_stream_selection_description">Choose streams automatically or reuse the last link</string>

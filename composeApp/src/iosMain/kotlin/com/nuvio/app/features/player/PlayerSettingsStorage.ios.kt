@@ -36,6 +36,8 @@ actual object PlayerSettingsStorage {
     private const val skipForwardSecondsKey = "skip_forward_seconds"
     private const val touchGesturesEnabledKey = "touch_gestures_enabled"
     private const val swipeToSeekEnabledKey = "swipe_to_seek_enabled"
+    private const val playerControlGlassEnabledKey = "player_glass_effect_enabled"
+    private const val showSkipButtonsKey = "player_show_skip_buttons"
     private const val seekPreviewEnabledKey = "seek_preview_enabled"
     private const val movieRecommendationsEnabledKey = "movie_recommendations_enabled"
     private const val autoShowSubtitlesOnRewindEnabledKey = "auto_show_subtitles_on_rewind_enabled"
@@ -415,6 +417,18 @@ actual object PlayerSettingsStorage {
 
     actual fun saveSwipeToSeekEnabled(enabled: Boolean) {
         saveBoolean(swipeToSeekEnabledKey, enabled)
+    }
+
+    actual fun loadPlayerControlGlassEnabled(): Boolean? = loadBoolean(playerControlGlassEnabledKey)
+
+    actual fun savePlayerControlGlassEnabled(enabled: Boolean) {
+        saveBoolean(playerControlGlassEnabledKey, enabled)
+    }
+
+    actual fun loadShowSkipButtons(): Boolean? = loadBoolean(showSkipButtonsKey)
+
+    actual fun saveShowSkipButtons(enabled: Boolean) {
+        saveBoolean(showSkipButtonsKey, enabled)
     }
 
     actual fun loadSeekPreviewEnabled(): Boolean? = loadBoolean(seekPreviewEnabledKey)

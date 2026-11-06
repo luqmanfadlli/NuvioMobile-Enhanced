@@ -2987,6 +2987,10 @@
     <string name="settings_playback_page_player">Player</string>
     <string name="settings_playback_show_title_logo">Tampilkan logo judul</string>
     <string name="settings_playback_show_title_logo_description">Gunakan artwork judul di kontrol player jika tersedia. Teks judul tetap dipakai sebagai cadangan.</string>
+    <string name="settings_playback_control_glass">Latar Kaca pada Kontrol</string>
+    <string name="settings_playback_control_glass_description">Tampilkan latar bulat dan kapsul transparan di belakang tombol player, pil waktu, dan bar bawah. Matikan untuk ikon dan teks polos.</string>
+    <string name="settings_playback_show_skip_buttons">Tampilkan Tombol Skip</string>
+    <string name="settings_playback_show_skip_buttons_description">Tampilkan tombol mundur dan maju di samping putar/jeda. Ketuk dua kali untuk seek tetap berfungsi.</string>
     <string name="settings_playback_page_player_description">Player bawaan dan mesin pemutaran</string>
     <string name="settings_playback_page_stream_selection">Pemilihan stream</string>
     <string name="settings_playback_page_stream_selection_description">Pilih stream secara otomatis atau pakai ulang tautan terakhir</string>

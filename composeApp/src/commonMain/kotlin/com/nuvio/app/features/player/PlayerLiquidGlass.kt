@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.border
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,9 @@ internal val PlayerGlassFallback = Color.White.copy(alpha = 0.08f)
 /** Hairline rim that sells the glass edge on top of Kyant's highlight. */
 internal val PlayerGlassRim = Color.White.copy(alpha = 0.22f)
 
+/** False when "Glass Backgrounds on Controls" is off: player buttons and pills draw no backing. */
+internal val LocalPlayerControlGlassEnabled = staticCompositionLocalOf { true }
+
 /**
  * The one glass recipe every player control uses: Kyant backdrop with vibrancy, a light blur, lens
  * refraction and edge highlight, sampled from the live video frame provided by
@@ -71,7 +75,11 @@ internal fun Modifier.playerLiquidGlass(
     fallback: Color = PlayerGlassFallback,
     backdropOpacity: Float = PlayerGlassBackdropOpacity,
     rim: Boolean = true,
+    // Panels (e.g. chapters) keep their glass when the control backings are turned off: their
+    // text needs a backing to stay readable over the video.
+    isControl: Boolean = true,
 ): Modifier {
+    if (isControl && !LocalPlayerControlGlassEnabled.current) return this
     val glass = clip(shape).ambientLiquidGlass(
         shape = shape,
         tint = tint,

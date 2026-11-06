@@ -38,6 +38,8 @@ actual object PlayerSettingsStorage {
     private const val skipForwardSecondsKey = "skip_forward_seconds"
     private const val touchGesturesEnabledKey = "touch_gestures_enabled"
     private const val swipeToSeekEnabledKey = "swipe_to_seek_enabled"
+    private const val playerControlGlassEnabledKey = "player_glass_effect_enabled"
+    private const val showSkipButtonsKey = "player_show_skip_buttons"
     private const val seekPreviewEnabledKey = "seek_preview_enabled"
     private const val movieRecommendationsEnabledKey = "movie_recommendations_enabled"
     private const val autoShowSubtitlesOnRewindEnabledKey = "auto_show_subtitles_on_rewind_enabled"
@@ -469,6 +471,26 @@ actual object PlayerSettingsStorage {
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(swipeToSeekEnabledKey), enabled)
             ?.apply()
+    }
+
+    actual fun loadPlayerControlGlassEnabled(): Boolean? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(playerControlGlassEnabledKey)
+            if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+        }
+
+    actual fun savePlayerControlGlassEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(playerControlGlassEnabledKey), enabled)?.apply()
+    }
+
+    actual fun loadShowSkipButtons(): Boolean? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(showSkipButtonsKey)
+            if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+        }
+
+    actual fun saveShowSkipButtons(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(showSkipButtonsKey), enabled)?.apply()
     }
 
     actual fun loadSeekPreviewEnabled(): Boolean? =

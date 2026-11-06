@@ -109,6 +109,7 @@ internal fun PlayerChaptersPanel(
                         .width(panelWidth)
                         .height(panelHeight)
                         .playerLiquidGlass(
+                            isControl = false,
                             shape = shape,
                             blurRadius = 24.dp,
                             refractionHeight = 10.dp,

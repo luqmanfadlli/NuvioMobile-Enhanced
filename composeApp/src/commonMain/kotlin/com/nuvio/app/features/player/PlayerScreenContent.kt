@@ -199,6 +199,7 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
         runtime.BindPlayerRuntimeEffects()
         CompositionLocalProvider(
             LocalLiquidGlassBackdrop provides rememberVideoFrameBackdrop(enabled = !runtime.isMiniPresentation && isLiquidGlassSupported()),
+            LocalPlayerControlGlassEnabled provides playerSettingsUiState.playerControlGlassEnabled,
         ) {
             runtime.RenderPlayerRuntimeUi(
                 partyPanelWidth = partyPanelWidth,

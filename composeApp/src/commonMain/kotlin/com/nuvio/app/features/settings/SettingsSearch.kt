@@ -648,6 +648,16 @@ internal fun settingsSearchEntries(
                 stringResource(Res.string.settings_playback_show_title_logo_description),
             ),
             PlaybackSearchRow(
+                "player-control-glass",
+                stringResource(Res.string.settings_playback_control_glass),
+                stringResource(Res.string.settings_playback_control_glass_description),
+            ),
+            PlaybackSearchRow(
+                "player-skip-buttons",
+                stringResource(Res.string.settings_playback_show_skip_buttons),
+                stringResource(Res.string.settings_playback_show_skip_buttons_description),
+            ),
+            PlaybackSearchRow(
                 "loading-overlay",
                 stringResource(Res.string.settings_playback_show_loading_overlay),
                 stringResource(Res.string.settings_playback_show_loading_overlay_description),
