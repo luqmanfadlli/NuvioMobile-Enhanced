@@ -33,8 +33,11 @@ import com.nuvio.app.features.watched.WatchedClock
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -162,21 +165,19 @@ object MetaDetailsRepository {
                 return@launch
             }
 
-            for (manifest in manifests) {
-                val result = withContext(Dispatchers.Default) {
-                    tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
-                }
-                if (result != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = result,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = type,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
+            val result = withContext(Dispatchers.Default) {
+                fetchFirstAvailableMeta(manifests, type, metaLookupId)
+            }
+            if (result != null) {
+                publishLoadedMeta(
+                    requestKey = requestKey,
+                    meta = result,
+                    fallbackItemId = metaLookupId,
+                    fallbackItemType = type,
+                    mdbListSettings = mdbListSettings,
+                    metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                )
+                return@launch
             }
 
             val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
@@ -380,15 +381,63 @@ object MetaDetailsRepository {
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L
+    private const val ADDON_META_TIMEOUT_MS = 10_000L
     private const val METADATA_PROVIDER_READY_TIMEOUT_MS = 10_000L
     private const val TMDB_ENRICH_TIMEOUT_MS = 5_000L
     private const val MDBLIST_ENRICH_TIMEOUT_MS = 5_000L
+
+    private suspend fun fetchFirstAvailableMeta(
+        manifests: List<AddonManifest>,
+        type: String,
+        id: String,
+    ): MetaDetails? = coroutineScope {
+        TmdbSettingsRepository.ensureLoaded()
+        val tmdbWarmup = async {
+            runCatching {
+                TmdbMetadataService.prefetchEnrichment(
+                    type = type,
+                    id = id,
+                    settings = TmdbSettingsRepository.snapshot(),
+                )
+            }.onFailure { if (it is CancellationException) throw it }
+        }
+        val attempts = manifests.map { manifest ->
+            async {
+                withTimeoutOrNull(ADDON_META_TIMEOUT_MS) {
+                    fetchAddonMeta(manifest, type, id)
+                }
+            }
+        }
+        var selected: Pair<AddonManifest, MetaDetails>? = null
+        for ((index, attempt) in attempts.withIndex()) {
+            val meta = attempt.await() ?: continue
+            selected = manifests[index] to meta
+            break
+        }
+        attempts.forEach { it.cancel() }
+        val (manifest, meta) = selected ?: run {
+            tmdbWarmup.cancel()
+            return@coroutineScope null
+        }
+        val enriched = enrichFetchedMeta(manifest, meta, id, includeMdbList = false, tmdbWarmup = tmdbWarmup)
+        tmdbWarmup.cancel()
+        enriched
+    }
 
     private suspend fun tryFetchMeta(
         manifest: AddonManifest,
         type: String,
         id: String,
         includeMdbList: Boolean,
+    ): MetaDetails? {
+        val meta = fetchAddonMeta(manifest, type, id) ?: return null
+        return enrichFetchedMeta(manifest, meta, id, includeMdbList)
+    }
+
+    private suspend fun fetchAddonMeta(
+        manifest: AddonManifest,
+        type: String,
+        id: String,
     ): MetaDetails? {
         val url = buildAddonResourceUrl(
             manifestUrl = manifest.transportUrl,
@@ -398,49 +447,63 @@ object MetaDetailsRepository {
         )
 
         return try {
-            TmdbSettingsRepository.ensureLoaded()
             log.d { "Fetching meta from: $url" }
             InAppLogger.info("Metadata/AddonFetch", "Fetching meta type=$type id=$id url=${InAppLogger.redactUrl(url)}")
             val payload = fetchAddonResponseText(url)
             log.d { "Raw payload length=${payload.length}, first 500 chars: ${payload.take(500)}" }
             InAppLogger.debug("Metadata/AddonFetch", "Meta payload length=${payload.length} type=$type id=$id")
-            val result = withContext(Dispatchers.Default) { MetaDetailsParser.parse(payload) }
-            val tmdbEnriched = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
-                TmdbMetadataService.enrichMeta(
-                    meta = result,
-                    fallbackItemId = id,
-                    settings = TmdbSettingsRepository.snapshot(),
-                )
-            } ?: result
-            val enriched = if (includeMdbList) {
-                MdbListSettingsRepository.ensureLoaded()
-                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                    MdbListMetadataService.enrichMeta(
-                        meta = tmdbEnriched,
-                        fallbackItemId = id,
-                        settings = MdbListSettingsRepository.snapshot(),
-                    )
-                } ?: tmdbEnriched
-            } else {
-                tmdbEnriched
-            }
-            log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
-            InAppLogger.info(
-                "Metadata/AddonFetch",
-                "Parsed meta source=${manifest.name} type=${enriched.type} id=${enriched.id} name=${enriched.name} videos=${enriched.videos.size}",
-            )
-            if (enriched.videos.isNotEmpty()) {
-                val first = enriched.videos.first()
-                log.d { "First video: id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}" }
-                InAppLogger.debug("Metadata/AddonFetch", "First video id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}")
-            }
-            enriched
+            withContext(Dispatchers.Default) { MetaDetailsParser.parse(payload) }
         } catch (e: Throwable) {
             if (e is CancellationException) throw e
             log.e(e) { "Failed to fetch/parse meta from $url (manifest=${manifest.transportUrl})" }
             InAppLogger.warn("Metadata/AddonFetch", "Failed meta source=${manifest.name} url=${InAppLogger.redactUrl(url)} error=${InAppLogger.throwableSummary(e)}")
             null
         }
+    }
+
+    private suspend fun enrichFetchedMeta(
+        manifest: AddonManifest,
+        result: MetaDetails,
+        id: String,
+        includeMdbList: Boolean,
+        tmdbWarmup: Deferred<*>? = null,
+    ): MetaDetails {
+        TmdbSettingsRepository.ensureLoaded()
+        val tmdbEnriched = runCatching {
+            withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                tmdbWarmup?.await()
+                TmdbMetadataService.enrichMeta(
+                    meta = result,
+                    fallbackItemId = id,
+                    settings = TmdbSettingsRepository.snapshot(),
+                )
+            }
+        }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: result
+        val enriched = if (includeMdbList) {
+            MdbListSettingsRepository.ensureLoaded()
+            runCatching {
+                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                    MdbListMetadataService.enrichMeta(
+                        meta = tmdbEnriched,
+                        fallbackItemId = id,
+                        settings = MdbListSettingsRepository.snapshot(),
+                    )
+                }
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: tmdbEnriched
+        } else {
+            tmdbEnriched
+        }
+        log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
+        InAppLogger.info(
+            "Metadata/AddonFetch",
+            "Parsed meta source=${manifest.name} type=${enriched.type} id=${enriched.id} name=${enriched.name} videos=${enriched.videos.size}",
+        )
+        if (enriched.videos.isNotEmpty()) {
+            val first = enriched.videos.first()
+            log.d { "First video: id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}" }
+            InAppLogger.debug("Metadata/AddonFetch", "First video id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}")
+        }
+        return enriched
     }
 
     private suspend fun findReadyMetaManifests(type: String, id: String): List<AddonManifest> {
