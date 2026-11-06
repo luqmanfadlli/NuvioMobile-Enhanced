@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.filter
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalFoundationApi::class)
 internal val ShelfRowCacheWindow = LazyLayoutCacheWindow(aheadFraction = 0.5f, behindFraction = 0.25f)
 
 private const val ShelfImagePrefetchAheadCount = 6

@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +58,7 @@ enum class NuvioViewAllPillSize {
     Compact,
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> NuvioShelfSection(
     title: String,
