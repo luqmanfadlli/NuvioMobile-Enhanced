@@ -120,7 +120,7 @@ internal fun MetaPreview.withHeroMeta(meta: HomeHeroMeta): MetaPreview {
     }
     return copy(
         name = details?.name?.takeIf { useOriginalTitle && it.isNotBlank() } ?: name,
-        logo = details?.logo?.takeIf { useOriginalTitle && it.isNotBlank() } ?: logo,
+        logo = details?.logo?.takeIf { it.isNotBlank() } ?: logo,
         genres = details?.genres?.takeIf { it.isNotEmpty() } ?: genres,
         imdbRating = details?.imdbRating?.takeIf { it.isNotBlank() } ?: imdbRating,
         runtime = details?.runtime?.takeIf { it.isNotBlank() } ?: runtime,

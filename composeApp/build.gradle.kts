@@ -7,8 +7,7 @@ import java.net.URL
 import java.security.MessageDigest
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -59,8 +58,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
-    @get:Optional
-    @get:InputFile
+    @get:InputFiles
     abstract val localPropertiesFile: RegularFileProperty
 
     @get:Input

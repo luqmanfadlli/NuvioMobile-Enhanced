@@ -85,6 +85,8 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.live_tv_button_continue
+import nuvio.composeapp.generated.resources.live_tv_categories
+import nuvio.composeapp.generated.resources.live_tv_category_channel_count
 import nuvio.composeapp.generated.resources.live_tv_empty_message
 import nuvio.composeapp.generated.resources.live_tv_empty_title
 import nuvio.composeapp.generated.resources.live_tv_filter_choose_category
@@ -104,6 +106,8 @@ import nuvio.composeapp.generated.resources.live_tv_action_search
 import nuvio.composeapp.generated.resources.live_tv_action_grid_view
 import nuvio.composeapp.generated.resources.live_tv_action_list_view
 import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
@@ -134,6 +138,7 @@ import nuvio.composeapp.generated.resources.live_tv_section_guide
 import nuvio.composeapp.generated.resources.live_tv_section_on_demand
 import nuvio.composeapp.generated.resources.live_tv_section_sports
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -261,6 +266,18 @@ fun LiveTvScreen(
                 .groupingBy { categoryNameForChannel(it, uncategorizedLabel).lowercase() }
                 .eachCount(),
         )
+    }
+
+    val matchingCategories = remember(categoryChips, searchQuery, channelChipCounts) {
+        val normalizedQuery = searchQuery.trim().lowercase()
+        if (normalizedQuery.isBlank()) {
+            emptyList()
+        } else {
+            categoryChips
+                .filter { it.lowercase().contains(normalizedQuery) }
+                .map { it to (channelChipCounts.categories[it.lowercase()] ?: 0) }
+                .filter { (_, count) -> count > 0 }
+        }
     }
 
     val playChannel: (LiveTvChannel) -> Unit = { channel ->
@@ -708,12 +725,26 @@ fun LiveTvScreen(
                 }
 
                 else -> {
+                    if (matchingCategories.isNotEmpty()) {
+                        liveTvCategorySearchResults(
+                            categories = matchingCategories,
+                            showChannelsHeader = visibleChannels.isNotEmpty(),
+                            onCategoryClick = { category ->
+                                filterMode = LiveTvChannelFilterMode.Category
+                                selectedCategoryName = category
+                                searchQuery = ""
+                                isSearchVisible = false
+                            },
+                        )
+                    }
                     if (visibleChannels.isEmpty()) {
-                        item {
-                            HomeEmptyStateCard(
-                                title = stringResource(Res.string.live_tv_no_matching_channels_title),
-                                message = stringResource(Res.string.live_tv_no_matching_channels_message),
-                            )
+                        if (matchingCategories.isEmpty()) {
+                            item {
+                                HomeEmptyStateCard(
+                                    title = stringResource(Res.string.live_tv_no_matching_channels_title),
+                                    message = stringResource(Res.string.live_tv_no_matching_channels_message),
+                                )
+                            }
                         }
                     } else if (uiState.isChannelGridEnabled) {
                         liveTvChannelGrid(
@@ -1284,6 +1315,102 @@ private fun LiveTvRecentChannelCard(
                     )
                 }
             }
+        }
+    }
+}
+
+private fun LazyListScope.liveTvCategorySearchResults(
+    categories: List<Pair<String, Int>>,
+    showChannelsHeader: Boolean,
+    onCategoryClick: (String) -> Unit,
+) {
+    item(key = "category_results_header") {
+        LiveTvSearchResultsHeader(text = stringResource(Res.string.live_tv_categories))
+    }
+    items(
+        items = categories,
+        key = { (category, _) -> "category_result:${category.lowercase()}" },
+    ) { (category, count) ->
+        LiveTvCategoryResultCard(
+            categoryName = category,
+            channelCount = count,
+            onClick = { onCategoryClick(category) },
+        )
+    }
+    if (showChannelsHeader) {
+        item(key = "channel_results_header") {
+            LiveTvSearchResultsHeader(text = stringResource(Res.string.live_tv_section_channels))
+        }
+    }
+}
+
+@Composable
+private fun LiveTvSearchResultsHeader(text: String) {
+    val tokens = MaterialTheme.nuvio
+    Text(
+        text = text,
+        modifier = Modifier.padding(top = NuvioTokens.Space.s8, bottom = 2.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = tokens.colors.textMuted,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun LiveTvCategoryResultCard(
+    categoryName: String,
+    channelCount: Int,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        color = tokens.colors.surface,
+        shape = tokens.shapes.compactCard,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(tokens.shapes.avatar)
+                    .background(tokens.colors.overlaySelected),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Folder,
+                    contentDescription = null,
+                    tint = tokens.colors.accent,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = categoryName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = tokens.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = pluralStringResource(Res.plurals.live_tv_category_channel_count, channelCount, channelCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textMuted,
+                    maxLines = 1,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = tokens.colors.textMuted,
+            )
         }
     }
 }

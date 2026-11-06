@@ -66,19 +66,24 @@ internal fun PlayerTimelineDetails(
     metrics: PlayerLayoutMetrics,
     badges: List<StreamBadge> = emptyList(),
     modifier: Modifier = Modifier,
+    titleLogo: String? = null,
+    showTitleLogo: Boolean = false,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
     Column(modifier.padding(horizontal = PlayerTimelineContentInset)) {
-        Text(
-            text = title,
-            style = typeScale.titleLg.copy(
+        PlayerTitleArtwork(
+            title = title,
+            logoUrl = titleLogo,
+            showLogo = showTitleLogo,
+            textStyle = typeScale.titleLg.copy(
                 fontSize = metrics.titleSize,
                 lineHeight = metrics.titleSize * 1.16f,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = Color.White,
+            textColor = Color.White,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            maxLogoHeight = metrics.timelineLogoMaxHeight,
+            maxLogoWidth = metrics.logoMaxWidth,
         )
         if (seasonNumber != null && episodeNumber != null) {
             val episodeCode = stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
