@@ -32,8 +32,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.StarBorder
 import com.nuvio.app.features.ratings.UserRatingSheet
 import com.nuvio.app.features.ratings.UserRatingSheetRequest
@@ -87,9 +88,11 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
+import com.nuvio.app.core.i18n.localizedEpisodeTitle
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import androidx.compose.ui.graphics.SolidColor
 import com.nuvio.app.core.ui.ArtworkBackdrop
+import com.nuvio.app.core.ui.LocalOnBackdrop
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.verticalBarWidth
@@ -116,6 +119,7 @@ import com.nuvio.app.features.details.components.DetailCastSection
 import com.nuvio.app.features.details.components.DetailCommentsSection
 import com.nuvio.app.features.details.components.DetailEpisodeRatingMap
 import com.nuvio.app.features.details.components.hasEpisodeRatingMap
+import com.nuvio.app.features.details.components.CinematicHeaderBackdrop
 import com.nuvio.app.features.details.components.DetailFloatingHeader
 import com.nuvio.app.features.details.components.DetailHero
 import com.nuvio.app.features.details.components.DetailMetaInfo
@@ -128,6 +132,7 @@ import com.nuvio.app.features.details.components.rememberEpisodeNavigatorState
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
 import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
+import com.nuvio.app.features.details.components.TabletArtworkBackdropAlignment
 import com.nuvio.app.features.details.components.TabletDetailBackdrop
 import com.nuvio.app.features.details.components.TabletDetailHero
 import com.nuvio.app.features.details.components.TabletDetailHeroActions
@@ -1153,6 +1158,7 @@ fun MetaDetailsScreen(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colorScheme = MaterialTheme.colorScheme
                     val useTabletLayout = minOf(maxWidth, maxHeight) >= 600.dp
+                    val screenHeight = maxHeight
                     val isTablet = useTabletLayout || maxWidth >= 720.dp
                     val tabletViewportHeight = maxHeight
                     val isTabletLandscape = maxWidth > maxHeight
@@ -1511,6 +1517,23 @@ fun MetaDetailsScreen(
                             isSaved = isSaved,
                             isHeroCollapsed = isHeroCollapsed,
                             backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
+                            headerBackground = if (cinematicBackground) {
+                                {
+                                    CinematicHeaderBackdrop(
+                                        image = cinematicBackdrop,
+                                        screenHeight = screenHeight,
+                                        alignment = if (useTabletLayout) {
+                                            TabletArtworkBackdropAlignment
+                                        } else {
+                                            Alignment.Center
+                                        },
+                                        // Fork: same lighter scrim as the cinematic page background.
+                                        scrim = if (useTabletLayout) null else SolidColor(colorScheme.background.copy(alpha = 0.48f)),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                             glassBackdrop = cinematicContentBackdrop.takeIf { cinematicGlassEnabled && it.isReady },
@@ -1985,7 +2008,11 @@ fun MetaDetailsScreen(
                             ),
                         )
                     }
-                    if (onPlayManually != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)) {
+                    if (
+                        onPlayManually != null &&
+                        StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) &&
+                        playbackAvailability.canStream(meta.type, selectedEpisode.id)
+                    ) {
                         add(
                             PosterZoomOverlayAction(
                                 icon = Icons.Default.PlayArrow,
@@ -2028,6 +2055,7 @@ fun MetaDetailsScreen(
                 },
             )
         }
+
     }
 }
 
@@ -2037,6 +2065,7 @@ private fun DetailHeaderOverlay(
     isSaved: Boolean,
     isHeroCollapsed: State<Boolean>,
     backgroundColor: Color?,
+    headerBackground: (@Composable () -> Unit)?,
     onBack: () -> Unit,
     onToggleSaved: () -> Unit,
     glassBackdrop: Backdrop? = null,
@@ -2072,6 +2101,7 @@ private fun DetailHeaderOverlay(
             isSaved = isSaved,
             progress = headerProgress,
             backgroundColor = backgroundColor,
+            background = headerBackground,
             onBack = onBack,
             onToggleSaved = onToggleSaved,
             modifier = Modifier.zIndex(2f),

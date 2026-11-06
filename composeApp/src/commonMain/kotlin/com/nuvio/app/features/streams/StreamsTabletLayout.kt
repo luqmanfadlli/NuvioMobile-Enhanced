@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.shimmer
+import com.nuvio.app.core.ui.LocalOnBackdrop
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.isIos
 import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
