@@ -2073,7 +2073,7 @@ final class MPVPlayerViewController: UIViewController {
         let idle = getFlag("core-idle")
         let seeking = getFlag("seeking")
         let bufferingCache = getFlag("paused-for-cache")
-        let cacheSpeed = getDouble("cache-speed")
+        let cacheSpeed = getCacheSpeedBytesPerSecond()
 
         return PlaybackStateSnapshot(
             isLoading: (idle && !paused && !eofReached) || seeking || bufferingCache,
@@ -2083,7 +2083,7 @@ final class MPVPlayerViewController: UIViewController {
             positionMs: Int64(max(position, 0) * 1000),
             bufferedMs: Int64(max(position + cached, 0) * 1000),
             speed: Float(speed > 0 ? speed : 1.0),
-            networkSpeedBytesPerSecond: cacheSpeed.isFinite && cacheSpeed >= 0 ? Int64(cacheSpeed) : -1
+            networkSpeedBytesPerSecond: cacheSpeed
         )
     }
 
@@ -2653,6 +2653,13 @@ final class MPVPlayerViewController: UIViewController {
 
     private func setVideoEqualizer(_ name: String, _ value: Int) {
         setIntProperty(name, Int64(max(-100, min(100, value))))
+    }
+
+    private func getCacheSpeedBytesPerSecond() -> Int64 {
+        guard let ctx = mpv else { return -1 }
+        var data = Int64()
+        let status = mpv_get_property(ctx, "cache-speed", MPV_FORMAT_INT64, &data)
+        return status >= 0 && data >= 0 ? data : -1
     }
 
     private func getInt(_ name: String) -> Int {
