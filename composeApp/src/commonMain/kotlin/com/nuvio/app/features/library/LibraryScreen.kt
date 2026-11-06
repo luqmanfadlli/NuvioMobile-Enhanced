@@ -13,9 +13,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -170,6 +168,7 @@ import kotlinx.serialization.json.Json
 import com.nuvio.app.core.poster.CustomPosterScreen
 import com.nuvio.app.core.poster.CustomPosterUrlRepository
 import com.nuvio.app.core.poster.withCustomPosterUrl
+import com.nuvio.app.core.ui.rememberScreenActiveInfiniteFloat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1506,8 +1505,7 @@ private fun rememberCloudLibrarySkeletonBrush(): Brush {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
     )
-    val transition = rememberInfiniteTransition()
-    val translateAnim by transition.animateFloat(
+    val translateAnim by rememberScreenActiveInfiniteFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
