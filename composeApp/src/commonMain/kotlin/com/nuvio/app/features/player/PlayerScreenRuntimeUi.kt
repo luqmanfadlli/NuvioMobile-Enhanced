@@ -21,6 +21,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -791,6 +793,21 @@ private fun BoxScope.RenderPlaybackOverlays(
         val snapshotIsLoading by remember(runtime) { derivedStateOf { playbackSnapshot.isLoading } }
         val snapshotDurationMs by remember(runtime) { derivedStateOf { playbackSnapshot.durationMs } }
         val displayedPositionMs = scrubbingPositionMs ?: overlaySnapshot.positionMs
+        val openingOverlayVisible = playerSettingsUiState.showLoadingOverlay && !initialLoadCompleted && errorMessage == null
+        val showNetworkSpeed = openingOverlayVisible &&
+            playerSettingsUiState.showPlayerLoadingStatus &&
+            p2pInitialLoadingMessage == null
+        val networkSpeedText by produceState<String?>(null, playerController, showNetworkSpeed) {
+            value = null
+            if (!showNetworkSpeed) return@produceState
+            var seenTraffic = false
+            while (true) {
+                val bytesPerSecond = playerController?.networkSpeedBytesPerSecond()
+                if (bytesPerSecond != null && bytesPerSecond > 0L) seenTraffic = true
+                value = if (bytesPerSecond != null && seenTraffic) formatNetworkSpeed(bytesPerSecond) else null
+                delay(1_000L)
+            }
+        }
         PlayerPlaybackOverlays(
             playerControlsLocked = playerControlsLocked,
             useLegacyLayout = playerSettingsUiState.useLegacyPlayerLayout,
@@ -801,7 +818,7 @@ private fun BoxScope.RenderPlaybackOverlays(
         metrics = metrics,
         horizontalSafePadding = horizontalSafePadding,
         onUnlock = { unlockPlayerControls() },
-        showOpeningOverlay = playerSettingsUiState.showLoadingOverlay && !initialLoadCompleted && errorMessage == null,
+        showOpeningOverlay = openingOverlayVisible,
         backdropArtwork = if (isLiveTvPlayback) activeLogo?.takeIf(String::isNotBlank) ?: background ?: poster else background ?: poster,
         logo = if (isLiveTvPlayback) activeLogo else logo,
         title = if (isLiveTvPlayback) activeStreamTitle else title,
@@ -816,6 +833,7 @@ private fun BoxScope.RenderPlaybackOverlays(
                 buffering = snapshotIsLoading,
             )
         } else null,
+        openingNetworkSpeed = networkSpeedText,
         p2pInitialLoadingProgress = p2pInitialLoadingProgress,
         showP2pRebufferStats = showP2pRebufferStats,
         p2pRebufferMessage = p2pRebufferMessage,

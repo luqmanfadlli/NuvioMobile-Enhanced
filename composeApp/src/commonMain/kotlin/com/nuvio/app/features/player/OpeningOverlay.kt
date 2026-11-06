@@ -1,6 +1,9 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -65,6 +68,7 @@ internal fun OpeningOverlay(
     horizontalSafePadding: Dp,
     modifier: Modifier = Modifier,
     message: String? = null,
+    networkSpeed: String? = null,
     progress: Float? = null,
 ) {
     val contentAlpha by animateFloatAsState(
@@ -232,6 +236,16 @@ internal fun OpeningOverlay(
                                 )
                             }
                         }
+                    }
+                    AnimatedVisibility(visible = networkSpeed != null, enter = fadeIn(), exit = fadeOut()) {
+                        Text(
+                            text = networkSpeed.orEmpty(),
+                            color = Color.White.copy(alpha = 0.56f),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                     if (showHorizontalProgress) {
                         Spacer(modifier = Modifier.height(10.dp))

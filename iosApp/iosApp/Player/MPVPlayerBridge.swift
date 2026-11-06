@@ -238,6 +238,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getIsEnded() -> Bool { return playerVC?.isPlayerEnded ?? false }
     func getDurationMs() -> Int64 { return playerVC?.durationMs ?? 0 }
     func getPositionMs() -> Int64 { return playerVC?.positionMs ?? 0 }
+    func networkSpeedBytesPerSecond() -> Int64 { return playerVC?.networkSpeedBytesPerSecond ?? -1 }
     func getBufferedMs() -> Int64 { return playerVC?.bufferedMs ?? 0 }
     func getPlaybackSpeed() -> Float { playerVC?.currentSpeed ?? 1.0 }
     func getVideoWidth() -> Int32 { Int32(playerVC?.currentVideoWidth ?? 0) }
@@ -481,6 +482,7 @@ final class MPVPlayerViewController: UIViewController {
     var isPlayerEnded: Bool = false
     var durationMs: Int64 = 0
     var positionMs: Int64 = 0
+    var networkSpeedBytesPerSecond: Int64 = -1
     var bufferedMs: Int64 = 0
     var currentSpeed: Float = 1.0
     var currentErrorMessage: String {
@@ -2028,6 +2030,7 @@ final class MPVPlayerViewController: UIViewController {
         let positionMs: Int64
         let bufferedMs: Int64
         let speed: Float
+        let networkSpeedBytesPerSecond: Int64
     }
 
     func refreshPlaybackState() {
@@ -2070,6 +2073,7 @@ final class MPVPlayerViewController: UIViewController {
         let idle = getFlag("core-idle")
         let seeking = getFlag("seeking")
         let bufferingCache = getFlag("paused-for-cache")
+        let cacheSpeed = getDouble("cache-speed")
 
         return PlaybackStateSnapshot(
             isLoading: (idle && !paused && !eofReached) || seeking || bufferingCache,
@@ -2078,7 +2082,8 @@ final class MPVPlayerViewController: UIViewController {
             durationMs: Int64(duration * 1000),
             positionMs: Int64(max(position, 0) * 1000),
             bufferedMs: Int64(max(position + cached, 0) * 1000),
-            speed: Float(speed > 0 ? speed : 1.0)
+            speed: Float(speed > 0 ? speed : 1.0),
+            networkSpeedBytesPerSecond: cacheSpeed.isFinite && cacheSpeed >= 0 ? Int64(cacheSpeed) : -1
         )
     }
 
@@ -2100,6 +2105,7 @@ final class MPVPlayerViewController: UIViewController {
         positionMs = snapshot.positionMs
         bufferedMs = snapshot.bufferedMs
         currentSpeed = snapshot.speed
+        networkSpeedBytesPerSecond = snapshot.networkSpeedBytesPerSecond
 
         positionSampleLock.lock()
         positionSampleMs = snapshot.positionMs
