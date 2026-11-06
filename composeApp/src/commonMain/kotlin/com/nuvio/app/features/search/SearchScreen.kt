@@ -20,6 +20,14 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.mutableIntStateOf
+import com.nuvio.app.core.ui.NuvioIconActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -100,6 +108,8 @@ fun SearchScreen(
 ) {
     val focusRequester = remember { FocusRequester() }
     var isSearchFocused by remember { mutableStateOf(false) }
+    var isSearchVisible by rememberSaveable { mutableStateOf(false) }
+    var searchFocusRequest by remember { mutableIntStateOf(0) }
 
     ScreenActivityEffect(listState) { screenActive ->
         if (!screenActive) {
@@ -110,7 +120,8 @@ fun SearchScreen(
 
     ScreenActivityEffect(searchFocusRequestCount) { screenActive ->
         if (screenActive && searchFocusRequestCount > 0) {
-            focusRequester.requestFocus()
+            isSearchVisible = true
+            searchFocusRequest++
         }
     }
 
@@ -240,9 +251,11 @@ fun SearchScreen(
         val homeSectionPadding = remember(maxWidth) {
             homeSectionHorizontalPaddingForWidth(maxWidth.value)
         }
-        val headerTitle = when {
-            query.isNotBlank() -> stringResource(Res.string.compose_nav_search)
-            else -> stringResource(Res.string.compose_nav_search)
+        val searchShown = isSearchVisible || query.isNotBlank()
+        val headerTitle = if (searchShown) {
+            stringResource(Res.string.compose_nav_search)
+        } else {
+            stringResource(Res.string.compose_search_discover_title)
         }
 
         androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
@@ -257,8 +270,33 @@ fun SearchScreen(
                     NuvioScreenHeader(
                         title = headerTitle,
                         modifier = Modifier.padding(horizontal = 16.dp),
+                        actions = {
+                            NuvioIconActionButton(
+                                icon = if (searchShown) Icons.Rounded.Close else Icons.Rounded.Search,
+                                contentDescription = stringResource(Res.string.compose_nav_search),
+                                onClick = {
+                                    if (searchShown) {
+                                        query = ""
+                                        isSearchFocused = false
+                                        isSearchVisible = false
+                                    } else {
+                                        isSearchVisible = true
+                                        searchFocusRequest++
+                                    }
+                                },
+                            )
+                        },
                     )
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
+                    AnimatedVisibility(
+                        visible = searchShown,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                    androidx.compose.foundation.layout.Column {
+                    LaunchedEffect(searchFocusRequest) {
+                        if (searchFocusRequest > 0) runCatching { focusRequester.requestFocus() }
+                    }
                     androidx.compose.foundation.layout.Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         NuvioInputField(
                             value = query,
@@ -284,8 +322,9 @@ fun SearchScreen(
                         )
                     }
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(14.dp))
+                    }
+                    }
                     if (query.isBlank()) {
-                        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
                         DiscoverFilterRow(
                             state = discoverUiState,
                             modifier = Modifier
