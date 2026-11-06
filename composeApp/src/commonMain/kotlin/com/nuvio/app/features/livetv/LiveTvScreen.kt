@@ -394,7 +394,7 @@ fun LiveTvScreen(
     } else {
         tokens.colors.background
     }
-    val listTopPadding = tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding
+    val listTopPadding = statusBarTop + nuvioPlatformExtraTopPadding
 
     val density = LocalDensity.current
     val controlsTopPadding by remember(listTopPadding) {
