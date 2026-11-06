@@ -244,7 +244,10 @@ internal fun com.nuvio.app.features.cloudstream.CloudStreamLoadItem.matchesCloud
         if (searchedYear != null && searchedYear != request.year) return false
         if (loadedYear != request.year && searchedYear != request.year) return false
     }
-    return titleMatches || (allowProviderRankedFallback && request.year != null && loadedYear == request.year)
+    val safeProviderRankedFallback = allowProviderRankedFallback &&
+        normalizeCloudStreamType(request.type) == "movie" &&
+        request.year != null && loadedYear == request.year
+    return titleMatches || safeProviderRankedFallback
 }
 
 internal fun com.nuvio.app.features.cloudstream.CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
@@ -258,7 +261,9 @@ internal fun com.nuvio.app.features.cloudstream.CloudStreamLoadItem.matchesCloud
     val titleMatches = normalizeCloudStreamTitle(name) in requestedTitles
     val loadedYear = year ?: cloudStreamYear(name)
     if (request.year != null && loadedYear != request.year) return false
-    return titleMatches
+    val safeLocalizedMovieFallback = normalizeCloudStreamType(request.type) == "movie" &&
+        request.year != null && loadedYear == request.year
+    return titleMatches || safeLocalizedMovieFallback
 }
 
 internal fun com.nuvio.app.features.cloudstream.CloudStreamLoadItem.linkDataForCloudStreamRequest(
@@ -270,11 +275,22 @@ internal fun com.nuvio.app.features.cloudstream.CloudStreamLoadItem.linkDataForC
         request.season == null || episode.season == request.season ||
             (request.season == 1 && episode.season == null)
     }
-    val byNumber = seasonCandidates.firstOrNull { episode ->
-        request.episode == null || episode.episode == request.episode
-    }?.takeIf { request.episode != null }
-    if (byNumber != null) return byNumber.data
     val episodeTitle = request.episodeTitle?.let(::normalizeCloudStreamTitle)
+    val numberedCandidates = if (request.episode == null) {
+        emptyList()
+    } else {
+        seasonCandidates.filter { it.episode == request.episode }
+    }
+    if (request.season == null && numberedCandidates.map { it.season }.distinct().size > 1) {
+        return null
+    }
+    val numbered = numberedCandidates.firstOrNull()
+    if (numbered != null) {
+        if (episodeTitle.isNullOrBlank()) return numbered.data
+        val actualTitle = normalizeCloudStreamTitle(numbered.name)
+        val isGenericEpisodeTitle = actualTitle.matches(Regex("episode \\d+"))
+        return numbered.data.takeIf { actualTitle == episodeTitle || isGenericEpisodeTitle }
+    }
     if (!episodeTitle.isNullOrBlank()) {
         return seasonCandidates.firstOrNull {
             normalizeCloudStreamTitle(it.name) == episodeTitle
