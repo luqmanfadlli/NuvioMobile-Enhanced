@@ -557,8 +557,12 @@ kotlin {
                     implementation("me.xdrop:fuzzywuzzy:1.4.0")
                     implementation("org.mozilla:rhino:1.8.1")
                     implementation("com.uwetrottmann.tmdb2:tmdb-java:2.13.0")
-                    implementation("dev.whyoleg.cryptography:cryptography-core:0.6.0")
-                    implementation("dev.whyoleg.cryptography:cryptography-provider-optimal:0.6.0")
+                    // Supabase Auth 3.4.1 references the pre-0.6 key API
+                    // (KeyDecoder / KeyFormat in materials.key). Cryptography 0.6.0
+                    // removed those types; use the compatible 0.5.x API for this
+                    // Android Full runtime and its dynamically loaded CloudStream plugins.
+                    implementation("dev.whyoleg.cryptography:cryptography-core:0.5.0")
+                    implementation("dev.whyoleg.cryptography:cryptography-provider-optimal:0.5.0")
                     implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.3") {
                         exclude(group = "org.mozilla", module = "rhino-engine")
                     }
