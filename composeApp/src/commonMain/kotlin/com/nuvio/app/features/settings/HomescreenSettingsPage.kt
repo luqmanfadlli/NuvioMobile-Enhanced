@@ -151,6 +151,9 @@ internal fun LazyListScope.homescreenSettingsContent(
             selectedHeroSourceCount = selectedHeroSourceCount,
         )
     }
+    item(key = "merged_home_rows_settings") {
+        MergedHomeRowsSettingsSection(isTablet = isTablet)
+    }
     item {
         SettingsSection(
             title = stringResource(Res.string.settings_homescreen_section_hero),

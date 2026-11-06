@@ -51,6 +51,8 @@ data class SyncAddonLayoutPreference(
 data class SyncHomeCatalogPayload(
     @SerialName("show_catalog_type") val showCatalogType: Boolean = true,
     @SerialName("hide_unreleased_content") val hideUnreleasedContent: Boolean = false,
+    @SerialName("hide_merged_titles_without_posters") val hideMergedTitlesWithoutPosters: Boolean = false,
+    @SerialName("merged_rows") val mergedRows: List<MergedHomeRowDefinition> = emptyList(),
     val items: List<SyncCatalogItem> = emptyList(),
     @SerialName("addon_layouts") val addonLayouts: List<SyncAddonLayoutPreference>? = null,
     @SerialName("addon_row_order_policy") val addonRowOrderPolicy: String = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
@@ -90,6 +92,8 @@ object HomeCatalogSettingsSyncService {
     }
 
     private const val HIDE_UNRELEASED_CONTENT_KEY = "hide_unreleased_content"
+    private const val HIDE_MERGED_TITLES_WITHOUT_POSTERS_KEY = "hide_merged_titles_without_posters"
+    private const val MERGED_ROWS_KEY = "merged_rows"
     private const val SHOW_CATALOG_TYPE_KEY = "show_catalog_type"
     private const val ADDON_ROW_ORDER_POLICY_KEY = "addon_row_order_policy"
     private const val UPCOMING_ROW_KEYS_KEY = "upcoming_row_keys"
@@ -234,6 +238,12 @@ object HomeCatalogSettingsSyncService {
             } else {
                 localPayload.hideUnreleasedContent
             },
+            hideMergedTitlesWithoutPosters = if (settingsJson.containsKey(HIDE_MERGED_TITLES_WITHOUT_POSTERS_KEY)) {
+                decoded.hideMergedTitlesWithoutPosters
+            } else {
+                localPayload.hideMergedTitlesWithoutPosters
+            },
+            mergedRows = if (settingsJson.containsKey(MERGED_ROWS_KEY)) decoded.mergedRows else localPayload.mergedRows,
             addonRowOrderPolicy = if (settingsJson.containsKey(ADDON_ROW_ORDER_POLICY_KEY)) {
                 decoded.addonRowOrderPolicy
             } else {

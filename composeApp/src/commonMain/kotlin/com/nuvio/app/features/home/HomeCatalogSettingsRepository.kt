@@ -32,6 +32,8 @@ data class HomeCatalogSettingsItem(
     val addonId: String? = null,
     val addonLayoutMode: HomeAddonLayoutMode = HomeAddonLayoutMode.NORMAL,
     val rowPlacement: HomeCatalogRowPlacement = HomeCatalogRowPlacement.NORMAL,
+    val isMergedRow: Boolean = false,
+    val mergedRowId: String? = null,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
@@ -97,6 +99,8 @@ internal data class HomeCatalogSettingsUiState(
     val heroTrailerStartUnmuted: Boolean = false,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
+    val hideMergedTitlesWithoutPosters: Boolean = false,
+    val mergedRows: List<MergedHomeRowDefinition> = emptyList(),
     val items: List<HomeCatalogSettingsItem> = emptyList(),
     val addonGroups: List<HomeAddonLayoutItem> = emptyList(),
     val addonRowOrderPolicy: HomeAddonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
@@ -116,6 +120,12 @@ internal data class HomeCatalogSettingsUiState(
             append(showCatalogType)
             append('|')
             append(hideUnreleasedContent)
+            append('|')
+            append(hideMergedTitlesWithoutPosters)
+            append('|')
+            append(mergedRows.sortedBy { it.order }.joinToString { row ->
+                "${row.id}:${row.title}:${row.sourceKeys.joinToString(",")}:${row.displayMode}:${row.blendMode}:${row.contentType}:${row.hideIncludedRows}:${row.deduplicate}:${row.hideTitlesWithoutPosters}:${row.sortMode}"
+            })
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
@@ -182,6 +192,8 @@ internal data class HomeCatalogSettingsSnapshot(
     val addonLayouts: Map<String, HomeAddonLayoutPreference> = emptyMap(),
     val addonRowOrderPolicy: HomeAddonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
     val upcomingRowKeys: Set<String> = emptySet(),
+    val hideMergedTitlesWithoutPosters: Boolean = false,
+    val mergedRows: List<MergedHomeRowDefinition> = emptyList(),
 )
 
 @Serializable
@@ -216,6 +228,8 @@ private data class StoredHomeCatalogSettingsPayload(
     val addonLayouts: List<StoredHomeAddonLayoutPreference> = emptyList(),
     val addonRowOrderPolicy: String = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
     val upcomingRowKeys: List<String> = emptyList(),
+    val hideMergedTitlesWithoutPosters: Boolean = false,
+    val mergedRows: List<MergedHomeRowDefinition> = emptyList(),
 )
 
 object HomeCatalogSettingsRepository {
@@ -238,6 +252,8 @@ object HomeCatalogSettingsRepository {
     private var definitions: List<HomeCatalogDefinition> = emptyList()
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
     private var cloudStreamCatalogItems: List<HomeCatalogSettingsItem> = emptyList()
+    private var hideMergedTitlesWithoutPosters = false
+    private var mergedRows: List<MergedHomeRowDefinition> = emptyList()
     private var lastCatalogSync: CatalogSyncInput? = null
     private var lastCollectionSync: Pair<List<Collection>, String>? = null
     private val preferencesRef = atomic<Map<String, StoredHomeCatalogPreference>>(emptyMap())
@@ -264,6 +280,8 @@ object HomeCatalogSettingsRepository {
         definitions = emptyList()
         collectionDefinitions = emptyList()
         cloudStreamCatalogItems = emptyList()
+        hideMergedTitlesWithoutPosters = false
+        mergedRows = emptyList()
         lastCatalogSync = null
         lastCollectionSync = null
         preferences = emptyMap()
@@ -359,6 +377,44 @@ object HomeCatalogSettingsRepository {
         HomeRepository.applyCurrentSettings()
     }
 
+    fun resolveMergedHomeRow(id: String): ResolvedMergedHomeRow? {
+        ensureLoaded()
+        val row = mergedRows.firstOrNull { it.id == id } ?: return null
+        val currentSettings = snapshot()
+        val availableDefinitions = row.sourceKeys.mapNotNull { sourceKey ->
+            definitions.firstOrNull { definition ->
+                definition.key == sourceKey &&
+                    definition.serverConnectionId == null &&
+                    !ServerCatalog.isServerKey(definition.key)
+            }
+        }
+        val baseTitles = availableDefinitions.map { definition ->
+            currentSettings.preferences[definition.key]?.customTitle
+                ?.takeIf(String::isNotBlank)
+                ?: definition.titleFor(currentSettings.showCatalogType)
+        }
+        val duplicateTitleCounts = baseTitles.groupingBy { it }.eachCount()
+        val sources = availableDefinitions.mapIndexed { index, definition ->
+            val baseTitle = baseTitles[index]
+            val title = cleanMergedSourceTabTitle(
+                if ((duplicateTitleCounts[baseTitle] ?: 0) > 1) {
+                    "$baseTitle ${definition.addonName}"
+                } else {
+                    baseTitle
+                },
+            )
+            ResolvedMergedHomeRowSource(
+                definition = definition,
+                title = title,
+            )
+        }
+        return ResolvedMergedHomeRow(
+            definition = row,
+            sources = sources,
+            unavailableSourceCount = (row.sourceKeys.distinct().size - sources.size).coerceAtLeast(0),
+        )
+    }
+
     internal fun snapshot(): HomeCatalogSettingsSnapshot {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(
@@ -366,6 +422,8 @@ object HomeCatalogSettingsRepository {
             heroStyle = heroStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
+            mergedRows = mergedRows.sortedBy { it.order },
             addonRowOrderPolicy = addonRowOrderPolicy,
             upcomingRowKeys = upcomingRowKeys,
             preferences = preferences.mapValues { (_, value) ->
@@ -458,6 +516,16 @@ object HomeCatalogSettingsRepository {
         HomeCatalogSettingsSyncService.triggerPush()
     }
 
+    fun setHideMergedTitlesWithoutPosters(enabled: Boolean) {
+        ensureLoaded()
+        if (hideMergedTitlesWithoutPosters == enabled) return
+        hideMergedTitlesWithoutPosters = enabled
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
     fun setHeroSourceEnabled(key: String, enabled: Boolean) {
         updatePreference(key, pushRemote = false, heroSourcesChanged = true) { preference ->
             if (!enabled) {
@@ -494,6 +562,175 @@ object HomeCatalogSettingsRepository {
             preference.copy(customTitle = title)
         }
     }
+
+    fun createMergedRow(
+        title: String,
+        sourceKeys: List<String>,
+        displayMode: MergedHomeRowDisplayMode,
+        deduplicate: Boolean = true,
+        contentType: MergedHomeRowContentType = MergedHomeRowContentType.ALL,
+        blendMode: MergedHomeRowBlendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY,
+        sortMode: MergedHomeRowSortMode = MergedHomeRowSortMode.OFF,
+        hideIncludedRows: Boolean = false,
+        hideTitlesWithoutPosters: Boolean = false,
+    ): String? {
+        ensureLoaded()
+        val validSources = sourceKeys.distinct().filter { key ->
+            definitions.any { definition ->
+                definition.key == key &&
+                    definition.serverConnectionId == null &&
+                    !ServerCatalog.isServerKey(definition.key)
+            }
+        }.take(MAX_MERGED_HOME_ROW_SOURCES)
+        val safeTitle = title.trim()
+        if (safeTitle.isBlank() || validSources.size < 2) return null
+
+        var id: String
+        do {
+            id = "mr_${kotlin.random.Random.nextLong()}"
+        } while (mergedRows.any { it.id == id })
+        val row = MergedHomeRowDefinition(
+            id = id,
+            title = safeTitle,
+            sourceKeys = validSources,
+            displayMode = displayMode.storageValue,
+            deduplicate = deduplicate,
+            order = (mergedRows.maxOfOrNull { it.order } ?: -1) + 1,
+            contentType = contentType.storageValue,
+            blendMode = blendMode.storageValue,
+            sortMode = sortMode.storageValue,
+            hideIncludedRows = hideIncludedRows,
+            hideTitlesWithoutPosters = hideTitlesWithoutPosters,
+        )
+        mergedRows = mergedRows + row
+        val key = mergedHomeRowKey(id)
+        val nextHomeOrder = (preferences.values.maxOfOrNull { it.order } ?: -1) + 1
+        preferences = preferences + (key to StoredHomeCatalogPreference(
+            key = key,
+            enabled = true,
+            heroSourceEnabled = false,
+            order = nextHomeOrder,
+        ))
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+        return id
+    }
+
+    fun updateMergedRow(
+        id: String,
+        title: String,
+        sourceKeys: List<String>,
+        displayMode: MergedHomeRowDisplayMode,
+        deduplicate: Boolean,
+        contentType: MergedHomeRowContentType? = null,
+        blendMode: MergedHomeRowBlendMode? = null,
+        sortMode: MergedHomeRowSortMode? = null,
+        hideIncludedRows: Boolean? = null,
+        hideTitlesWithoutPosters: Boolean? = null,
+    ): Boolean {
+        ensureLoaded()
+        val existing = mergedRows.firstOrNull { it.id == id } ?: return false
+        val validSources = sourceKeys.distinct().filter { key ->
+            definitions.any { definition ->
+                definition.key == key &&
+                    definition.serverConnectionId == null &&
+                    !ServerCatalog.isServerKey(definition.key)
+            }
+        }.take(MAX_MERGED_HOME_ROW_SOURCES)
+        val safeTitle = title.trim()
+        if (safeTitle.isBlank() || validSources.size < 2) return false
+        val updated = existing.copy(
+            title = safeTitle,
+            sourceKeys = validSources,
+            displayMode = displayMode.storageValue,
+            deduplicate = deduplicate,
+            contentType = contentType?.storageValue ?: existing.contentType,
+            blendMode = blendMode?.storageValue ?: existing.blendMode,
+            sortMode = sortMode?.storageValue ?: existing.sortMode,
+            hideIncludedRows = hideIncludedRows ?: existing.hideIncludedRows,
+            hideTitlesWithoutPosters = hideTitlesWithoutPosters ?: existing.hideTitlesWithoutPosters,
+        )
+        if (updated == existing) return true
+        mergedRows = mergedRows.map { if (it.id == id) updated else it }
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+        return true
+    }
+
+    fun duplicateMergedRow(id: String): String? {
+        ensureLoaded()
+        val source = mergedRows.firstOrNull { it.id == id } ?: return null
+        var newId: String
+        do {
+            newId = "mr_${kotlin.random.Random.nextLong().toString()}"
+        } while (mergedRows.any { it.id == newId })
+        val copy = source.copy(
+            id = newId,
+            title = "${source.title} (copy)",
+            order = (mergedRows.maxOfOrNull { it.order } ?: -1) + 1,
+        )
+        mergedRows = mergedRows + copy
+        val newKey = mergedHomeRowKey(newId)
+        val sourcePreference = preferences[mergedHomeRowKey(id)]
+        preferences = preferences + (newKey to StoredHomeCatalogPreference(
+            key = newKey,
+            customTitle = "",
+            enabled = sourcePreference?.enabled ?: true,
+            heroSourceEnabled = false,
+            order = (preferences.values.maxOfOrNull { it.order } ?: -1) + 1,
+        ))
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+        return newId
+    }
+
+    fun deleteMergedRow(id: String) {
+        ensureLoaded()
+        if (mergedRows.none { it.id == id }) return
+        mergedRows = mergedRows.filterNot { it.id == id }
+            .mapIndexed { index, row -> row.copy(order = index) }
+        preferences = preferences - mergedHomeRowKey(id)
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    fun moveMergedRowDefinition(fromIndex: Int, toIndex: Int) {
+        ensureLoaded()
+        val ordered = mergedRows.sortedBy { it.order }
+        if (fromIndex !in ordered.indices || toIndex !in ordered.indices || fromIndex == toIndex) return
+        val reordered = ordered.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        val visibleKeys = _uiState.value.items.map { it.key }.toMutableList()
+        val currentMergedKeys = visibleKeys.filter { key -> mergedRows.any { mergedHomeRowKey(it.id) == key } }
+        val reorderedMergedKeys = reordered.map { mergedHomeRowKey(it.id) }
+        currentMergedKeys.forEachIndexed { index, key ->
+            val position = visibleKeys.indexOf(key)
+            if (position >= 0) visibleKeys[position] = reorderedMergedKeys.getOrElse(index) { key }
+        }
+        mergedRows = reordered
+        persistVisibleOrder(visibleKeys)
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    fun mergedRowEnabled(id: String): Boolean {
+        ensureLoaded()
+        return preferences[mergedHomeRowKey(id)]?.enabled != false
+    }
+
+    private fun validMergedRowKey(key: String): Boolean =
+        mergedRows.any { mergedHomeRowKey(it.id) == key }
+
+
 
     fun setAddonLayoutMode(addonId: String, mode: HomeAddonLayoutMode) {
         ensureLoaded()
@@ -651,6 +888,8 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        hideMergedTitlesWithoutPosters = false
+        mergedRows = emptyList()
         preferences = emptyMap()
         addonLayouts = emptyMap()
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
@@ -713,6 +952,10 @@ object HomeCatalogSettingsRepository {
             updatedPreferences[key] = current.copy(order = index)
         }
         preferences = updatedPreferences
+        val mergedOrderByKey = orderedKeys.withIndex().associate { it.value to it.index }
+        mergedRows = mergedRows.map { row ->
+            mergedOrderByKey[mergedHomeRowKey(row.id)]?.let { row.copy(order = it) } ?: row
+        }
 
         val addonIdByKey = definitions
             .filterNot { ServerCatalog.isServerKey(it.key) }
@@ -763,6 +1006,9 @@ object HomeCatalogSettingsRepository {
             heroTrailerStartUnmuted = parsedPayload.heroTrailerStartUnmuted
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
+            hideMergedTitlesWithoutPosters = parsedPayload.hideMergedTitlesWithoutPosters
+            mergedRows = parsedPayload.mergedRows.filter { it.id.isNotBlank() }
+                .map { it.copy(sourceKeys = it.sourceKeys.distinct().take(MAX_MERGED_HOME_ROW_SOURCES)) }
             addonRowOrderPolicy = HomeAddonRowOrderPolicy.fromStorage(parsedPayload.addonRowOrderPolicy)
             upcomingRowKeys = parsedPayload.upcomingRowKeys.toSet()
             preferences = parsedPayload.items.associateBy { it.key }
@@ -782,10 +1028,11 @@ object HomeCatalogSettingsRepository {
 
     private fun normalizePreferences() {
         val current = preferences
-        data class UnifiedEntry(val key: String, val isCollection: Boolean)
+        data class UnifiedEntry(val key: String, val isCollection: Boolean, val isMergedRow: Boolean = false)
         val catalogEntries = definitions.map { UnifiedEntry(it.key, false) }
         val collectionEntries = collectionDefinitions.map { UnifiedEntry(it.key, true) }
-        val allEntries = catalogEntries + collectionEntries
+        val mergedRowEntries = mergedRows.map { UnifiedEntry(mergedHomeRowKey(it.id), false, true) }
+        val allEntries = catalogEntries + collectionEntries + mergedRowEntries
         val knownKeys = allEntries.mapTo(linkedSetOf(), UnifiedEntry::key)
         var nextOrder = (current.values.maxOfOrNull(StoredHomeCatalogPreference::order) ?: -1) + 1
 
@@ -803,12 +1050,12 @@ object HomeCatalogSettingsRepository {
         ).map { it.first }
 
         val normalized = current
-            .filterKeys { it !in knownKeys }
+            .filterKeys { it !in knownKeys || it.startsWith("cloudstream:") }
             .toMutableMap()
         var enabledHeroSourceCount = 0
         orderedEntries.forEach { entry ->
             val stored = current[entry.key]
-            val heroSourceEnabled = if (entry.isCollection) {
+            val heroSourceEnabled = if (entry.isCollection || entry.isMergedRow) {
                 false
             } else {
                 (stored?.heroSourceEnabled ?: true) &&
@@ -868,8 +1115,25 @@ object HomeCatalogSettingsRepository {
             )
         }
 
+        val mergedItems = mergedRows.map { row ->
+            val key = mergedHomeRowKey(row.id)
+            val preference = preferences[key]
+            HomeCatalogSettingsItem(
+                key = key,
+                defaultTitle = row.title,
+                addonName = "Merged row",
+                customTitle = preference?.customTitle.orEmpty(),
+                enabled = preference?.enabled ?: true,
+                heroSourceEnabled = false,
+                order = preference?.order ?: 0,
+                isMergedRow = true,
+                mergedRowId = row.id,
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
+            )
+        }
+
         val items = orderHomeCatalogSettingsItems(
-            items = catalogItems + collectionItems + cloudStreamCatalogItems,
+            items = catalogItems + collectionItems + cloudStreamCatalogItems + mergedItems,
             addonIdByCatalogKey = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
                 .associate { definition -> definition.key to definition.addonGroupId() } +
@@ -913,6 +1177,8 @@ object HomeCatalogSettingsRepository {
             heroTrailerStartUnmuted = heroTrailerStartUnmuted,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
+            mergedRows = mergedRows.sortedBy { it.order },
             items = items,
             addonGroups = addonGroups,
             addonRowOrderPolicy = addonRowOrderPolicy,
@@ -930,6 +1196,8 @@ object HomeCatalogSettingsRepository {
                     heroTrailerStartUnmuted = heroTrailerStartUnmuted,
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
+                    hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
+                    mergedRows = mergedRows.sortedBy { it.order },
                     items = preferences.values.sortedBy { it.order },
                     addonLayouts = addonLayouts.values.sortedWith(
                         compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId },
@@ -1014,6 +1282,8 @@ object HomeCatalogSettingsRepository {
         return SyncHomeCatalogPayload(
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
+            mergedRows = mergedRows.sortedBy { it.order },
             items = items,
             addonRowOrderPolicy = addonRowOrderPolicy.storageValue,
             upcomingRowKeys = upcomingRowKeys.toList().sorted(),
@@ -1035,6 +1305,9 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
+        hideMergedTitlesWithoutPosters = payload.hideMergedTitlesWithoutPosters
+        mergedRows = payload.mergedRows.filter { it.id.isNotBlank() }
+            .map { it.copy(sourceKeys = it.sourceKeys.distinct().take(MAX_MERGED_HOME_ROW_SOURCES)) }
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
         upcomingRowKeys = payload.upcomingRowKeys.toSet()
         payload.addonLayouts
@@ -1083,7 +1356,8 @@ object HomeCatalogSettingsRepository {
         val catalogKeys = definitions.map { it.key }
         val collectionKeys = collectionDefinitions.map { it.key }
         val cloudStreamKeys = cloudStreamCatalogItems.map { it.key }
-        return (catalogKeys + collectionKeys + cloudStreamKeys)
+        val mergedKeys = mergedRows.map { mergedHomeRowKey(it.id) }
+        return (catalogKeys + collectionKeys + cloudStreamKeys + mergedKeys)
             .sortedBy { key -> preferences[key]?.order ?: Int.MAX_VALUE }
     }
 
@@ -1130,13 +1404,14 @@ object HomeCatalogSettingsRepository {
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {
         val isCollection = collectionDefinitions.any { it.key == key }
         val isCloudStream = cloudStreamCatalogItems.any { it.key == key }
+        val isMerged = validMergedRowKey(key)
         val isCatalog = definitions.any { it.key == key } || isCloudStream
-        if (!isCollection && !isCatalog) return null
+        if (!isCollection && !isCatalog && !isMerged) return null
 
         return StoredHomeCatalogPreference(
             key = key,
             enabled = true,
-            heroSourceEnabled = isCatalog && !isCloudStream &&
+            heroSourceEnabled = isCatalog && !isCloudStream && !isMerged &&
                 selectedHeroSourceCount(excludingKey = key) < HERO_SOURCE_SELECTION_LIMIT,
             order = _uiState.value.items.firstOrNull { it.key == key }?.order
                 ?: ((preferences.values.maxOfOrNull { it.order } ?: -1) + 1),
@@ -1147,6 +1422,7 @@ object HomeCatalogSettingsRepository {
         definitions.mapTo(mutableSetOf()) { it.key }.also { keys ->
             keys.addAll(cloudStreamCatalogItems.map { it.key })
             keys.addAll(collectionDefinitions.map { it.key })
+            keys.addAll(mergedRows.map { mergedHomeRowKey(it.id) })
         }
 
     private fun HomeCatalogDefinition.addonIdForSync(): String {
