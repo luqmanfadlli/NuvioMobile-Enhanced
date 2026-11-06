@@ -582,6 +582,41 @@ class DeadLinkStartupMonitorTest {
     }
 
     @Test
+    fun bufferingWhileTimeoutDisabledIsRecognizedWhenTimeoutIsReenabled() = runTest {
+        val current = stream("Current source", "addon:current", "https://media.example/current.mp4")
+        val next = stream("Next source", "addon:next", "https://media.example/next.mp4")
+        var enabled = true
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            timeoutEnabled = { enabled },
+            candidates = { listOf(current, next) },
+            onFallback = fallbacks::add,
+        )
+
+        monitor.sourceSelected(current)
+        runCurrent()
+        monitor.playbackStateChanged(current, isPlaying = true, isLoading = false)
+
+        // The guest follows the host, so its local fallback watchdog is suppressed.
+        enabled = false
+        monitor.settingsChanged()
+        monitor.playbackStateChanged(current, isPlaying = false, isLoading = true)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(fallbacks.isEmpty())
+
+        // If sharing is disabled, local fallback resumes and recognizes existing buffering.
+        enabled = true
+        monitor.settingsChanged()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(listOf(next), fallbacks)
+        monitor.close()
+    }
+
+    @Test
     fun playIntentWhileStillLoadingDoesNotCancelDeadLinkDeadline() = runTest {
         val current = stream("Buffering dead link", "addon:current", "https://media.example/current.mp4")
         val next = stream("Next source", "addon:next", "https://media.example/next.mp4")
