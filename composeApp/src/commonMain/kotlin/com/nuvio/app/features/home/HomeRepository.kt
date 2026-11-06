@@ -5,6 +5,9 @@ import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.catalog.fetchCatalogPage
+import com.nuvio.app.features.cloudstream.CloudStreamPluginItem
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
+import com.nuvio.app.features.cloudstream.toMetaPreview
 import com.nuvio.app.core.poster.CustomPosterUrlRepository
 import com.nuvio.app.core.poster.reapplyCustomPosterUrls
 import com.nuvio.app.core.poster.withCustomPosterUrls
@@ -17,13 +20,16 @@ import com.nuvio.app.features.collection.findCollectionCatalog
 import com.nuvio.app.features.servers.ServerCatalog
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +65,11 @@ object HomeRepository {
     private var snapshotSaveJob: Job? = null
     private var lastRefreshAddonSignature: List<String>? = null
     private var collectionHeroResolving: Boolean = false
+    private var cloudStreamGeneration = 0L
+    private var cachedCloudStreamSections: List<HomeCatalogSection> = emptyList()
+    private var cloudStreamHomeJob: Job? = null
+    private var cloudStreamHomeRequestKey: String? = null
+    private var cloudStreamHomeCompletedKey: String? = null
 
     fun preloadSnapshot() {
         val profileKey = HomeSnapshotStore.currentProfileKey() ?: return
@@ -74,6 +85,7 @@ object HomeRepository {
         cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
         val requestKey = requests.joinToString(separator = "|", transform = HomeCatalogDefinition::cacheKey)
         currentRequestKey = requestKey
+        refreshCloudStreamHomeSections()
 
         if (!force && activeRequestKey == requestKey && _uiState.value.isLoading) return
         activeRequestKey = requestKey
@@ -166,7 +178,113 @@ object HomeRepository {
         }
     }
 
+    private fun refreshCloudStreamHomeSections() {
+        val generation = cloudStreamGeneration
+        CloudStreamRepository.initialize()
+        val state = CloudStreamRepository.uiState.value
+        val hiddenProviderIds = state.hiddenHomeCatalogProviderIds
+        val plugins = if (state.hideAllHomeCatalogs) emptyList() else state.plugins
+            .filter(CloudStreamPluginItem::isRunnable)
+            .filterNot { it.metadata.id.value in hiddenProviderIds }
+        val runnableProviderIds = plugins.mapTo(mutableSetOf()) { it.metadata.id.value }
+        val requestKey = buildString {
+            append(state.hideAllHomeCatalogs).append('|')
+            append(hiddenProviderIds.sorted().joinToString(",")).append('|')
+            plugins.sortedBy { it.metadata.id.value }.forEach { plugin ->
+                append(plugin.metadata.id.value).append(':')
+                append(plugin.metadata.version).append(':')
+                append(plugin.installedVersion).append(':')
+                append(plugin.enabled).append(':')
+                append(plugin.verified).append('|')
+            }
+        }
+        cachedCloudStreamSections = if (state.hideAllHomeCatalogs) emptyList() else
+            cachedCloudStreamSections.filter { section ->
+                val target = section.target as? CatalogTarget.CloudStream
+                target == null || (target.providerId in runnableProviderIds && target.providerId !in hiddenProviderIds)
+            }
+        if (
+            cloudStreamHomeRequestKey == requestKey &&
+            (cloudStreamHomeJob?.let { !it.isCompleted } == true || cloudStreamHomeCompletedKey == requestKey)
+        ) return
+        cloudStreamHomeJob?.cancel()
+        cloudStreamHomeRequestKey = requestKey
+        if (plugins.isEmpty()) {
+            HomeCatalogSettingsRepository.syncCloudStreamCatalogs(emptyList())
+            cloudStreamHomeCompletedKey = requestKey
+            cloudStreamHomeJob = null
+            publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+            return
+        }
+        publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+        lateinit var loadJob: Job
+        loadJob = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val providerResults = coroutineScope {
+                    val pluginSemaphore = Semaphore(3)
+                    plugins.map { plugin ->
+                        async {
+                            pluginSemaphore.withPermit {
+                                try {
+                                    Result.success(
+                                        CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
+                                            .mapNotNull { (sectionName, items) ->
+                                                if (items.isEmpty()) return@mapNotNull null
+                                                val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
+                                                HomeCatalogSection(
+                                                    key = "cloudstream:${plugin.metadata.id.value}:${sectionName}",
+                                                    title = sectionName,
+                                                    subtitle = plugin.metadata.name,
+                                                    addonName = plugin.metadata.name,
+                                                    target = CatalogTarget.CloudStream(
+                                                        providerId = plugin.metadata.id.value,
+                                                        sectionName = sectionName,
+                                                        contentType = contentType,
+                                                    ),
+                                                    items = items.map { it.toMetaPreview() },
+                                                    availableItemCount = items.size,
+                                                    hasMore = true,
+                                                )
+                                            },
+                                    )
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Throwable) {
+                                    Result.failure(error)
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+                val allProvidersSucceeded = providerResults.all { it.isSuccess }
+                val sections = providerResults.mapNotNull { it.getOrNull() }.flatten()
+                if (generation != cloudStreamGeneration || cloudStreamHomeRequestKey != requestKey) return@launch
+
+                val latestState = CloudStreamRepository.uiState.value
+                val latestRunnableIds = if (latestState.hideAllHomeCatalogs) emptySet() else
+                    latestState.plugins.filter(CloudStreamPluginItem::isRunnable).mapTo(mutableSetOf()) { it.metadata.id.value }
+                val visibleSections = if (latestState.hideAllHomeCatalogs) emptyList() else
+                    sections.filter { section ->
+                        val target = section.target as? CatalogTarget.CloudStream
+                        target == null || (
+                            target.providerId in latestRunnableIds &&
+                                target.providerId !in latestState.hiddenHomeCatalogProviderIds
+                        )
+                    }
+                HomeCatalogSettingsRepository.syncCloudStreamCatalogs(visibleSections)
+                cachedCloudStreamSections = visibleSections
+                cloudStreamHomeCompletedKey = requestKey.takeIf { allProvidersSucceeded }
+                publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+            } finally {
+                if (cloudStreamHomeJob === loadJob) cloudStreamHomeJob = null
+            }
+        }
+        cloudStreamHomeJob = loadJob
+        loadJob.start()
+    }
+
     fun applyCurrentSettings(heroSourcesChanged: Boolean = false) {
+        refreshCloudStreamHomeSections()
         publishCurrentState(
             isLoading = _uiState.value.isLoading,
             requestKey = currentRequestKey,
@@ -181,6 +299,12 @@ object HomeRepository {
     }
 
     fun clear() {
+        cloudStreamGeneration++
+        cloudStreamHomeJob?.cancel()
+        cloudStreamHomeJob = null
+        cloudStreamHomeRequestKey = null
+        cloudStreamHomeCompletedKey = null
+        cachedCloudStreamSections = emptyList()
         activeJob?.cancel()
         activeJob = null
         activeRequestKey = null
@@ -279,7 +403,20 @@ object HomeRepository {
         if (entries.isNotEmpty() || currentDefinitions.isNotEmpty()) {
             lastPublishedEntries = entries
         }
-        val sections = entries.map { (_, section) -> section }
+        val cloudStreamSections = cachedCloudStreamSections.mapNotNull { section ->
+            val preference = preferences[section.key]
+            if (preference?.enabled == false) return@mapNotNull null
+            section.copy(
+                items = section.items.reapplyCustomPosterUrls(posterPattern),
+            ).withReleaseFilter().copy(
+                title = preference?.customTitle?.takeIf { it.isNotBlank() } ?: section.title,
+            )
+        }
+        val configuredOrder = HomeCatalogSettingsRepository.uiState.value.items
+            .mapIndexed { index, item -> item.key to index }
+            .toMap()
+        val sections = (entries.map { (_, section) -> section } + cloudStreamSections)
+            .sortedBy { section -> configuredOrder[section.key] ?: Int.MAX_VALUE }
 
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)

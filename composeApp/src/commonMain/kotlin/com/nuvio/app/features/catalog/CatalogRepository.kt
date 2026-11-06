@@ -2,6 +2,8 @@ package com.nuvio.app.features.catalog
 
 import com.nuvio.app.core.poster.CustomPosterUrlRepository
 import com.nuvio.app.core.poster.withCustomPosterUrls
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
+import com.nuvio.app.features.cloudstream.toMetaPreview
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.details.MoreLikeThisSource
 import com.nuvio.app.features.simkl.SimklRelatedRepository
@@ -157,6 +159,19 @@ object CatalogRepository {
                         skip = requestedSkip.takeIf { it > 0 },
                         forceRefresh = forceRefresh,
                     )
+
+                    is CatalogTarget.CloudStream -> {
+                        val sections = CloudStreamRepository.getMainPage(
+                            target.providerId,
+                            cloudStreamPageNumber(requestedSkip),
+                        ).getOrThrow()
+                        val items = sections.firstOrNull { it.first == target.sectionName }?.second.orEmpty()
+                        CatalogPage(
+                            items = items.map { it.toMetaPreview() },
+                            rawItemCount = items.size,
+                            nextSkip = cloudStreamNextPageSkip(requestedSkip, items.size),
+                        )
+                    }
 
                     is CatalogTarget.CollectionSource -> fetchCollectionSourcePage(
                         target = target,

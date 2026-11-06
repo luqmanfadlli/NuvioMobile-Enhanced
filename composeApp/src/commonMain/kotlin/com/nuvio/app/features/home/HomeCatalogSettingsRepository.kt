@@ -237,6 +237,7 @@ object HomeCatalogSettingsRepository {
     private var hasLoaded = false
     private var definitions: List<HomeCatalogDefinition> = emptyList()
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
+    private var cloudStreamCatalogItems: List<HomeCatalogSettingsItem> = emptyList()
     private var lastCatalogSync: CatalogSyncInput? = null
     private var lastCollectionSync: Pair<List<Collection>, String>? = null
     private val preferencesRef = atomic<Map<String, StoredHomeCatalogPreference>>(emptyMap())
@@ -262,6 +263,7 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         definitions = emptyList()
         collectionDefinitions = emptyList()
+        cloudStreamCatalogItems = emptyList()
         lastCatalogSync = null
         lastCollectionSync = null
         preferences = emptyMap()
@@ -306,6 +308,40 @@ object HomeCatalogSettingsRepository {
         normalizePreferences()
         publish()
         persist()
+    }
+
+    fun syncCloudStreamCatalogs(sections: List<HomeCatalogSection>) {
+        ensureLoaded()
+        var nextOrder = (preferences.values.maxOfOrNull(StoredHomeCatalogPreference::order) ?: -1) + 1
+        val updatedPreferences = preferences.toMutableMap()
+        val nextItems = sections.mapNotNull { section ->
+            val target = section.target as? com.nuvio.app.features.catalog.CatalogTarget.CloudStream
+                ?: return@mapNotNull null
+            val preference = updatedPreferences[section.key] ?: StoredHomeCatalogPreference(
+                key = section.key,
+                enabled = true,
+                heroSourceEnabled = false,
+                order = nextOrder++,
+            ).also { updatedPreferences[section.key] = it }
+            HomeCatalogSettingsItem(
+                key = section.key,
+                defaultTitle = section.title,
+                addonName = section.addonName,
+                customTitle = preference.customTitle,
+                enabled = preference.enabled,
+                heroSourceEnabled = false,
+                order = preference.order,
+                addonId = "cloudstream:${target.providerId}",
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference.rowPlacement),
+            )
+        }
+        if (updatedPreferences != preferences) {
+            preferences = updatedPreferences.toMap()
+            persist()
+        }
+        if (cloudStreamCatalogItems == nextItems) return
+        cloudStreamCatalogItems = nextItems
+        publish()
     }
 
     fun syncCollections(collections: List<Collection>) {
@@ -833,10 +869,11 @@ object HomeCatalogSettingsRepository {
         }
 
         val items = orderHomeCatalogSettingsItems(
-            items = catalogItems + collectionItems,
+            items = catalogItems + collectionItems + cloudStreamCatalogItems,
             addonIdByCatalogKey = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
-                .associate { definition -> definition.key to definition.addonGroupId() },
+                .associate { definition -> definition.key to definition.addonGroupId() } +
+                cloudStreamCatalogItems.mapNotNull { item -> item.addonId?.let { item.key to it } }.toMap(),
             addonLayouts = addonLayouts.mapValues { (_, stored) ->
                 HomeAddonLayoutPreference(
                     mode = HomeAddonLayoutMode.fromStorage(stored.mode),
@@ -1045,7 +1082,8 @@ object HomeCatalogSettingsRepository {
     private fun allOrderedKeys(): List<String> {
         val catalogKeys = definitions.map { it.key }
         val collectionKeys = collectionDefinitions.map { it.key }
-        return (catalogKeys + collectionKeys)
+        val cloudStreamKeys = cloudStreamCatalogItems.map { it.key }
+        return (catalogKeys + collectionKeys + cloudStreamKeys)
             .sortedBy { key -> preferences[key]?.order ?: Int.MAX_VALUE }
     }
 
@@ -1091,13 +1129,14 @@ object HomeCatalogSettingsRepository {
 
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {
         val isCollection = collectionDefinitions.any { it.key == key }
-        val isCatalog = definitions.any { it.key == key }
+        val isCloudStream = cloudStreamCatalogItems.any { it.key == key }
+        val isCatalog = definitions.any { it.key == key } || isCloudStream
         if (!isCollection && !isCatalog) return null
 
         return StoredHomeCatalogPreference(
             key = key,
             enabled = true,
-            heroSourceEnabled = isCatalog &&
+            heroSourceEnabled = isCatalog && !isCloudStream &&
                 selectedHeroSourceCount(excludingKey = key) < HERO_SOURCE_SELECTION_LIMIT,
             order = _uiState.value.items.firstOrNull { it.key == key }?.order
                 ?: ((preferences.values.maxOfOrNull { it.order } ?: -1) + 1),
@@ -1106,6 +1145,7 @@ object HomeCatalogSettingsRepository {
 
     private fun knownPreferenceKeys(): Set<String> =
         definitions.mapTo(mutableSetOf()) { it.key }.also { keys ->
+            keys.addAll(cloudStreamCatalogItems.map { it.key })
             keys.addAll(collectionDefinitions.map { it.key })
         }
 
