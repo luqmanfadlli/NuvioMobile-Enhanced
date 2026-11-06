@@ -478,7 +478,7 @@ private fun MobileStreamsLayout(
             ArtworkBackdrop(
                 image = rememberArtworkBackdrop(heroArtwork),
                 modifier = Modifier.nuvioBackdropSource(streamsGlassBackdrop),
-                scrim = SolidColor(Color.Black.copy(alpha = if (isEpisode) 0.56f else 0.46f)),
+                scrim = SolidColor(Color.Black.copy(alpha = if (isEpisode) 0.46f else 0.36f)),
             )
         }
 
