@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -68,6 +69,7 @@ import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.trakt.TraktPublicListSearchResult
 import nuvio.composeapp.generated.resources.*
@@ -1130,7 +1132,11 @@ private fun TmdbSourcePickerScreen(
                 item {
                     PickerSectionLabel(stringResource(Res.string.collections_editor_tmdb_search_results))
                 }
-                itemsIndexed(state.tmdbCompanyResults) { _, result ->
+                items(
+                    items = state.tmdbCompanyResults.withDuplicateSafeLazyKeys { "tmdb_company_${it.id}" },
+                    key = { it.lazyKey },
+                ) { keyedResult ->
+                    val result = keyedResult.value
                     val title = result.name ?: stringResource(Res.string.collections_editor_tmdb_company_fallback, result.id)
                     val movieSuffix = stringResource(Res.string.collections_editor_tmdb_movies)
                     val seriesSuffix = stringResource(Res.string.collections_editor_tmdb_series)
@@ -1163,7 +1169,11 @@ private fun TmdbSourcePickerScreen(
                 item {
                     PickerSectionLabel(stringResource(Res.string.collections_editor_tmdb_search_results))
                 }
-                itemsIndexed(state.tmdbCollectionResults) { _, result ->
+                items(
+                    items = state.tmdbCollectionResults.withDuplicateSafeLazyKeys { "tmdb_collection_${it.id}" },
+                    key = { it.lazyKey },
+                ) { keyedResult ->
+                    val result = keyedResult.value
                     val title = result.name ?: stringResource(Res.string.collections_editor_tmdb_collection_fallback, result.id)
                     PickerOptionRow(
                         title = title,
@@ -1824,7 +1834,11 @@ private fun LazyListScope.TraktResultSection(
     item {
         PickerSectionLabel(title)
     }
-    itemsIndexed(results) { _, result ->
+    items(
+        items = results.withDuplicateSafeLazyKeys { "trakt_list_${title}_${it.traktListId}" },
+        key = { it.lazyKey },
+    ) { keyedResult ->
+        val result = keyedResult.value
         PickerOptionRow(
             title = result.title,
             subtitle = result.subtitle,

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,10 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.nuvio.app.features.settings.ThemeSettingsRepository
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -73,7 +69,7 @@ fun <T> NuvioShelfSection(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
     key: ((T) -> Any)? = null,
     animatePlacement: Boolean = false,
-    state: LazyListState = rememberLazyListState(),
+    state: LazyListState = rememberShelfRowListState(),
     itemContent: @Composable (T) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -173,16 +169,11 @@ fun NuvioPosterCard(
                 val platformContext = coil3.compose.LocalPlatformContext.current
                 val hasFallback = !fallbackImageUrl.isNullOrBlank() && fallbackImageUrl != imageUrl
                 val imageModel = remember(imageUrl, fallbackImageUrl, platformContext) {
-                    if (hasFallback) {
-                        coil3.request.ImageRequest.Builder(platformContext)
-                            .data(imageUrl)
-                            .memoryCacheKeyExtras(
-                                mapOf(com.nuvio.app.core.poster.CustomPosterFallbackInterceptor.FALLBACK_URL_KEY to fallbackImageUrl!!)
-                            )
-                            .build()
-                    } else {
-                        imageUrl
-                    }
+                    posterImageModel(
+                        platformContext = platformContext,
+                        imageUrl = imageUrl,
+                        fallbackImageUrl = fallbackImageUrl.takeIf { hasFallback },
+                    )
                 }
                 AsyncImage(
                     model = imageModel,
@@ -281,7 +272,7 @@ private fun NuvioShelfSectionHeader(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
 ) {
     val tokens = MaterialTheme.nuvio
-    val showAccent by ThemeSettingsRepository.showCatalogAccentEnabled.collectAsState()
+    val showAccent = rememberShowCatalogAccentEnabled()
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -353,7 +344,7 @@ private fun NuvioViewAllPill(
     }
 }
 
-private val NuvioPosterShape.aspectRatio: Float
+internal val NuvioPosterShape.aspectRatio: Float
     get() = when (this) {
         NuvioPosterShape.Poster -> 0.675f
         NuvioPosterShape.Square -> 1f
@@ -386,7 +377,7 @@ private fun catalogLogoOverlaySize(
         }
     }
 
-private fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
+internal fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
     when (this) {
         NuvioPosterShape.Poster -> basePosterWidthDp.dp
         NuvioPosterShape.Square -> basePosterWidthDp.dp

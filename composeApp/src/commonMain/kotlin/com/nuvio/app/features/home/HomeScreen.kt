@@ -26,6 +26,7 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
+import com.nuvio.app.core.ui.rememberShelfRowListState
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.DynamicArtworkBackground
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
@@ -149,8 +150,8 @@ fun HomeScreen(
         HomeCatalogSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val homeListState = rememberLazyListState()
-    val continueWatchingListState = rememberLazyListState()
-    val upcomingListState = rememberLazyListState()
+    val continueWatchingListState = rememberShelfRowListState()
+    val upcomingListState = rememberShelfRowListState()
     ScreenActivityEffect(homeListState, continueWatchingListState, upcomingListState) { active ->
         if (!active) {
             homeListState.stopScroll(MutatePriority.PreventUserInput)
@@ -1080,7 +1081,7 @@ fun HomeScreen(
                             onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                         )
-                        items(3) {
+                        items(3, contentType = { HOME_SKELETON_ROW_CONTENT_TYPE }) {
                             HomeSkeletonRow(
                                 modifier = Modifier.padding(horizontal = 16.dp),
                             )
@@ -1198,7 +1199,7 @@ fun HomeScreen(
                             if (settingsItem.isCollection) {
                                 val collection = collectionsMap[settingsItem.key]
                                 if (collection != null) {
-                                    item(key = keyedSettingsItem.lazyKey) {
+                                    item(key = keyedSettingsItem.lazyKey, contentType = HOME_COLLECTION_ROW_CONTENT_TYPE) {
                                         HomeCollectionRowSection(
                                             collection = collection,
                                             modifier = Modifier.padding(bottom = 12.dp),
@@ -1211,7 +1212,7 @@ fun HomeScreen(
                             } else {
                                 val section = sectionsMap[settingsItem.key]
                                 if (section != null && section.items.isNotEmpty()) {
-                                    item(key = keyedSettingsItem.lazyKey) {
+                                    item(key = keyedSettingsItem.lazyKey, contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
                                         HomeCatalogRowSection(
                                             section = section,
                                             entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
@@ -1254,7 +1255,7 @@ private fun LazyListScope.homeContinueWatchingSections(
     if (!preferences.isVisible) return
 
     if (continueWatchingItems.isNotEmpty()) {
-        item(key = HOME_CONTINUE_WATCHING_SECTION_KEY) {
+        item(key = HOME_CONTINUE_WATCHING_SECTION_KEY, contentType = HOME_CONTINUE_WATCHING_ROW_CONTENT_TYPE) {
             HomeContinueWatchingSection(
                 items = continueWatchingItems,
                 dataSourceKey = dataSourceKey,
@@ -1273,7 +1274,7 @@ private fun LazyListScope.homeContinueWatchingSections(
     }
 
     if (upcomingItems.isNotEmpty()) {
-        item(key = HOME_UPCOMING_SECTION_KEY) {
+        item(key = HOME_UPCOMING_SECTION_KEY, contentType = HOME_CONTINUE_WATCHING_ROW_CONTENT_TYPE) {
             HomeContinueWatchingSection(
                 items = upcomingItems,
                 dataSourceKey = dataSourceKey,
@@ -1296,6 +1297,11 @@ private fun LazyListScope.homeContinueWatchingSections(
 private const val HOME_CATALOG_PREVIEW_LIMIT = 18
 private const val HOME_CONTINUE_WATCHING_SECTION_KEY = "home_continue_watching"
 private const val HOME_UPCOMING_SECTION_KEY = "home_upcoming"
+
+private const val HOME_CATALOG_ROW_CONTENT_TYPE = "home_catalog_row"
+private const val HOME_COLLECTION_ROW_CONTENT_TYPE = "home_collection_row"
+private const val HOME_CONTINUE_WATCHING_ROW_CONTENT_TYPE = "home_continue_watching_row"
+private const val HOME_SKELETON_ROW_CONTENT_TYPE = "home_skeleton_row"
 internal const val HomeContinueWatchingMaxRecentProgressItems = 300
 internal const val HomeNextUpInitialResolutionLimit = 32
 private const val NEXT_UP_RESOLUTION_CONCURRENCY = 4
