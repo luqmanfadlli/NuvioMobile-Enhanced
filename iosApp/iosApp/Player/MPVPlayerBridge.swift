@@ -617,6 +617,13 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func startMemoryDiagnostics() {
+        // Dense samples while the first frames, GPU resources and demuxer cache are set up.
+        for delay in [2.0, 5.0, 10.0, 20.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.memoryDiagnosticsTimer != nil else { return }
+                self.logMemory("startup+\(Int(delay))s")
+            }
+        }
         memoryDiagnosticsTimer?.invalidate()
         memoryDiagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.logMemory("tick")
