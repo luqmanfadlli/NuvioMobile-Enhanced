@@ -1395,6 +1395,7 @@ final class MPVPlayerViewController: UIViewController {
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
         pendingLoadRequest = nil
+        detachMetalLayerBeforeTeardown()
 
         mpvQueue.async { [weak self, eventQueue, metalLayer] in
             eventQueue.sync {}
@@ -1405,6 +1406,18 @@ final class MPVPlayerViewController: UIViewController {
                 DispatchQueue.main.async(execute: completion)
             }
         }
+    }
+
+    private func detachMetalLayerBeforeTeardown() {
+        let detach = { [metalLayer] in
+            guard metalLayer.superlayer != nil else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            metalLayer.removeFromSuperlayer()
+            CATransaction.commit()
+        }
+        guard Thread.isMainThread else { return }
+        detach()
     }
 
     private func reapplyRememberedSettings() {
