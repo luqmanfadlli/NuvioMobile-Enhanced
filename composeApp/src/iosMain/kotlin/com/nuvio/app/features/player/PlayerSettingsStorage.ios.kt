@@ -58,6 +58,8 @@ actual object PlayerSettingsStorage {
     private const val androidLibmpvHardwareDecodingEnabledKey = "android_libmpv_hardware_decoding_enabled"
     private const val androidLibmpvVideoOutputKey = "android_libmpv_video_output"
     private const val androidLibmpvYuv420pEnabledKey = "android_libmpv_yuv420p_enabled"
+    private const val androidAnimeUpscaleEnabledKey = "android_anime_upscale_enabled"
+    private const val androidAnimeLineSharpenEnabledKey = "android_anime_line_sharpen_enabled"
     private const val androidPlaybackEngineKey = "android_playback_engine"
     private const val rememberAudioDelayPerDeviceKey = "remember_audio_delay_per_device"
     private const val persistAudioAmplificationKey = "persist_audio_amplification"
@@ -171,6 +173,8 @@ actual object PlayerSettingsStorage {
         androidLibmpvVideoOutputKey,
         androidLibmpvHardwareDecodingEnabledKey,
         androidLibmpvYuv420pEnabledKey,
+        androidAnimeUpscaleEnabledKey,
+        androidAnimeLineSharpenEnabledKey,
         androidExoChaptersEnabledKey,
         rememberAudioDelayPerDeviceKey,
         persistAudioAmplificationKey,
@@ -746,6 +750,26 @@ actual object PlayerSettingsStorage {
         }
     }
 
+    actual fun loadAndroidAnimeUpscaleEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(androidAnimeUpscaleEnabledKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
+    actual fun loadAndroidAnimeLineSharpenEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(androidAnimeLineSharpenEnabledKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
     actual fun loadAndroidExoChaptersEnabled(): Boolean? {
         val defaults = NSUserDefaults.standardUserDefaults
         val key = ProfileScopedKey.of(androidExoChaptersEnabledKey)
@@ -758,6 +782,14 @@ actual object PlayerSettingsStorage {
 
     actual fun saveAndroidLibmpvYuv420pEnabled(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(androidLibmpvYuv420pEnabledKey))
+    }
+
+    actual fun saveAndroidAnimeUpscaleEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(androidAnimeUpscaleEnabledKey))
+    }
+
+    actual fun saveAndroidAnimeLineSharpenEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(androidAnimeLineSharpenEnabledKey))
     }
 
     actual fun saveAndroidExoChaptersEnabled(enabled: Boolean) {
@@ -1422,6 +1454,8 @@ actual object PlayerSettingsStorage {
             put(androidLibmpvHardwareDecodingEnabledKey, encodeSyncBoolean(it))
         }
         loadAndroidLibmpvYuv420pEnabled()?.let { put(androidLibmpvYuv420pEnabledKey, encodeSyncBoolean(it)) }
+        loadAndroidAnimeUpscaleEnabled()?.let { put(androidAnimeUpscaleEnabledKey, encodeSyncBoolean(it)) }
+        loadAndroidAnimeLineSharpenEnabled()?.let { put(androidAnimeLineSharpenEnabledKey, encodeSyncBoolean(it)) }
         loadAndroidExoChaptersEnabled()?.let { put(androidExoChaptersEnabledKey, encodeSyncBoolean(it)) }
         loadRememberAudioDelayPerDevice()?.let { put(rememberAudioDelayPerDeviceKey, encodeSyncBoolean(it)) }
         loadPersistAudioAmplification()?.let { put(persistAudioAmplificationKey, encodeSyncBoolean(it)) }
@@ -1519,6 +1553,8 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(androidLibmpvHardwareDecodingEnabledKey)
             ?.let(::saveAndroidLibmpvHardwareDecodingEnabled)
         payload.decodeSyncBoolean(androidLibmpvYuv420pEnabledKey)?.let(::saveAndroidLibmpvYuv420pEnabled)
+        payload.decodeSyncBoolean(androidAnimeUpscaleEnabledKey)?.let(::saveAndroidAnimeUpscaleEnabled)
+        payload.decodeSyncBoolean(androidAnimeLineSharpenEnabledKey)?.let(::saveAndroidAnimeLineSharpenEnabled)
         payload.decodeSyncBoolean(androidExoChaptersEnabledKey)?.let(::saveAndroidExoChaptersEnabled)
         payload.decodeSyncBoolean(rememberAudioDelayPerDeviceKey)?.let(::saveRememberAudioDelayPerDevice)
         payload.decodeSyncBoolean(persistAudioAmplificationKey)?.let(::savePersistAudioAmplification)
