@@ -581,6 +581,35 @@ final class MPVPlayerViewController: UIViewController {
         }
     }
 
+    /// After destroy the controller should be released within seconds. If it is still alive,
+    /// record where it still hangs in the UIKit hierarchy to find what retains it.
+    private func scheduleLeakCheck() {
+        let id = memoryDiagnosticsId
+        for delay in [15.0, 60.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self else { return }
+                var parents: [String] = []
+                var parent = self.parent
+                while let current = parent {
+                    parents.append(String(describing: type(of: current)))
+                    parent = current.parent
+                }
+                var supers: [String] = []
+                var superview = self.viewIfLoaded?.superview
+                while let current = superview, supers.count < 8 {
+                    supers.append(String(describing: type(of: current)))
+                    superview = current.superview
+                }
+                Self.writeMemoryLog(
+                    "event=still-alive after=\(Int(delay))s player=\(id) live=\(Self.livePlayerCount) " +
+                        "inWindow=\(self.viewIfLoaded?.window != nil) " +
+                        "parents=[\(parents.joined(separator: ">"))] supers=[\(supers.joined(separator: ">"))] " +
+                        String(format: "footprint=%.0fMB", Self.appFootprintMB())
+                )
+            }
+        }
+    }
+
     private func startMemoryDiagnostics() {
         memoryDiagnosticsTimer?.invalidate()
         memoryDiagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
@@ -1906,6 +1935,7 @@ final class MPVPlayerViewController: UIViewController {
         memoryDiagnosticsTimer?.invalidate()
         memoryDiagnosticsTimer = nil
         logMemory("destroy")
+        scheduleLeakCheck()
         pictureInPictureController?.invalidate()
         pictureInPictureController = nil
         NotificationCenter.default.removeObserver(self)

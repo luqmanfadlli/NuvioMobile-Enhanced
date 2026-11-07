@@ -163,6 +163,10 @@ final class PlayerRouteContainerViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        MPVPlayerViewController.writeMemoryLog("event=route-container-deinit")
+    }
+
     override func loadView() {
         let view = WindowObservingView()
         view.backgroundColor = .black
