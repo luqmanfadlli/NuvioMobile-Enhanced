@@ -523,8 +523,88 @@ final class MPVPlayerViewController: UIViewController {
 
     // MARK: - Lifecycle
 
+    // MARK: - Memory diagnostics (debugging jetsam after long sessions)
+
+    private static var livePlayerCount = 0
+    private var memoryDiagnosticsTimer: Timer?
+    private let memoryDiagnosticsId = String(UUID().uuidString.prefix(6))
+
+    static func appFootprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return -1 }
+        return Double(info.phys_footprint) / 1_048_576
+    }
+
+    private func logMemory(_ event: String) {
+        var details = "event=\(event) player=\(memoryDiagnosticsId) live=\(Self.livePlayerCount) " +
+            String(format: "footprint=%.0fMB", Self.appFootprintMB())
+        if mpv != nil {
+            details += " hwdec=\(getString("hwdec-current") ?? "-")" +
+                " demuxCacheSec=\(String(format: "%.0f", getDouble("demuxer-cache-duration")))" +
+                " size=\(getInt("width"))x\(getInt("height"))"
+        }
+        Self.writeMemoryLog(details)
+    }
+
+    /// Written to Documents/Diagnostics/mpv-memory.log (visible in the Files app) instead of the
+    /// in-app log, whose ring buffer is flooded by other tags during long sessions.
+    private static let memoryLogQueue = DispatchQueue(label: "nuvio.mpv-memory-log")
+    private static let memoryLogMaxBytes = 2 * 1024 * 1024
+
+    static func writeMemoryLog(_ message: String) {
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        memoryLogQueue.async {
+            let fm = FileManager.default
+            guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+            let dir = docs.appendingPathComponent("Diagnostics", isDirectory: true)
+            let url = dir.appendingPathComponent("mpv-memory.log")
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > memoryLogMaxBytes {
+                let old = dir.appendingPathComponent("mpv-memory.old.log")
+                try? fm.removeItem(at: old)
+                try? fm.moveItem(at: url, to: old)
+            }
+            guard let data = line.data(using: .utf8) else { return }
+            if let handle = try? FileHandle(forWritingTo: url) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            } else {
+                try? data.write(to: url)
+            }
+        }
+    }
+
+    private func startMemoryDiagnostics() {
+        memoryDiagnosticsTimer?.invalidate()
+        memoryDiagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.logMemory("tick")
+        }
+    }
+
+    deinit {
+        memoryDiagnosticsTimer?.invalidate()
+        let id = memoryDiagnosticsId
+        DispatchQueue.main.async {
+            Self.livePlayerCount -= 1
+            Self.writeMemoryLog(
+                "event=deinit player=\(id) live=\(Self.livePlayerCount) " +
+                    String(format: "footprint=%.0fMB", Self.appFootprintMB())
+            )
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        Self.livePlayerCount += 1
+        logMemory("create")
+        startMemoryDiagnostics()
         view.backgroundColor = .black
         view.layer.masksToBounds = true
 
@@ -1823,6 +1903,9 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     func destroyPlayer() {
+        memoryDiagnosticsTimer?.invalidate()
+        memoryDiagnosticsTimer = nil
+        logMemory("destroy")
         pictureInPictureController?.invalidate()
         pictureInPictureController = nil
         NotificationCenter.default.removeObserver(self)
