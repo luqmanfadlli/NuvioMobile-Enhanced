@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.logging.InAppLogger
+import com.nuvio.app.core.ui.trimImageMemoryForPlayback
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.delay
@@ -75,6 +76,8 @@ actual fun PlatformPlayerSurface(
     var subtitleText by remember(sourceUrl) { mutableStateOf("") }
     var subtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
 
+    // Make room for the player's GPU/decoder memory (4K HDR/DV needs well over 1 GB).
+    LaunchedEffect(Unit) { trimImageMemoryForPlayback() }
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
     }

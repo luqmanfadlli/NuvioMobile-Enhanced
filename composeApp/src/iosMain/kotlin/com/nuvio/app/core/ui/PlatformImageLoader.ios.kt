@@ -1,7 +1,47 @@
 package com.nuvio.app.core.ui
 
 import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.memory.MemoryCache
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSOperationQueue
+import platform.UIKit.UIApplicationDidReceiveMemoryWarningNotification
 
-internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoader.Builder = this
+/**
+ * Coil's default memory cache on iOS is a share of the device's physical RAM (well over 1 GB on
+ * 8 GB iPhones). Images alone kept the app at 1.1-1.4 GB, leaving too little headroom under the
+ * ~2.3 GB jetsam limit for a 4K HDR/DV player. Cap it and give memory back on warnings.
+ */
+private const val IosImageMemoryCacheBytes = 256L * 1024 * 1024
+private const val IosImageMemoryCacheDuringPlaybackBytes = 64L * 1024 * 1024
+
+private var memoryWarningObserverInstalled = false
+
+internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoader.Builder {
+    installMemoryWarningObserver()
+    return memoryCache {
+        MemoryCache.Builder()
+            .maxSizeBytes(IosImageMemoryCacheBytes)
+            .build()
+    }
+}
 
 internal actual val platformProvidesImageLoader: Boolean = false
+
+private fun installMemoryWarningObserver() {
+    if (memoryWarningObserverInstalled) return
+    memoryWarningObserverInstalled = true
+    NSNotificationCenter.defaultCenter.addObserverForName(
+        name = UIApplicationDidReceiveMemoryWarningNotification,
+        `object` = null,
+        queue = NSOperationQueue.mainQueue,
+    ) { _ ->
+        SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.clear()
+    }
+}
+
+/** Called when a player starts: decoded posters/backdrops are cheap to reload afterwards. */
+fun trimImageMemoryForPlayback() {
+    SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.trimToSize(IosImageMemoryCacheDuringPlaybackBytes)
+}
