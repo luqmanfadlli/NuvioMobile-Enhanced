@@ -11,12 +11,16 @@ import ComposeApp
 final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
 
     private var playerVC: MPVPlayerViewController?
+    private var hostVC: PlayerHostViewController?
     private var experimentalSinglePrimaryPictureInPictureEnabled = false
     private var keyboardShortcutsEnabled = true
     private var keyboardShortcutHandler: ((String) -> Void)?
 
     func createPlayerViewController() -> UIViewController {
-        return ensurePlayerViewController()
+        if let hostVC { return hostVC }
+        let host = PlayerHostViewController(player: ensurePlayerViewController())
+        hostVC = host
+        return host
     }
 
     private func ensurePlayerViewController() -> MPVPlayerViewController {
@@ -250,6 +254,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func destroy() {
         playerVC?.systemControlHandler = nil
         playerVC?.destroyPlayer()
+        hostVC?.detachPlayer()
+        hostVC = nil
         playerVC = nil
     }
 
@@ -733,6 +739,10 @@ final class MPVPlayerViewController: UIViewController {
         if parent == nil {
             publishImmersiveSystemUIVisibility(isVisible: false)
         }
+    }
+
+    func hostDidLeaveParent() {
+        publishImmersiveSystemUIVisibility(isVisible: false)
     }
 
     override func viewSafeAreaInsetsDidChange() {
@@ -2943,6 +2953,56 @@ final class MPVPlayerViewController: UIViewController {
             super.pressesBegan(unhandled, with: event)
         }
     }
+}
+
+// MARK: - Host (what Compose holds)
+
+/// Thin container handed to Compose. It forwards the status bar, home indicator and edge-gesture
+/// preferences to the player and lets go of it in `detachPlayer()`.
+final class PlayerHostViewController: UIViewController {
+    private var player: MPVPlayerViewController?
+
+    init(player: MPVPlayerViewController) {
+        self.player = player
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        guard let player else { return }
+        addChild(player)
+        player.view.frame = view.bounds
+        player.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(player.view)
+        player.didMove(toParent: self)
+    }
+
+    func detachPlayer() {
+        guard let player else { return }
+        player.willMove(toParent: nil)
+        player.view.removeFromSuperview()
+        player.removeFromParent()
+        self.player = nil
+        setNeedsStatusBarAppearanceUpdate()
+        setNeedsUpdateOfHomeIndicatorAutoHidden()
+        setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+    }
+
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        if parent == nil { player?.hostDidLeaveParent() }
+    }
+
+    override var childForStatusBarHidden: UIViewController? { player }
+    override var childForStatusBarStyle: UIViewController? { player }
+    override var childForHomeIndicatorAutoHidden: UIViewController? { player }
+    override var childForScreenEdgesDeferringSystemGestures: UIViewController? { player }
 }
 
 // MARK: - Bridge Creator (implements Kotlin protocol)
