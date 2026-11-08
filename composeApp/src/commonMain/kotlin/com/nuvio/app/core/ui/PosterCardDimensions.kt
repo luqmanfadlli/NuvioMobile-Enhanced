@@ -4,6 +4,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 internal const val PosterLandscapeAspectRatio = 1.77f
+
+// Netflix-style home rails intentionally use larger cards than the configurable standard preset.
+internal const val NETFLIX_HOME_POSTER_WIDTH_DP = 165
 private const val PosterLandscapeWidthScale = 180f / 110f
 
 internal fun landscapePosterWidth(basePosterWidthDp: Int): Dp =

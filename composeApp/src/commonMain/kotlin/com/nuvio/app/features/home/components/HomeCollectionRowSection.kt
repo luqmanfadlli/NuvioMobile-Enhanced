@@ -27,6 +27,7 @@ import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.LocalScreenActive
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.NETFLIX_HOME_POSTER_WIDTH_DP
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.nuvioCardDepth
@@ -99,7 +100,12 @@ private fun CollectionFolderCard(
     onClick: (() -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
-    val isLandscapeMode = posterCardStyle.catalogLandscapeModeEnabled
+    val netflixStyleEnabled = posterCardStyle.netflixStyleEnabled
+    val effectivePosterCardStyle = if (netflixStyleEnabled) {
+        val width = maxOf(effectivePosterCardStyle.widthDp, NETFLIX_HOME_POSTER_WIDTH_DP)
+        posterCardStyle.copy(widthDp = width, heightDp = (width * 3) / 2, cornerRadiusDp = minOf(effectivePosterCardStyle.cornerRadiusDp, 8), catalogLandscapeModeEnabled = false)
+    } else posterCardStyle
+    val isLandscapeMode = effectivePosterCardStyle.catalogLandscapeModeEnabled
     val shape = if (isLandscapeMode) PosterShape.Landscape else folder.posterShape
     val cardWidth: Dp
     val aspectRatio: Float

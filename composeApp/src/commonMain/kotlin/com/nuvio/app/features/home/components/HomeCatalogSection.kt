@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.NETFLIX_HOME_POSTER_WIDTH_DP
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.PosterRowImagePrefetchEffect
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -97,7 +98,7 @@ private fun HomeCatalogRowSectionContent(
         if (!netflixStyleEnabled) {
             posterCardStyle
         } else {
-            val width = maxOf(posterCardStyle.widthDp, 142)
+            val width = maxOf(posterCardStyle.widthDp, NETFLIX_HOME_POSTER_WIDTH_DP)
             posterCardStyle.copy(
                 widthDp = width,
                 heightDp = (width * 3) / 2,

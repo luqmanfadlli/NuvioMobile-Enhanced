@@ -38,6 +38,7 @@ import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.rememberHeroStretchState
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.NETFLIX_HOME_POSTER_WIDTH_DP
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -977,7 +978,7 @@ fun HomeScreen(
             if (!netflixStyleEnabled) {
                 posterCardStyle
             } else {
-                val widthDp = maxOf(posterCardStyle.widthDp, 155)
+                val widthDp = maxOf(posterCardStyle.widthDp, NETFLIX_HOME_POSTER_WIDTH_DP)
                 posterCardStyle.copy(
                     widthDp = widthDp,
                     heightDp = (widthDp * 3) / 2,
