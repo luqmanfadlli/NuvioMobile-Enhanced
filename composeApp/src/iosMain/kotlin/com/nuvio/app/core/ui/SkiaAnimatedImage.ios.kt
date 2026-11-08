@@ -378,8 +378,10 @@ private fun decodeAnimation(
 
 private class SharedAnimation(
     val key: String,
-    val animation: AnimationFrames,
+    animation: AnimationFrames,
 ) {
+    /** Null once dropped for playback; the frames are then free to be collected. */
+    var animation: AnimationFrames? = animation
     var refCount: Int = 0
     var job: Job? = null
     var idleEviction: Job? = null
@@ -391,6 +393,44 @@ private val registry = mutableMapOf<String, SharedAnimation>()
 private val pending = mutableMapOf<String, Deferred<SharedAnimation?>>()
 private var budgetUsedBytes = 0L
 private var animationsPaused = false
+
+/**
+ * While a player is open (> 0) every decoded animation is dropped and no new one is decoded: the
+ * screens underneath stay composed but are not visible, and their frames (up to the 120 MB budget
+ * plus GPU textures) are the headroom 4K HDR/DV playback needs. Bumping [playbackGeneration] on
+ * resume makes visible composables acquire (decode from the disk cache) again.
+ */
+private var playbackSuspensions = 0
+private val playbackGeneration = mutableStateOf(0)
+
+internal fun suspendAnimatedImagesForPlayback() {
+    playbackSuspensions++
+    if (playbackSuspensions > 1) return
+    registry.values.forEach { shared ->
+        shared.job?.cancel()
+        shared.job = null
+        shared.idleEviction?.cancel()
+        shared.idleEviction = null
+        shared.frame.value = null
+        shared.animation = null
+    }
+    registry.clear()
+    pending.values.forEach { it.cancel() }
+    pending.clear()
+    budgetUsedBytes = 0
+    registryScope.launch {
+        sourceCacheLock.withLock {
+            sourceCache.clear()
+            sourceCacheBytes = 0
+        }
+    }
+}
+
+internal fun resumeAnimatedImagesAfterPlayback() {
+    if (playbackSuspensions == 0) return
+    playbackSuspensions--
+    if (playbackSuspensions == 0) playbackGeneration.value++
+}
 private var lifecycleObserversInstalled = false
 
 private fun installLifecycleObservers() {
@@ -442,6 +482,7 @@ private fun bucket(value: Int): Int {
 
 private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: Int): SharedAnimation? {
     installLifecycleObservers()
+    if (playbackSuspensions > 0) return null
     val key = "$url|${targetWidth}x$targetHeight"
 
     registry[key]?.let { existing ->
@@ -462,6 +503,7 @@ private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: I
         } ?: return@async null
 
         registry[key]?.let { return@async it }
+        if (playbackSuspensions > 0) return@async null
 
         if (budgetUsedBytes + animation.bytes > MaxAnimationBudgetBytes) return@async null
 
@@ -490,8 +532,8 @@ private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: I
 }
 
 private fun startIfNeeded(shared: SharedAnimation) {
-    if (shared.job != null || animationsPaused) return
-    val animation = shared.animation
+    if (shared.job != null || animationsPaused || playbackSuspensions > 0) return
+    val animation = shared.animation ?: return
     if (animation.frames.size <= 1) return
 
     shared.job = registryScope.launch {
@@ -507,6 +549,8 @@ private fun startIfNeeded(shared: SharedAnimation) {
 private fun releaseShared(shared: SharedAnimation) {
     shared.refCount--
     if (shared.refCount > 0) return
+    // Dropped for playback: no longer in the registry, nothing to evict.
+    if (shared.animation == null || registry[shared.key] !== shared) return
 
     shared.idleEviction?.cancel()
     shared.idleEviction = registryScope.launch {
@@ -524,7 +568,8 @@ private fun evictIfIdle(key: String) {
     shared.idleEviction = null
     registry.remove(key)
     shared.frame.value = null
-    budgetUsedBytes -= shared.animation.bytes
+    budgetUsedBytes -= shared.animation?.bytes ?: 0L
+    shared.animation = null
     if (budgetUsedBytes < 0) budgetUsedBytes = 0
 }
 
@@ -545,10 +590,11 @@ internal fun rememberAnimatedFrame(
 ): AnimatedFrame {
     val width = bucket(targetWidthPx)
     val height = bucket(targetHeightPx)
-    var shared by remember(url, width, height) { mutableStateOf<SharedAnimation?>(null) }
-    var unavailable by remember(url, width, height) { mutableStateOf(false) }
+    val generation = playbackGeneration.value
+    var shared by remember(url, width, height, generation) { mutableStateOf<SharedAnimation?>(null) }
+    var unavailable by remember(url, width, height, generation) { mutableStateOf(false) }
 
-    DisposableEffect(url, width, height) {
+    DisposableEffect(url, width, height, generation) {
         var released = false
         var acquired: SharedAnimation? = null
 

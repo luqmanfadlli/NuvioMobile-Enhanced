@@ -49,6 +49,7 @@ private fun installMemoryWarningObserver() {
 @OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
 fun trimImageMemoryForPlayback() {
     SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.trimToSize(IosImageMemoryCacheDuringPlaybackBytes)
+    suspendAnimatedImagesForPlayback()
     kotlin.native.runtime.GC.collect()
 }
 
@@ -56,4 +57,5 @@ fun trimImageMemoryForPlayback() {
 @OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
 fun collectAfterPlayback() {
     kotlin.native.runtime.GC.collect()
+    resumeAnimatedImagesAfterPlayback()
 }
