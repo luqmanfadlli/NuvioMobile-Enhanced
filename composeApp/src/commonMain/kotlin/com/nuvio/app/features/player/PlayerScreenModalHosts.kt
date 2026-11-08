@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import androidx.compose.runtime.Composable
+import com.nuvio.app.isIos
 import com.nuvio.app.features.details.MetaDetailsUiState
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.downloads.DownloadsRepository
@@ -61,6 +62,7 @@ internal fun PlayerScreenModalHosts(
     playerSettings: PlayerSettingsUiState,
     onVideoSettingsChanged: () -> Unit,
     onVideoSettingsModalDismissed: () -> Unit,
+    animeEnhancementStatus: AnimeEnhancementStatus? = null,
     showSourcesPanel: Boolean,
     sourceStreamsState: StreamsUiState,
     contentTitle: String,
@@ -188,9 +190,16 @@ internal fun PlayerScreenModalHosts(
     )
 
     IosVideoSettingsModal(
-        visible = showVideoSettingsModal,
+        visible = showVideoSettingsModal && isIos,
         settings = playerSettings,
         onSettingsChanged = onVideoSettingsChanged,
+        onDismiss = onVideoSettingsModalDismissed,
+    )
+
+    AnimeEnhancementPanel(
+        visible = showVideoSettingsModal && !isIos,
+        settings = playerSettings,
+        status = animeEnhancementStatus,
         onDismiss = onVideoSettingsModalDismissed,
     )
 

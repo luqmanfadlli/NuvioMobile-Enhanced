@@ -56,6 +56,7 @@ actual fun PlatformPlayerSurface(
     initialPositionRequestKey: String?,
     resizeMode: PlayerResizeMode,
     playbackEngine: AndroidPlaybackEngine?,
+    animeContent: Boolean,
     useNativeController: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
