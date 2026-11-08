@@ -154,7 +154,7 @@ class HomeHeroMetaRepositoryTest {
 
         val selected = selectHomeHeroItems(candidates, emptyMap())
 
-        assertEquals(10, selected.size)
+        assertEquals(8, selected.size)
         assertEquals(true, selected.all(MetaPreview::hasUsableHeroRating))
     }
 

@@ -43,16 +43,17 @@ internal data class HomeHeroMeta(
 internal object HomeHeroMetaRepository {
     private val dispatcher = Dispatchers.Default.limitedParallelism(1)
     private val _metas = MutableStateFlow<Map<String, HomeHeroMeta>>(emptyMap())
+    private val attemptedKeys = mutableSetOf<String>()
     val metas: StateFlow<Map<String, HomeHeroMeta>> = _metas.asStateFlow()
 
     suspend fun load(items: List<MetaPreview>, ratingSettings: MdbListSettings?) {
-        val keys = items.mapTo(mutableSetOf(), MetaPreview::stableKey)
-        _metas.update { metas -> metas.filterKeys(keys::contains) }
+        val missingItems = items.filter { item ->
+            attemptedKeys.add(item.stableKey() + ":" + (ratingSettings?.hashCode() ?: 0))
+        }
+        _metas.update { metas -> metas + missingItems.associate { it.stableKey() to HomeHeroMeta() } }
         val permits = Semaphore(DETAILS_FETCH_CONCURRENCY)
         withContext(dispatcher) {
-            items.forEach { item ->
-                launch { loadItem(item, ratingSettings, permits) }
-            }
+            missingItems.forEach { item -> launch { loadItem(item, ratingSettings, permits) } }
         }
     }
 
@@ -151,7 +152,14 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
 
     LaunchedEffect(items, mdbListSettings, tmdbSettings) {
         delay(LOAD_DEBOUNCE_MS)
-        HomeHeroMetaRepository.load(items, mdbListSettings.takeIf { showMdbListRatings })
+        val ratingSettings = mdbListSettings.takeIf { showMdbListRatings }
+        var endExclusive = minOf(HOME_HERO_INITIAL_BATCH_SIZE, items.size)
+        while (endExclusive > 0) {
+            val batch = items.take(endExclusive)
+            HomeHeroMetaRepository.load(batch, ratingSettings)
+            if (selectHomeHeroItems(batch, HomeHeroMetaRepository.metas.value).size >= HOME_HERO_RATED_ITEM_LIMIT || endExclusive >= items.size) break
+            endExclusive = minOf(endExclusive + HOME_HERO_INITIAL_BATCH_SIZE, items.size)
+        }
     }
 
     val heroItems = remember(items, metas) {
@@ -176,7 +184,8 @@ internal fun MetaPreview.hasUsableHeroRating(): Boolean =
     imdbRating?.trim()?.toDoubleOrNull()?.let { it > 0.0 } == true ||
         externalRatings.any { rating -> rating.value > 0.0 }
 
-private const val HOME_HERO_RATED_ITEM_LIMIT = 10
+private const val HOME_HERO_RATED_ITEM_LIMIT = 8
+private const val HOME_HERO_INITIAL_BATCH_SIZE = 16
 private const val DETAILS_FETCH_CONCURRENCY = 4
 private const val RATINGS_TIMEOUT_MS = 5_000L
 private const val LOAD_DEBOUNCE_MS = 400L

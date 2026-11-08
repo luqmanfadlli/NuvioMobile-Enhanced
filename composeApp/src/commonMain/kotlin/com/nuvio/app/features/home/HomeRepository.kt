@@ -837,7 +837,7 @@ object HomeRepository {
 }
 
 private const val HOME_HERO_ITEM_LIMIT = 8
-private const val HOME_HERO_CANDIDATE_LIMIT = 16
+private const val HOME_HERO_CANDIDATE_LIMIT = 32
 private const val HOME_COLLECTION_HERO_SOURCE_LIMIT = 6
 private const val HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT = 8
 private const val HOME_CATALOG_MAX_CONCURRENT_FETCHES = 6
