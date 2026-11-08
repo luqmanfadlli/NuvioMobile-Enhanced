@@ -532,6 +532,32 @@ final class MPVPlayerViewController: UIViewController {
     // MARK: - Memory diagnostics (debugging jetsam after long sessions)
 
     private static var livePlayerCount = 0
+
+    private final class WeakPlayer {
+        weak var value: MPVPlayerViewController?
+        init(_ value: MPVPlayerViewController) { self.value = value }
+    }
+
+    private static var livePlayers: [WeakPlayer] = []
+
+    /// Switching source/episode creates the new player before the old route is gone, so two mpv
+    /// cores (two 4K HDR swapchains) briefly coexist and can exceed the jetsam limit. A full player
+    /// starting up retires every other full player that is not parked in Picture in Picture.
+    private func retireOtherPlayers() {
+        guard !isEmbeddedPreviewMode else { return }
+        let others = Self.livePlayers.compactMap(\.value).filter { other in
+            other !== self &&
+                !other.isEmbeddedPreviewMode &&
+                !other.isPlayerDestroyed &&
+                !PlayerPictureInPictureParking.shared.isParked(player: other)
+        }
+        Self.livePlayers.removeAll { $0.value == nil }
+        Self.livePlayers.append(WeakPlayer(self))
+        for other in others {
+            Self.writeMemoryLog("event=retire player=\(other.memoryDiagnosticsId) by=\(memoryDiagnosticsId)")
+            other.destroyPlayer()
+        }
+    }
     private var memoryDiagnosticsTimer: Timer?
     private let memoryDiagnosticsId = String(UUID().uuidString.prefix(6))
 
@@ -690,6 +716,7 @@ final class MPVPlayerViewController: UIViewController {
         view.layer.addSublayer(metalLayer)
         layoutPlayerSurfaces()
 
+        retireOtherPlayers()
         setupMpv()
         if let settings = lastVideoOutputSettings {
             configureVideoOutput(
@@ -1959,6 +1986,10 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     func destroyPlayer() {
+        // May already have been retired early by a newer player (see retireOtherPlayers); a second
+        // pass would deactivate the audio session the new player just activated.
+        guard !isPlayerDestroyed else { return }
+        Self.livePlayers.removeAll { $0.value == nil || $0.value === self }
         memoryDiagnosticsTimer?.invalidate()
         memoryDiagnosticsTimer = nil
         logMemory("destroy")
