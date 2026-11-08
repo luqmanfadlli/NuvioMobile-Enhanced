@@ -557,6 +557,12 @@ final class MPVPlayerViewController: UIViewController {
             Self.writeMemoryLog("event=retire player=\(other.memoryDiagnosticsId) by=\(memoryDiagnosticsId)")
             other.destroyPlayer()
         }
+        // A player parked in Picture in Picture is still a full mpv core; starting another one
+        // next to it (4K in PiP + a new film) crossed the jetsam limit. Close the PiP session first.
+        if PlayerPictureInPictureParking.shared.hasParkedPlayer {
+            Self.writeMemoryLog("event=retire-parked by=\(memoryDiagnosticsId)")
+            PlayerPictureInPictureParking.shared.closeParked()
+        }
     }
     private var memoryDiagnosticsTimer: Timer?
     private let memoryDiagnosticsId = String(UUID().uuidString.prefix(6))
@@ -646,7 +652,7 @@ final class MPVPlayerViewController: UIViewController {
                 " demuxCacheSec=\(String(format: "%.0f", getDouble("demuxer-cache-duration")))" +
                 " size=\(getInt("width"))x\(getInt("height"))"
         }
-        if event == "create" || event == "destroy" || event == "deinit" || event.hasPrefix("startup") {
+        if event == "create" || event == "destroy" || event == "deinit" || event == "tick" || event.hasPrefix("startup") {
             details += " " + Self.memoryBreakdown()
         }
         Self.writeMemoryLog(details)
@@ -719,7 +725,7 @@ final class MPVPlayerViewController: UIViewController {
             }
         }
         memoryDiagnosticsTimer?.invalidate()
-        memoryDiagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        memoryDiagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             self?.logMemory("tick")
         }
     }

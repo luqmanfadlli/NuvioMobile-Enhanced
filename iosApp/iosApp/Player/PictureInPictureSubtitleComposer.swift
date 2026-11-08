@@ -23,21 +23,35 @@ final class PictureInPictureSubtitleComposer {
     private var overlayKey: OverlayKey?
     private var overlay: CIImage?
 
+    /// PiP windows are small; composing at 4K kept a pool of 4K buffers plus a 4K overlay alive
+    /// (well over 100 MB) while a 4K HDR/DV player sat close to the jetsam limit.
+    private static let maxOutputEdge: CGFloat = 1920
+
     func compose(_ buffer: CVPixelBuffer, text: String, bold: Bool) -> CVPixelBuffer? {
-        let width = CVPixelBufferGetWidth(buffer)
-        let height = CVPixelBufferGetHeight(buffer)
-        guard width > 0, height > 0,
-              let overlay = overlayImage(text: text, width: width, height: height, bold: bold) else {
+        let sourceWidth = CVPixelBufferGetWidth(buffer)
+        let sourceHeight = CVPixelBufferGetHeight(buffer)
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+        let scale = min(1, Self.maxOutputEdge / CGFloat(max(sourceWidth, sourceHeight)))
+        let width = max(2, Int((CGFloat(sourceWidth) * scale).rounded()) & ~1)
+        let height = max(2, Int((CGFloat(sourceHeight) * scale).rounded()) & ~1)
+        guard let overlay = overlayImage(text: text, width: width, height: height, bold: bold) else {
             return nil
         }
-        let base = CIImage(cvPixelBuffer: buffer)
-        let composed = overlay.composited(over: base)
-        if let output = render(composed, extent: base.extent, like: buffer, bgra: renderAsBGRA) {
+        var base = CIImage(cvPixelBuffer: buffer)
+        if scale < 1 {
+            base = base.transformed(by: CGAffineTransform(
+                scaleX: CGFloat(width) / CGFloat(sourceWidth),
+                y: CGFloat(height) / CGFloat(sourceHeight)
+            ))
+        }
+        let extent = CGRect(x: 0, y: 0, width: width, height: height)
+        let composed = overlay.composited(over: base).cropped(to: extent)
+        if let output = render(composed, extent: extent, like: buffer, bgra: renderAsBGRA) {
             return output
         }
         guard !renderAsBGRA else { return nil }
         renderAsBGRA = true
-        return render(composed, extent: base.extent, like: buffer, bgra: true)
+        return render(composed, extent: extent, like: buffer, bgra: true)
     }
 
     private func render(_ image: CIImage, extent: CGRect, like source: CVPixelBuffer, bgra: Bool) -> CVPixelBuffer? {
