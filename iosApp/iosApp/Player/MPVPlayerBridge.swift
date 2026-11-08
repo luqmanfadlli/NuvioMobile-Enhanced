@@ -975,6 +975,10 @@ final class MPVPlayerViewController: UIViewController {
         setSetupOption("gpu-context", "moltenvk")
         setSetupOption("hwdec", "videotoolbox")
         setSetupOption("hwdec-software-fallback", "300")
+        // VideoToolbox surface pool beyond what the decoder needs (mpv default 6). A 4K 10-bit
+        // frame is ~12 MB, and iosurface reached ~410 MB during 4K HDR/DV playback, close to the
+        // jetsam limit. 3 still covers gpu-next's queued frames without stutter.
+        setSetupOption("hwdec-extra-frames", "3")
         setSetupOption("ao", Self.defaultAudioOutput)
         setSetupOption("audio-exclusive", "yes")
         setSetupOption("audio-channels", "auto")
