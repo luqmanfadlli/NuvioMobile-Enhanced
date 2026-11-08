@@ -550,6 +550,16 @@ final class MPVPlayerViewController: UIViewController {
     private func logMemory(_ event: String) {
         var details = "event=\(event) player=\(memoryDiagnosticsId) live=\(Self.livePlayerCount) " +
             String(format: "footprint=%.0fMB", Self.appFootprintMB())
+        if isViewLoaded {
+            let layerSize = metalLayer.bounds.size
+            let drawable = metalLayer.drawableSize
+            details += " view=\(Int(view.bounds.width))x\(Int(view.bounds.height))" +
+                " inWindow=\(view.window != nil) host=\(parent.map { String(describing: type(of: $0)) } ?? "-")" +
+                " hostView=\(Int(parent?.view.bounds.width ?? -1))x\(Int(parent?.view.bounds.height ?? -1))" +
+                " layerAttached=\(metalLayer.superlayer != nil) layer=\(Int(layerSize.width))x\(Int(layerSize.height))" +
+                " drawable=\(Int(drawable.width))x\(Int(drawable.height)) hidden=\(view.isHidden || metalLayer.isHidden)" +
+                " ext=\(externallyManagedViewSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "-")"
+        }
         if mpv != nil {
             details += " hwdec=\(getString("hwdec-current") ?? "-")" +
                 " demuxCacheSec=\(String(format: "%.0f", getDouble("demuxer-cache-duration")))" +
