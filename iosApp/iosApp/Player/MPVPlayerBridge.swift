@@ -573,6 +573,62 @@ final class MPVPlayerViewController: UIViewController {
         return Double(info.phys_footprint) / 1_048_576
     }
 
+    /// vmmap-style breakdown that works on an installed (non-Xcode) build: task ledgers for
+    /// graphics/media memory plus dirty+compressed bytes per VM user tag, largest first.
+    static func memoryBreakdown() -> String {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        func mb(_ value: UInt64) -> Int { Int(value / 1_048_576) }
+        var parts: [String] = []
+        if kr == KERN_SUCCESS {
+            parts.append("internal=\(mb(info.internal)) compressed=\(mb(info.compressed))")
+            parts.append("graphics=\(mb(info.ledger_tag_graphics_nonvolatile + info.ledger_tag_graphics_nonvolatile_compressed))")
+            parts.append("media=\(mb(info.ledger_tag_media_nonvolatile + info.ledger_tag_media_nonvolatile_compressed))")
+            parts.append("purgeableNonVolatile=\(mb(info.ledger_purgeable_nonvolatile + info.ledger_purgeable_novolatile_compressed))")
+            parts.append("limitRemaining=\(mb(info.limit_bytes_remaining))")
+        }
+
+        var byTag: [UInt32: UInt64] = [:]
+        var address: mach_vm_address_t = 0
+        var size: mach_vm_size_t = 0
+        var depth: natural_t = 0
+        let pageSize = UInt64(vm_kernel_page_size)
+        while true {
+            var region = vm_region_submap_info_data_64_t()
+            var regionCount = mach_msg_type_number_t(MemoryLayout<vm_region_submap_info_data_64_t>.size / MemoryLayout<natural_t>.size)
+            let result = withUnsafeMutablePointer(to: &region) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: Int(regionCount)) {
+                    mach_vm_region_recurse(mach_task_self_, &address, &size, &depth, $0, &regionCount)
+                }
+            }
+            if result != KERN_SUCCESS { break }
+            if region.is_submap != 0 {
+                depth += 1
+                continue
+            }
+            let dirty = UInt64(region.pages_dirtied) + UInt64(region.pages_swapped_out)
+            if dirty > 0 { byTag[region.user_tag, default: 0] += dirty * pageSize }
+            address += size
+        }
+        let names: [UInt32: String] = [
+            1: "malloc", 2: "malloc_small", 3: "malloc_large", 4: "malloc_huge", 7: "malloc_tiny",
+            11: "malloc_nano", 12: "malloc_medium", 21: "iokit", 30: "stack", 51: "layerkit",
+            52: "cgimage", 54: "cg_data", 60: "dyld", 66: "glsl", 70: "imageio", 74: "libdispatch",
+            82: "swift_runtime", 88: "iosurface", 90: "audio", 91: "videobitstream",
+            94: "cm_memorypool", 95: "cm_readcache", 100: "ioaccelerator", 106: "cm_hls",
+        ]
+        let top = byTag.sorted { $0.value > $1.value }.prefix(10).map { tag, bytes in
+            "\(names[tag] ?? "tag\(tag)")=\(mb(bytes))"
+        }
+        parts.append("tags[" + top.joined(separator: " ") + "]")
+        return parts.joined(separator: " ")
+    }
+
     private func logMemory(_ event: String) {
         var details = "event=\(event) player=\(memoryDiagnosticsId) live=\(Self.livePlayerCount) " +
             String(format: "footprint=%.0fMB", Self.appFootprintMB())
@@ -590,6 +646,9 @@ final class MPVPlayerViewController: UIViewController {
             details += " hwdec=\(getString("hwdec-current") ?? "-")" +
                 " demuxCacheSec=\(String(format: "%.0f", getDouble("demuxer-cache-duration")))" +
                 " size=\(getInt("width"))x\(getInt("height"))"
+        }
+        if event == "create" || event == "destroy" || event == "startup+5s" {
+            details += " " + Self.memoryBreakdown()
         }
         Self.writeMemoryLog(details)
     }
@@ -3025,10 +3084,22 @@ final class PlayerHostViewController: UIViewController {
         view.backgroundColor = .black
         guard let player else { return }
         addChild(player)
+        // No autoresizing: the player also sizes its own view from the size Compose reports
+        // (applyExternallyManagedViewSize), and autoresizing applied the rotation delta a second
+        // time (390x844 -> 1298x0). With masksToBounds the video was clipped away: blank picture
+        // on the first play after rotating to landscape. The host owns the frame instead.
+        player.view.autoresizingMask = []
         player.view.frame = view.bounds
-        player.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(player.view)
         player.didMove(toParent: self)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let playerView = player?.viewIfLoaded, playerView.superview === view else { return }
+        if playerView.frame != view.bounds {
+            playerView.frame = view.bounds
+        }
     }
 
     func detachPlayer() {
