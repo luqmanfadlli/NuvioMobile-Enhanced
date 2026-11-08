@@ -624,6 +624,7 @@ final class MPVPlayerViewController: UIViewController {
             "\(names[tag] ?? "tag\(tag)")=\(mb(bytes))"
         }
         parts.append("tags[" + top.joined(separator: " ") + "]")
+        parts.append(MemoryHintsKt.memoryHints())
         return parts.joined(separator: " ")
     }
 
