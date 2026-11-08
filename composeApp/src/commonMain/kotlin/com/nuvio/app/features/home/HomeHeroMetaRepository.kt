@@ -158,7 +158,7 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
             val batch = items.take(endExclusive)
             HomeHeroMetaRepository.load(batch, ratingSettings)
             if (selectHomeHeroItems(batch, HomeHeroMetaRepository.metas.value).size >= HOME_HERO_RATED_ITEM_LIMIT || endExclusive >= items.size) break
-            endExclusive = minOf(endExclusive + HOME_HERO_INITIAL_BATCH_SIZE, items.size)
+            endExclusive = minOf(endExclusive + HOME_HERO_NEXT_BATCH_SIZE, items.size)
         }
     }
 
@@ -184,8 +184,9 @@ internal fun MetaPreview.hasUsableHeroRating(): Boolean =
     imdbRating?.trim()?.toDoubleOrNull()?.let { it > 0.0 } == true ||
         externalRatings.any { rating -> rating.value > 0.0 }
 
-private const val HOME_HERO_RATED_ITEM_LIMIT = 8
-private const val HOME_HERO_INITIAL_BATCH_SIZE = 16
+private const val HOME_HERO_RATED_ITEM_LIMIT = 10
+private const val HOME_HERO_INITIAL_BATCH_SIZE = 15
+private const val HOME_HERO_NEXT_BATCH_SIZE = 10
 private const val DETAILS_FETCH_CONCURRENCY = 4
 private const val RATINGS_TIMEOUT_MS = 5_000L
 private const val LOAD_DEBOUNCE_MS = 400L
