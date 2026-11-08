@@ -142,4 +142,20 @@ class HomeHeroMetaRepositoryTest {
         )
     }
 
+    @Test
+    fun `rating filter fills ten hero slots from larger candidate pool`() {
+        val candidates = List(30) { index ->
+            preview.copy(
+                id = "hero-$index",
+                name = "Hero $index",
+                imdbRating = if (index % 3 == 0) "7.5" else null,
+            )
+        }
+
+        val selected = selectHomeHeroItems(candidates, emptyMap())
+
+        assertEquals(10, selected.size)
+        assertEquals(true, selected.all(MetaPreview::hasUsableHeroRating))
+    }
+
 }

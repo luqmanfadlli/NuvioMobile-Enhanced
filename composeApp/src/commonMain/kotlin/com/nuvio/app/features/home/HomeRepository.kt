@@ -561,7 +561,8 @@ object HomeRepository {
                 .flatMap { section -> section.items }
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(heroRandom)
-                .take(HOME_HERO_ITEM_LIMIT)
+                // Rating eligibility is applied later, so resolve a larger pool first.
+                .take(HOME_HERO_CANDIDATE_LIMIT)
         } else {
             emptyList()
         }
@@ -836,6 +837,7 @@ object HomeRepository {
 }
 
 private const val HOME_HERO_ITEM_LIMIT = 8
+private const val HOME_HERO_CANDIDATE_LIMIT = 30
 private const val HOME_COLLECTION_HERO_SOURCE_LIMIT = 6
 private const val HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT = 8
 private const val HOME_CATALOG_MAX_CONCURRENT_FETCHES = 6

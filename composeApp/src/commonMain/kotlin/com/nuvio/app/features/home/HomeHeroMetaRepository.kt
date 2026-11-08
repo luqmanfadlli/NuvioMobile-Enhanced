@@ -155,8 +155,7 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
     }
 
     val heroItems = remember(items, metas) {
-        items.map { item -> metas[item.stableKey()]?.let(item::withHeroMeta) ?: item }
-            .filter(MetaPreview::hasUsableHeroRating)
+        selectHomeHeroItems(items, metas)
     }
     return HomeHeroState(
         items = heroItems,
@@ -165,10 +164,19 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
     )
 }
 
+internal fun selectHomeHeroItems(
+    items: List<MetaPreview>,
+    metas: Map<String, HomeHeroMeta>,
+): List<MetaPreview> = items
+    .map { item -> metas[item.stableKey()]?.let(item::withHeroMeta) ?: item }
+    .filter(MetaPreview::hasUsableHeroRating)
+    .take(HOME_HERO_RATED_ITEM_LIMIT)
+
 internal fun MetaPreview.hasUsableHeroRating(): Boolean =
     imdbRating?.trim()?.toDoubleOrNull()?.let { it > 0.0 } == true ||
         externalRatings.any { rating -> rating.value > 0.0 }
 
+private const val HOME_HERO_RATED_ITEM_LIMIT = 10
 private const val DETAILS_FETCH_CONCURRENCY = 4
 private const val RATINGS_TIMEOUT_MS = 5_000L
 private const val LOAD_DEBOUNCE_MS = 400L
