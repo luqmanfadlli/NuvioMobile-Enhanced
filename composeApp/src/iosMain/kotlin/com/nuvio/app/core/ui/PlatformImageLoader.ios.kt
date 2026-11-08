@@ -41,7 +41,19 @@ private fun installMemoryWarningObserver() {
     }
 }
 
-/** Called when a player starts: decoded posters/backdrops are cheap to reload afterwards. */
+/**
+ * Called when a player starts: decoded posters/backdrops are cheap to reload afterwards, and a
+ * full Kotlin GC returns garbage the scheduler has not collected yet (the Kotlin heap, VM tag 246,
+ * held 380-490 MB before playback in the memory logs).
+ */
+@OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
 fun trimImageMemoryForPlayback() {
     SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.trimToSize(IosImageMemoryCacheDuringPlaybackBytes)
+    kotlin.native.runtime.GC.collect()
+}
+
+/** After a player is gone its Kotlin-side state (snapshots, track lists, bridges) is garbage. */
+@OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
+fun collectAfterPlayback() {
+    kotlin.native.runtime.GC.collect()
 }

@@ -645,7 +645,7 @@ final class MPVPlayerViewController: UIViewController {
                 " demuxCacheSec=\(String(format: "%.0f", getDouble("demuxer-cache-duration")))" +
                 " size=\(getInt("width"))x\(getInt("height"))"
         }
-        if event == "create" || event == "destroy" || event == "startup+5s" {
+        if event == "create" || event == "destroy" || event == "deinit" || event.hasPrefix("startup") {
             details += " " + Self.memoryBreakdown()
         }
         Self.writeMemoryLog(details)
