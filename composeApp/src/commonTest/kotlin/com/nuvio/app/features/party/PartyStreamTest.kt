@@ -195,4 +195,12 @@ class PartyStreamTest {
         assertFalse(shouldShareHostStreamForMedia(true, false, "movie|new||", "movie|new||"))
     }
 
+    @Test
+    fun hostMediaChangeAutomaticallySwitchesGuestsButNotHostOrAlreadyMatchingMedia() {
+        val next = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "Next movie")
+        assertEquals(PartyMediaChangeDecision.AutoSwitch, decidePartyMediaChange(false, "movie|tt1||", next))
+        assertEquals(PartyMediaChangeDecision.Ignore, decidePartyMediaChange(true, "movie|tt1||", next))
+        assertEquals(PartyMediaChangeDecision.Ignore, decidePartyMediaChange(false, next.key, next))
+    }
+
 }

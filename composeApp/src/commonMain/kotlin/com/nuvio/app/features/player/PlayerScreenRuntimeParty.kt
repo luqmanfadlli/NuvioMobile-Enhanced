@@ -53,6 +53,8 @@ import com.nuvio.app.features.party.PartyChat
 import com.nuvio.app.features.party.PartyCorrection
 import com.nuvio.app.features.party.PartyEvent
 import com.nuvio.app.features.party.PartyMedia
+import com.nuvio.app.features.party.PartyMediaChangeDecision
+import com.nuvio.app.features.party.decidePartyMediaChange
 import com.nuvio.app.features.party.PartyMemberStatus
 import com.nuvio.app.features.party.PartyNotice
 import com.nuvio.app.features.party.PartyPanel
@@ -227,10 +229,21 @@ private fun PlayerScreenRuntime.applyPartyPaused(paused: Boolean, force: Boolean
 
 private fun PlayerScreenRuntime.handlePartyMediaChange(media: PartyMedia) {
     val party = PartyRepository.state.value.party ?: return
-    if (party.isHost || media.key == partyKey || media.key != party.media.key) return
-    showPartyChat = false
-    showPartyPanel = false
-    onFollowPartyMedia(media)
+    if (media.key != party.media.key) return
+    when (decidePartyMediaChange(isHost = party.isHost, localMediaKey = partyKey, media = media)) {
+        PartyMediaChangeDecision.Ignore -> return
+        PartyMediaChangeDecision.AutoSwitch -> {
+            // Pause the previous title before navigating to the host's new selection.
+            showPartyChat = false
+            showPartyPanel = false
+            partyBehind = false
+            partyBehindMs = null
+            clearPartyNudge()
+            playerController?.pause()
+            shouldPlay = false
+            onFollowPartyMedia(media)
+        }
+    }
 }
 
 @Composable

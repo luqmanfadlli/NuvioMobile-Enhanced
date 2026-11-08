@@ -110,6 +110,20 @@ internal fun shouldWaitForPartyHostShare(
 ): Boolean =
     !isHost && (hostUnavailable || (hasSharedBefore && !sharingEnabled))
 
+internal enum class PartyMediaChangeDecision {
+    Ignore,
+    AutoSwitch,
+}
+
+/** Keep host media changes authoritative while preventing stale or self-targeted switches. */
+internal fun decidePartyMediaChange(
+    isHost: Boolean,
+    localMediaKey: String,
+    media: PartyMedia,
+): PartyMediaChangeDecision =
+    if (isHost || media.key == localMediaKey) PartyMediaChangeDecision.Ignore
+    else PartyMediaChangeDecision.AutoSwitch
+
 /** A replacement host player must announce its media before its source can be shared. */
 internal fun shouldPublishHostPartyMedia(
     isHost: Boolean,
