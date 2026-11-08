@@ -173,8 +173,6 @@ actual object PlayerSettingsStorage {
         androidLibmpvVideoOutputKey,
         androidLibmpvHardwareDecodingEnabledKey,
         androidLibmpvYuv420pEnabledKey,
-        androidAnimeUpscaleEnabledKey,
-        androidAnimeLineSharpenEnabledKey,
         androidExoChaptersEnabledKey,
         rememberAudioDelayPerDeviceKey,
         persistAudioAmplificationKey,
@@ -1454,8 +1452,6 @@ actual object PlayerSettingsStorage {
             put(androidLibmpvHardwareDecodingEnabledKey, encodeSyncBoolean(it))
         }
         loadAndroidLibmpvYuv420pEnabled()?.let { put(androidLibmpvYuv420pEnabledKey, encodeSyncBoolean(it)) }
-        loadAndroidAnimeUpscaleEnabled()?.let { put(androidAnimeUpscaleEnabledKey, encodeSyncBoolean(it)) }
-        loadAndroidAnimeLineSharpenEnabled()?.let { put(androidAnimeLineSharpenEnabledKey, encodeSyncBoolean(it)) }
         loadAndroidExoChaptersEnabled()?.let { put(androidExoChaptersEnabledKey, encodeSyncBoolean(it)) }
         loadRememberAudioDelayPerDevice()?.let { put(rememberAudioDelayPerDeviceKey, encodeSyncBoolean(it)) }
         loadPersistAudioAmplification()?.let { put(persistAudioAmplificationKey, encodeSyncBoolean(it)) }
@@ -1553,8 +1549,6 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(androidLibmpvHardwareDecodingEnabledKey)
             ?.let(::saveAndroidLibmpvHardwareDecodingEnabled)
         payload.decodeSyncBoolean(androidLibmpvYuv420pEnabledKey)?.let(::saveAndroidLibmpvYuv420pEnabled)
-        payload.decodeSyncBoolean(androidAnimeUpscaleEnabledKey)?.let(::saveAndroidAnimeUpscaleEnabled)
-        payload.decodeSyncBoolean(androidAnimeLineSharpenEnabledKey)?.let(::saveAndroidAnimeLineSharpenEnabled)
         payload.decodeSyncBoolean(androidExoChaptersEnabledKey)?.let(::saveAndroidExoChaptersEnabled)
         payload.decodeSyncBoolean(rememberAudioDelayPerDeviceKey)?.let(::saveRememberAudioDelayPerDevice)
         payload.decodeSyncBoolean(persistAudioAmplificationKey)?.let(::savePersistAudioAmplification)
