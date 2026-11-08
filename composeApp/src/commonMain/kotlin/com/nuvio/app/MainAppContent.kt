@@ -1328,11 +1328,12 @@ internal fun MainAppContent(
                     PartyEvent.Removed -> getString(Res.string.party_removed)
                     PartyEvent.Ended -> getString(Res.string.party_ended)
                     is PartyEvent.MediaChanged -> getString(Res.string.party_media_changed, event.media.title)
+                    PartyEvent.HostLeft -> ""
                     is PartyEvent.ControlChanged -> getString(
                         if (event.hostOnly) Res.string.party_control_host_only else Res.string.party_control_everyone,
                     )
                 }
-                NuvioToastController.show(message)
+                if (message.isNotBlank()) NuvioToastController.show(message)
             }
         }
 

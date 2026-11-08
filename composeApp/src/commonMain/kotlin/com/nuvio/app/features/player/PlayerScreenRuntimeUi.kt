@@ -916,11 +916,7 @@ private fun BoxScope.RenderPlaybackOverlays(
             showMovieRecommendationCard = movieRecommendationStage > 0
         },
         onDismissMovieRecommendations = {
-            movieRecommendationDismissedStage = PlayerNextEpisodeRules.movieRecommendationStage(
-                positionMs = playbackSnapshot.positionMs,
-                durationMs = playbackSnapshot.durationMs,
-                isEnded = playbackSnapshot.isEnded,
-            )
+            movieRecommendationDismissedStage = movieRecommendationStage
             showMovieRecommendationCard = false
         },
         errorMessage = errorMessage,
