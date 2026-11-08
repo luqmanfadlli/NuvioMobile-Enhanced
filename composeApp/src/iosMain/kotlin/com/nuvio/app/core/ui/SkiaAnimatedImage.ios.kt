@@ -82,6 +82,8 @@ internal const val AnimatedImageProbeLogging = false
 
 private val animatedSourceHttpClient by lazy { HttpClient(Darwin) }
 private val loadSemaphore = Semaphore(MaxConcurrentLoads)
+private const val MaxConcurrentDecodes = 2
+private val decodeSemaphore = Semaphore(MaxConcurrentDecodes)
 
 // ---------------------------------------------------------------------------
 // Compressed source cache (bytes only)
@@ -404,6 +406,9 @@ private var playbackSuspensions = 0
 private val playbackGeneration = mutableStateOf(0)
 
 internal fun suspendAnimatedImagesForPlayback() {
+    // A resume still waiting from the previous player is superseded by this one.
+    pendingResume?.cancel()
+    pendingResume = null
     playbackSuspensions++
     if (playbackSuspensions > 1) return
     registry.values.forEach { shared ->
@@ -426,11 +431,30 @@ internal fun suspendAnimatedImagesForPlayback() {
     }
 }
 
+private const val ResumeAfterPlaybackDelayMillis = 3_000L
+private var pendingResume: Job? = null
+
+/**
+ * Re-decoding right away crashed the app on closing a 4K player: the mpv core is torn down
+ * asynchronously (~1 s) and the screen underneath reloads its images at the same moment, so up to
+ * 120 MB of GIF frames landed on top of a still-alive 4K player. Wait a few seconds, and decode
+ * at most [MaxConcurrentDecodes] animations at a time.
+ */
 internal fun resumeAnimatedImagesAfterPlayback() {
     if (playbackSuspensions == 0) return
     playbackSuspensions--
-    if (playbackSuspensions == 0) playbackGeneration.value++
+    if (playbackSuspensions > 0) return
+    pendingResume?.cancel()
+    pendingResume = registryScope.launch {
+        delay(ResumeAfterPlaybackDelayMillis)
+        if (playbackSuspensions == 0) playbackGeneration.value++
+        pendingResume = null
+    }
 }
+
+/** True while a player is open or the post-playback grace period has not ended. */
+private val animationsHeldForPlayback: Boolean
+    get() = playbackSuspensions > 0 || pendingResume?.isActive == true
 private var lifecycleObserversInstalled = false
 
 private fun installLifecycleObservers() {
@@ -482,7 +506,7 @@ private fun bucket(value: Int): Int {
 
 private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: Int): SharedAnimation? {
     installLifecycleObservers()
-    if (playbackSuspensions > 0) return null
+    if (animationsHeldForPlayback) return null
     val key = "$url|${targetWidth}x$targetHeight"
 
     registry[key]?.let { existing ->
@@ -498,12 +522,15 @@ private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: I
         val remaining = MaxAnimationBudgetBytes - budgetUsedBytes
         if (remaining <= 0) return@async null
 
-        val animation = withContext(Dispatchers.Default) {
-            decodeAnimation(bytes, targetWidth, targetHeight, remaining)
+        val animation = decodeSemaphore.withPermit {
+            if (animationsHeldForPlayback) return@withPermit null
+            withContext(Dispatchers.Default) {
+                decodeAnimation(bytes, targetWidth, targetHeight, MaxAnimationBudgetBytes - budgetUsedBytes)
+            }
         } ?: return@async null
 
         registry[key]?.let { return@async it }
-        if (playbackSuspensions > 0) return@async null
+        if (animationsHeldForPlayback) return@async null
 
         if (budgetUsedBytes + animation.bytes > MaxAnimationBudgetBytes) return@async null
 
@@ -532,7 +559,7 @@ private suspend fun acquireShared(url: String, targetWidth: Int, targetHeight: I
 }
 
 private fun startIfNeeded(shared: SharedAnimation) {
-    if (shared.job != null || animationsPaused || playbackSuspensions > 0) return
+    if (shared.job != null || animationsPaused || animationsHeldForPlayback) return
     val animation = shared.animation ?: return
     if (animation.frames.size <= 1) return
 
