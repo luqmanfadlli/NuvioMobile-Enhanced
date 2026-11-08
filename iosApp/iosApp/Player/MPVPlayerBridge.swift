@@ -587,15 +587,13 @@ final class MPVPlayerViewController: UIViewController {
         var parts: [String] = []
         if kr == KERN_SUCCESS {
             parts.append("internal=\(mb(info.internal)) compressed=\(mb(info.compressed))")
-            parts.append("graphics=\(mb(info.ledger_tag_graphics_nonvolatile + info.ledger_tag_graphics_nonvolatile_compressed))")
-            parts.append("media=\(mb(info.ledger_tag_media_nonvolatile + info.ledger_tag_media_nonvolatile_compressed))")
-            parts.append("purgeableNonVolatile=\(mb(info.ledger_purgeable_nonvolatile + info.ledger_purgeable_novolatile_compressed))")
+            parts.append("purgeableNonVolatile=\(mb(UInt64(max(0, info.ledger_purgeable_nonvolatile + info.ledger_purgeable_novolatile_compressed))))")
             parts.append("limitRemaining=\(mb(info.limit_bytes_remaining))")
         }
 
         var byTag: [UInt32: UInt64] = [:]
-        var address: mach_vm_address_t = 0
-        var size: mach_vm_size_t = 0
+        var address: vm_address_t = 0
+        var size: vm_size_t = 0
         var depth: natural_t = 0
         let pageSize = UInt64(vm_kernel_page_size)
         while true {
@@ -603,7 +601,7 @@ final class MPVPlayerViewController: UIViewController {
             var regionCount = mach_msg_type_number_t(MemoryLayout<vm_region_submap_info_data_64_t>.size / MemoryLayout<natural_t>.size)
             let result = withUnsafeMutablePointer(to: &region) {
                 $0.withMemoryRebound(to: integer_t.self, capacity: Int(regionCount)) {
-                    mach_vm_region_recurse(mach_task_self_, &address, &size, &depth, $0, &regionCount)
+                    vm_region_recurse_64(mach_task_self_, &address, &size, &depth, $0, &regionCount)
                 }
             }
             if result != KERN_SUCCESS { break }
