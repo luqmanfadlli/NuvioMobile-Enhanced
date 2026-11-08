@@ -90,4 +90,56 @@ class HomeHeroMetaRepositoryTest {
 
         assertEquals("https://image.tmdb.org/t/p/w500/logo.png", merged.logo)
     }
+
+    @Test
+    fun `full meta fills a missing hero description`() {
+        val merged = preview.copy(description = null).withHeroMeta(
+            HomeHeroMeta(
+                details = MetaDetails(
+                    id = "tt1",
+                    type = "series",
+                    name = "Show",
+                    description = "A detailed synopsis.",
+                ),
+            ),
+        )
+
+        assertEquals("A detailed synopsis.", merged.description)
+    }
+
+    @Test
+    fun `hero description preserves catalog value when details description is missing`() {
+        val merged = preview.copy(description = "Catalog synopsis").withHeroMeta(
+            HomeHeroMeta(
+                details = MetaDetails(
+                    id = "tt1",
+                    type = "series",
+                    name = "Show",
+                    description = " ",
+                ),
+            ),
+        )
+
+        assertEquals("Catalog synopsis", merged.description)
+    }
+
+    @Test
+    fun `hero rating eligibility accepts imdb or external rating only`() {
+        assertEquals(true, preview.hasUsableHeroRating())
+        assertEquals(
+            true,
+            preview.copy(imdbRating = null, externalRatings = listOf(MetaExternalRating("TMDB", 8.1)))
+                .hasUsableHeroRating(),
+        )
+        assertEquals(
+            false,
+            preview.copy(imdbRating = null, externalRatings = emptyList()).hasUsableHeroRating(),
+        )
+        assertEquals(
+            false,
+            preview.copy(imdbRating = "N/A", externalRatings = listOf(MetaExternalRating("TMDB", 0.0)))
+                .hasUsableHeroRating(),
+        )
+    }
+
 }

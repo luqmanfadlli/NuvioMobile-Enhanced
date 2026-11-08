@@ -61,4 +61,6 @@ internal fun buildSimklAuthorizationUrl(
     append(appName.encodeURLParameter())
     append("&app-version=")
     append(appVersion.encodeURLParameter())
+    append("&scope=")
+    append("media:read media:write".encodeURLParameter())
 }

@@ -120,6 +120,7 @@ internal fun MetaPreview.withHeroMeta(meta: HomeHeroMeta): MetaPreview {
     }
     return copy(
         name = details?.name?.takeIf { useOriginalTitle && it.isNotBlank() } ?: name,
+        description = details?.description?.takeIf { it.isNotBlank() } ?: description,
         logo = details?.logo?.takeIf { it.isNotBlank() } ?: logo,
         genres = details?.genres?.takeIf { it.isNotEmpty() } ?: genres,
         imdbRating = details?.imdbRating?.takeIf { it.isNotBlank() } ?: imdbRating,
@@ -155,6 +156,7 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
 
     val heroItems = remember(items, metas) {
         items.map { item -> metas[item.stableKey()]?.let(item::withHeroMeta) ?: item }
+            .filter(MetaPreview::hasUsableHeroRating)
     }
     return HomeHeroState(
         items = heroItems,
@@ -162,6 +164,10 @@ internal fun rememberHomeHeroState(items: List<MetaPreview>): HomeHeroState {
         showMdbListRatings = showMdbListRatings,
     )
 }
+
+internal fun MetaPreview.hasUsableHeroRating(): Boolean =
+    imdbRating?.trim()?.toDoubleOrNull()?.let { it > 0.0 } == true ||
+        externalRatings.any { rating -> rating.value > 0.0 }
 
 private const val DETAILS_FETCH_CONCURRENCY = 4
 private const val RATINGS_TIMEOUT_MS = 5_000L

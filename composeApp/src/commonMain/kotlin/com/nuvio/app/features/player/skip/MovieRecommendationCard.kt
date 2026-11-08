@@ -6,28 +6,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,11 +37,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.features.home.MetaPreview
-import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.action_close
-import nuvio.composeapp.generated.resources.details_more_like_this
-import org.jetbrains.compose.resources.stringResource
-import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 
 @Composable
 fun MovieRecommendationCard(
@@ -93,81 +77,41 @@ fun MovieRecommendationCard(
             fadeOut(animationSpec = tween(160)),
         modifier = modifier,
     ) {
-        val shape = RoundedCornerShape(16.dp)
-        Column(
+        // NuvioEx recommendation tray: a transparent, full-width bottom strip.
+        // Artwork is deliberately rendered in a landscape frame; titles sit directly below.
+        LazyRow(
             modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(shape)
-                .ambientLiquidGlass(
-                    shape = shape,
-                    tint = Color(0xFF191919).copy(alpha = 0.64f),
-                    fallback = Color(0xFF191919).copy(alpha = 0.89f),
-                    blurRadius = 20.dp,
-                    refractionHeight = 10.dp,
-                    refractionAmount = 14.dp,
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
-                .padding(vertical = 8.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 11.dp, end = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(Res.string.details_more_like_this),
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                Box(
+            items(recommendations, key = { "${it.type}:${it.id}" }) { preview ->
+                Column(
                     modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .clickable(enabled = visible, onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
+                        .width(184.dp)
+                        .clickable(enabled = visible) { onOpen(preview) },
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(Res.string.action_close),
-                        tint = Color.White.copy(alpha = 0.75f),
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 9.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(recommendations, key = { "${it.type}:${it.id}" }) { preview ->
-                    Column(
+                    AsyncImage(
+                        model = preview.banner ?: preview.poster,
+                        contentDescription = preview.name,
                         modifier = Modifier
-                            .width(72.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .clickable(enabled = visible) { onOpen(preview) },
-                    ) {
-                        AsyncImage(
-                            model = preview.poster ?: preview.banner,
-                            contentDescription = preview.name,
-                            modifier = Modifier
-                                .size(width = 72.dp, height = 108.dp)
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(Color.White.copy(alpha = 0.08f)),
-                            contentScale = ContentScale.Crop,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = preview.name,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
+                            .fillMaxWidth()
+                            .height(104.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Text(
+                        text = preview.name,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                    )
                 }
             }
         }

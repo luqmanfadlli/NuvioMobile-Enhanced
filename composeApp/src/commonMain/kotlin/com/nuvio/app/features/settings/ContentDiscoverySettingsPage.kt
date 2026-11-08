@@ -10,10 +10,12 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_addons
 import nuvio.composeapp.generated.resources.compose_settings_page_media_servers
 import nuvio.composeapp.generated.resources.compose_settings_page_plugins
+import nuvio.composeapp.generated.resources.compose_settings_page_cloudstream
 import nuvio.composeapp.generated.resources.settings_content_discovery_addons_description
 import nuvio.composeapp.generated.resources.settings_content_discovery_addons_description_appstore
 import nuvio.composeapp.generated.resources.settings_content_discovery_media_servers_description
 import nuvio.composeapp.generated.resources.settings_content_discovery_plugins_description
+import nuvio.composeapp.generated.resources.settings_content_discovery_cloudstream_description
 import nuvio.composeapp.generated.resources.settings_content_discovery_section_sources
 import nuvio.composeapp.generated.resources.settings_content_discovery_section_search
 import nuvio.composeapp.generated.resources.settings_content_discovery_recent_searches
@@ -23,8 +25,10 @@ import org.jetbrains.compose.resources.stringResource
 internal fun LazyListScope.contentDiscoveryContent(
     isTablet: Boolean,
     showPluginsEntry: Boolean,
+    showCloudStreamEntry: Boolean,
     onAddonsClick: () -> Unit,
     onPluginsClick: () -> Unit,
+    onCloudStreamClick: () -> Unit,
     onMediaServersClick: () -> Unit,
 ) {
     item {
@@ -79,6 +83,14 @@ internal fun LazyListScope.contentDiscoveryContent(
                         description = stringResource(Res.string.settings_content_discovery_plugins_description),
                         isTablet = isTablet,
                         onClick = onPluginsClick,
+                    )
+                }
+                if (showCloudStreamEntry) {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.compose_settings_page_cloudstream),
+                        description = stringResource(Res.string.settings_content_discovery_cloudstream_description),
+                        isTablet = isTablet,
+                        onClick = onCloudStreamClick,
                     )
                 }
             }

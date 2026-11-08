@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
@@ -76,6 +77,9 @@ fun DetailHero(
     heroTrailerMuted: Boolean = true,
     heroGradientColor: Color? = null,
     cinematicBackground: Boolean = false,
+    netflixStyleEnabled: Boolean = false,
+    viewportHeight: Dp? = null,
+    actions: (@Composable () -> Unit)? = null,
     onBackdropLoaded: (Painter, ImageBitmap?) -> Unit = { _, _ -> },
     onHeroTrailerMuteToggle: () -> Unit = {},
     onHeroTrailerReady: () -> Unit = {},
@@ -86,7 +90,11 @@ fun DetailHero(
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
     ) {
-        val heroHeight = detailHeroHeight(maxWidth - verticalBarWidth(), isTablet)
+        val heroHeight = if (netflixStyleEnabled && viewportHeight != null) {
+            (viewportHeight * 0.68f).coerceIn(420.dp, 760.dp)
+        } else {
+            detailHeroHeight(maxWidth - verticalBarWidth(), isTablet)
+        }
         val trailerAlpha by animateFloatAsState(
             targetValue = if (heroTrailerReady) 1f else 0f,
             animationSpec = tween(durationMillis = 300),
@@ -96,7 +104,7 @@ fun DetailHero(
         val heroChromeTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
             8.dp +
             ((40.dp - muteIconSize) / 2)
-        val bottomGradientColor = heroGradientColor ?: MaterialTheme.colorScheme.background
+        val bottomGradientColor = if (netflixStyleEnabled) Color.Black else heroGradientColor ?: MaterialTheme.colorScheme.background
         var logoLoadError by remember(meta.id, meta.logo) {
             mutableStateOf(false)
         }
@@ -156,6 +164,19 @@ fun DetailHero(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(MaterialTheme.colorScheme.surface),
+                        )
+                    }
+                    if (netflixStyleEnabled) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .align(Alignment.TopCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Black.copy(alpha = 0.62f), Color.Transparent),
+                                    ),
+                                ),
                         )
                     }
                     if (heroTrailerSourceUrl != null) {
@@ -224,7 +245,7 @@ fun DetailHero(
                     }
                 }
 
-                if (!cinematicBackground) {
+                if (!cinematicBackground || netflixStyleEnabled) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -251,17 +272,17 @@ fun DetailHero(
                         .fillMaxWidth()
                         .padding(horizontal = if (isTablet) 32.dp else 18.dp)
                         .padding(bottom = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    horizontalAlignment = if (netflixStyleEnabled) Alignment.Start else Alignment.CenterHorizontally,
                 ) {
                     if (logoUrl != null && !logoLoadError) {
                         AsyncImage(
                             model = logoUrl,
                             contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
                             modifier = Modifier
-                                .fillMaxWidth(if (isTablet) 0.56f else 0.6f)
+                                .fillMaxWidth(if (netflixStyleEnabled) 0.56f else if (isTablet) 0.56f else 0.6f)
                                 .widthIn(max = contentMaxWidth)
                                 .height(if (isTablet) 72.dp else 80.dp),
-                            alignment = Alignment.Center,
+                            alignment = if (netflixStyleEnabled) Alignment.CenterStart else Alignment.Center,
                             contentScale = ContentScale.Fit,
                             onError = { logoLoadError = true },
                         )
@@ -270,18 +291,45 @@ fun DetailHero(
                             text = meta.name,
                             style = if (isTablet) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
                             color = MaterialTheme.colorScheme.onBackground,
-                            textAlign = TextAlign.Center,
+                            textAlign = if (netflixStyleEnabled) TextAlign.Start else TextAlign.Center,
                         )
                     }
 
+                    val heroMetadata = listOfNotNull(
+                        meta.releaseInfo?.takeIf { it.isNotBlank() },
+                        meta.ageRating?.takeIf { it.isNotBlank() },
+                        meta.runtime?.takeIf { it.isNotBlank() },
+                    ).joinToString(" • ")
+                    if (netflixStyleEnabled && heroMetadata.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = heroMetadata,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.88f),
+                        )
+                    }
                     if (meta.genres.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = meta.genres.take(3).joinToString(" \u2022 "),
+                            text = meta.genres.take(3).joinToString(" • "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                            textAlign = if (netflixStyleEnabled) TextAlign.Start else TextAlign.Center,
                         )
+                    }
+                    if (netflixStyleEnabled && !meta.description.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = meta.description.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.82f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (netflixStyleEnabled && actions != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        actions()
                     }
                 }
             }

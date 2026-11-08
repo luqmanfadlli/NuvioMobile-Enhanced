@@ -21,8 +21,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.nuvio.app.features.shuffle.ShuffleBadge
@@ -1028,7 +1033,8 @@ private fun ContinueWatchingPosterCard(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
-    val cornerRadius = rememberPosterCardStyleUiState().cornerRadiusDp.dp
+    val cornerRadius = layout.posterCornerRadius
+    val netflixStyleEnabled = rememberPosterCardStyleUiState().netflixStyleEnabled
     val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
     Column(
         modifier = Modifier.width(layout.posterCardWidth),
@@ -1072,6 +1078,24 @@ private fun ContinueWatchingPosterCard(
                 )
             }
             if (item.shufflePlayback) ShuffleBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
+            if (netflixStyleEnabled) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.58f))
+                        .border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+            }
             if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
                 Box(
                     modifier = Modifier
@@ -1093,20 +1117,36 @@ private fun ContinueWatchingPosterCard(
                 }
             }
             if (item.progressFraction > 0f) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 10.dp, vertical = 10.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 6.dp, vertical = 6.dp),
-                ) {
-                    NuvioProgressBar(
-                        progress = item.progressFraction,
-                        modifier = Modifier.width(layout.posterCardWidth - 32.dp),
-                        height = layout.progressHeight,
-                        trackColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.16f),
-                    )
+                if (netflixStyleEnabled) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 7.dp),
+                    ) {
+                        NuvioProgressBar(
+                            progress = item.progressFraction,
+                            height = 3.dp,
+                            trackColor = Color.White.copy(alpha = 0.38f),
+                            fillColor = Color(0xFFE50914),
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 10.dp, vertical = 10.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                    ) {
+                        NuvioProgressBar(
+                            progress = item.progressFraction,
+                            modifier = Modifier.width(layout.posterCardWidth - 32.dp),
+                            height = layout.progressHeight,
+                            trackColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.16f),
+                        )
+                    }
                 }
             }
         }
@@ -1150,6 +1190,18 @@ private fun ContinueWatchingPosterCard(
                     ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (netflixStyleEnabled && onLongClick != null) {
+                IconButton(
+                    onClick = onLongClick,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = stringResource(Res.string.details_actions_menu_label),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -1229,6 +1281,7 @@ internal data class ContinueWatchingLayout(
     val wideContentPadding: Dp,
     val posterCardWidth: Dp,
     val posterCardHeight: Dp,
+    val posterCornerRadius: Dp,
     val progressHeight: Dp,
     val wideTitleSize: androidx.compose.ui.unit.TextUnit,
     val wideMetaSize: androidx.compose.ui.unit.TextUnit,
@@ -1253,6 +1306,7 @@ internal fun rememberContinueWatchingLayout(
             wideContentPadding = 16.dp,
             posterCardWidth = posterCardStyle.widthDp.dp,
             posterCardHeight = posterCardStyle.heightDp.dp,
+            posterCornerRadius = posterCardStyle.cornerRadiusDp.dp,
             progressHeight = 6.dp,
             wideTitleSize = 20.sp,
             wideMetaSize = 16.sp,
@@ -1271,6 +1325,7 @@ internal fun rememberContinueWatchingLayout(
             wideContentPadding = 14.dp,
             posterCardWidth = posterCardStyle.widthDp.dp,
             posterCardHeight = posterCardStyle.heightDp.dp,
+            posterCornerRadius = posterCardStyle.cornerRadiusDp.dp,
             progressHeight = 5.dp,
             wideTitleSize = 18.sp,
             wideMetaSize = 15.sp,
@@ -1289,6 +1344,7 @@ internal fun rememberContinueWatchingLayout(
             wideContentPadding = 12.dp,
             posterCardWidth = posterCardStyle.widthDp.dp,
             posterCardHeight = posterCardStyle.heightDp.dp,
+            posterCornerRadius = posterCardStyle.cornerRadiusDp.dp,
             progressHeight = 4.dp,
             wideTitleSize = 17.sp,
             wideMetaSize = 14.sp,
@@ -1307,6 +1363,7 @@ internal fun rememberContinueWatchingLayout(
             wideContentPadding = 12.dp,
             posterCardWidth = posterCardStyle.widthDp.dp,
             posterCardHeight = posterCardStyle.heightDp.dp,
+            posterCornerRadius = posterCardStyle.cornerRadiusDp.dp,
             progressHeight = 4.dp,
             wideTitleSize = 16.sp,
             wideMetaSize = 13.sp,

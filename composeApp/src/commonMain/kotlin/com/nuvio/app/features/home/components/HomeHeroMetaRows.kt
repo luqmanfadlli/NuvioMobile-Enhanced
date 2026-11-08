@@ -41,6 +41,7 @@ internal fun HomeHeroMetaRows(
     isTablet: Boolean,
     showImdbRating: Boolean,
     showMdbListRatings: Boolean,
+    forceStartAlignment: Boolean = false,
 ) {
     val type = item.type.trim().lowercase()
     val isSeries = type == "series" || type == "tv"
@@ -64,7 +65,7 @@ internal fun HomeHeroMetaRows(
         ?.let(::formatOneDecimal)
     val primaryImdbRating = imdbRating?.takeIf { !isSeries && badges.isEmpty() }
     val secondaryImdbRating = imdbRating?.takeIf { primaryImdbRating == null }
-    val horizontalAlignment = if (isTablet) Alignment.Start else Alignment.CenterHorizontally
+    val horizontalAlignment = if (isTablet || forceStartAlignment) Alignment.Start else Alignment.CenterHorizontally
     val rowArrangement = Arrangement.spacedBy(8.dp, horizontalAlignment)
 
     Column(

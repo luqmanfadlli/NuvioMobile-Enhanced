@@ -49,6 +49,21 @@ sealed interface CatalogTarget {
         override val contentType: String,
         override val supportsPagination: Boolean = false,
     ) : CatalogTarget
+
+    data class CloudStream(
+        val providerId: String,
+        val sectionName: String,
+        override val contentType: String,
+    ) : CatalogTarget {
+        override val supportsPagination: Boolean = true
+    }
+
+    data class MergedRow(
+        val rowId: String,
+    ) : CatalogTarget {
+        override val contentType: String = "mixed"
+        override val supportsPagination: Boolean = true
+    }
 }
 
 @Serializable

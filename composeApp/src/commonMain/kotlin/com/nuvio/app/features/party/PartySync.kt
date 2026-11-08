@@ -98,5 +98,5 @@ internal object PartySync {
             .filter { it.mediaKey == party.media.key }
             .filter { it.status == PartyMemberStatus.Loading || it.status == PartyMemberStatus.Buffering }
             .map { it.memberId }
-            .filterNot { it in ignored }
+            .filterNot { it == party.memberId || it in ignored }
 }

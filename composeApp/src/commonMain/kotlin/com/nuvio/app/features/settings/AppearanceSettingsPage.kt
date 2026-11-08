@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppTheme
+import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioStatusModal
@@ -83,6 +84,10 @@ internal fun LazyListScope.appearanceSettingsContent(
         val layoutDirection = LocalLayoutDirection.current
         var showAppIconPicker by remember { mutableStateOf(false) }
         val liquidGlassEffectsEnabled by ThemeSettingsRepository.liquidGlassEffectsEnabled.collectAsStateWithLifecycle()
+        val posterCardStyle by remember {
+            PosterCardStyleRepository.ensureLoaded()
+            PosterCardStyleRepository.uiState
+        }.collectAsStateWithLifecycle()
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_display),
             isTablet = isTablet,
@@ -105,6 +110,22 @@ internal fun LazyListScope.appearanceSettingsContent(
                         onCheckedChange = ThemeSettingsRepository::setLiquidGlassEffectsEnabled,
                     )
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = "Netflix-style interface",
+                    description = "Use a Netflix-inspired Home and Details layout. Turn off to restore the standard Zuvio interface.",
+                    checked = posterCardStyle.netflixStyleEnabled,
+                    isTablet = isTablet,
+                    leadingContent = {
+                        Text(
+                            text = "N",
+                            color = androidx.compose.ui.graphics.Color(0xFFE50914),
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Black,
+                        )
+                    },
+                    onCheckedChange = PosterCardStyleRepository::setNetflixStyleEnabled,
+                )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_icon),

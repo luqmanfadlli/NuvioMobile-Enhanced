@@ -60,11 +60,13 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      build_android: ${{ steps.targets.outputs.build_android }}
+      build_ios: ${{ steps.targets.outputs.build_ios }}
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
-      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
+      CONTRIBUTIONS_URL: https://api.github.com/repos/${{ github.repository }}/contributors?per_page=100
 
     steps:
       - name: Check out full history
@@ -75,6 +77,46 @@ jobs:
       - name: Read release metadata
         id: release
         run: ./scripts/release-metadata.sh "${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve platform selection
+        id: targets
+        env:
+          RELEASE_TARGET: ${{ inputs.target }}
+        run: |
+          case "${RELEASE_TARGET}" in
+            all)
+              BUILD_ANDROID=true
+              BUILD_IOS=true
+              ;;
+            android-only)
+              BUILD_ANDROID=true
+              BUILD_IOS=false
+              ;;
+            ios-only)
+              BUILD_ANDROID=false
+              BUILD_IOS=true
+              ;;
+            *)
+              echo "Invalid release target: ${RELEASE_TARGET}" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "build_android=${BUILD_ANDROID}"
+            echo "build_ios=${BUILD_IOS}"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "### Platform selection"
+            echo
+            echo "- Requested target: `${RELEASE_TARGET}`"
+            echo "- Android build: `${BUILD_ANDROID}`"
+            echo "- iOS build: `${BUILD_IOS}`"
+            if [[ "${BUILD_IOS}" == "false" ]]; then
+              echo "- iOS build and IPA attachment path: **disabled**"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Validate release state
         env:
@@ -206,14 +248,14 @@ jobs:
 
   android:
     name: Build Android APKs
-    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'android-only')
+    if: inputs.mode != 'dry-run' && needs.prepare.outputs.build_android == 'true'
     needs: prepare
     runs-on: ubuntu-latest
     env:
       RELEASE_VERSION: ${{ needs.prepare.outputs.tag }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
-      CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
+      CONTRIBUTIONS_URL: https://api.github.com/repos/${{ github.repository }}/contributors?per_page=100
 
     steps:
       - name: Check out source
@@ -245,7 +287,6 @@ jobs:
             NUVIO_RELEASE_KEY_ALIAS
             NUVIO_RELEASE_KEY_PASSWORD
             TRAKT_CLIENT_ID
-            TRAKT_CLIENT_SECRET
             SIMKL_CLIENT_ID
           )
           for property_name in "${required_properties[@]}"; do
@@ -272,7 +313,7 @@ jobs:
 
   ios:
     name: Build iOS IPA
-    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'ios-only')
+    if: inputs.mode != 'dry-run' && needs.prepare.outputs.build_ios == 'true'
     needs: prepare
     runs-on: xcode-27
     timeout-minutes: 180
@@ -427,6 +468,7 @@ jobs:
       always()
       && (inputs.mode == 'draft' || inputs.mode == 'publish')
       && needs.prepare.result == 'success'
+      && needs.prepare.outputs.build_ios == 'true'
       && needs.ios.result == 'success'
       && (needs.release.result == 'success' || inputs.target == 'ios-only')
     needs:

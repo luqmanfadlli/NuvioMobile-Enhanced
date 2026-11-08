@@ -11,3 +11,17 @@ internal fun landscapePosterWidth(basePosterWidthDp: Int): Dp =
 
 internal fun landscapePosterHeightForWidth(width: Dp): Dp =
     (width.value / PosterLandscapeAspectRatio).dp
+
+
+private const val MinimumLandscapeLogoAspectRatio = 1.5f
+
+/**
+ * Reject portrait and square artwork from logo slots. Logos are intentionally wide;
+ * validating decoded dimensions avoids rendering a portrait poster as a tiny logo.
+ */
+internal fun isLandscapeLogo(
+    width: Int,
+    height: Int,
+    minimumAspectRatio: Float = MinimumLandscapeLogoAspectRatio,
+): Boolean =
+    width > 0 && height > 0 && width.toFloat() / height.toFloat() >= minimumAspectRatio

@@ -31,6 +31,23 @@ fun TrackingLibraryTab.supportsContentType(contentType: String): Boolean =
         supported.equals(contentType, ignoreCase = true)
     }
 
+internal fun TrackingLibraryTab.matchesStatus(status: TrackingListStatus): Boolean {
+    if (kind != TrackingLibraryTabKind.STATUS || !isMembershipDestination) return false
+    val keyStatus = key.substringAfterLast(':').lowercase()
+    val normalizedTitle = title.trim().replace('_', ' ').lowercase()
+    val acceptedKeys = when (status) {
+        TrackingListStatus.ON_HOLD -> setOf("hold", "on_hold", "paused")
+        TrackingListStatus.DROPPED -> setOf("dropped")
+        else -> setOf(status.wireValue, status.name.lowercase())
+    }
+    val acceptedTitles = when (status) {
+        TrackingListStatus.ON_HOLD -> setOf("on hold", "paused", "hold")
+        TrackingListStatus.DROPPED -> setOf("dropped")
+        else -> setOf(status.name.lowercase().replace('_', ' '))
+    }
+    return keyStatus in acceptedKeys || normalizedTitle in acceptedTitles
+}
+
 fun TrackingLibraryTab.membershipTitle(): String =
     providerId?.let { "${it.displayName} · $title" } ?: title
 

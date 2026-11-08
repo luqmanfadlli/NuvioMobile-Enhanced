@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -33,7 +34,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.random.Random
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.StringResource
@@ -132,7 +132,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     fun hasRequiredCredentials(): Boolean =
-        TraktConfig.CLIENT_ID.isNotBlank() && TraktConfig.CLIENT_SECRET.isNotBlank()
+        TraktConfig.CLIENT_ID.isNotBlank() && TraktConfig.REDIRECT_URI.isNotBlank()
 
     internal fun selectedAuthenticationMethod(profileId: Int = ProfileRepository.activeProfileId): TraktAuthenticationMethod {
         ensureLoaded(profileId)
@@ -170,9 +170,11 @@ object TraktAuthRepository : TrackingAuthProvider {
 
         return when (authenticationMethod) {
             TraktAuthenticationMethod.BROWSER_REDIRECT -> {
+                val pkce = createTraktPkceParameters()
                 val oauthState = generateOauthState()
                 authState = authState.copy(
                     pendingAuthorizationState = oauthState,
+                    pendingAuthorizationCodeVerifier = pkce.verifier,
                     pendingAuthorizationStartedAtMillis = TraktPlatformClock.nowEpochMs(),
                 )
                 persist(profileId)
@@ -180,19 +182,28 @@ object TraktAuthRepository : TrackingAuthProvider {
                     statusMessage = localizedString(Res.string.trakt_complete_sign_in_browser),
                     errorMessage = null,
                 )
-                buildAuthorizationUrl(oauthState)
+                buildAuthorizationUrl(oauthState, pkce.challenge)
             }
 
             TraktAuthenticationMethod.DEVICE_CODE -> {
-                publish(
-                    isLoading = true,
-                    statusMessage = localizedString(Res.string.trakt_device_request_code),
-                    errorMessage = null,
-                )
-                scope.launch {
-                    startDeviceAuthorization(profileId)
+                if (TraktConfig.CLIENT_SECRET.isBlank()) {
+                    publish(
+                        isLoading = false,
+                        statusMessage = null,
+                        errorMessage = "Device-code sign-in requires a Trakt client secret. Use browser sign-in with PKCE instead.",
+                    )
+                    null
+                } else {
+                    publish(
+                        isLoading = true,
+                        statusMessage = localizedString(Res.string.trakt_device_request_code),
+                        errorMessage = null,
+                    )
+                    scope.launch {
+                        startDeviceAuthorization(profileId)
+                    }
+                    null
                 }
-                null
             }
         }
     }
@@ -201,7 +212,8 @@ object TraktAuthRepository : TrackingAuthProvider {
         ensureLoaded(profileId)
         val pendingState = authState.pendingAuthorizationState ?: return null
         if (pendingState.startsWith(DEVICE_CODE_PREFIX)) return ACTIVATE_URL
-        return buildAuthorizationUrl(pendingState)
+        val verifier = authState.pendingAuthorizationCodeVerifier?.takeIf { it.isNotBlank() } ?: return null
+        return buildAuthorizationUrl(pendingState, traktPkceChallenge(verifier))
     }
 
     internal fun pendingDeviceUserCode(profileId: Int = ProfileRepository.activeProfileId): String? {
@@ -474,7 +486,10 @@ object TraktAuthRepository : TrackingAuthProvider {
 
         val expectedState = authState.pendingAuthorizationState
         val callbackState = parsedUrl.parameters["state"].orEmpty().trim()
-        if (!expectedState.isNullOrBlank() && callbackState != expectedState) {
+        val codeVerifier = authState.pendingAuthorizationCodeVerifier.orEmpty()
+        if (expectedState.isNullOrBlank() || callbackState.isBlank() ||
+            callbackState != expectedState || codeVerifier.isBlank()
+        ) {
             clearPendingAuthorization()
             persist(profileId)
             publish(
@@ -484,15 +499,19 @@ object TraktAuthRepository : TrackingAuthProvider {
             return
         }
 
-        exchangeAuthorizationCode(code, profileId)
+        exchangeAuthorizationCode(code, codeVerifier, profileId)
     }
 
-    private suspend fun exchangeAuthorizationCode(code: String, profileId: Int = currentProfileId) {
+    private suspend fun exchangeAuthorizationCode(
+        code: String,
+        codeVerifier: String,
+        profileId: Int = currentProfileId,
+    ) {
         val body = json.encodeToString(
             TraktAuthorizationCodeRequest(
                 code = code,
                 clientId = TraktConfig.CLIENT_ID,
-                clientSecret = TraktConfig.CLIENT_SECRET,
+                codeVerifier = codeVerifier,
                 redirectUri = TraktConfig.REDIRECT_URI,
             ),
         )
@@ -533,6 +552,7 @@ object TraktAuthRepository : TrackingAuthProvider {
             createdAt = parsed.createdAt,
             expiresIn = parsed.expiresIn,
             pendingAuthorizationState = null,
+            pendingAuthorizationCodeVerifier = null,
             pendingAuthorizationStartedAtMillis = null,
         )
         persist(profileId)
@@ -548,7 +568,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         publish(isLoading = true, errorMessage = null)
 
         val token = authState.accessToken?.takeIf { it.isNotBlank() }
-        if (!token.isNullOrBlank() && hasRequiredCredentials()) {
+        if (!token.isNullOrBlank() && TraktConfig.CLIENT_ID.isNotBlank() && TraktConfig.CLIENT_SECRET.isNotBlank()) {
             val body = json.encodeToString(
                 TraktRevokeRequest(
                     token = token,
@@ -590,7 +610,6 @@ object TraktAuthRepository : TrackingAuthProvider {
             TraktRefreshTokenRequest(
                 refreshToken = refreshToken,
                 clientId = TraktConfig.CLIENT_ID,
-                clientSecret = TraktConfig.CLIENT_SECRET,
                 redirectUri = TraktConfig.REDIRECT_URI,
             ),
         )
@@ -614,7 +633,10 @@ object TraktAuthRepository : TrackingAuthProvider {
             return@withLock false
         }
 
-        when (traktTokenRefreshResponseAction(response.status)) {
+        val oauthErrorCode = runCatching {
+            json.decodeFromString<TraktOAuthError>(response.body).error
+        }.getOrNull()
+        when (traktTokenRefreshResponseAction(response.status, oauthErrorCode)) {
             TraktTokenRefreshResponseAction.INVALIDATE -> {
                 log.w { "Trakt rejected the refresh token with HTTP 400; clearing local credentials" }
                 invalidateCredentials(profileId)
@@ -640,7 +662,13 @@ object TraktAuthRepository : TrackingAuthProvider {
             createdAt = parsed.createdAt,
             expiresIn = parsed.expiresIn,
         )
-        persist(profileId)
+        val refreshedPayload = json.encodeToString(authState)
+        val persisted = withContext(Dispatchers.IO) {
+            TraktAuthStorage.savePayloadDurably(profileId, refreshedPayload)
+        }
+        if (!persisted) {
+            log.e { "Failed to durably persist the rotated Trakt token pair for profile $profileId" }
+        }
         publish()
         true
     }
@@ -684,6 +712,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     private fun clearPendingAuthorization() {
         authState = authState.copy(
             pendingAuthorizationState = null,
+            pendingAuthorizationCodeVerifier = null,
             pendingAuthorizationStartedAtMillis = null,
         )
     }
@@ -785,19 +814,16 @@ object TraktAuthRepository : TrackingAuthProvider {
         )
     }
 
-    private fun buildAuthorizationUrl(state: String): String {
-        val responseType = "code"
-        val encodedClientId = TraktConfig.CLIENT_ID.encodeURLParameter()
-        val encodedRedirectUri = TraktConfig.REDIRECT_URI.encodeURLParameter()
-        val encodedState = state.encodeURLParameter()
-        return "$AUTHORIZE_URL?response_type=$responseType&client_id=$encodedClientId&redirect_uri=$encodedRedirectUri&state=$encodedState"
-    }
+    private fun buildAuthorizationUrl(state: String, challenge: String): String =
+        buildTraktAuthorizationUrl(
+            clientId = TraktConfig.CLIENT_ID,
+            redirectUri = TraktConfig.REDIRECT_URI,
+            state = state,
+            challenge = challenge,
+        )
 
-    private fun generateOauthState(): String {
-        val nowPart = TraktPlatformClock.nowEpochMs().toString(16)
-        val randomPart = Random.nextLong().toULong().toString(16)
-        return "$nowPart$randomPart"
-    }
+    private fun generateOauthState(): String =
+        base64UrlNoPadding(traktSecureRandomBytes(32))
 
     private fun isTokenExpiredOrExpiring(state: TraktAuthState): Boolean {
         val createdAt = state.createdAt ?: return true
@@ -819,9 +845,13 @@ internal enum class TraktTokenRefreshResponseAction {
     TRANSIENT_FAILURE,
 }
 
-internal fun traktTokenRefreshResponseAction(status: Int): TraktTokenRefreshResponseAction = when {
-    status == 400 -> TraktTokenRefreshResponseAction.INVALIDATE
+internal fun traktTokenRefreshResponseAction(
+    status: Int,
+    errorCode: String? = null,
+): TraktTokenRefreshResponseAction = when {
     status in 200..299 -> TraktTokenRefreshResponseAction.ACCEPT
+    status == 400 && errorCode.equals("invalid_grant", ignoreCase = true) ->
+        TraktTokenRefreshResponseAction.INVALIDATE
     else -> TraktTokenRefreshResponseAction.TRANSIENT_FAILURE
 }
 
@@ -867,7 +897,7 @@ private data class TraktDeviceTokenRequest(
 private data class TraktAuthorizationCodeRequest(
     @SerialName("code") val code: String,
     @SerialName("client_id") val clientId: String,
-    @SerialName("client_secret") val clientSecret: String,
+    @SerialName("code_verifier") val codeVerifier: String,
     @SerialName("redirect_uri") val redirectUri: String,
     @SerialName("grant_type") val grantType: String = "authorization_code",
 )
@@ -876,9 +906,14 @@ private data class TraktAuthorizationCodeRequest(
 private data class TraktRefreshTokenRequest(
     @SerialName("refresh_token") val refreshToken: String,
     @SerialName("client_id") val clientId: String,
-    @SerialName("client_secret") val clientSecret: String,
     @SerialName("redirect_uri") val redirectUri: String,
     @SerialName("grant_type") val grantType: String = "refresh_token",
+)
+
+@Serializable
+private data class TraktOAuthError(
+    @SerialName("error") val error: String? = null,
+    @SerialName("error_description") val errorDescription: String? = null,
 )
 
 @Serializable

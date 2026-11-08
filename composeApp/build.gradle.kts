@@ -1,17 +1,58 @@
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
+import java.net.URL
+import java.security.MessageDigest
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.TaskAction
 import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import java.util.Properties
+
+abstract class DownloadCloudStreamRuntimeTask : DefaultTask() {
+    @get:Input
+    abstract val sourceUrl: Property<String>
+    @get:Input
+    abstract val expectedSha256: Property<String>
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+    @TaskAction
+    fun downloadRuntime() {
+        val destination = outputFile.get().asFile
+        val expectedHash = expectedSha256.get()
+        val temporary = destination.resolveSibling(destination.name + ".download")
+        fun sha256(file: java.io.File): String =
+            MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        try {
+            if (!destination.isFile || sha256(destination) != expectedHash) {
+                destination.parentFile.mkdirs()
+                val connection = URL(sourceUrl.get()).openConnection().apply {
+                    connectTimeout = 30_000
+                    readTimeout = 60_000
+                    useCaches = false
+                }
+                connection.getInputStream().use { input ->
+                    temporary.outputStream().use { output -> input.copyTo(output) }
+                }
+                check(temporary.isFile && temporary.length() > 0L) { "CloudStream runtime AAR download was empty" }
+                val actualHash = sha256(temporary)
+                check(actualHash == expectedHash) { "CloudStream runtime AAR SHA-256 mismatch: $actualHash" }
+                if (destination.exists()) check(destination.delete()) { "Could not replace existing CloudStream runtime AAR" }
+                check(temporary.renameTo(destination)) { "Could not install CloudStream runtime AAR" }
+            }
+        } finally {
+            temporary.delete()
+        }
+    }
+}
 
 abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:OutputDirectory
@@ -261,6 +302,12 @@ val iosDistributionSourceDir = if (iosDistribution == "full") {
 val iosFrameworkBundleId = "com.nuvio.media"
 val nuvioEngineAppleFramework = rootProject.file("../nuvio-engine/platform/apple/NuvioEngine.xcframework")
 val fullCommonSourceDir = project.file("src/fullCommonMain/kotlin")
+val cloudStreamRuntimeAar = layout.projectDirectory.file("libs/cloudstream-runtime-api-4.8.0-3496e5f.aar")
+val downloadCloudStreamRuntime = tasks.register<DownloadCloudStreamRuntimeTask>("downloadCloudStreamRuntime") {
+    sourceUrl.set("https://raw.githubusercontent.com/yesnt10/NuvioMobile-Enhanced/894499115fb1a69cd4bb34d6969a74832f0e5636/composeApp/libs/cloudstream-runtime-api-4.8.0-3496e5f.aar")
+    expectedSha256.set("b67a4384bea1f4072123b86c5f164471422d9c6c12845d5067f12db44674d427")
+    outputFile.set(cloudStreamRuntimeAar)
+}
 val generatedRuntimeConfigDir = layout.buildDirectory.dir("generated/runtime-config/kotlin")
 val requestedGradleTasks = gradle.startParameter.taskNames.map { taskName ->
     taskName.substringAfterLast(':').lowercase()
@@ -503,8 +550,32 @@ kotlin {
                 implementation(libs.mpv.android.lib)
                 implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
                 if (androidDistribution == "full") {
+                    implementation("com.github.capullo-tech:lib-tdlib-android:11850efeb5791d4fd386c0eeec1ebce4c5080435")
+                    implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
+                    implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
+                    implementation(files(cloudStreamRuntimeAar).builtBy(downloadCloudStreamRuntime))
                     implementation(libs.ksoup)
+                    implementation("androidx.annotation:annotation:1.10.0")
+                    implementation("com.google.guava:guava:33.3.1-android")
+                    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
+                    implementation("org.jsoup:jsoup:1.22.1")
+                    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+                    implementation("com.github.Blatzar:NiceHttp:0.4.18")
+                    implementation("me.xdrop:fuzzywuzzy:1.4.0")
+                    implementation("org.mozilla:rhino:1.8.1")
+                    implementation("com.uwetrottmann.tmdb2:tmdb-java:2.13.0")
+                    // Supabase Auth 3.4.1 references the pre-0.6 key API
+                    // (KeyDecoder / KeyFormat in materials.key). Cryptography 0.6.0
+                    // removed those types; use the compatible 0.5.x API for this
+                    // Android Full runtime and its dynamically loaded CloudStream plugins.
+                    implementation("dev.whyoleg.cryptography:cryptography-core:0.5.0")
+                    implementation("dev.whyoleg.cryptography:cryptography-provider-optimal:0.5.0")
+                    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.3") {
+                        exclude(group = "org.mozilla", module = "rhino-engine")
+                    }
+                    implementation("org.tukaani:xz:1.10")
+                    implementation(kotlin("reflect"))
                 }
             }
         }

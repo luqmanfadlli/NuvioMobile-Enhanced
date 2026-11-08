@@ -27,7 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -136,8 +139,9 @@ fun NuvioPosterCard(
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    posterCardStyleOverride: PosterCardStyleUiState? = null,
 ) {
-    val posterCardStyle = rememberPosterCardStyleUiState()
+    val posterCardStyle = posterCardStyleOverride ?: rememberPosterCardStyleUiState()
     val tokens = MaterialTheme.nuvio
     val cardWidth = shape.cardWidth(basePosterWidthDp = posterCardStyle.widthDp)
     val cardShape = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
@@ -146,6 +150,7 @@ fun NuvioPosterCard(
         shape = shape,
     )
     val shouldShowTitleBelow = showTitleBelow && !posterCardStyle.hideLabelsEnabled
+    var logoIsLandscape by remember(bottomLeftLogoUrl) { mutableStateOf<Boolean?>(null) }
 
     Column(
         modifier = modifier.width(cardWidth),
@@ -224,13 +229,24 @@ fun NuvioPosterCard(
                             contentDescription = stringResource(Res.string.poster_logo_content_description, title),
                             modifier = Modifier
                                 .width(catalogLogoOverlaySize.width)
-                                .height(catalogLogoOverlaySize.height),
+                                .height(catalogLogoOverlaySize.height)
+                                .alpha(if (logoIsLandscape == true) 1f else 0f),
                             contentScale = ContentScale.Fit,
                             alignment = Alignment.CenterStart,
+                            onSuccess = { result ->
+                                val image = result.result.image
+                                logoIsLandscape = isLandscapeLogo(
+                                    image.width,
+                                    image.height,
+                                    minimumAspectRatio = 1.2f,
+                                )
+                            },
+                            onError = { logoIsLandscape = false },
                         )
-                    } else {
+                    }
+                    if (logoIsLandscape != true && !bottomLeftText.isNullOrBlank()) {
                         Text(
-                            text = bottomLeftText.orEmpty(),
+                            text = bottomLeftText,
                             style = MaterialTheme.typography.labelMedium,
                             color = tokens.colors.textPrimary,
                             maxLines = 1,
@@ -354,6 +370,7 @@ internal val NuvioPosterShape.aspectRatio: Float
         NuvioPosterShape.Square -> 1f
         NuvioPosterShape.Landscape -> PosterLandscapeAspectRatio
     }
+
 
 private data class CatalogLogoOverlaySize(
     val width: Dp,

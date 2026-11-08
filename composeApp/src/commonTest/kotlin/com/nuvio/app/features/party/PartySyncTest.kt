@@ -181,6 +181,39 @@ class PartySyncTest {
     }
 
     @Test
+    fun hostBufferingNeverCountsAsAWaitingGuest() {
+        val media = PartyMedia(type = "movie", metaId = "tt1", metaType = "movie")
+        val hostOnly = party(memberId = "a", hostMemberId = "a", online = emptyList()).copy(
+            media = media,
+            presence = mapOf(
+                "a" to PartyPresence("a", PartyMemberStatus.Buffering, media.key),
+            ),
+        )
+        assertEquals(emptyList(), PartySync.waitingMemberIds(hostOnly, ignored = emptySet()))
+
+        val hostAndReadyGuest = hostOnly.copy(
+            presence = mapOf(
+                "a" to PartyPresence("a", PartyMemberStatus.Loading, media.key),
+                "b" to PartyPresence("b", PartyMemberStatus.Ready, media.key),
+            ),
+        )
+        assertEquals(emptyList(), PartySync.waitingMemberIds(hostAndReadyGuest, ignored = emptySet()))
+    }
+
+    @Test
+    fun bufferingGuestStillHoldsUpTheParty() {
+        val media = PartyMedia(type = "movie", metaId = "tt1", metaType = "movie")
+        val party = party(memberId = "a", hostMemberId = "a", online = emptyList()).copy(
+            media = media,
+            presence = mapOf(
+                "a" to PartyPresence("a", PartyMemberStatus.Buffering, media.key),
+                "b" to PartyPresence("b", PartyMemberStatus.Buffering, media.key),
+            ),
+        )
+        assertEquals(listOf("b"), PartySync.waitingMemberIds(party, ignored = emptySet()))
+    }
+
+    @Test
     fun clockUsesTheFastestSample() {
         val time = TestTimeSource()
         val clock = PartyClock(timeSource = time, wallClockMs = { 0L })

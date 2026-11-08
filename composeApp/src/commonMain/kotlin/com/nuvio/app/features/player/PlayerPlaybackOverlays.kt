@@ -3,8 +3,26 @@ package com.nuvio.app.features.player
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +36,7 @@ import com.nuvio.app.features.player.skip.NextEpisodeCard
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.SkipIntroButton
 import com.nuvio.app.features.player.skip.SkipInterval
+import com.nuvio.app.core.ui.PlatformBackHandler
 
 @Composable
 internal fun BoxScope.PlayerPlaybackOverlays(
@@ -67,6 +86,10 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     movieRecommendationStage: Int = 0,
     onOpenMovieRecommendation: (MetaPreview) -> Unit = {},
     onDismissMovieRecommendations: () -> Unit = {},
+    moreLikeThisItems: List<MetaPreview> = emptyList(),
+    showMoreLikeThis: Boolean = false,
+    onOpenMoreLikeThis: (MetaPreview) -> Unit = {},
+    onDismissMoreLikeThis: () -> Unit = {},
     errorMessage: String?,
     onDismissError: () -> Unit,
 ) {
@@ -163,8 +186,17 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             onOpen = onOpenMovieRecommendation,
             onDismiss = onDismissMovieRecommendations,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = sliderEdgePadding, bottom = overlayBottomPadding),
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = overlayBottomPadding),
+        )
+    }
+
+    if (showMoreLikeThis && moreLikeThisItems.isNotEmpty()) {
+        MoreLikeThisOverlay(
+            items = moreLikeThisItems,
+            onItemClick = onOpenMoreLikeThis,
+            onDismiss = onDismissMoreLikeThis,
         )
     }
 
@@ -173,5 +205,80 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             message = errorMessage,
             onDismiss = onDismissError,
         )
+    }
+}
+
+
+internal fun shouldShowMoreLikeThisOverlay(
+    isPlaybackEnded: Boolean,
+    hasRecommendations: Boolean,
+    isSeries: Boolean,
+    hasNextEpisode: Boolean,
+    controlsLocked: Boolean,
+    dismissed: Boolean,
+    hasPlaybackError: Boolean,
+    isInPip: Boolean,
+    completionPromptVisible: Boolean,
+): Boolean =
+    isPlaybackEnded &&
+        hasRecommendations &&
+        !controlsLocked &&
+        !dismissed &&
+        !hasPlaybackError &&
+        !isInPip &&
+        !completionPromptVisible &&
+        (!isSeries || !hasNextEpisode)
+
+@Composable
+private fun BoxScope.MoreLikeThisOverlay(
+    items: List<MetaPreview>,
+    onItemClick: (MetaPreview) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PlatformBackHandler(
+        enabled = items.isNotEmpty(),
+        onBack = onDismiss,
+    )
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items.forEach { item ->
+                Column(
+                    modifier = Modifier
+                        .width(184.dp)
+                        .clickable { onItemClick(item) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AsyncImage(
+                        model = item.banner ?: item.landscapePoster ?: item.poster,
+                        contentDescription = item.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(104.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                    )
+                    Text(
+                        text = item.name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.94f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }

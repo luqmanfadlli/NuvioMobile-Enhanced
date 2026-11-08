@@ -33,8 +33,8 @@ internal data class GitHubAssetDto(
 internal class NoChannelReleaseException : IllegalStateException()
 
 internal const val GITHUB_API_BASE = "https://api.github.com"
-internal const val GITHUB_OWNER = "luqmanfadlli"
-internal const val GITHUB_REPO = "NuvioMobile-Enhanced"
+internal const val GITHUB_OWNER = "Sam3110xavier"
+internal const val GITHUB_REPO = "Zuvio"
 
 internal object AppUpdaterRepository {
     private val json = Json {
@@ -45,7 +45,7 @@ internal object AppUpdaterRepository {
     suspend fun getLatestChannelUpdate(channel: UpdateChannel): Result<AppUpdate> = runCatching {
         val response = httpRequestRaw(
             method = "GET",
-            url = "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/${releasePath(channel)}",
+            url = releaseApiUrl(channel),
             headers = mapOf(
                 "Accept" to "application/vnd.github+json",
                 "User-Agent" to "NuvioMobile",
@@ -60,6 +60,9 @@ internal object AppUpdaterRepository {
         selectUpdate(response.body, channel, AppUpdaterPlatform.getSupportedAbis())
             ?: throw NoChannelReleaseException()
     }
+
+    internal fun releaseApiUrl(channel: UpdateChannel): String =
+        "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/${releasePath(channel)}"
 
     internal fun releasePath(channel: UpdateChannel): String = when (channel) {
         UpdateChannel.STABLE -> "releases/latest"

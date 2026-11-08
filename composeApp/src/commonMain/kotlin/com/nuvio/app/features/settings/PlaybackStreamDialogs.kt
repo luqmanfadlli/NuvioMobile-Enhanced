@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -23,11 +24,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
@@ -60,6 +63,11 @@ internal fun StreamAutoPlayModeDialog(
             StreamAutoPlayMode.REGEX_MATCH,
             Res.string.settings_playback_stream_selection_mode_regex,
             Res.string.settings_playback_stream_selection_mode_regex_description,
+        ),
+        Triple(
+            StreamAutoPlayMode.SEMI_AUTOMATIC,
+            Res.string.settings_playback_stream_selection_mode_semi_automatic,
+            Res.string.settings_playback_stream_selection_mode_semi_automatic_description,
         ),
     )
 
@@ -371,3 +379,90 @@ internal fun StreamAutoPlayRegexDialog(
         }
     }
 }
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun StreamAutoPlayProviderPriorityDialog(
+    items: List<String>,
+    currentOrder: List<String>,
+    onOrderSaved: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var ordering by remember(currentOrder, items) {
+        val available = items.toSet()
+        mutableStateOf(
+            (currentOrder.filter { it in available } + items.filterNot { it in currentOrder })
+                .distinct(),
+        )
+    }
+
+    DialogSurface(
+        onDismissRequest = onDismiss,
+        title = "Semi-auto add-on priority",
+    ) {
+        Text(
+            text = "Higher entries are tried first for the selected resolution. All matching links at that resolution are tried before the fallback chain steps down to lower qualities.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (ordering.isEmpty()) {
+            Text(
+                text = "No enabled stream add-ons are available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(
+                    count = ordering.size,
+                    key = { ordering[it] },
+                ) { index ->
+                    val provider = ordering[index]
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "${index + 1}. $provider",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                        )
+                        TextButton(
+                            enabled = index > 0,
+                            onClick = {
+                                ordering = ordering.toMutableList().also { list ->
+                                    val moved = list.removeAt(index)
+                                    list.add(index - 1, moved)
+                                }
+                            },
+                        ) { Text("↑") }
+                        TextButton(
+                            enabled = index < ordering.lastIndex,
+                            onClick = {
+                                ordering = ordering.toMutableList().also { list ->
+                                    val moved = list.removeAt(index)
+                                    list.add(index + 1, moved)
+                                }
+                            },
+                        ) { Text("↓") }
+                    }
+                }
+            }
+        }
+
+        DialogButtons {
+            DialogButton(text = "Cancel", onClick = onDismiss)
+            DialogButton(
+                text = "Save priority",
+                onClick = { onOrderSaved(ordering) },
+            )
+        }
+    }
+}
+

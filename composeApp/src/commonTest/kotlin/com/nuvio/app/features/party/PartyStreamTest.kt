@@ -59,4 +59,140 @@ class PartyStreamTest {
         val encoded = PartyApi.json.encodeToString(PartyStream.serializer(), stream)
         assertEquals(stream, PartyApi.json.decodeFromString(PartyStream.serializer(), encoded))
     }
+
+    @Test
+    fun disabledSharingNeverForcesTheGuestToFollowAStaleAnnouncement() {
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun guestsWaitWhenTheHostLeavesEvenIfNoStreamWasShared() {
+        assertTrue(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = true,
+                hasSharedBefore = false,
+                sharingEnabled = false,
+            ),
+        )
+        assertFalse(
+            shouldWaitForPartyHostShare(
+                isHost = true,
+                hostUnavailable = true,
+                hasSharedBefore = true,
+                sharingEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun guestsStopAfterAPreviouslySharedStreamIsWithdrawn() {
+        assertTrue(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = false,
+                hasSharedBefore = true,
+                sharingEnabled = false,
+            ),
+        )
+        assertFalse(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = false,
+                hasSharedBefore = false,
+                sharingEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun guestFollowsSharedUrlOnlyForTheMatchingPartyMedia() {
+        assertTrue(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = true,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = "movie|different||",
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(mediaKey = "movie|different||"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = stream.url,
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(url = "http://localhost:8096/video"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun hostPublishesNewMediaAfterReplacementPlayerIsReady() {
+        assertTrue(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(false, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|same||", "movie|same||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = false))
+    }
+
+
+    @Test
+    fun hostStreamWaitsForPartyMediaToMatch() {
+        assertTrue(shouldShareHostStreamForMedia(true, true, "movie|new||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(true, true, "movie|old||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(false, true, "movie|new||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(true, false, "movie|new||", "movie|new||"))
+    }
+
 }

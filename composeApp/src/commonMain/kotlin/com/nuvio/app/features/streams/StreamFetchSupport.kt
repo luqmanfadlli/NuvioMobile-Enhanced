@@ -27,6 +27,12 @@ internal data class PluginProviderGroup(
 )
 
 internal sealed interface StreamLoadCompletion {
+    data class CloudStreamProvider(
+        val addonId: String,
+        val addonName: String,
+        val streams: List<StreamItem>,
+        val error: String?,
+    ) : StreamLoadCompletion
     data class Addon(val group: AddonStreamGroup) : StreamLoadCompletion
     data class PluginScraper(
         val addonId: String,
@@ -154,3 +160,24 @@ private fun String.fallbackRepositoryLabel(): String {
         }
     }
 }
+
+
+/**
+ * Stable identity shared by provider integrations so the same direct source is not
+ * displayed repeatedly when it is returned by more than one provider.
+ */
+internal fun crossProviderStreamIdentity(stream: StreamItem): String =
+    stream.infoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { "hash:$it" }
+        ?: stream.ytId?.trim()?.takeIf { it.isNotBlank() }?.let { "youtube:$it" }
+        ?: stream.playableDirectUrl?.let { raw ->
+            val normalized = raw.trim().substringBefore('#').substringBefore('?').trimEnd('/')
+            normalized.takeIf { it.isNotBlank() }?.lowercase()?.let { "url:$it" }
+        }
+        ?: listOf(
+            stream.addonId,
+            stream.sourceName.orEmpty(),
+            stream.streamLabel,
+        ).joinToString("|") { it.trim().lowercase() }
+
+internal fun pluginStreamIdentity(stream: StreamItem): String =
+    crossProviderStreamIdentity(stream)
