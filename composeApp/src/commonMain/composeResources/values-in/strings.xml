@@ -2731,7 +2731,7 @@
     <string name="settings_nav_bar_position_bottom">Bawah</string>
     <string name="settings_nav_bar_position_top">Atas</string>
     <string name="settings_appearance_liquid_glass_effects">Efek liquid glass</string>
-    <string name="settings_appearance_liquid_glass_effects_description">Kaca pada bar navigasi, sheet, kontrol player, dan layar sinematik. Matikan untuk permukaan solid.</string>
+    <string name="settings_appearance_liquid_glass_effects_description">Kaca hidup pada bar navigasi, sheet, kontrol player, dan layar sinematik. Mati secara default saat Glass UI aktif, yang memakai kaca statis yang lebih ringan; tanpa Glass UI, mematikannya memberi permukaan solid.</string>
     <string name="settings_nav_bar_glass">Liquid glass</string>
     <string name="settings_nav_bar_glass_material_liquid">Liquid</string>
     <string name="settings_nav_bar_glass_material_frosted">Buram</string>

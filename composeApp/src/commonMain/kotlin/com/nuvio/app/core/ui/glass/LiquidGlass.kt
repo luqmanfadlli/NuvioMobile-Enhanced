@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import com.nuvio.app.core.ui.background.appGlassBackdrop
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
@@ -52,8 +54,18 @@ import com.kyant.backdrop.isRenderEffectSupported
 import com.kyant.backdrop.isRuntimeShaderSupported
 import com.kyant.backdrop.shadow.Shadow
 
+/**
+ * Liquid Glass (Kyant backdrop) re-captures and blurs the content behind every glass surface,
+ * which costs several hundred MB on iOS. When Glass UI (app background) is active, the default is
+ * its static glass (the pre-blurred background slice) on every platform; Liquid Glass stays
+ * available as an explicit opt-in. [userChoice] is the stored setting, null when never changed.
+ */
 object LiquidGlassSettings {
-    var enabled: Boolean by mutableStateOf(true)
+    var userChoice: Boolean? by mutableStateOf(null)
+    var glassUiActive: Boolean by mutableStateOf(false)
+
+    val enabled: Boolean
+        get() = userChoice ?: !glassUiActive
 }
 
 fun isLiquidGlassAvailable(): Boolean = isRenderEffectSupported()
@@ -275,7 +287,10 @@ internal fun Modifier.liquidGlassSurface(
     backdropOpacity: Float = 1f,
 ): Modifier =
     if (backdrop == null || !isLiquidGlassSupported()) {
-        if (fallbackBrush != null) clip(shape).background(fallbackBrush) else clip(shape).background(fallback)
+        // Static Glass UI: when an app background with Glass UI is active, show its pre-blurred
+        // slice behind the fallback tint (no-op otherwise).
+        val staticGlass = clip(shape).composed { appGlassBackdrop(shape) }
+        if (fallbackBrush != null) staticGlass.background(fallbackBrush) else staticGlass.background(fallback)
     } else {
         drawBackdrop(
             backdrop = backdrop,

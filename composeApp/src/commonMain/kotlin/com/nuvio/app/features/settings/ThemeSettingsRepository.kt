@@ -132,7 +132,8 @@ object ThemeSettingsRepository {
         _navBarStyle.value = NavBarStyle.ADAPTIVE
         _navBarPosition.value = NavBarPosition.BOTTOM
         _navBarGlass.value = LiquidGlassStyle.Default
-        applyLiquidGlassEffectsEnabled(true)
+        LiquidGlassSettings.userChoice = null
+        _liquidGlassEffectsEnabled.value = LiquidGlassSettings.enabled
     }
 
     private fun loadFromDisk() {
@@ -183,7 +184,8 @@ object ThemeSettingsRepository {
         val storedNavBarGlass = ThemeSettingsStorage.loadNavBarGlass()
         _navBarGlass.value = LiquidGlassStyle.decode(storedNavBarGlass)
         migrateLegacyNavBarGlass(storedNavBarGlass)
-        applyLiquidGlassEffectsEnabled(ThemeSettingsStorage.loadLiquidGlassEffectsEnabled() ?: true)
+        LiquidGlassSettings.userChoice = ThemeSettingsStorage.loadLiquidGlassEffectsEnabled()
+        _liquidGlassEffectsEnabled.value = LiquidGlassSettings.enabled
     }
 
     fun setCustomTheme(colors: CustomThemeColors) {
@@ -391,8 +393,18 @@ object ThemeSettingsRepository {
     }
 
     private fun applyLiquidGlassEffectsEnabled(enabled: Boolean) {
-        _liquidGlassEffectsEnabled.value = enabled
-        LiquidGlassSettings.enabled = enabled
+        LiquidGlassSettings.userChoice = enabled
+        _liquidGlassEffectsEnabled.value = LiquidGlassSettings.enabled
+    }
+
+    /**
+     * Glass UI (app background) switched on or off. Without an explicit choice, Liquid Glass then
+     * follows its default: off while Glass UI is active (static glass), on otherwise.
+     */
+    fun onGlassUiActiveChanged(active: Boolean) {
+        if (LiquidGlassSettings.glassUiActive == active) return
+        LiquidGlassSettings.glassUiActive = active
+        _liquidGlassEffectsEnabled.value = LiquidGlassSettings.enabled
     }
 
     private fun observeMembership() {

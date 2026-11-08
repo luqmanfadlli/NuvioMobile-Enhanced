@@ -2766,7 +2766,7 @@
     <string name="settings_nav_bar_position_bottom">Bottom</string>
     <string name="settings_nav_bar_position_top">Top</string>
     <string name="settings_appearance_liquid_glass_effects">Liquid glass effects</string>
-    <string name="settings_appearance_liquid_glass_effects_description">Glass on the navigation bar, sheets, player controls and cinematic screens. Turn off for solid surfaces.</string>
+    <string name="settings_appearance_liquid_glass_effects_description">Live glass on the navigation bar, sheets, player controls and cinematic screens. Off by default with Glass UI, which then uses lighter static glass; otherwise off gives solid surfaces.</string>
     <string name="settings_nav_bar_glass">Liquid glass</string>
     
     <string name="settings_nav_bar_glass_material_liquid">Liquid</string>
