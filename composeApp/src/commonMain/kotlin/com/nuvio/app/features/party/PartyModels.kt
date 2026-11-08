@@ -142,6 +142,17 @@ internal fun shouldShareHostStreamForMedia(
 
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
 
+/** Freeze the shared playhead at the last estimated position when the host leaves. */
+internal fun pausePartyPlaybackForHostDeparture(
+    playback: PartyPlayback?,
+    at: Long,
+): PartyPlayback? {
+    playback ?: return null
+    val positionMs = if (playback.paused) playback.positionMs
+    else PartySync.expectedPositionMs(playback, at)
+    return playback.copy(paused = true, positionMs = positionMs, at = at, waiting = false)
+}
+
 internal fun partyMediaKey(metaType: String, metaId: String, season: Int?, episode: Int?): String =
     listOf(metaType.lowercase(), metaId, season?.toString().orEmpty(), episode?.toString().orEmpty())
         .joinToString("|")
@@ -296,6 +307,7 @@ sealed interface PartyEvent {
     data object Removed : PartyEvent
     data object Ended : PartyEvent
     data class MediaChanged(val media: PartyMedia) : PartyEvent
+    data object HostLeft : PartyEvent
     data class ControlChanged(val hostOnly: Boolean) : PartyEvent
 }
 

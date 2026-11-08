@@ -203,4 +203,37 @@ class PartyStreamTest {
         assertEquals(PartyMediaChangeDecision.Ignore, decidePartyMediaChange(false, next.key, next))
     }
 
+    @Test
+    fun hostDepartureFreezesPlaybackWithoutChangingItsAuthoritySequence() {
+        val playing = PartyPlayback(
+            seq = 7,
+            memberId = "host",
+            paused = false,
+            positionMs = 10_000,
+            rate = 1.5f,
+            at = 1_000,
+            mediaKey = "movie|tt1||",
+        )
+        val paused = pausePartyPlaybackForHostDeparture(playing, at = 3_000)
+        assertEquals(7L, paused?.seq)
+        assertEquals("host", paused?.memberId)
+        assertEquals(13_000L, paused?.positionMs)
+        assertEquals(3_000L, paused?.at)
+        assertTrue(paused?.paused == true)
+        assertFalse(paused?.waiting == true)
+    }
+
+    @Test
+    fun hostDepartureKeepsAlreadyPausedPositionAndHandlesMissingPlayback() {
+        val alreadyPaused = PartyPlayback(
+            seq = 8, memberId = "host", paused = true, positionMs = 4_000, at = 1_000,
+        )
+        val result = pausePartyPlaybackForHostDeparture(alreadyPaused, at = 3_000)
+        assertEquals(4_000L, result?.positionMs)
+        assertEquals(8L, result?.seq)
+        assertEquals(3_000L, result?.at)
+        assertTrue(result?.paused == true)
+        assertEquals(null, pausePartyPlaybackForHostDeparture(null, at = 3_000))
+    }
+
 }

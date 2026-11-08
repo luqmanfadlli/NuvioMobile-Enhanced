@@ -492,6 +492,13 @@ object PartyRepository {
         updateParty { it.copy(presence = it.presence + (status.memberId to status)) }
     }
 
+    private fun pausePlaybackForHostDeparture() {
+        _sharedStream.value = null
+        _hostSharingEnabled.value = false
+        _hostUnavailable.value = true
+        _playback.value = pausePartyPlaybackForHostDeparture(_playback.value, clock.nowMs())
+    }
+
     private fun ownPresence(party: ActiveParty): PartyPresence =
         localPresence ?: PartyPresence(memberId = party.memberId)
 
@@ -503,11 +510,8 @@ object PartyRepository {
             return
         }
         val name = party.member(memberId)?.displayName
-        if (memberId == party.hostMemberId) {
-            _sharedStream.value = null
-            _hostSharingEnabled.value = false
-            _hostUnavailable.value = true
-        }
+        val hostDeparted = memberId == party.hostMemberId
+        if (hostDeparted) pausePlaybackForHostDeparture()
         updateParty { current ->
             current.copy(
                 members = current.members.filterNot { it.id == memberId },
@@ -516,6 +520,7 @@ object PartyRepository {
             )
         }
         ignoredWaiting.remove(memberId)
+        if (hostDeparted) _events.tryEmit(PartyEvent.HostLeft)
         if (name != null) _events.tryEmit(PartyEvent.MemberLeft(name))
     }
 
@@ -549,9 +554,8 @@ object PartyRepository {
             info.hostMemberId != null &&
             previousHostMemberId != info.hostMemberId
         ) {
-            _sharedStream.value = null
-            _hostSharingEnabled.value = false
-            _hostUnavailable.value = true
+            pausePlaybackForHostDeparture()
+            _events.tryEmit(PartyEvent.HostLeft)
         }
         updateParty { current ->
             current.copy(
