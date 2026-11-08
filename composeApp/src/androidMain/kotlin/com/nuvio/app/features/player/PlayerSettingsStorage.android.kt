@@ -42,6 +42,7 @@ actual object PlayerSettingsStorage {
     private const val showSkipButtonsKey = "player_show_skip_buttons"
     private const val seekPreviewEnabledKey = "seek_preview_enabled"
     private const val movieRecommendationsEnabledKey = "movie_recommendations_enabled"
+    private const val movieRecommendationsFallbackSecondsKey = "movie_recommendations_fallback_seconds"
     private const val autoShowSubtitlesOnRewindEnabledKey = "auto_show_subtitles_on_rewind_enabled"
     private const val autoShowSubtitlesOnMuteEnabledKey = "auto_show_subtitles_on_mute_enabled"
     private const val externalPlayerEnabledKey = "external_player_enabled"
@@ -529,10 +530,14 @@ actual object PlayerSettingsStorage {
         }
 
     actual fun saveMovieRecommendationsEnabled(enabled: Boolean) {
-        preferences
-            ?.edit()
-            ?.putBoolean(ProfileScopedKey.of(movieRecommendationsEnabledKey), enabled)
-            ?.apply()
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(movieRecommendationsEnabledKey), enabled)?.apply()
+    }
+    actual fun loadMovieRecommendationsFallbackSeconds(): Int? = preferences?.let { prefs ->
+        val key = ProfileScopedKey.of(movieRecommendationsFallbackSecondsKey)
+        if (prefs.contains(key)) prefs.getInt(key, 180) else null
+    }
+    actual fun saveMovieRecommendationsFallbackSeconds(seconds: Int) {
+        preferences?.edit()?.putInt(ProfileScopedKey.of(movieRecommendationsFallbackSecondsKey), seconds.coerceIn(30, 600))?.apply()
     }
 
     actual fun loadAutoShowSubtitlesOnRewindEnabled(): Boolean? =
@@ -1995,6 +2000,7 @@ actual object PlayerSettingsStorage {
         loadTouchGesturesEnabled()?.let { put(touchGesturesEnabledKey, encodeSyncBoolean(it)) }
         loadSwipeToSeekEnabled()?.let { put(swipeToSeekEnabledKey, encodeSyncBoolean(it)) }
         loadMovieRecommendationsEnabled()?.let { put(movieRecommendationsEnabledKey, encodeSyncBoolean(it)) }
+        loadMovieRecommendationsFallbackSeconds()?.let { put(movieRecommendationsFallbackSecondsKey, encodeSyncInt(it)) }
         loadAutoShowSubtitlesOnRewindEnabled()?.let { put(autoShowSubtitlesOnRewindEnabledKey, encodeSyncBoolean(it)) }
         loadAutoShowSubtitlesOnMuteEnabled()?.let { put(autoShowSubtitlesOnMuteEnabledKey, encodeSyncBoolean(it)) }
         loadExternalPlayerEnabled()?.let { put(externalPlayerEnabledKey, encodeSyncBoolean(it)) }
@@ -2100,6 +2106,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(touchGesturesEnabledKey)?.let(::saveTouchGesturesEnabled)
         payload.decodeSyncBoolean(swipeToSeekEnabledKey)?.let(::saveSwipeToSeekEnabled)
         payload.decodeSyncBoolean(movieRecommendationsEnabledKey)?.let(::saveMovieRecommendationsEnabled)
+        payload.decodeSyncInt(movieRecommendationsFallbackSecondsKey)?.let(::saveMovieRecommendationsFallbackSeconds)
         payload.decodeSyncBoolean(autoShowSubtitlesOnRewindEnabledKey)?.let(::saveAutoShowSubtitlesOnRewindEnabled)
         payload.decodeSyncBoolean(autoShowSubtitlesOnMuteEnabledKey)?.let(::saveAutoShowSubtitlesOnMuteEnabled)
         payload.decodeSyncBoolean(externalPlayerEnabledKey)?.let(::saveExternalPlayerEnabled)

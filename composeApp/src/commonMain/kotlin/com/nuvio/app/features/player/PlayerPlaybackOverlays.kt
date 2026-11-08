@@ -86,10 +86,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     movieRecommendationStage: Int = 0,
     onOpenMovieRecommendation: (MetaPreview) -> Unit = {},
     onDismissMovieRecommendations: () -> Unit = {},
-    moreLikeThisItems: List<MetaPreview> = emptyList(),
-    showMoreLikeThis: Boolean = false,
-    onOpenMoreLikeThis: (MetaPreview) -> Unit = {},
-    onDismissMoreLikeThis: () -> Unit = {},
+    onShowMovieRecommendations: () -> Unit = {},
     errorMessage: String?,
     onDismissError: () -> Unit,
 ) {
@@ -185,6 +182,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             controlsVisible = controlsVisible,
             onOpen = onOpenMovieRecommendation,
             onDismiss = onDismissMovieRecommendations,
+            onShow = onShowMovieRecommendations,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
@@ -192,13 +190,6 @@ internal fun BoxScope.PlayerPlaybackOverlays(
         )
     }
 
-    if (showMoreLikeThis && moreLikeThisItems.isNotEmpty()) {
-        MoreLikeThisOverlay(
-            items = moreLikeThisItems,
-            onItemClick = onOpenMoreLikeThis,
-            onDismiss = onDismissMoreLikeThis,
-        )
-    }
 
     if (errorMessage != null) {
         ErrorModal(
@@ -208,77 +199,3 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     }
 }
 
-
-internal fun shouldShowMoreLikeThisOverlay(
-    isPlaybackEnded: Boolean,
-    hasRecommendations: Boolean,
-    isSeries: Boolean,
-    hasNextEpisode: Boolean,
-    controlsLocked: Boolean,
-    dismissed: Boolean,
-    hasPlaybackError: Boolean,
-    isInPip: Boolean,
-    completionPromptVisible: Boolean,
-): Boolean =
-    isPlaybackEnded &&
-        hasRecommendations &&
-        !controlsLocked &&
-        !dismissed &&
-        !hasPlaybackError &&
-        !isInPip &&
-        !completionPromptVisible &&
-        (!isSeries || !hasNextEpisode)
-
-@Composable
-private fun BoxScope.MoreLikeThisOverlay(
-    items: List<MetaPreview>,
-    onItemClick: (MetaPreview) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    PlatformBackHandler(
-        enabled = items.isNotEmpty(),
-        onBack = onDismiss,
-    )
-    Column(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items.forEach { item ->
-                Column(
-                    modifier = Modifier
-                        .width(184.dp)
-                        .clickable { onItemClick(item) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    AsyncImage(
-                        model = item.banner ?: item.landscapePoster ?: item.poster,
-                        contentDescription = item.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(104.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                    )
-                    Text(
-                        text = item.name,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.94f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}

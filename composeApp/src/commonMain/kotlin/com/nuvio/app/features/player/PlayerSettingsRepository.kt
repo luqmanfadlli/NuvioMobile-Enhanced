@@ -54,6 +54,7 @@ data class PlayerSettingsUiState(
     val showSkipButtons: Boolean = true,
     val seekPreviewEnabled: Boolean = true,
     val movieRecommendationsEnabled: Boolean = true,
+    val movieRecommendationsFallbackSeconds: Int = 180,
     val autoShowSubtitlesOnRewindEnabled: Boolean = true,
     val autoShowSubtitlesOnMuteEnabled: Boolean = true,
     val externalPlayerEnabled: Boolean = false,
@@ -172,6 +173,7 @@ object PlayerSettingsRepository {
     private var showSkipButtons = true
     private var seekPreviewEnabled = true
     private var movieRecommendationsEnabled = true
+    private var movieRecommendationsFallbackSeconds = 180
     private var autoShowSubtitlesOnRewindEnabled = true
     private var autoShowSubtitlesOnMuteEnabled = true
     private var externalPlayerEnabled = false
@@ -295,6 +297,7 @@ object PlayerSettingsRepository {
         showSkipButtons = true
         seekPreviewEnabled = true
         movieRecommendationsEnabled = true
+        movieRecommendationsFallbackSeconds = 180
         autoShowSubtitlesOnRewindEnabled = true
         autoShowSubtitlesOnMuteEnabled = true
         externalPlayerEnabled = false
@@ -413,6 +416,7 @@ object PlayerSettingsRepository {
         showSkipButtons = PlayerSettingsStorage.loadShowSkipButtons() ?: true
         seekPreviewEnabled = PlayerSettingsStorage.loadSeekPreviewEnabled() ?: true
         movieRecommendationsEnabled = PlayerSettingsStorage.loadMovieRecommendationsEnabled() ?: true
+        movieRecommendationsFallbackSeconds = PlayerSettingsStorage.loadMovieRecommendationsFallbackSeconds()?.coerceIn(30, 600) ?: 180
         autoShowSubtitlesOnRewindEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnRewindEnabled() ?: true
         autoShowSubtitlesOnMuteEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnMuteEnabled() ?: true
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
@@ -747,6 +751,15 @@ object PlayerSettingsRepository {
         movieRecommendationsEnabled = enabled
         publish()
         PlayerSettingsStorage.saveMovieRecommendationsEnabled(enabled)
+    }
+
+    fun setMovieRecommendationsFallbackSeconds(seconds: Int) {
+        ensureLoaded()
+        val value = seconds.coerceIn(30, 600)
+        if (movieRecommendationsFallbackSeconds == value) return
+        movieRecommendationsFallbackSeconds = value
+        publish()
+        PlayerSettingsStorage.saveMovieRecommendationsFallbackSeconds(value)
     }
 
     fun setAutoShowSubtitlesOnRewindEnabled(enabled: Boolean) {
@@ -1581,6 +1594,7 @@ object PlayerSettingsRepository {
             showSkipButtons = showSkipButtons,
             seekPreviewEnabled = seekPreviewEnabled,
             movieRecommendationsEnabled = movieRecommendationsEnabled,
+            movieRecommendationsFallbackSeconds = movieRecommendationsFallbackSeconds,
             autoShowSubtitlesOnRewindEnabled = autoShowSubtitlesOnRewindEnabled,
             autoShowSubtitlesOnMuteEnabled = autoShowSubtitlesOnMuteEnabled,
             externalPlayerEnabled = externalPlayerEnabled,

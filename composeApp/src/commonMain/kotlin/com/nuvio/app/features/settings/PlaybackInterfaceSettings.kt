@@ -29,6 +29,7 @@ internal fun PlaybackInterfaceSettings(
     settings: PlayerSettingsUiState,
 ) {
     var showHoldToSpeedValueDialog by remember { mutableStateOf(false) }
+    var showRecommendationFallbackDialog by remember { mutableStateOf(false) }
     var skipDirectionDialog by remember { mutableStateOf<Boolean?>(null) } // true = forward
     var showToolbarLayoutDialog by remember { mutableStateOf(false) }
     var showLegacyBottomButtonsDialog by remember { mutableStateOf(false) }
@@ -142,6 +143,10 @@ internal fun PlaybackInterfaceSettings(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setMovieRecommendationsEnabled,
                 )
+                if (settings.movieRecommendationsEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(title = "More Like This fallback", description = "${settings.movieRecommendationsFallbackSeconds / 60} min", isTablet = isTablet, onClick = { showRecommendationFallbackDialog = true })
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_mini_player),
@@ -223,6 +228,14 @@ internal fun PlaybackInterfaceSettings(
         }
     }
 
+    if (showRecommendationFallbackDialog) {
+        DialogSurface(onDismissRequest = { showRecommendationFallbackDialog = false }, title = "Recommendation fallback timing") {
+            listOf(60, 90, 120, 180, 240, 300).forEach { seconds ->
+                DialogOption(text = if (seconds % 60 == 0) "${seconds / 60} minutes" else "$seconds seconds", selected = settings.movieRecommendationsFallbackSeconds == seconds, onClick = { PlayerSettingsRepository.setMovieRecommendationsFallbackSeconds(seconds); showRecommendationFallbackDialog = false })
+            }
+            DialogButtons { DialogButton(text = stringResource(Res.string.action_done), onClick = { showRecommendationFallbackDialog = false }) }
+        }
+    }
     if (showToolbarLayoutDialog) {
         PlayerToolbarSettingsDialog(
             layout = settings.toolbarLayout,

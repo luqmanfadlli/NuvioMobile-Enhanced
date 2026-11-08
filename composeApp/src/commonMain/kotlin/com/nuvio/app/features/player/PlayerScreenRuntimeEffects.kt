@@ -821,7 +821,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
 
     LaunchedEffect(
         activeVideoId, parentMetaId, parentMetaType, contentType, activeSeasonNumber, activeEpisodeNumber,
-        playerSettingsUiState.skipIntroEnabled, networkCondition,
+        playerSettingsUiState.skipIntroEnabled, playerSettingsUiState.movieRecommendationsEnabled, networkCondition,
     ) {
         skipIntervals = emptyList()
         apiSkipIntervals = emptyList()
@@ -837,13 +837,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         val season = activeSeasonNumber
         val episode = activeEpisodeNumber
         val vid = activeVideoId
-        if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
-        if ((contentType ?: parentMetaType).equals("movie", ignoreCase = true)) {
-            val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid)
+        val movie = (contentType ?: parentMetaType).equals("movie", ignoreCase = true)
+        if (!playerSettingsUiState.skipIntroEnabled && !(movie && playerSettingsUiState.movieRecommendationsEnabled)) return@LaunchedEffect
+        if (movie) {
+            val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid, requireSkipIntroEnabled = playerSettingsUiState.skipIntroEnabled)
             apiSkipIntervals = api
             recomputeMergedSkipIntervals()
             return@LaunchedEffect
         }
+        if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
         if (season == null || episode == null || vid == null) return@LaunchedEffect
         // Skip intervals come from remote providers: pointless to look them up without a network.
         if (isNetworkOffline()) return@LaunchedEffect
@@ -1070,16 +1072,24 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         watchedUiState.watchedKeys,
         movieRecommendationDismissedStage,
         playerSettingsUiState.movieRecommendationsEnabled,
+        playerSettingsUiState.movieRecommendationsFallbackSeconds,
+        apiSkipIntervals,
+        chapterSkipIntervals,
     ) {
         if (!isMoviePlayback || !playerSettingsUiState.movieRecommendationsEnabled || movieRecommendationCandidates.isEmpty()) {
             showMovieRecommendationCard = false
             movieRecommendationStage = 0
+            movieRecommendationDismissedStage = 0
             return@LaunchedEffect
         }
+        val apiStart = apiSkipIntervals.firstOrNull { it.type.equals("movie-credits", true) || it.type.equals("outro", true) || it.type.equals("credits", true) || it.type.equals("ed", true) }?.startTime?.takeIf { it.isFinite() && it >= 0.0 }?.let { (it * 1000.0).toLong() }
+        val chapterStart = chapterSkipIntervals.firstOrNull { it.type.equals("outro", true) || it.type.equals("credits", true) || it.type.equals("ed", true) }?.startTime?.takeIf { it.isFinite() && it >= 0.0 }?.let { (it * 1000.0).toLong() }
         val stage = PlayerNextEpisodeRules.movieRecommendationStage(
             positionMs = playbackSnapshot.positionMs,
             durationMs = playbackSnapshot.durationMs,
             isEnded = playbackSnapshot.isEnded,
+            creditsStartMs = apiStart ?: chapterStart,
+            fallbackSeconds = playerSettingsUiState.movieRecommendationsFallbackSeconds,
         )
         if (stage == 0 && movieRecommendationDismissedStage != 0) {
             movieRecommendationDismissedStage = 0

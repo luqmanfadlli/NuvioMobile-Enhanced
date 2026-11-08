@@ -7,7 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,40 +48,29 @@ fun MovieRecommendationCard(
     controlsVisible: Boolean,
     onOpen: (MetaPreview) -> Unit,
     onDismiss: () -> Unit,
+    onShow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (recommendations.isEmpty()) return
 
-    val ended = stage >= PlayerNextEpisodeRules.MOVIE_RECOMMENDATION_STAGE_ENDED
-    val shouldShow = stage > 0 && (!dismissed || controlsVisible)
-    var autoHidden by remember { mutableStateOf(false) }
-
-    LaunchedEffect(stage) {
-        autoHidden = false
-    }
-
-    LaunchedEffect(shouldShow, autoHidden, controlsVisible, ended) {
-        if (shouldShow && !autoHidden && !controlsVisible && !ended) {
-            delay(MOVIE_RECOMMENDATION_AUTO_HIDE_MS)
-            autoHidden = true
-        }
-    }
-
-    val visible = shouldShow && (ended || !autoHidden || controlsVisible)
-
-    PlatformBackHandler(enabled = visible && !dismissed, onBack = onDismiss)
+    val visible = stage > 0 && !dismissed
+    PlatformBackHandler(enabled = visible, onBack = onDismiss)
 
     AnimatedVisibility(
-        visible = visible,
+        visible = stage > 0,
         enter = slideInHorizontally(animationSpec = tween(260), initialOffsetX = { it / 2 }) +
             fadeIn(animationSpec = tween(220)),
         exit = slideOutHorizontally(animationSpec = tween(200), targetOffsetX = { it / 2 }) +
             fadeOut(animationSpec = tween(160)),
-        modifier = modifier,
+        modifier = modifier.pointerInput(stage, dismissed) {
+            var dragDistance = 0f
+            detectVerticalDragGestures(onVerticalDrag = { change, amount -> dragDistance += amount; change.consume() }, onDragEnd = { if (dragDistance > 36f) onDismiss() else if (dragDistance < -36f) onShow(); dragDistance = 0f }, onDragCancel = { dragDistance = 0f })
+        },
     ) {
-        // NuvioEx recommendation tray: a transparent, full-width bottom strip.
-        // Artwork is deliberately rendered in a landscape frame; titles sit directly below.
-        LazyRow(
+        // The collapsed grab area remains mounted so an upward swipe can restore the tray.
+        if (dismissed) {
+            Box(Modifier.fillMaxWidth().height(22.dp))
+        } else LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
@@ -89,7 +80,7 @@ fun MovieRecommendationCard(
             items(recommendations, key = { "${it.type}:${it.id}" }) { preview ->
                 Column(
                     modifier = Modifier
-                        .width(184.dp)
+                        .width(248.dp)
                         .clickable(enabled = visible) { onOpen(preview) },
                 ) {
                     AsyncImage(
@@ -97,7 +88,7 @@ fun MovieRecommendationCard(
                         contentDescription = preview.name,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(104.dp)
+                            .height(140.dp)
                             .clip(RoundedCornerShape(4.dp)),
                         contentScale = ContentScale.Crop,
                     )
@@ -118,4 +109,3 @@ fun MovieRecommendationCard(
     }
 }
 
-private const val MOVIE_RECOMMENDATION_AUTO_HIDE_MS = 10_000L
