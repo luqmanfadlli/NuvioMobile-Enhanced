@@ -30,6 +30,7 @@ internal const val SUBTITLE_BLUR_REFERENCE_WIDTH_PX = 1280f
 internal const val SUBTITLE_BLUR_SIGMA_FACTOR = 0.8493218f
 internal const val SUBTITLE_BLUR_SOFTNESS_SCALE = 1.5f
 internal const val SUBTITLE_BLUR_OUTSET_SIGMAS = 3f
+internal const val MPV_SUBTITLE_BLUR_MAX = 20f
 
 /**
  * Reduce the outline's ink density as blur increases. This prevents a blurred
@@ -122,7 +123,7 @@ internal val SubtitleStyleState.mpvNativeOutlineBlurLevel: Int
  */
 internal val SubtitleStyleState.mpvNativeOutlineBlurAmount: Float
     get() = (mpvNativeOutlineBlurLevel * SUBTITLE_BLUR_SOFTNESS_SCALE)
-        .coerceAtMost(SUBTITLE_OUTLINE_BLUR_MAX.toFloat())
+        .coerceIn(SUBTITLE_OUTLINE_BLUR_MIN.toFloat(), MPV_SUBTITLE_BLUR_MAX)
 
 internal expect fun supportsNativeSubtitleBlur(): Boolean
 

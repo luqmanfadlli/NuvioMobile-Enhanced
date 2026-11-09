@@ -81,6 +81,8 @@ class SubtitleAppearanceTest {
         assertFalse(blurOnly.requiresComposeStyledOverlay)
         assertEquals(4, blurOnly.mpvNativeOutlineBlurLevel)
         assertEquals(6f, blurOnly.mpvNativeOutlineBlurAmount)
+        val maximumBlur = blurOnly.copy(appearance = blurOnly.appearance.copy(outlineBlur = 10))
+        assertEquals(15f, maximumBlur.mpvNativeOutlineBlurAmount)
 
         val customFont = blurOnly.copy(appearance = blurOnly.appearance.copy(fontId = "serif"))
         assertTrue(customFont.requiresComposeStyledOverlay)
