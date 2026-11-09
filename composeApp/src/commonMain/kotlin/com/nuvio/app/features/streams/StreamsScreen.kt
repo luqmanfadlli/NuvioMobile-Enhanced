@@ -148,6 +148,7 @@ fun StreamsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    LaunchedEffect(Unit) { com.nuvio.app.features.player.closeBackgroundPlayerForNewPlayback() }
     val useNativeNavigation = LocalUseNativeNavigation.current
     val nativeNavigationBarHidden = LocalNativeNavigationBarHidden.current
     val uiState by StreamsRepository.uiState.collectAsStateWithLifecycle()

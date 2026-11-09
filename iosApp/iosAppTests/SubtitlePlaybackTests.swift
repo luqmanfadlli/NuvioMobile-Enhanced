@@ -137,6 +137,8 @@ private final class RecordingPlayerFactory: NSObject, NuvioPlayerBridgeCreator {
         self.bridge = bridge
         return bridge
     }
+
+    func closeParkedPictureInPicture() {}
 }
 
 // Regression for the add-on subtitle restored while the stream is still opening:
