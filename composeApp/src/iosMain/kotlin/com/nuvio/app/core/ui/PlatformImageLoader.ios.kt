@@ -7,6 +7,8 @@ import coil3.memory.MemoryCache
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.UIKit.UIApplicationDidReceiveMemoryWarningNotification
+import platform.UIKit.UIDevice
+import platform.UIKit.UIUserInterfaceIdiomPhone
 
 /**
  * Coil's default memory cache on iOS is a share of the device's physical RAM (well over 1 GB on
@@ -14,7 +16,12 @@ import platform.UIKit.UIApplicationDidReceiveMemoryWarningNotification
  * ~2.3 GB jetsam limit for a 4K HDR/DV player. Cap it and give memory back on warnings.
  */
 private const val IosImageMemoryCacheBytes = 256L * 1024 * 1024
+private const val IosPhoneImageMemoryCacheBytes = 160L * 1024 * 1024
 private const val IosImageMemoryCacheDuringPlaybackBytes = 64L * 1024 * 1024
+
+private val isPhone: Boolean by lazy {
+    UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone
+}
 
 private var memoryWarningObserverInstalled = false
 
@@ -22,7 +29,7 @@ internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoa
     installMemoryWarningObserver()
     return memoryCache {
         MemoryCache.Builder()
-            .maxSizeBytes(IosImageMemoryCacheBytes)
+            .maxSizeBytes(if (isPhone) IosPhoneImageMemoryCacheBytes else IosImageMemoryCacheBytes)
             .build()
     }
 }
@@ -48,9 +55,11 @@ private fun installMemoryWarningObserver() {
  */
 @OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
 fun trimImageMemoryForPlayback() {
-    SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.trimToSize(IosImageMemoryCacheDuringPlaybackBytes)
+    val memoryCache = SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache
+    if (isPhone) memoryCache?.clear() else memoryCache?.trimToSize(IosImageMemoryCacheDuringPlaybackBytes)
     suspendAnimatedImagesForPlayback()
     kotlin.native.runtime.GC.collect()
+    if (isPhone) kotlin.native.runtime.GC.collect()
 }
 
 /** After a player is gone its Kotlin-side state (snapshots, track lists, bridges) is garbage. */

@@ -62,6 +62,10 @@ object MetaDetailsRepository {
     private var activeRequestKey: String? = null
     private val cachedMetaByRequestKey = mutableMapOf<String, CachedMetaEntry>()
 
+    internal val debugCachedMetaCount: Int get() = cachedMetaByRequestKey.size
+
+    internal val debugCachedVideoCount: Int get() = cachedMetaByRequestKey.values.sumOf { it.baseMeta.videos.size }
+
     fun load(type: String, id: String) {
         log.d { "load() called — type=$type id=$id" }
         InAppLogger.info("Metadata/MetaDetailsRepository", "Loading meta type=$type id=$id")
