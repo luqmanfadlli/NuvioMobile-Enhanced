@@ -30,6 +30,21 @@ import com.nuvio.app.AppLoadingProfileAvatar
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.themePalette
+import com.nuvio.app.features.experience.ExperienceMode
+import com.nuvio.app.features.experience.ExperienceRepository
+import com.nuvio.app.features.livetv.LiveTvRepository
+import com.nuvio.app.features.sports.SportsRepository
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.VideoLibrary
+import androidx.compose.material.icons.rounded.Warning
 import com.nuvio.app.features.profiles.ProfileRepository
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Groups
@@ -49,6 +64,27 @@ internal fun LazyListScope.settingsRootContent(
     if (onSwitchProfileClick != null && (category == null || category == SettingsCategory.You)) {
         item(key = "profile_card") {
             SettingsProfileCard(isTablet = isTablet, onClick = onSwitchProfileClick)
+        }
+    }
+    if (category == null || category == SettingsCategory.You) {
+        item(key = "sports_dashboard") {
+            val mode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+            if (mode == ExperienceMode.SportsFocus) SettingsSportsDashboard(isTablet = isTablet, onPageClick = onPageClick)
+        }
+        item(key = "experience_card") {
+            val mode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+            SettingsGroup(
+                isTablet = isTablet,
+                modifier = Modifier.padding(top = if (isTablet) 12.dp else 8.dp),
+            ) {
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_experience_title),
+                    description = stringResource(mode.titleRes),
+                    icon = SettingsPage.Experience.icon,
+                    isTablet = isTablet,
+                    onClick = { onPageClick(SettingsPage.Experience) },
+                )
+            }
         }
     }
     SettingsCategory.entries.filter { category == null || it == category }.forEach { group ->
@@ -225,5 +261,73 @@ private fun SettingsProfileCard(
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsSportsDashboard(isTablet: Boolean, onPageClick: (SettingsPage) -> Unit) {
+    val tokens = MaterialTheme.nuvio
+    val live by LiveTvRepository.uiState.collectAsStateWithLifecycle()
+    val follows by SportsRepository.follows.collectAsStateWithLifecycle()
+    val playlists = live.playlists.size + (if (live.stalkerSettings.isConfigured) 1 else 0) + (if (live.xtreamSettings.isConfigured) 1 else 0)
+    val ready = live.hasPlaylist
+    val teams = follows.teams.size
+    val leagues = follows.leagues.size
+    val guideLoaded = live.epgPrograms.isNotEmpty()
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = if (isTablet) 12.dp else 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(tokens.colors.surface).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(
+                imageVector = if (ready) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
+                contentDescription = null,
+                tint = if (ready) tokens.colors.success else tokens.colors.warning,
+                modifier = Modifier.size(34.dp),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(if (ready) "Ready to watch" else "Set up Live TV", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tokens.colors.textPrimary)
+                Text(
+                    listOf(
+                        if (playlists == 1) "1 playlist" else "$playlists playlists",
+                        if (teams == 1) "1 team followed" else "$teams teams followed",
+                    ).joinToString(" \u00B7 "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = tokens.colors.textSecondary,
+                )
+                Text(if (guideLoaded) "Guide loaded" else "No guide data yet", style = MaterialTheme.typography.bodySmall, color = tokens.colors.textMuted)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DashboardTile(Icons.Rounded.VideoLibrary, "Playlists", if (playlists == 0) "None yet" else "$playlists connected", Modifier.weight(1f)) { onPageClick(SettingsPage.LiveTv) }
+            DashboardTile(Icons.Rounded.Tv, "Guide", if (guideLoaded) "Loaded" else "Not loaded", Modifier.weight(1f)) { onPageClick(SettingsPage.LiveTv) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DashboardTile(Icons.Rounded.PlayArrow, "Playback", "Player & streams", Modifier.weight(1f)) { onPageClick(SettingsPage.Playback) }
+            DashboardTile(
+                Icons.Rounded.Notifications,
+                "Notifications",
+                if (leagues + teams == 0) "Nothing followed" else "$teams ${if (teams == 1) "team" else "teams"} \u00B7 $leagues ${if (leagues == 1) "league" else "leagues"}",
+                Modifier.weight(1f),
+            ) { onPageClick(SettingsPage.Notifications) }
+        }
+    }
+}
+
+@Composable
+private fun DashboardTile(icon: ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+    val tokens = MaterialTheme.nuvio
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(tokens.colors.surface).clickable(onClick = onClick).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = tokens.colors.accent, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = tokens.colors.textPrimary, maxLines = 1)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = tokens.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

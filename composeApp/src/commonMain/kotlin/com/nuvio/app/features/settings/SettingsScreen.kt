@@ -876,6 +876,7 @@ private fun MobileSettingsScreen(
                 SettingsPage.DiscordRpc -> discordRpcSettingsContent(
                     isTablet = false,
                 )
+                SettingsPage.Experience -> experienceSettingsContent(isTablet = false)
             }
         }
         }
@@ -1334,6 +1335,7 @@ private fun TabletSettingsScreen(
                     SettingsPage.DiscordRpc -> discordRpcSettingsContent(
                         isTablet = true,
                     )
+                    SettingsPage.Experience -> experienceSettingsContent(isTablet = true)
                 }
             }
             }

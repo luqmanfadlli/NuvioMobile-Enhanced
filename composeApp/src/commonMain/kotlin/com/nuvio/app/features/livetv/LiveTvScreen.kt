@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.SportsSoccer
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -111,6 +112,9 @@ fun LiveTvScreen(
     modifier: Modifier = Modifier,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
     onChannelClick: (LiveTvChannel) -> Unit,
+    onSportsClick: (() -> Unit)? = null,
+    /** Shown under the title, above the channel controls (Sports mode puts its Channels / Guide / Sports switch here). */
+    segments: (@Composable () -> Unit)? = null,
 ) {
     val uiState by remember {
         LiveTvRepository.ensureChannelsLoaded()
@@ -246,6 +250,13 @@ fun LiveTvScreen(
                         title = stringResource(Res.string.live_tv_title),
                         includeStatusBarPadding = false,
                         actions = {
+                            if (onSportsClick != null) {
+                                NuvioIconActionButton(
+                                    icon = Icons.Rounded.SportsSoccer,
+                                    contentDescription = "Sports",
+                                    onClick = onSportsClick,
+                                )
+                            }
                             if (uiState.hasPlaylist) {
                                 NuvioIconActionButton(
                                     icon = Icons.Rounded.Refresh,
@@ -255,6 +266,7 @@ fun LiveTvScreen(
                             }
                         },
                     )
+                    segments?.invoke()
                     if (showChannelControls) {
                         LiveTvChannelControls(
                             topPadding = 0.dp,

@@ -132,6 +132,18 @@ import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.sports.compat.LiveTvDeepLinks
+import com.nuvio.app.features.sports.compat.LiveTvLink
+import com.nuvio.app.features.sports.ui.SportsActions
+import com.nuvio.app.features.sports.ui.SportsGameScreen
+import com.nuvio.app.features.news.ArticleReaderScreen
+import com.nuvio.app.features.news.NewsArticle
+import com.nuvio.app.features.podcasts.Podcast
+import com.nuvio.app.features.podcasts.PodcastBrowserScreen
+import com.nuvio.app.features.podcasts.PodcastNowPlayingHost
+import com.nuvio.app.features.podcasts.PodcastShowScreen
+import com.nuvio.app.features.sports.ui.SportsLeagueScreen
+import com.nuvio.app.features.sports.ui.SportsScreen
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
@@ -327,7 +339,8 @@ internal fun MainAppContent(
             LiveTvRepository.ensureLoaded()
             LiveTvRepository.uiState
         }.collectAsStateWithLifecycle()
-        val showLiveTvInNavigation = liveTvUiState.showInNavigation
+        // Live TV and Sports are part of the app's tabs in every mode that lists them, not a user toggle.
+        val showLiveTvInNavigation = true
         val authState by AuthRepository.state.collectAsStateWithLifecycle()
         val openPosterActions: (PosterActionTarget) -> Unit = { target ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -434,7 +447,7 @@ internal fun MainAppContent(
     }
 
     fun activateTab(tab: AppScreenTab) {
-        val destination = if (tab == AppScreenTab.LiveTv && !showLiveTvInNavigation) {
+        val destination = if ((tab == AppScreenTab.LiveTv || tab == AppScreenTab.Sports) && !showLiveTvInNavigation) {
             AppScreenTab.Home
         } else {
             tab
@@ -468,12 +481,16 @@ internal fun MainAppContent(
             }
             AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
             AppScreenTab.LiveTv -> liveTvScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.Sports -> Unit
+            AppScreenTab.Music -> Unit
+            AppScreenTab.Following -> Unit
+            AppScreenTab.News -> Unit
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
     }
 
     LaunchedEffect(showLiveTvInNavigation, selectedTab) {
-        if (!showLiveTvInNavigation && selectedTab == AppScreenTab.LiveTv) {
+        if (!showLiveTvInNavigation && (selectedTab == AppScreenTab.LiveTv || selectedTab == AppScreenTab.Sports)) {
             activateTab(AppScreenTab.Home)
         }
     }
@@ -490,7 +507,7 @@ internal fun MainAppContent(
     ) {
         NativeTabBridge.requestedTabs.collectLatest { requestedTab ->
             val requestedAppTab = requestedTab.toAppScreenTab()
-            if (requestedAppTab == AppScreenTab.LiveTv && !showLiveTvInNavigation) {
+            if ((requestedAppTab == AppScreenTab.LiveTv || requestedAppTab == AppScreenTab.Sports) && !showLiveTvInNavigation) {
                 return@collectLatest
             }
             if (
@@ -1540,6 +1557,39 @@ internal fun MainAppContent(
             }
         }
 
+        // Sports hub (ported from NuvioPlusIPTV-Mobile): its channel taps play through Nuvio's own Live TV player path.
+        val sportsActions = SportsActions(
+            onPlay = { channel, _ ->
+                LiveTvRepository.uiState.value.channels.firstOrNull { it.id == channel.key }?.let(onLiveTvChannelClick)
+            },
+            onPlayCatchup = { _, _ -> NuvioToastController.show("Catch-up isn't available in this version") },
+            onOpenGame = { ev -> navController.navigate(SportsGameRoute(eventId = ev.id, title = ev.title)) },
+            onOpenLeague = { l -> navController.navigate(SportsLeagueRoute(leagueId = l.id, title = l.name)) },
+        )
+
+        // A game reminder or live-score notification was tapped.
+        LaunchedEffect(navController) {
+            LiveTvDeepLinks.pending.collectLatest { link ->
+                when (link) {
+                    is LiveTvLink.Channel -> {
+                        LiveTvRepository.ensureLoaded()
+                        LiveTvRepository.uiState.value.channels.firstOrNull { it.id == link.key }?.let(onLiveTvChannelClick)
+                        LiveTvDeepLinks.consume(link)
+                    }
+                    is LiveTvLink.SportsGame -> {
+                        activateTab(AppScreenTab.Sports)
+                        navController.navigate(SportsGameRoute(eventId = link.eventId, title = "Sports")) { launchSingleTop = true }
+                        LiveTvDeepLinks.consume(link)
+                    }
+                    LiveTvLink.Sports -> {
+                        activateTab(AppScreenTab.Sports)
+                        LiveTvDeepLinks.consume(link)
+                    }
+                    null -> Unit
+                }
+            }
+        }
+
         AppUpdaterHost(
             controller = appUpdaterController,
             modifier = Modifier.fillMaxSize(),
@@ -1577,6 +1627,7 @@ internal fun MainAppContent(
                     LocalNuvioBottomNavigationOverlayPadding provides settingsRouteBottomOverlay,
                     LocalPosterClickAnchor provides if (posterNavigationEnabled) posterNavigation::prepare else null,
                     LocalUseNativeNavigation provides useNativeNavigation,
+                    LocalReserveProfileButton provides nativeTabBarOwnsChrome,
                     LocalNativeNavigationBarHidden provides (currentRoute?.hidesNavigationBar == true),
                     LocalVerticalBarPadding provides if (drawsUnderVerticalBar) verticalBarPadding else PaddingValues(),
                 ) {
@@ -1725,6 +1776,35 @@ internal fun MainAppContent(
                                 },
                                 onLicensesAttributionsSettingsClick = {
                                     navController.navigate(LicensesAttributionsSettingsRoute(licensesSettingsTitle))
+                                },
+                                onSportsClick = { navController.navigate(SportsRoute("Sports")) },
+                                sportsActions = sportsActions,
+                                onSportsBack = { activateTab(AppScreenTab.Home) },
+                                onOpenNews = { activateTab(AppScreenTab.News) },
+                                onOpenFollowing = { activateTab(AppScreenTab.Following) },
+                                onOpenLive = { activateTab(AppScreenTab.LiveTv) },
+                                onOpenPodcasts = { navController.navigate(PodcastsRoute()) },
+                                onOpenPodcastShow = { show ->
+                                    navController.navigate(
+                                        PodcastShowRoute(feedUrl = show.id, title = show.title, publisher = show.publisher, imageUrl = show.imageUrl, sport = show.sport),
+                                    )
+                                },
+                                onOpenArticle = { a ->
+                                    a.url?.let { url ->
+                                        navController.navigate(
+                                            ArticleRoute(
+                                                url = url,
+                                                headline = a.headline,
+                                                summary = a.summary,
+                                                imageUrl = a.imageUrl,
+                                                publisher = a.publisher,
+                                                author = a.author,
+                                                publishedMs = a.publishedMs,
+                                                leagueShort = a.leagueShort,
+                                                title = a.headline,
+                                            ),
+                                        )
+                                    }
                                 },
                                 onWhatsNewSettingsClick = {
                                     navController.navigate(WhatsNewSettingsRoute(whatsNewSettingsTitle))
@@ -1917,6 +1997,57 @@ internal fun MainAppContent(
                         )
                     }
                 }
+                entry<SportsRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    SportsScreen(onBack = onBack, actions = sportsActions, modifier = Modifier.fillMaxSize())
+                }
+                entry<SportsGameRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    SportsGameScreen(eventId = route.eventId, onBack = onBack, actions = sportsActions, modifier = Modifier.fillMaxSize())
+                }
+                entry<SportsLeagueRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    SportsLeagueScreen(leagueId = route.leagueId, onBack = onBack, actions = sportsActions, modifier = Modifier.fillMaxSize())
+                }
+                entry<PodcastsRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    PodcastBrowserScreen(
+                        onBack = onBack,
+                        onOpenShow = { show ->
+                            navController.navigate(
+                                PodcastShowRoute(feedUrl = show.id, title = show.title, publisher = show.publisher, imageUrl = show.imageUrl, sport = show.sport),
+                            )
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                entry<PodcastShowRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    PodcastShowScreen(
+                        podcast = Podcast(id = route.feedUrl, title = route.title, publisher = route.publisher, imageUrl = route.imageUrl, sport = route.sport),
+                        onBack = onBack,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                entry<ArticleRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    ArticleReaderScreen(
+                        article = NewsArticle(
+                            id = route.url,
+                            headline = route.headline,
+                            summary = route.summary,
+                            imageUrl = route.imageUrl,
+                            url = route.url,
+                            publishedMs = route.publishedMs,
+                            leagueId = null,
+                            leagueShort = route.leagueShort,
+                            publisher = route.publisher,
+                            author = route.author,
+                        ),
+                        onBack = onBack,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
                 entry<DownloadsRoute> { route ->
                     DownloadsDestination(
                         route = route,
@@ -2033,6 +2164,8 @@ internal fun MainAppContent(
                 }
             }
             }
+
+            PodcastNowPlayingHost(Modifier.fillMaxSize())
 
             MiniPlayerHost(
                 hostedRoute = hostedPlayerRoute,

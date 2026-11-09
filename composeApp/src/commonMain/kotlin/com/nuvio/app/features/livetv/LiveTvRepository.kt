@@ -324,6 +324,7 @@ object LiveTvRepository {
         refreshJob = scope.launch {
             val loadedChannels = mutableListOf<LiveTvChannel>()
             val failedPlaylistNames = mutableListOf<String>()
+            val failureNotes = mutableListOf<String>()
             val playlistEpgUrls = mutableListOf<String>()
 
             val playlistResults = enabledPlaylists.map { playlist ->
@@ -369,6 +370,7 @@ object LiveTvRepository {
                 onFailure = { error ->
                     if (error is CancellationException) throw error
                     failedPlaylistNames += "Xtream"
+                    failureNotes += "Xtream: ${describeProviderFailure(error)}"
                     log.w(error) { "Failed to load Xtream provider" }
                 },
             )
@@ -394,7 +396,9 @@ object LiveTvRepository {
                 channels = channels,
                 isLoading = false,
                 errorMessage = when {
-                    channels.isEmpty() && failedPlaylistNames.isNotEmpty() -> "Playlist could not be loaded."
+                    channels.isEmpty() && failedPlaylistNames.isNotEmpty() ->
+                        if (failureNotes.isEmpty()) "Playlist could not be loaded."
+                        else "Playlist could not be loaded. ${failureNotes.joinToString("; ")}."
                     channels.isEmpty() -> "No channels found in these playlists."
                     failedPlaylistNames.isNotEmpty() -> "Some playlists could not be loaded: ${failedPlaylistNames.joinToString()}"
                     else -> null

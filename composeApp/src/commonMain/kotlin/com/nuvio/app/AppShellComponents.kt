@@ -1,5 +1,20 @@
 package com.nuvio.app
 
+import nuvio.composeapp.generated.resources.compose_nav_music
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Explore
+import com.nuvio.app.features.experience.ExperienceMode
+import com.nuvio.app.features.experience.ExperienceRepository
+import com.nuvio.app.features.music.ui.MusicRoot
+import com.nuvio.app.features.news.NewsArticle
+import com.nuvio.app.features.podcasts.Podcast
+import com.nuvio.app.features.sportsfocus.LiveHub
+import com.nuvio.app.features.sportsfocus.SportsSearchScreen
+import com.nuvio.app.features.sportsfocus.SportsFocusFollowing
+import com.nuvio.app.features.sportsfocus.SportsFocusHome
+import com.nuvio.app.features.discover.DiscoverScreen
+import com.nuvio.app.features.music.ui.MusicTab
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.core.ui.background.OpaqueAppSurfaces
 import androidx.compose.animation.AnimatedVisibility
@@ -33,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.rounded.SportsSoccer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,6 +93,8 @@ import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
 import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvScreen
+import com.nuvio.app.features.sports.ui.SportsActions
+import com.nuvio.app.features.sports.ui.SportsScreen
 import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
@@ -98,6 +116,7 @@ import nuvio.composeapp.generated.resources.app_brand_name
 import nuvio.composeapp.generated.resources.compose_nav_home
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_live_tv
+import nuvio.composeapp.generated.resources.compose_nav_sports
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.sidebar_library
@@ -170,6 +189,15 @@ internal data class AppTabActions(
     val onSupportersContributorsSettingsClick: () -> Unit = {},
     val onLicensesAttributionsSettingsClick: () -> Unit = {},
     val onWhatsNewSettingsClick: () -> Unit = {},
+    val onSportsClick: () -> Unit = {},
+    val sportsActions: SportsActions? = null,
+    val onSportsBack: () -> Unit = {},
+    val onOpenNews: () -> Unit = {},
+    val onOpenFollowing: () -> Unit = {},
+    val onOpenLive: () -> Unit = {},
+    val onOpenArticle: (NewsArticle) -> Unit = {},
+    val onOpenPodcasts: () -> Unit = {},
+    val onOpenPodcastShow: (Podcast) -> Unit = {},
     val onCheckForUpdatesClick: (() -> Unit)? = null,
     val onTestUpdateBannerClick: (() -> Unit)? = null,
     val onCollectionsSettingsClick: () -> Unit = {},
@@ -193,7 +221,28 @@ internal fun AppTabHost(
         active = state.rootActionsEnabled,
         profileId = state.profileId,
     ) { tab ->
-        when (tab) {
+        val experienceMode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+        val musicTab = if (experienceMode == ExperienceMode.Music) {
+            when (tab) {
+                AppScreenTab.Home -> MusicTab.Home
+                AppScreenTab.Search -> MusicTab.Search
+                AppScreenTab.Library -> MusicTab.Library
+                else -> null
+            }
+        } else null
+        val sportsHome = experienceMode == ExperienceMode.SportsFocus && tab == AppScreenTab.Home && actions.sportsActions != null
+        if (musicTab != null) {
+            MusicRoot(musicTab, Modifier.fillMaxSize())
+        } else if (sportsHome) {
+            SportsFocusHome(actions.sportsActions!!, onOpenNews = actions.onOpenNews, onOpenArticle = actions.onOpenArticle, onOpenFollowing = actions.onOpenFollowing, onOpenLive = actions.onOpenLive, modifier = Modifier.fillMaxSize())
+        } else when (tab) {
+            AppScreenTab.Following -> actions.sportsActions?.let { SportsFocusFollowing(it, actions.onOpenArticle, Modifier.fillMaxSize()) }
+            AppScreenTab.News -> DiscoverScreen(
+                onOpenArticle = actions.onOpenArticle,
+                onOpenPodcast = actions.onOpenPodcastShow,
+                onOpenPodcasts = actions.onOpenPodcasts,
+                modifier = Modifier.fillMaxSize(),
+            )
             AppScreenTab.Home -> {
                 key(state.homeContentGeneration) {
                     val homeDynamicBackground by ThemeSettingsRepository.dynamicArtworkBackgroundEnabled.collectAsStateWithLifecycle()
@@ -215,7 +264,15 @@ internal fun AppTabHost(
                 }
             }
 
-            AppScreenTab.Search -> {
+            AppScreenTab.Search -> if (experienceMode == ExperienceMode.SportsFocus && actions.sportsActions != null) {
+                SportsSearchScreen(
+                    actions = actions.sportsActions,
+                    onOpenArticle = actions.onOpenArticle,
+                    onOpenPodcast = actions.onOpenPodcastShow,
+                    onOpenPodcasts = actions.onOpenPodcasts,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
                 SearchScreen(
                     modifier = Modifier.fillMaxSize(),
                     listState = state.searchListState,
@@ -245,10 +302,34 @@ internal fun AppTabHost(
             }
 
             AppScreenTab.LiveTv -> {
-                LiveTvScreen(
-                    scrollToTopRequests = requests.liveTvScrollToTopRequests,
-                    onChannelClick = actions.onLiveTvChannelClick,
-                )
+                if (experienceMode == ExperienceMode.SportsFocus && actions.sportsActions != null) {
+                    LiveHub(
+                        onChannelClick = actions.onLiveTvChannelClick,
+                        sportsActions = actions.sportsActions,
+                        scrollToTopRequests = requests.liveTvScrollToTopRequests,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    LiveTvScreen(
+                        scrollToTopRequests = requests.liveTvScrollToTopRequests,
+                        onChannelClick = actions.onLiveTvChannelClick,
+                        onSportsClick = null,
+                    )
+                }
+            }
+
+            AppScreenTab.Music -> {
+                com.nuvio.app.features.music.MusicScreen(modifier = Modifier.fillMaxSize())
+            }
+
+            AppScreenTab.Sports -> {
+                actions.sportsActions?.let { sportsActions ->
+                    SportsScreen(
+                        onBack = null,
+                        actions = sportsActions,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
 
             AppScreenTab.Settings -> {
@@ -312,7 +393,9 @@ internal fun TabletFloatingTopBar(
                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TabletTopPillItem(
+                ExperienceRepository.mode.collectAsStateWithLifecycle().value.tabs(showLiveTv).forEach { tab ->
+                    when (tab) {
+                        AppScreenTab.Home -> TabletTopPillItem(
                     label = stringResource(Res.string.compose_nav_home),
                     selected = selectedTab == AppScreenTab.Home,
                     onClick = { onTabSelected(AppScreenTab.Home) },
@@ -329,42 +412,7 @@ internal fun TabletFloatingTopBar(
                         )
                     },
                 )
-                TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_search),
-                    selected = selectedTab == AppScreenTab.Search,
-                    onClick = { onTabSelected(AppScreenTab.Search) },
-                    icon = {
-                        Icon(
-                            painter = painterResource(Res.drawable.sidebar_search),
-                            contentDescription = stringResource(Res.string.compose_nav_search),
-                            modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.Search) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
-                        )
-                    },
-                )
-                TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_library),
-                    selected = selectedTab == AppScreenTab.Library,
-                    onClick = { onTabSelected(AppScreenTab.Library) },
-                    icon = {
-                        Icon(
-                            painter = painterResource(Res.drawable.sidebar_library),
-                            contentDescription = stringResource(Res.string.compose_nav_library),
-                            modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.Library) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
-                        )
-                    },
-                )
-                if (showLiveTv) {
-                    TabletTopPillItem(
+                        AppScreenTab.LiveTv -> TabletTopPillItem(
                         label = stringResource(Res.string.compose_nav_live_tv),
                         selected = selectedTab == AppScreenTab.LiveTv,
                         onClick = { onTabSelected(AppScreenTab.LiveTv) },
@@ -381,6 +429,88 @@ internal fun TabletFloatingTopBar(
                             )
                         },
                     )
+                        AppScreenTab.Search -> TabletTopPillItem(
+                    label = stringResource(Res.string.compose_nav_search),
+                    selected = selectedTab == AppScreenTab.Search,
+                    onClick = { onTabSelected(AppScreenTab.Search) },
+                    icon = {
+                        Icon(
+                            painter = painterResource(Res.drawable.sidebar_search),
+                            contentDescription = stringResource(Res.string.compose_nav_search),
+                            modifier = Modifier.size(NuvioTokens.Space.s18),
+                            tint = if (selectedTab == AppScreenTab.Search) {
+                                tokens.colors.textPrimary
+                            } else {
+                                tokens.colors.textMuted
+                            },
+                        )
+                    },
+                )
+                        AppScreenTab.Sports -> TabletTopPillItem(
+                        label = stringResource(Res.string.compose_nav_sports),
+                        selected = selectedTab == AppScreenTab.Sports,
+                        onClick = { onTabSelected(AppScreenTab.Sports) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.SportsSoccer,
+                                contentDescription = stringResource(Res.string.compose_nav_sports),
+                                modifier = Modifier.size(18.dp),
+                                tint = if (selectedTab == AppScreenTab.Sports) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        },
+                    )
+                        AppScreenTab.Library -> TabletTopPillItem(
+                    label = stringResource(Res.string.compose_nav_library),
+                    selected = selectedTab == AppScreenTab.Library,
+                    onClick = { onTabSelected(AppScreenTab.Library) },
+                    icon = {
+                        Icon(
+                            painter = painterResource(Res.drawable.sidebar_library),
+                            contentDescription = stringResource(Res.string.compose_nav_library),
+                            modifier = Modifier.size(NuvioTokens.Space.s18),
+                            tint = if (selectedTab == AppScreenTab.Library) {
+                                tokens.colors.textPrimary
+                            } else {
+                                tokens.colors.textMuted
+                            },
+                        )
+                    },
+                )
+                        AppScreenTab.Music -> TabletTopPillItem(
+                            label = stringResource(Res.string.compose_nav_music),
+                            selected = selectedTab == AppScreenTab.Music,
+                            onClick = { onTabSelected(AppScreenTab.Music) },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.MusicNote,
+                                    contentDescription = stringResource(Res.string.compose_nav_music),
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (selectedTab == AppScreenTab.Music) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            },
+                        )
+                        AppScreenTab.Following -> TabletTopPillItem(
+                            label = "Following",
+                            selected = selectedTab == AppScreenTab.Following,
+                            onClick = { onTabSelected(AppScreenTab.Following) },
+                            icon = { Icon(imageVector = Icons.Rounded.Star, contentDescription = "Following", modifier = Modifier.size(18.dp), tint = if (selectedTab == AppScreenTab.Following) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) },
+                        )
+                        AppScreenTab.News -> TabletTopPillItem(
+                            label = "Discover",
+                            selected = selectedTab == AppScreenTab.News,
+                            onClick = { onTabSelected(AppScreenTab.News) },
+                            icon = { Icon(imageVector = Icons.Rounded.Explore, contentDescription = "Discover", modifier = Modifier.size(18.dp), tint = if (selectedTab == AppScreenTab.News) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) },
+                        )
+                        AppScreenTab.Settings -> Unit
+                    }
                 }
                 Surface(
                     color = if (selectedTab == AppScreenTab.Settings) {

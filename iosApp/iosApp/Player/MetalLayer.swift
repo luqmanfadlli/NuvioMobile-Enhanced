@@ -240,12 +240,20 @@ class MetalLayer: CAMetalLayer {
             return drawable
         }
 
-        drawable.addPresentedHandler { [weak self] _ in
+        // Xcode 27 beta SDK: `addPresentedHandler` is no longer declared on MTLDrawable. Call it through the Objective-C runtime
+        // when the running OS still implements it, and otherwise count the frame immediately.
+        let presented: @convention(block) (AnyObject) -> Void = { [weak self] _ in
             guard let self else { return }
             self.captureLock.lock()
             self.capturedDrawableCount &+= 1
             self.captureLock.unlock()
             handler(drawable)
+        }
+        let selector = Selector(("addPresentedHandler:"))
+        if (drawable as AnyObject).responds(to: selector) {
+            _ = (drawable as AnyObject).perform(selector, with: presented as AnyObject)
+        } else {
+            presented(drawable as AnyObject)
         }
 
         return drawable

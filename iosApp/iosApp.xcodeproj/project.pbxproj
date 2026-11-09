@@ -449,7 +449,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 8QBDZ766S3;
+				DEVELOPMENT_TEAM = TFM85T3W6S;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DownloadsWidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
@@ -458,7 +458,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app.DownloadsWidgetExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.DownloadsWidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -473,7 +473,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 8QBDZ766S3;
+				DEVELOPMENT_TEAM = TFM85T3W6S;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DownloadsWidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
@@ -482,7 +482,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.media.DownloadsWidgetExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.DownloadsWidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -507,7 +507,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.SubtitleTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.SubtitleTests;
 				PRODUCT_MODULE_NAME = SubtitleTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -535,7 +535,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = 8QBDZ766S3;
+				DEVELOPMENT_TEAM = TFM85T3W6S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -559,7 +559,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.media;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -583,7 +583,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = 8QBDZ766S3;
+				DEVELOPMENT_TEAM = TFM85T3W6S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -607,7 +607,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -695,7 +695,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.SubtitleTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.SubtitleTests;
 				PRODUCT_MODULE_NAME = SubtitleTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

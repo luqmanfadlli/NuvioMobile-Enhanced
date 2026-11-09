@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Description
@@ -74,6 +75,11 @@ internal enum class SettingsPage(
     ),
     Account(
         titleRes = Res.string.compose_settings_page_account,
+        category = SettingsCategory.You,
+        parentPage = Root,
+    ),
+    Experience(
+        titleRes = Res.string.settings_experience_title,
         category = SettingsCategory.You,
         parentPage = Root,
     ),
@@ -324,5 +330,6 @@ internal val SettingsPage.icon: ImageVector
         SettingsPage.Downloads -> Icons.Default.Download
         SettingsPage.Omdb -> Icons.Default.Link
         SettingsPage.LiveTv -> Icons.Default.LiveTv
+        SettingsPage.Experience -> Icons.Default.Tune
         SettingsPage.DiscordRpc -> Icons.Default.Link
     }

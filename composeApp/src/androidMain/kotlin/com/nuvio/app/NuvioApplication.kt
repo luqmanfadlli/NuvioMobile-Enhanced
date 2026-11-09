@@ -28,6 +28,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         DnsPlatform.initialize(this)
+        com.nuvio.app.features.sports.compat.SportsAndroid.initialize(this) // Sports hub (ported from NuvioPlusIPTV-Mobile)
     }
 
     override fun newImageLoader(context: android.content.Context): ImageLoader {

@@ -92,29 +92,14 @@ import nuvio.composeapp.generated.resources.live_tv_username
 import nuvio.composeapp.generated.resources.live_tv_xtream_description
 import nuvio.composeapp.generated.resources.live_tv_xtream_server
 import nuvio.composeapp.generated.resources.live_tv_xtream_title
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.liveTvSettingsContent(
     isTablet: Boolean,
     uiState: LiveTvUiState,
 ) {
-    if (uiState.hasPlaylist) {
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.live_tv_settings_section_navigation),
-                isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    LiveTvNavigationVisibilityRow(
-                        isTablet = isTablet,
-                        enabled = uiState.isNavigationEnabled,
-                        onEnabledChanged = LiveTvRepository::setNavigationEnabled,
-                    )
-                }
-            }
-        }
-    }
-
     if (uiState.hasPlaylist) {
         item {
             SettingsSection(
@@ -157,6 +142,22 @@ internal fun LazyListScope.liveTvSettingsContent(
                     onPlaylistEnabledChanged = LiveTvRepository::setPlaylistEnabled,
                     onPlaylistRemoved = LiveTvRepository::removePlaylist,
                 )
+            }
+        }
+    }
+
+    item {
+        SettingsSection(title = "Sports", isTablet = isTablet) {
+            SettingsGroup(isTablet = isTablet) {
+                var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                val sportsSettings by com.nuvio.app.features.sports.SportsRepository.settings.collectAsStateWithLifecycle()
+                SettingsNavigationRow(
+                    title = "Sports playback",
+                    description = (if (sportsSettings.sdOnly) "SD only" else "Best quality") + " \u00B7 " + (if (sportsSettings.choosePlayStream) "choose stream" else "play best stream"),
+                    isTablet = isTablet,
+                    onClick = { open = true },
+                )
+                if (open) com.nuvio.app.features.sports.ui.SportsSettingsSheet(sportsSettings, onDismiss = { open = false })
             }
         }
     }

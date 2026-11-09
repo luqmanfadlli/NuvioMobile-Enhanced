@@ -3,6 +3,8 @@ package com.nuvio.app.core.ui
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 
 /**
@@ -25,6 +27,12 @@ internal fun NativeTabBarScrollEffect(
     enabled: Boolean = true,
 ) {
     val supported = isLiquidGlassNativeTabBarSupported()
+    val sportsMode by com.nuvio.app.features.experience.ExperienceRepository.mode.collectAsState()
+    // Sports mode keeps the bar fixed on every main page.
+    if (sportsMode == com.nuvio.app.features.experience.ExperienceMode.SportsFocus) {
+        LaunchedEffect(Unit) { NativeTabBridge.publishTabBarVisible(true) }
+        return
+    }
 
     LaunchedEffect(listState, enabled, supported) {
         if (!enabled || !supported) return@LaunchedEffect

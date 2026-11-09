@@ -1,6 +1,6 @@
 #include? "Version.xcconfig"
 
-TEAM_ID=
+TEAM_ID=TFM85T3W6S
 
-PRODUCT_NAME=Nuvio Enhanced
-PRODUCT_BUNDLE_IDENTIFIER=com.nuvio.app.Nuvio$(TEAM_ID)
+PRODUCT_NAME=BannerTV
+PRODUCT_BUNDLE_IDENTIFIER=com.alexdiab.StadiaTV

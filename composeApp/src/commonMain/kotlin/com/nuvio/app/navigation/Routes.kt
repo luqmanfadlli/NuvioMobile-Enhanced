@@ -94,6 +94,58 @@ data class DownloadsRoute(override val title: String = "") : AppRoute {
 }
 
 @Serializable
+data class SportsRoute(override val title: String = "") : AppRoute {
+    // The Sports tab only exists in the other layouts; in Sports focus a game opens on the tab you are on.
+    override val preferredTabName: String?
+        get() = if (com.nuvio.app.features.experience.ExperienceRepository.mode.value == com.nuvio.app.features.experience.ExperienceMode.SportsFocus) null else "Sports"
+}
+
+@Serializable
+data class SportsGameRoute(val eventId: String, override val title: String = "") : AppRoute {
+    // The Sports tab only exists in the other layouts; in Sports focus a game opens on the tab you are on.
+    override val preferredTabName: String?
+        get() = if (com.nuvio.app.features.experience.ExperienceRepository.mode.value == com.nuvio.app.features.experience.ExperienceMode.SportsFocus) null else "Sports"
+}
+
+@Serializable
+data class SportsLeagueRoute(val leagueId: String, override val title: String = "") : AppRoute {
+    // The Sports tab only exists in the other layouts; in Sports focus a game opens on the tab you are on.
+    override val preferredTabName: String?
+        get() = if (com.nuvio.app.features.experience.ExperienceRepository.mode.value == com.nuvio.app.features.experience.ExperienceMode.SportsFocus) null else "Sports"
+}
+
+/** Browse and search sports podcasts. */
+@Serializable
+data class PodcastsRoute(override val title: String = "Sports Talk") : AppRoute
+
+/** One podcast's page. Carries what the catalogue knows so the page can draw before its feed arrives. */
+@Serializable
+data class PodcastShowRoute(
+    val feedUrl: String,
+    override val title: String = "",
+    val publisher: String = "",
+    val imageUrl: String? = null,
+    val sport: String? = null,
+) : AppRoute
+
+/** A news story opened in the app's own reader. Carries what the feed already knows so it opens at once. */
+@Serializable
+data class ArticleRoute(
+    val url: String,
+    val headline: String,
+    val summary: String = "",
+    val imageUrl: String? = null,
+    val publisher: String = "",
+    val author: String? = null,
+    val publishedMs: Long = 0L,
+    val leagueShort: String? = null,
+    override val title: String = "",
+) : AppRoute {
+    override val hidesNavigationBar: Boolean
+        get() = true
+}
+
+@Serializable
 data class DownloadShowRoute(
     val showId: String,
     override val title: String,

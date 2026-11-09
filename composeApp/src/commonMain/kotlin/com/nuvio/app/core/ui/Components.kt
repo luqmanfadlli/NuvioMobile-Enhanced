@@ -78,6 +78,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.nuvio.app.navigation.LocalNativeNavigationBarHidden
+import com.nuvio.app.navigation.LocalReserveProfileButton
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 @Stable
@@ -189,6 +190,7 @@ fun NuvioScreenHeader(
 ) {
     val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val reserveProfileButton = LocalReserveProfileButton.current
     val nativeDetailNavigation = LocalUseNativeNavigation.current &&
         !LocalNativeNavigationBarHidden.current &&
         onBack != null
@@ -227,7 +229,8 @@ fun NuvioScreenHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = sideBleed)
-                .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
+                .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4)
+                .padding(end = if (reserveProfileButton && onBack == null) 52.dp else 0.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {

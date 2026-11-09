@@ -21,7 +21,8 @@ captures
 node_modules/
 logs/
 analysis/
-Docs
+Docs/*
+!Docs/integration/
 SUPPORTER_COSMETICS.md
 supabase/migrations/
 keystore/

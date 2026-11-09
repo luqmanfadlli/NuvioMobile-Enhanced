@@ -88,7 +88,7 @@ struct NuvioGlassTabBar: View {
     }
 
     private var visibleTabs: [NuvioAppTab] {
-        isExpanded ? appCoordinator.availableTabs : [selectedTab]
+        isExpanded ? appCoordinator.barTabs : [selectedTab == .settings ? .home : selectedTab]
     }
 
     private var mirroredItems: [NuvioTabBarItemMetrics]? {
@@ -133,15 +133,15 @@ struct NuvioGlassTabBar: View {
     }
 
     private var segmentedBar: some View {
-        let tabs = appCoordinator.availableTabs
+        let tabs = appCoordinator.barTabs
         let singleAccent = iconStore.accentColors.count <= 1
         let items = tabs.map { tab in
             NuvioSegmentedTabBarItem(
                 title: appCoordinator.title(for: tab),
                 baseImage: iconStore.image(for: tab, selected: false),
                 accentImage: iconStore.image(for: tab, selected: true),
-                tintsBaseImage: tab != .settings,
-                tintsAccentImage: tab != .settings && singleAccent
+                tintsBaseImage: !(tab == .settings),
+                tintsAccentImage: !(tab == .settings) && singleAccent
             )
         }
         let contentKey = tabs.map { "\($0.rawValue):\(appCoordinator.title(for: $0))" }.joined(separator: "|")
@@ -149,7 +149,7 @@ struct NuvioGlassTabBar: View {
         return NuvioSegmentedTabBar(
             items: items,
             contentKey: contentKey,
-            selectedIndex: tabs.firstIndex(of: selectedTab) ?? 0,
+            selectedIndex: tabs.firstIndex(of: selectedTab) ?? UISegmentedControl.noSegment,
             isExpanded: isExpanded || hidesWhenCollapsed,
             isCompact: isCompactHeight,
             accentColor: iconStore.accentColor,

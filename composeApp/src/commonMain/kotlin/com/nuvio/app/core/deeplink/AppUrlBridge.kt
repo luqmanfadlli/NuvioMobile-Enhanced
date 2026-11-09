@@ -49,6 +49,7 @@ fun handleAppUrl(url: String) {
     val normalizedUrl = url.trim()
     if (normalizedUrl.isBlank()) return
     if (infusePlaybackCallbacks.handleUrl(normalizedUrl)) return
+    if (com.nuvio.app.features.sports.compat.LiveTvDeepLinks.handle(normalizedUrl)) return // Sports hub: reminder notifications
 
     ensureTrackingProvidersRegistered()
     TrackingProviderRegistry.handleAuthCallback(normalizedUrl)

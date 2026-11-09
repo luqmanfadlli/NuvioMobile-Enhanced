@@ -1,6 +1,7 @@
 package com.nuvio.app.features.livetv
 
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
+import com.nuvio.app.features.addons.httpRequestRaw
 import io.ktor.http.encodeURLParameter
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -38,7 +39,7 @@ internal suspend fun fetchXtreamChannels(settings: LiveTvXtreamSettings): List<L
             group = item.string("category_id")?.let(categories::get),
             playlistId = XTREAM_PLAYLIST_ID,
             playlistName = "Xtream",
-            headers = streamRequestHeaders,
+            headers = normalized.streamHeaders(),
             streamType = extension,
             epgId = item.string("epg_channel_id"),
         )
@@ -50,9 +51,78 @@ internal fun xtreamEpgUrl(settings: LiveTvXtreamSettings): String {
     return "${normalized.serverUrl}/xmltv.php?username=${normalized.username.encodeURLParameter()}&password=${normalized.password.encodeURLParameter()}"
 }
 
+/**
+ * Many IPTV panels answer 403 (or an HTML page) to unknown clients. Try the well-known player User-Agents in turn,
+ * starting with the one that worked last time, and remember the one that gets through.
+ */
+private val xtreamUserAgentCandidates = listOf(
+    "IPTVSmartersPro",
+    "VLC/3.0.20 LibVLC/3.0.20",
+    "okhttp/4.12.0",
+    "Nuvio/1.0",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+    "TiviMate/5.1.0 (Android 14)",
+    "Lavf/60.16.100",
+)
+private var xtreamWorkingUserAgent: String? = null
+private val httpStatusPattern = Regex("HTTP (\\d{3})")
+
+/** The HTTP status carried by a failed request's message ("Request failed with HTTP 403"), if any. */
+internal fun httpStatusOf(error: Throwable): Int? =
+    httpStatusPattern.find(error.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()
+
+/** A failed provider request that keeps what the panel said about why (status, reason header, page text). */
+internal class ProviderHttpException(val status: Int, val panelReason: String?) :
+    RuntimeException("Request failed with HTTP $status${panelReason?.let { ": $it" }.orEmpty()}")
+
+/** A short, user-facing reason for a provider failure. */
+internal fun describeProviderFailure(error: Throwable): String {
+    val status = ((error as? ProviderHttpException) ?: (error.cause as? ProviderHttpException))?.status ?: httpStatusOf(error)
+    val panelReason = ((error as? ProviderHttpException) ?: (error.cause as? ProviderHttpException))?.panelReason
+    return when {
+        panelReason != null && status != null -> "the provider answered HTTP $status: $panelReason"
+        status == 401 || status == 403 -> "the provider refused the request (HTTP $status) without naming a reason. It usually means this network or device is not allowed for the line, or the login is wrong"
+        status != null -> "the provider answered HTTP $status"
+        error.message.orEmpty().contains("timed out", ignoreCase = true) -> "the provider did not answer in time"
+        else -> error.message?.take(120)?.ifBlank { null } ?: "unexpected response from the provider"
+    }
+}
+
+private fun LiveTvXtreamSettings.streamHeaders(): Map<String, String> =
+    streamRequestHeaders + ("User-Agent" to (xtreamWorkingUserAgent ?: "IPTVSmartersPro"))
+
 private suspend fun xtreamRequest(settings: LiveTvXtreamSettings, action: String): JsonElement {
     val url = "${settings.serverUrl}/player_api.php?username=${settings.username.encodeURLParameter()}&password=${settings.password.encodeURLParameter()}&action=${action.encodeURLParameter()}"
-    return portalJson.parseToJsonElement(httpGetTextWithHeaders(url, playlistRequestHeaders))
+    val candidates = (listOfNotNull(xtreamWorkingUserAgent) + xtreamUserAgentCandidates).distinct()
+    var lastError: Throwable? = null
+    for (userAgent in candidates) {
+        try {
+            val response = httpRequestRaw(
+                method = "GET",
+                url = url,
+                headers = playlistRequestHeaders + ("User-Agent" to userAgent),
+                body = "",
+                maxResponseBodyBytes = 64 * 1024 * 1024,
+            )
+            if (response.status !in 200..299) {
+                val reason = response.headers["x-panel-reason-message"]?.takeIf(String::isNotBlank)
+                    ?: response.body.replace(Regex("(?is)<(style|script)[^>]*>.*?</\\1>"), " ").replace(Regex("<[^>]*>"), " ").trim().take(120).takeIf(String::isNotBlank)
+                throw ProviderHttpException(response.status, reason)
+            }
+            val element = portalJson.parseToJsonElement(response.body)
+            xtreamWorkingUserAgent = userAgent
+            return element
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            lastError = error
+            val status = httpStatusOf(error)
+            // Only a rejection (or a non-JSON page) is worth retrying with another client name.
+            val retryable = status in setOf(401, 403, 406, 429) || (status == null && error is IllegalArgumentException)
+            if (!retryable) break
+        }
+    }
+    throw IllegalStateException(describeProviderFailure(lastError ?: IllegalStateException("no response")), lastError)
 }
 
 private data class StalkerSession(val settings: LiveTvStalkerSettings, val token: String)

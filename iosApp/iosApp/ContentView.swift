@@ -1,8 +1,12 @@
 import AVKit
 import Combine
+import SafariServices
 import SwiftUI
 import UIKit
 import ComposeApp
+
+// Referenced so Xcode links SafariServices for the in-app article browser (the Kotlin framework is static).
+private let nuvioSafariServicesLink: AnyClass = SFSafariViewController.self
 
 private let nuvioBackgroundColor = UIColor(
     red: 0.051,
@@ -408,18 +412,57 @@ final class TabNavigationCoordinator: ObservableObject {
     }
 }
 
+/// How the app is arranged; mirrors `ExperienceMode` in Kotlin (same UserDefaults key).
+enum BannerExperienceMode: String {
+    case balanced
+    case sports
+    case music
+
+    static let storageKey = "BannerExperienceMode"
+
+    static func current() -> BannerExperienceMode {
+        BannerExperienceMode(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .balanced
+    }
+}
+
+@available(iOS 16.0, *)
+extension BannerExperienceMode {
+    /// Bottom-bar tabs for this mode, in order (Profile is the top-right avatar, never a bar item).
+    func tabs(showLiveTv: Bool) -> [NuvioAppTab] {
+        let ordered: [NuvioAppTab]
+        switch self {
+        case .balanced: ordered = [.home, .liveTv, .search, .sports, .library]
+        case .sports: ordered = [.home, .following, .search, .liveTv, .news]
+        case .music: ordered = [.home, .search, .library]
+        }
+        return showLiveTv ? ordered : ordered.filter { $0 != .liveTv && $0 != .sports }
+    }
+}
+
 @available(iOS 16.0, *)
 enum NuvioAppTab: String, CaseIterable, Hashable {
     case home = "Home"
-    case search = "Search"
-    case library = "Library"
     case liveTv = "LiveTv"
+    case search = "Search"
+    case sports = "Sports"
+    case music = "Music"
+    case following = "Following"
+    case news = "News"
+    case library = "Library"
     case settings = "Settings"
 
     var fallbackTitle: String {
         switch self {
         case .liveTv:
             return "Live TV"
+        case .sports:
+            return "Sports"
+        case .music:
+            return "Music"
+        case .following:
+            return "Following"
+        case .news:
+            return "Discover"
         default:
             return String(localized: String.LocalizationValue(rawValue))
         }
@@ -431,6 +474,10 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case "search": return .search
         case "library": return .library
         case "livetv", "live_tv", "live tv": return .liveTv
+        case "sports": return .sports
+        case "music": return .music
+        case "following": return .following
+        case "news": return .news
         case "settings", "profile": return .settings
         default: return nil
         }
@@ -442,6 +489,10 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case .search: return "NuvioTabSearch"
         case .library: return "NuvioTabLibrary"
         case .liveTv: return "NuvioTabLiveTv"
+        case .sports: return "NuvioTabSports"
+        case .music: return "NuvioTabMusic"
+        case .following: return "NuvioTabFollowing"
+        case .news: return "NuvioTabNews"
         case .settings: return "NuvioTabProfile"
         }
     }
@@ -452,6 +503,10 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case .search: return "magnifyingglass"
         case .library: return "rectangle.stack.fill"
         case .liveTv: return "tv.fill"
+        case .sports: return "soccerball"
+        case .music: return "music.note"
+        case .following: return "star.fill"
+        case .news: return "safari.fill"
         case .settings: return "person.crop.circle.fill"
         }
     }
@@ -945,7 +1000,8 @@ final class AppNavigationCoordinator: ObservableObject {
     }
     @Published private(set) var tabBarBehavior: NuvioTabBarBehavior = NuvioTabBarBehavior.current()
     @Published private(set) var isSelectedTabAtRoot = true
-    @Published private(set) var isLiveTvTabVisible = false
+    @Published private(set) var isLiveTvTabVisible = true
+    @Published private(set) var experienceMode: BannerExperienceMode = BannerExperienceMode.current()
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published private(set) var localizedSwitchProfileTitle = ""
     @Published private(set) var localizedAddProfileTitle = ""
@@ -957,6 +1013,10 @@ final class AppNavigationCoordinator: ObservableObject {
     let searchCoordinator = TabNavigationCoordinator()
     let libraryCoordinator = TabNavigationCoordinator()
     let liveTvCoordinator = TabNavigationCoordinator()
+    let sportsCoordinator = TabNavigationCoordinator()
+    let musicCoordinator = TabNavigationCoordinator()
+    let followingCoordinator = TabNavigationCoordinator()
+    let newsCoordinator = TabNavigationCoordinator()
     let settingsCoordinator = TabNavigationCoordinator()
     let appGateController = AppGateController()
     let profileSwitcherController = NativeProfileSwitcherController()
@@ -994,11 +1054,44 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     private var allCoordinators: [TabNavigationCoordinator] {
-        [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, settingsCoordinator]
+        [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, sportsCoordinator, musicCoordinator, followingCoordinator, newsCoordinator, settingsCoordinator]
     }
 
     var availableTabs: [NuvioAppTab] {
-        NuvioAppTab.allCases.filter { $0 != .liveTv || isLiveTvTabVisible }
+        NuvioAppTab.allCases.filter { ($0 != .liveTv && $0 != .sports) || isLiveTvTabVisible }
+    }
+
+    /// The corner profile button is used whenever the native/glass bar is active (iOS 26+); older layouts keep Profile in the bar.
+    var isProfileButtonEnabled: Bool {
+        // In Sports focus Settings is a bar tab (gear), so the corner avatar is not needed.
+        if #available(iOS 26.0, *) { return tabBarBehavior.isEnabled }
+        return false
+    }
+
+    /// Tells the profile-select animation where the corner avatar lives so it lands exactly on it.
+    func publishCornerProfileFrame(in frame: CGRect) {
+        guard isProfileButtonEnabled, frame.width > 0 else { return }
+        let side: CGFloat = 40
+        NativeTabBridgeKt.publishProfileTabIconFrame(
+            xDp: Float(frame.maxX - 14 - side),
+            yDp: Float(frame.minY + 6),
+            widthDp: Float(side),
+            heightDp: Float(side)
+        )
+    }
+
+    /// Tabs shown in the bottom bar. Profile is reached from the avatar button at the top right instead.
+    var barTabs: [NuvioAppTab] {
+        experienceMode.tabs(showLiveTv: isLiveTvTabVisible)
+    }
+
+    func reloadExperienceMode() {
+        let mode = BannerExperienceMode.current()
+        guard mode != experienceMode else { return }
+        experienceMode = mode
+        if selectedTab != .settings, !barTabs.contains(selectedTab) {
+            selectedTab = barTabs.first ?? .home
+        }
     }
 
     var usesGlassTabBarOverlay: Bool {
@@ -1062,9 +1155,10 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     func reloadLiveTvTabVisibility() {
-        let visible = UserDefaults.standard.bool(forKey: Self.liveTvTabVisibleKey)
+        // Live TV and Sports are always available; the old navigation toggle no longer hides them.
+        let visible = true
         guard isLiveTvTabVisible != visible else { return }
-        if !visible && selectedTab == .liveTv {
+        if !visible && (selectedTab == .liveTv || selectedTab == .sports) {
             selectedTab = .home
         }
         isLiveTvTabVisible = visible
@@ -1076,13 +1170,17 @@ final class AppNavigationCoordinator: ObservableObject {
         case .search: return searchCoordinator
         case .library: return libraryCoordinator
         case .liveTv: return liveTvCoordinator
+        case .sports: return sportsCoordinator
+        case .music: return musicCoordinator
+        case .following: return followingCoordinator
+        case .news: return newsCoordinator
         case .settings: return settingsCoordinator
         }
     }
 
     func activateTab(named tabName: String) {
         guard let tab = NuvioAppTab.from(kotlinName: tabName) else { return }
-        guard tab != .liveTv || isLiveTvTabVisible else {
+        guard (tab != .liveTv && tab != .sports) || isLiveTvTabVisible else {
             selectedTab = .home
             return
         }
@@ -1092,7 +1190,8 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     func title(for tab: NuvioAppTab) -> String {
-        localizedTabTitles[tab] ?? tab.fallbackTitle
+        if experienceMode == .music && tab == .library { return "Your Library" }
+        return localizedTabTitles[tab] ?? tab.fallbackTitle
     }
 
     func updateTabTitles(
@@ -1108,6 +1207,7 @@ final class AppNavigationCoordinator: ObservableObject {
             .search: search,
             .library: library,
             .liveTv: NuvioAppTab.liveTv.fallbackTitle,
+            .sports: NuvioAppTab.sports.fallbackTitle,
             .settings: profile,
         ]
         localizedSwitchProfileTitle = switchProfile
@@ -1116,6 +1216,10 @@ final class AppNavigationCoordinator: ObservableObject {
 
     func updateAppReady(_ ready: Bool) {
         isAppReady = ready
+        if ready {
+            reloadExperienceMode()
+            if let first = barTabs.first, selectedTab == .home, first != .home { selectedTab = first }
+        }
         if !ready {
             isProfileSwitcherPresented = false
             setTabBarVisible(true)
@@ -1160,7 +1264,7 @@ final class AppNavigationCoordinator: ObservableObject {
         let requestedTab = NuvioAppTab.from(kotlinName: route.preferredTabName)
             ?? tab(for: origin)
             ?? selectedTab
-        let targetTab = requestedTab == .liveTv && !isLiveTvTabVisible ? .home : requestedTab
+        let targetTab = (requestedTab == .liveTv || requestedTab == .sports) && !isLiveTvTabVisible ? .home : requestedTab
         let target = coordinator(for: targetTab)
         selectedTab = targetTab
         target.push(route, launchSingleTop: launchSingleTop)
@@ -1233,9 +1337,7 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
             hidesContainingTabBar: !usesNativeTabBar,
             verticalBar: verticalBar,
             onTabBarControllerAvailable: { tabBarController in
-                if usesNativeTabBar {
-                    appCoordinator.profileTabInteraction.attach(to: tabBarController)
-                }
+                // Profile is no longer a bar item, so the last-item long-press hook is intentionally not attached.
             }
         )
     }
@@ -1370,6 +1472,7 @@ struct TabContentView: View {
             .ignoresSafeArea(.all)
             .navigationTitle(appCoordinator.title(for: tab))
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteWrapper.self) { wrapper in
                 if appCoordinator.selectedTab == tab {
                     DetailDestinationView(
@@ -1848,79 +1951,74 @@ struct NativeNavContentView: View {
         }
     }
 
+    @State private var settingsMounted = false
+    @State private var lastBarTab: NuvioAppTab = .home
+
+    /// The native TabView only ever holds the bar tabs (five at most keeps iOS from adding a "More" tab with its own
+    /// back button); Profile is shown as an overlay instead.
+    private var nativeTabSelection: Binding<NuvioAppTab> {
+        Binding(
+            get: { appCoordinator.selectedTab == .settings ? lastBarTab : appCoordinator.selectedTab },
+            set: { newTab in tabSelection.wrappedValue = newTab }
+        )
+    }
+
     @available(iOS 26.0, *)
     private var nativeTabs: some View {
-        TabView(selection: tabSelection) {
-            ForEach(appCoordinator.availableTabs, id: \.self) { tab in
-                if tab == .settings {
-                    Tab(value: tab) {
-                        TabContentView(
-                            tab: tab,
-                            usesNativeTabBar: usesNativeTabBar,
-                            usesTabletFloatingTabBar: usesTabletFloatingTabBar,
-                            coordinator: appCoordinator.coordinator(for: tab),
-                            appCoordinator: appCoordinator
+        TabView(selection: nativeTabSelection) {
+            ForEach(appCoordinator.barTabs.filter { $0 != .settings }, id: \.self) { tab in
+                Tab(value: tab) {
+                    TabContentView(
+                        tab: tab,
+                        usesNativeTabBar: usesNativeTabBar,
+                        usesTabletFloatingTabBar: usesTabletFloatingTabBar,
+                        coordinator: appCoordinator.coordinator(for: tab),
+                        appCoordinator: appCoordinator
+                    )
+                } label: {
+                    Label {
+                        Text(appCoordinator.title(for: tab))
+                    } icon: {
+                        Image(
+                            uiImage: iconStore.image(
+                                for: tab,
+                                selected: appCoordinator.selectedTab == tab
+                            )
                         )
-                    } label: {
-                        Label {
-                            Text(appCoordinator.title(for: tab))
-                        } icon: {
-                            Image(
-                                uiImage: iconStore.image(
-                                    for: tab,
-                                    selected: appCoordinator.selectedTab == tab
-                                )
-                            )
-                            .id(
-                                "\(tab.rawValue)-\(iconStore.revision)-" +
-                                    "\(appCoordinator.selectedTab == tab)"
-                            )
-                        }
-                    }
-                    .popover(
-                        isPresented: $appCoordinator.isProfileSwitcherPresented,
-                        attachmentAnchor: .rect(.bounds),
-                        arrowEdge: .bottom
-                    ) {
-                        NativeProfileSwitcherView(
-                            controller: appCoordinator.profileSwitcherController,
-                            title: appCoordinator.localizedSwitchProfileTitle,
-                            addProfileTitle: appCoordinator.localizedAddProfileTitle,
-                            onManageProfiles: appCoordinator.openProfileManagement
+                        .id(
+                            "\(tab.rawValue)-\(iconStore.revision)-" +
+                                "\(appCoordinator.selectedTab == tab)"
                         )
-                    }
-                } else {
-                    Tab(value: tab) {
-                        TabContentView(
-                            tab: tab,
-                            usesNativeTabBar: usesNativeTabBar,
-                            usesTabletFloatingTabBar: usesTabletFloatingTabBar,
-                            coordinator: appCoordinator.coordinator(for: tab),
-                            appCoordinator: appCoordinator
-                        )
-                    } label: {
-                        Label {
-                            Text(appCoordinator.title(for: tab))
-                        } icon: {
-                            Image(
-                                uiImage: iconStore.image(
-                                    for: tab,
-                                    selected: appCoordinator.selectedTab == tab
-                                )
-                            )
-                            .id(
-                                "\(tab.rawValue)-\(iconStore.revision)-" +
-                                    "\(appCoordinator.selectedTab == tab)"
-                            )
-                        }
                     }
                 }
             }
         }
-        .id(appCoordinator.isLiveTvTabVisible)
+        .overlay {
+            if settingsMounted {
+                TabContentView(
+                    tab: .settings,
+                    usesNativeTabBar: usesNativeTabBar,
+                    usesTabletFloatingTabBar: usesTabletFloatingTabBar,
+                    coordinator: appCoordinator.coordinator(for: .settings),
+                    appCoordinator: appCoordinator
+                )
+                .background(Color(uiColor: nuvioBackgroundColor).ignoresSafeArea())
+                .opacity(appCoordinator.selectedTab == .settings ? 1 : 0)
+                .allowsHitTesting(appCoordinator.selectedTab == .settings)
+                .accessibilityHidden(appCoordinator.selectedTab != .settings)
+            }
+        }
+        .onAppear {
+            if appCoordinator.selectedTab == .settings { settingsMounted = true } else { lastBarTab = appCoordinator.selectedTab }
+        }
+        .onChange(of: appCoordinator.selectedTab) { newTab in
+            if newTab == .settings { settingsMounted = true } else { lastBarTab = newTab }
+        }
+        .id("\(appCoordinator.isLiveTvTabVisible)-\(appCoordinator.experienceMode.rawValue)")
         .tint(Color(uiColor: iconStore.accentColor))
         .tabBarMinimizeBehavior(
-            appCoordinator.tabBarBehavior == .autoHide ? .onScrollDown : .never
+            // Sports mode keeps the bar fixed; it only goes away for a stream or a podcast player.
+            appCoordinator.tabBarBehavior == .autoHide && appCoordinator.experienceMode != .sports ? .onScrollDown : .never
         )
         .overlay(alignment: .bottom) {
             if appCoordinator.usesGlassTabBarOverlay &&
@@ -1957,12 +2055,34 @@ struct NativeNavContentView: View {
             }
             .zIndex(0)
 
+            if #available(iOS 26.0, *),
+               appCoordinator.isAppReady,
+               appCoordinator.isMainContentMounted,
+               appCoordinator.selectedTab != .settings,
+               appCoordinator.isSelectedTabAtRoot,
+               appCoordinator.isProfileButtonEnabled {
+                ProfileCornerButton(appCoordinator: appCoordinator, iconStore: iconStore)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 6)
+                    .padding(.trailing, 14)
+                    .zIndex(0.5)
+            }
+
             AppGateComposeView(appCoordinator: appCoordinator)
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(!appCoordinator.isAppReady)
                 .accessibilityHidden(appCoordinator.isAppReady)
                 .zIndex(1)
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { appCoordinator.publishCornerProfileFrame(in: proxy.frame(in: .global)) }
+                    .onChange(of: proxy.size) { _ in
+                        appCoordinator.publishCornerProfileFrame(in: proxy.frame(in: .global))
+                    }
+            }
+        )
         .onReceive(
             NotificationCenter.default.publisher(
                 for: Notification.Name("NuvioNativeTabChromeDidChange")
@@ -1977,6 +2097,57 @@ struct NativeNavContentView: View {
             )
         ) { _ in
             appCoordinator.reloadLiveTvTabVisibility()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: Notification.Name("BannerExperienceModeDidChange")
+            )
+        ) { _ in
+            appCoordinator.reloadExperienceMode()
+        }
+    }
+}
+
+@available(iOS 26.0, *)
+struct ProfileCornerButton: View {
+    @ObservedObject var appCoordinator: AppNavigationCoordinator
+    @ObservedObject var iconStore: NativeTabIconStore
+
+    var body: some View {
+        Button {
+            guard appCoordinator.isAppReady else { return }
+            appCoordinator.selectedTab = .settings
+        } label: {
+            Image(uiImage: iconStore.image(for: .settings, selected: false))
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 34, height: 34)
+                .clipShape(Circle())
+                .padding(3)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+                .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(appCoordinator.title(for: .settings)))
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+                guard appCoordinator.isAppReady else { return }
+                appCoordinator.isProfileSwitcherPresented = true
+            }
+        )
+        .popover(
+            isPresented: $appCoordinator.isProfileSwitcherPresented,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) {
+            NativeProfileSwitcherView(
+                controller: appCoordinator.profileSwitcherController,
+                title: appCoordinator.localizedSwitchProfileTitle,
+                addProfileTitle: appCoordinator.localizedAddProfileTitle,
+                onManageProfiles: appCoordinator.openProfileManagement
+            )
         }
     }
 }

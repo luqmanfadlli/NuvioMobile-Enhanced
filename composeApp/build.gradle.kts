@@ -425,6 +425,7 @@ kotlin {
                 "-framework", "Security",
                 "-framework", "LocalAuthentication",
                 "-framework", "CoreFoundation",
+                "-framework", "SafariServices",
             )
             if (iosDistribution == "full") {
                 linkerOpts(
@@ -532,6 +533,8 @@ kotlin {
             implementation(libs.androidx.savedstate.compose)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.atomicfu)
             implementation(libs.kmpalette.core)

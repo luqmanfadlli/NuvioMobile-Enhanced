@@ -1,5 +1,13 @@
 package com.nuvio.app
 
+import nuvio.composeapp.generated.resources.compose_nav_music
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Star
+import com.nuvio.app.features.experience.ExperienceMode
+import com.nuvio.app.features.experience.ExperienceRepository
+import com.nuvio.app.features.podcasts.PodcastMiniPlayer
+import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import androidx.compose.runtime.collectAsState
 import com.nuvio.app.core.ui.NativeTabBridge
 import androidx.compose.foundation.layout.Box
@@ -13,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.rounded.SportsSoccer
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -49,6 +58,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_live_tv
+import nuvio.composeapp.generated.resources.compose_nav_sports
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.sidebar_library
@@ -93,6 +103,7 @@ internal fun MainTabsDestination(
         }
         val tabsRouteActive = rootRouteActive
         val navBarScrollState = rememberNuvioNavBarScrollState()
+        val sportsExperience by ExperienceRepository.mode.collectAsState()
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
         val navBarGlowEnabled by ThemeSettingsRepository.navBarGlowEnabled.collectAsStateWithLifecycle()
         val navBarPosition by ThemeSettingsRepository.navBarPosition.collectAsStateWithLifecycle()
@@ -162,9 +173,12 @@ internal fun MainTabsDestination(
                                     Modifier
                                 },
                             )
-                            .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
+                            .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE && sportsExperience != ExperienceMode.SportsFocus) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                             .padding(innerPadding),
                     )
+                    if (tabsRouteActive && sportsExperience != ExperienceMode.Music) {
+                        PodcastMiniPlayer(Modifier.align(Alignment.BottomCenter).padding(bottom = nuvioSafeBottomPadding(8.dp)))
+                    }
                 }
 
                 // CLASSIC keeps the previous per-form-factor chrome: a top rail on
@@ -254,39 +268,75 @@ internal fun mainFloatingNavigationItems(
     backdrop: Backdrop?,
     defaultIconColorOverride: Color? = null,
 ): List<FloatingNavigationItem> = buildList {
-    add(
-        FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
-            icon = Icons.Filled.Home,
-            label = stringResource(Res.string.compose_nav_home),
-        ),
-    )
-    add(
-        FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Search,
-            onClick = { onTabSelected(AppScreenTab.Search) },
-            drawable = Res.drawable.sidebar_search,
-            label = stringResource(Res.string.compose_nav_search),
-        ),
-    )
-    add(
-        FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Library,
-            onClick = { onTabSelected(AppScreenTab.Library) },
-            drawable = Res.drawable.sidebar_library,
-            label = stringResource(Res.string.compose_nav_library),
-        ),
-    )
-    if (showLiveTv) {
-        add(
-            FloatingNavigationItem(
-                selected = highlightedTab == AppScreenTab.LiveTv,
-                onClick = { onTabSelected(AppScreenTab.LiveTv) },
-                icon = Icons.Filled.Tv,
-                label = stringResource(Res.string.compose_nav_live_tv),
-            ),
-        )
+    val experienceMode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+    experienceMode.tabs(showLiveTv).forEach { tab ->
+        when (tab) {
+            AppScreenTab.Home -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Home,
+                    onClick = { onTabSelected(AppScreenTab.Home) },
+                    icon = Icons.Filled.Home,
+                    label = stringResource(Res.string.compose_nav_home),
+                ),
+            )
+            AppScreenTab.Search -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Search,
+                    onClick = { onTabSelected(AppScreenTab.Search) },
+                    drawable = Res.drawable.sidebar_search,
+                    label = stringResource(Res.string.compose_nav_search),
+                ),
+            )
+            AppScreenTab.Library -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Library,
+                    onClick = { onTabSelected(AppScreenTab.Library) },
+                    drawable = Res.drawable.sidebar_library,
+                    label = stringResource(Res.string.compose_nav_library),
+                ),
+            )
+            AppScreenTab.LiveTv -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.LiveTv,
+                    onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                    icon = Icons.Filled.Tv,
+                    label = stringResource(Res.string.compose_nav_live_tv),
+                ),
+            )
+            AppScreenTab.Sports -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Sports,
+                    onClick = { onTabSelected(AppScreenTab.Sports) },
+                    icon = Icons.Rounded.SportsSoccer,
+                    label = stringResource(Res.string.compose_nav_sports),
+                ),
+            )
+            AppScreenTab.Music -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Music,
+                    onClick = { onTabSelected(AppScreenTab.Music) },
+                    icon = Icons.Rounded.MusicNote,
+                    label = stringResource(Res.string.compose_nav_music),
+                ),
+            )
+            AppScreenTab.Following -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.Following,
+                    onClick = { onTabSelected(AppScreenTab.Following) },
+                    icon = Icons.Rounded.Star,
+                    label = "Following",
+                ),
+            )
+            AppScreenTab.News -> add(
+                FloatingNavigationItem(
+                    selected = highlightedTab == AppScreenTab.News,
+                    onClick = { onTabSelected(AppScreenTab.News) },
+                    icon = Icons.Rounded.Explore,
+                    label = "Discover",
+                ),
+            )
+            AppScreenTab.Settings -> Unit
+        }
     }
     add(
         FloatingNavigationItem(
@@ -318,31 +368,59 @@ internal fun MainClassicNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     NuvioClassicNavigationBar(modifier) {
-        NavItem(
-            selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
-            icon = Icons.Filled.Home,
-            contentDescription = stringResource(Res.string.compose_nav_home),
-        )
-        NavItem(
-            selected = highlightedTab == AppScreenTab.Search,
-            onClick = { onTabSelected(AppScreenTab.Search) },
-            icon = Res.drawable.sidebar_search,
-            contentDescription = stringResource(Res.string.compose_nav_search),
-        )
-        NavItem(
-            selected = highlightedTab == AppScreenTab.Library,
-            onClick = { onTabSelected(AppScreenTab.Library) },
-            icon = Res.drawable.sidebar_library,
-            contentDescription = stringResource(Res.string.compose_nav_library),
-        )
-        if (showLiveTv) {
-            NavItem(
-                selected = highlightedTab == AppScreenTab.LiveTv,
-                onClick = { onTabSelected(AppScreenTab.LiveTv) },
-                icon = Icons.Filled.Tv,
-                contentDescription = stringResource(Res.string.compose_nav_live_tv),
-            )
+        val experienceMode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+        experienceMode.tabs(showLiveTv).forEach { tab ->
+            when (tab) {
+                AppScreenTab.Home -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Home,
+                    onClick = { onTabSelected(AppScreenTab.Home) },
+                    icon = Icons.Filled.Home,
+                    contentDescription = stringResource(Res.string.compose_nav_home),
+                )
+                AppScreenTab.Search -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Search,
+                    onClick = { onTabSelected(AppScreenTab.Search) },
+                    icon = Res.drawable.sidebar_search,
+                    contentDescription = stringResource(Res.string.compose_nav_search),
+                )
+                AppScreenTab.Library -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Library,
+                    onClick = { onTabSelected(AppScreenTab.Library) },
+                    icon = Res.drawable.sidebar_library,
+                    contentDescription = stringResource(Res.string.compose_nav_library),
+                )
+                AppScreenTab.LiveTv -> NavItem(
+                    selected = highlightedTab == AppScreenTab.LiveTv,
+                    onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                    icon = Icons.Filled.Tv,
+                    contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                )
+                AppScreenTab.Sports -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Sports,
+                    onClick = { onTabSelected(AppScreenTab.Sports) },
+                    icon = Icons.Rounded.SportsSoccer,
+                    contentDescription = stringResource(Res.string.compose_nav_sports),
+                )
+                AppScreenTab.Music -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Music,
+                    onClick = { onTabSelected(AppScreenTab.Music) },
+                    icon = Icons.Rounded.MusicNote,
+                    contentDescription = stringResource(Res.string.compose_nav_music),
+                )
+                AppScreenTab.Following -> NavItem(
+                    selected = highlightedTab == AppScreenTab.Following,
+                    onClick = { onTabSelected(AppScreenTab.Following) },
+                    icon = Icons.Rounded.Star,
+                    contentDescription = "Following",
+                )
+                AppScreenTab.News -> NavItem(
+                    selected = highlightedTab == AppScreenTab.News,
+                    onClick = { onTabSelected(AppScreenTab.News) },
+                    icon = Icons.Rounded.Explore,
+                    contentDescription = "Discover",
+                )
+                AppScreenTab.Settings -> Unit
+            }
         }
         NavItem(
             selected = highlightedTab == AppScreenTab.Settings,

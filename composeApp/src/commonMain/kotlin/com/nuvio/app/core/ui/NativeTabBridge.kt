@@ -29,6 +29,10 @@ internal enum class NativeNavigationTab {
     Search,
     Library,
     LiveTv,
+    Sports,
+    Music,
+    Following,
+    News,
     Settings,
     ;
 
