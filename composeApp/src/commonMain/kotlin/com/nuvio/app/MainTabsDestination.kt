@@ -1,5 +1,9 @@
 package com.nuvio.app
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.nuvio.app.core.ui.LocalIsTv
+import com.nuvio.app.core.ui.TvSideRail
 import nuvio.composeapp.generated.resources.compose_nav_music
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Explore
@@ -117,7 +121,9 @@ internal fun MainTabsDestination(
         }
         val floatingBarOnTop = navBarStyleSetting != NavBarStyle.CLASSIC && navBarPosition == NavBarPosition.TOP
         // The backdrop source is only consumed by the custom floating bar, not native or CLASSIC navigation.
-        val floatingBarVisible = tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC
+        // On a TV the tabs are a rail down the left edge instead of any bar.
+        val isTv = LocalIsTv.current
+        val floatingBarVisible = tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC && !isTv
         val navBarBackdrop = if (floatingBarVisible) rememberNuvioBackdrop() else null
         val floatingNavigationItems = mainFloatingNavigationItems(
             highlightedTab = highlightedTab,
@@ -136,7 +142,7 @@ internal fun MainTabsDestination(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                if (tabsRouteActive && !isTv && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                     MainClassicNavigationBar(
                         highlightedTab = highlightedTab,
                         showLiveTv = showLiveTvInNavigation,
@@ -147,9 +153,14 @@ internal fun MainTabsDestination(
                 }
             },
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxSize()) {
+            if (isTv && tabsRouteActive) {
+                TvSideRail(items = floatingNavigationItems)
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 CompositionLocalProvider(
                     LocalNuvioBottomNavigationOverlayPadding provides when {
+                        isTv -> 0.dp
                         tabsRouteActive && useNativeBottomTabs -> 49.dp
                         // A top pill floats over the content like the tablet CLASSIC bar, so
                         // nothing needs to be kept clear at the bottom.
@@ -184,7 +195,7 @@ internal fun MainTabsDestination(
                 // CLASSIC keeps the previous per-form-factor chrome: a top rail on
                 // tablet/landscape and the solid bottom bar on phones. Every other
                 // style now uses the floating pill at the bottom on all sizes.
-                if (isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                if (isTabletLayout && !isTv && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                     TabletFloatingTopBar(
                         selectedTab = highlightedTab,
                         showLiveTv = showLiveTvInNavigation,
@@ -219,6 +230,7 @@ internal fun MainTabsDestination(
                         defaultIconColorOverride = navBarDefaultIconColorOverride,
                     )
                 }
+            }
             }
         }
     }

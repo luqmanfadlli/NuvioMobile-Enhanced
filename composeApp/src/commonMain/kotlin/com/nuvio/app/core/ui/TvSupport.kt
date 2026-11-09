@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -41,6 +42,9 @@ val LocalIsTv = staticCompositionLocalOf { false }
 /** The focus-ring indication on a TV, for controls that otherwise turn the touch ripple off. */
 @Composable
 internal fun tvFocusIndication(): Indication? = if (LocalIsTv.current) LocalIndication.current else null
+
+/** Held by the control that should get the remote's first focus when the app opens. */
+internal val LocalTvInitialFocus = staticCompositionLocalOf { FocusRequester() }
 
 /** Whether this device is a television. Always false off Android. */
 @Composable
@@ -124,20 +128,24 @@ internal fun ProvideTvSupport(content: @Composable () -> Unit) {
     var hasFocus by remember { mutableStateOf(false) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     val requestPlatformFocus = rememberRequestPlatformFocus()
+    val initialFocus = remember { FocusRequester() }
     LaunchedEffect(hasFocus, windowFocused) {
         if (hasFocus || !windowFocused) return@LaunchedEffect
-        // Retry for a few seconds: the first attempts can land before the window or the screen is ready.
-        var attempt = 0
-        while (attempt < 10) {
-            delay(if (attempt == 0) 400 else 700)
+        // Keep trying until it takes: early attempts can land before the window or the screen is ready.
+        var first = true
+        while (true) {
+            delay(if (first) 400 else 700)
+            first = false
             requestPlatformFocus()
+            // Prefer the control that asked to hold the first focus (the selected tab in the rail).
+            if (runCatching { initialFocus.requestFocus() }.getOrDefault(false)) break
             if (focusManager.moveFocus(FocusDirection.Next)) break
-            attempt++
         }
     }
     CompositionLocalProvider(
         LocalIsTv provides true,
         LocalIndication provides TvFocusIndication,
+        LocalTvInitialFocus provides initialFocus,
     ) {
         Box(
             Modifier
