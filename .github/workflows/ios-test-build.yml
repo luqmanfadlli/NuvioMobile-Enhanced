@@ -32,9 +32,10 @@ concurrency:
 jobs:
   build:
     name: Build unsigned full ${{ inputs.configuration }} IPA
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: ${{ inputs.configuration == 'Release' && 180 || 30 }}
     env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
       IOS_CONFIGURATION: ${{ inputs.configuration }}
       NUVIO_IOS_PHASE_PROFILE: ${{ inputs.disable_phases }}
