@@ -22,6 +22,7 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.supportsContentType
+import com.nuvio.app.features.tracking.matchesStatus
 import com.nuvio.app.features.tracking.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
 import com.nuvio.app.features.tracking.providerId
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -422,6 +423,47 @@ object LibraryRepository {
     internal fun listManager(context: LibraryManagementContext): com.nuvio.app.features.tracking.TrackingListManager {
         check(context == listManagementContext()) { "Library account changed" }
         return requireNotNull(activeLibraryProvider(context.source)?.listManager)
+    }
+
+    suspend fun moveToStatus(
+        item: LibraryItem,
+        status: com.nuvio.app.features.tracking.TrackingListStatus,
+        providerId: TrackingProviderId,
+        confirmedRemovalProviders: Set<TrackingProviderId> = emptySet(),
+    ): TrackingMembershipApplyResult {
+        ensureLoaded()
+        require(!ServerItemRef.isServerId(item.id)) {
+            getString(Res.string.library_server_title_unsupported)
+        }
+        val provider = TrackingProviderRegistry.connectedLibraryProviders()
+            .firstOrNull { it.providerId == providerId }
+            ?: throw IllegalStateException("${providerId.displayName} is not connected")
+
+        val destination = provider.snapshot().tabs.firstOrNull { tab ->
+            tab.providerId == providerId &&
+                tab.matchesStatus(status) &&
+                tab.supportsContentType(item.type)
+        } ?: throw IllegalStateException(
+            "${providerId.displayName} does not support ${status.name.lowercase().replace('_', ' ')} for ${item.type}",
+        )
+
+        val desiredMembership = provider.membership(item).toMutableMap()
+        destination.selectionGroup?.let { selectionGroup ->
+            provider.snapshot().tabs
+                .filter { tab ->
+                    tab.providerId == providerId && tab.selectionGroup == selectionGroup
+                }
+                .forEach { tab -> desiredMembership[tab.key] = false }
+        }
+        desiredMembership[destination.key] = true
+
+        return applyMembershipChanges(
+            item = item,
+            desiredMembership = desiredMembership,
+            confirmedRemovalProviders = confirmedRemovalProviders,
+            targetProviderIds = setOf(providerId),
+            updateLocal = false,
+        )
     }
 
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {

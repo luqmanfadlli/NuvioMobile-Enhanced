@@ -1,10 +1,43 @@
 package com.nuvio.app.features.home.components
 
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import com.nuvio.app.features.home.HomeHeroArtworkSource
+import com.nuvio.app.features.home.MetaPreview
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class HomeHeroSectionTest {
+
+    @Test
+    fun `wide hero uses landscape artwork when banner is unavailable`() {
+        val item = MetaPreview(
+            id = "1",
+            type = "movie",
+            name = "Example",
+            poster = "poster-url",
+            landscapePoster = "landscape-url",
+        )
+
+        assertEquals(
+            "landscape-url",
+            heroArtworkUrl(item, HomeHeroArtworkSource.BACKDROP),
+        )
+    }
+
+    @Test
+    fun `wide hero falls back to poster when no landscape artwork exists`() {
+        val item = MetaPreview(
+            id = "1",
+            type = "movie",
+            name = "Example",
+            poster = "poster-url",
+        )
+
+        assertEquals(
+            "poster-url",
+            heroArtworkUrl(item, HomeHeroArtworkSource.BACKDROP),
+        )
+    }
 
     @Test
     fun `first and last indicators select adjacent pages across the loop`() {

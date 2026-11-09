@@ -59,4 +59,181 @@ class PartyStreamTest {
         val encoded = PartyApi.json.encodeToString(PartyStream.serializer(), stream)
         assertEquals(stream, PartyApi.json.decodeFromString(PartyStream.serializer(), encoded))
     }
+
+    @Test
+    fun disabledSharingNeverForcesTheGuestToFollowAStaleAnnouncement() {
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun guestsWaitWhenTheHostLeavesEvenIfNoStreamWasShared() {
+        assertTrue(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = true,
+                hasSharedBefore = false,
+                sharingEnabled = false,
+            ),
+        )
+        assertFalse(
+            shouldWaitForPartyHostShare(
+                isHost = true,
+                hostUnavailable = true,
+                hasSharedBefore = true,
+                sharingEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun guestsStopAfterAPreviouslySharedStreamIsWithdrawn() {
+        assertTrue(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = false,
+                hasSharedBefore = true,
+                sharingEnabled = false,
+            ),
+        )
+        assertFalse(
+            shouldWaitForPartyHostShare(
+                isHost = false,
+                hostUnavailable = false,
+                hasSharedBefore = false,
+                sharingEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun guestFollowsSharedUrlOnlyForTheMatchingPartyMedia() {
+        assertTrue(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = true,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = "movie|different||",
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(mediaKey = "movie|different||"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = stream.url,
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(url = "http://localhost:8096/video"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun hostPublishesNewMediaAfterReplacementPlayerIsReady() {
+        assertTrue(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(false, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|same||", "movie|same||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = false))
+    }
+
+
+    @Test
+    fun hostStreamWaitsForPartyMediaToMatch() {
+        assertTrue(shouldShareHostStreamForMedia(true, true, "movie|new||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(true, true, "movie|old||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(false, true, "movie|new||", "movie|new||"))
+        assertFalse(shouldShareHostStreamForMedia(true, false, "movie|new||", "movie|new||"))
+    }
+
+    @Test
+    fun hostMediaChangeAutomaticallySwitchesGuestsButNotHostOrAlreadyMatchingMedia() {
+        val next = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "Next movie")
+        assertEquals(PartyMediaChangeDecision.AutoSwitch, decidePartyMediaChange(false, "movie|tt1||", next))
+        assertEquals(PartyMediaChangeDecision.Ignore, decidePartyMediaChange(true, "movie|tt1||", next))
+        assertEquals(PartyMediaChangeDecision.Ignore, decidePartyMediaChange(false, next.key, next))
+    }
+
+    @Test
+    fun hostDepartureFreezesPlaybackWithoutChangingItsAuthoritySequence() {
+        val playing = PartyPlayback(
+            seq = 7,
+            memberId = "host",
+            paused = false,
+            positionMs = 10_000,
+            rate = 1.5f,
+            at = 1_000,
+            mediaKey = "movie|tt1||",
+        )
+        val paused = pausePartyPlaybackForHostDeparture(playing, at = 3_000)
+        assertEquals(7L, paused?.seq)
+        assertEquals("host", paused?.memberId)
+        assertEquals(13_000L, paused?.positionMs)
+        assertEquals(3_000L, paused?.at)
+        assertTrue(paused?.paused == true)
+        assertFalse(paused?.waiting == true)
+    }
+
+    @Test
+    fun hostDepartureKeepsAlreadyPausedPositionAndHandlesMissingPlayback() {
+        val alreadyPaused = PartyPlayback(
+            seq = 8, memberId = "host", paused = true, positionMs = 4_000, at = 1_000,
+        )
+        val result = pausePartyPlaybackForHostDeparture(alreadyPaused, at = 3_000)
+        assertEquals(4_000L, result?.positionMs)
+        assertEquals(8L, result?.seq)
+        assertEquals(3_000L, result?.at)
+        assertTrue(result?.paused == true)
+        assertEquals(null, pausePartyPlaybackForHostDeparture(null, at = 3_000))
+    }
+
 }

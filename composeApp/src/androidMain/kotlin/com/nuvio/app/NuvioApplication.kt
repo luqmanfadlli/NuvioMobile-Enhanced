@@ -29,6 +29,13 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         DnsPlatform.initialize(this)
+        runCatching {
+            Class.forName("com.nuvio.app.features.telegram.TelegramAndroidBootstrap")
+                .getMethod("install", Application::class.java)
+                .invoke(null, this)
+        }.onFailure { error ->
+            android.util.Log.d("NuvioApplication", "Optional Telegram runtime is not installed: ${error.message}")
+        }
     }
 
     override fun newImageLoader(context: android.content.Context): ImageLoader {

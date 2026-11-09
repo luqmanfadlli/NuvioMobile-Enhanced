@@ -54,6 +54,28 @@ class TrackingReadsTest {
     }
 
     @Test
+    fun `status destinations match canonical keys and labels only when writable`() {
+        val dropped = tab("simkl:status:dropped").copy(title = "Dropped")
+        val onHold = tab("trakt:status:hold").copy(title = "On Hold")
+        val completed = tab("simkl:status:completed").copy(title = "Completed")
+            .copy(isMembershipDestination = false)
+
+        assertTrue(dropped.matchesStatus(TrackingListStatus.DROPPED))
+        assertTrue(onHold.matchesStatus(TrackingListStatus.ON_HOLD))
+        assertFalse(onHold.matchesStatus(TrackingListStatus.DROPPED))
+        assertFalse(completed.matchesStatus(TrackingListStatus.COMPLETED))
+    }
+
+    @Test
+    fun `provider paused labels map to on hold status`() {
+        val aniListPaused = tab("anilist:status:paused").copy(title = "Paused")
+        val weTrakrPaused = tab("wetrakr:status:paused").copy(title = "Paused")
+
+        assertTrue(aniListPaused.matchesStatus(TrackingListStatus.ON_HOLD))
+        assertTrue(weTrakrPaused.matchesStatus(TrackingListStatus.ON_HOLD))
+    }
+
+    @Test
     fun `non destination status stays in selection group without appearing in picker`() {
         val watching = tab("simkl:watching", selectionGroup = "simkl:status")
         val completed = tab("simkl:completed", selectionGroup = "simkl:status")

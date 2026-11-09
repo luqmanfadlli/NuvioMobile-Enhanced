@@ -40,6 +40,7 @@ actual object PlayerSettingsStorage {
     private const val showSkipButtonsKey = "player_show_skip_buttons"
     private const val seekPreviewEnabledKey = "seek_preview_enabled"
     private const val movieRecommendationsEnabledKey = "movie_recommendations_enabled"
+    private const val movieRecommendationsFallbackSecondsKey = "movie_recommendations_fallback_seconds"
     private const val autoShowSubtitlesOnRewindEnabledKey = "auto_show_subtitles_on_rewind_enabled"
     private const val autoShowSubtitlesOnMuteEnabledKey = "auto_show_subtitles_on_mute_enabled"
     private const val externalPlayerEnabledKey = "external_player_enabled"
@@ -124,6 +125,8 @@ actual object PlayerSettingsStorage {
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlayTimeoutSecondsKey = "stream_auto_play_timeout_seconds"
+    private const val deadLinkTimeoutEnabledKey = "dead_link_timeout_enabled"
+    private const val deadLinkTimeoutSecondsKey = "dead_link_timeout_seconds"
     private const val streamReuseLastLinkCacheHoursKey = "stream_reuse_last_link_cache_hours"
     private const val streamReuseLastLinkEnabledKey = "stream_reuse_last_link_enabled"
     private const val subtitleBoldKey = "subtitle_bold"
@@ -187,9 +190,11 @@ actual object PlayerSettingsStorage {
         streamAutoPlayModeKey,
         streamAutoPlaySourceKey,
         streamAutoPlaySelectedAddonsKey,
+        streamAutoPlayAddonPriorityKey,
         streamAutoPlaySelectedPluginsKey,
         streamAutoPlayRegexKey,
         streamAutoPlayTimeoutSecondsKey,
+        deadLinkTimeoutSecondsKey,
         skipIntroEnabledKey,
         autoSkipMovieCreditsKey,
         autoSkipSegmentTypesKey,
@@ -444,6 +449,8 @@ actual object PlayerSettingsStorage {
     actual fun saveMovieRecommendationsEnabled(enabled: Boolean) {
         saveBoolean(movieRecommendationsEnabledKey, enabled)
     }
+    actual fun loadMovieRecommendationsFallbackSeconds(): Int? = loadInt(movieRecommendationsFallbackSecondsKey)
+    actual fun saveMovieRecommendationsFallbackSeconds(seconds: Int) = saveInt(movieRecommendationsFallbackSecondsKey, seconds.coerceIn(30, 600))
 
     actual fun loadAutoShowSubtitlesOnRewindEnabled(): Boolean? = loadBoolean(autoShowSubtitlesOnRewindEnabledKey)
 
@@ -1001,6 +1008,19 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setObject(addons.toList(), forKey = ProfileScopedKey.of(streamAutoPlaySelectedAddonsKey))
     }
 
+    actual fun loadStreamAutoPlayAddonPriority(): List<String>? =
+        NSUserDefaults.standardUserDefaults
+            .stringForKey(ProfileScopedKey.of(streamAutoPlayAddonPriorityKey))
+            ?.split(streamAutoPlayAddonPrioritySeparator)
+            ?.filter { it.isNotBlank() }
+
+    actual fun saveStreamAutoPlayAddonPriority(priority: List<String>) {
+        NSUserDefaults.standardUserDefaults.setObject(
+            priority.filter { it.isNotBlank() }.distinct().joinToString(streamAutoPlayAddonPrioritySeparator),
+            forKey = ProfileScopedKey.of(streamAutoPlayAddonPriorityKey),
+        )
+    }
+
     @Suppress("UNCHECKED_CAST")
     actual fun loadStreamAutoPlaySelectedPlugins(): Set<String>? {
         val defaults = NSUserDefaults.standardUserDefaults
@@ -1035,6 +1055,30 @@ actual object PlayerSettingsStorage {
 
     actual fun saveStreamAutoPlayTimeoutSeconds(seconds: Int) {
         NSUserDefaults.standardUserDefaults.setInteger(seconds.toLong(), forKey = ProfileScopedKey.of(streamAutoPlayTimeoutSecondsKey))
+    }
+
+
+    actual fun loadDeadLinkTimeoutEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(deadLinkTimeoutEnabledKey)
+        return if (defaults.objectForKey(key) != null) defaults.boolForKey(key) else null
+    }
+
+    actual fun saveDeadLinkTimeoutEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(deadLinkTimeoutEnabledKey))
+    }
+
+    actual fun loadDeadLinkTimeoutSeconds(): Int? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(deadLinkTimeoutSecondsKey)
+        return if (defaults.objectForKey(key) != null) defaults.integerForKey(key).toInt() else null
+    }
+
+    actual fun saveDeadLinkTimeoutSeconds(seconds: Int) {
+        NSUserDefaults.standardUserDefaults.setInteger(
+            DeadLinkTimeoutPolicy.normalizeSeconds(seconds).toLong(),
+            forKey = ProfileScopedKey.of(deadLinkTimeoutSecondsKey),
+        )
     }
 
     actual fun loadSkipIntroEnabled(): Boolean? {
@@ -1420,6 +1464,7 @@ actual object PlayerSettingsStorage {
         loadTouchGesturesEnabled()?.let { put(touchGesturesEnabledKey, encodeSyncBoolean(it)) }
         loadSwipeToSeekEnabled()?.let { put(swipeToSeekEnabledKey, encodeSyncBoolean(it)) }
         loadMovieRecommendationsEnabled()?.let { put(movieRecommendationsEnabledKey, encodeSyncBoolean(it)) }
+        loadMovieRecommendationsFallbackSeconds()?.let { put(movieRecommendationsFallbackSecondsKey, encodeSyncInt(it)) }
         loadAutoShowSubtitlesOnRewindEnabled()?.let { put(autoShowSubtitlesOnRewindEnabledKey, encodeSyncBoolean(it)) }
         loadAutoShowSubtitlesOnMuteEnabled()?.let { put(autoShowSubtitlesOnMuteEnabledKey, encodeSyncBoolean(it)) }
         loadExternalPlayerEnabled()?.let { put(externalPlayerEnabledKey, encodeSyncBoolean(it)) }
@@ -1466,9 +1511,13 @@ actual object PlayerSettingsStorage {
         loadStreamAutoPlayMode()?.let { put(streamAutoPlayModeKey, encodeSyncString(it)) }
         loadStreamAutoPlaySource()?.let { put(streamAutoPlaySourceKey, encodeSyncString(it)) }
         loadStreamAutoPlaySelectedAddons()?.let { put(streamAutoPlaySelectedAddonsKey, encodeSyncStringSet(it)) }
+        loadStreamAutoPlayAddonPriority()?.let {
+            put(streamAutoPlayAddonPriorityKey, encodeSyncString(it.joinToString(streamAutoPlayAddonPrioritySeparator)))
+        }
         loadStreamAutoPlaySelectedPlugins()?.let { put(streamAutoPlaySelectedPluginsKey, encodeSyncStringSet(it)) }
         loadStreamAutoPlayRegex()?.let { put(streamAutoPlayRegexKey, encodeSyncString(it)) }
         loadStreamAutoPlayTimeoutSeconds()?.let { put(streamAutoPlayTimeoutSecondsKey, encodeSyncInt(it)) }
+        loadDeadLinkTimeoutSeconds()?.let { put(deadLinkTimeoutSecondsKey, encodeSyncInt(it)) }
         loadSkipIntroEnabled()?.let { put(skipIntroEnabledKey, encodeSyncBoolean(it)) }
         loadAutoSkipMovieCredits()?.let { put(autoSkipMovieCreditsKey, encodeSyncBoolean(it)) }
         loadAutoSkipSegmentTypes()?.let { put(autoSkipSegmentTypesKey, encodeSyncStringSet(it)) }
@@ -1520,6 +1569,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(touchGesturesEnabledKey)?.let(::saveTouchGesturesEnabled)
         payload.decodeSyncBoolean(swipeToSeekEnabledKey)?.let(::saveSwipeToSeekEnabled)
         payload.decodeSyncBoolean(movieRecommendationsEnabledKey)?.let(::saveMovieRecommendationsEnabled)
+        payload.decodeSyncInt(movieRecommendationsFallbackSecondsKey)?.let(::saveMovieRecommendationsFallbackSeconds)
         payload.decodeSyncBoolean(autoShowSubtitlesOnRewindEnabledKey)?.let(::saveAutoShowSubtitlesOnRewindEnabled)
         payload.decodeSyncBoolean(autoShowSubtitlesOnMuteEnabledKey)?.let(::saveAutoShowSubtitlesOnMuteEnabled)
         payload.decodeSyncBoolean(externalPlayerEnabledKey)?.let(::saveExternalPlayerEnabled)
@@ -1563,9 +1613,13 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncString(streamAutoPlayModeKey)?.let(::saveStreamAutoPlayMode)
         payload.decodeSyncString(streamAutoPlaySourceKey)?.let(::saveStreamAutoPlaySource)
         payload.decodeSyncStringSet(streamAutoPlaySelectedAddonsKey)?.let(::saveStreamAutoPlaySelectedAddons)
+        payload.decodeSyncString(streamAutoPlayAddonPriorityKey)?.let { encoded ->
+            saveStreamAutoPlayAddonPriority(encoded.split(streamAutoPlayAddonPrioritySeparator).filter { it.isNotBlank() })
+        }
         payload.decodeSyncStringSet(streamAutoPlaySelectedPluginsKey)?.let(::saveStreamAutoPlaySelectedPlugins)
         payload.decodeSyncString(streamAutoPlayRegexKey)?.let(::saveStreamAutoPlayRegex)
         payload.decodeSyncInt(streamAutoPlayTimeoutSecondsKey)?.let(::saveStreamAutoPlayTimeoutSeconds)
+        payload.decodeSyncInt(deadLinkTimeoutSecondsKey)?.let(::saveDeadLinkTimeoutSeconds)
         payload.decodeSyncBoolean(skipIntroEnabledKey)?.let(::saveSkipIntroEnabled)
         payload.decodeSyncBoolean(autoSkipMovieCreditsKey)?.let(::saveAutoSkipMovieCredits)
         payload.decodeSyncStringSet(autoSkipSegmentTypesKey)?.let(::saveAutoSkipSegmentTypes)

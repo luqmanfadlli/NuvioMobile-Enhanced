@@ -20,6 +20,7 @@ private data class StoredPosterCardStylePreferences(
     val catalogLandscapeModeEnabled: Boolean = false,
     val hideLabelsEnabled: Boolean = false,
     val alwaysShowLandscapeClearlogo: Boolean = false,
+    val netflixStyleEnabled: Boolean = false,
 )
 
 data class PosterCardStyleUiState(
@@ -29,6 +30,7 @@ data class PosterCardStyleUiState(
     val catalogLandscapeModeEnabled: Boolean = false,
     val hideLabelsEnabled: Boolean = false,
     val alwaysShowLandscapeClearlogo: Boolean = false,
+    val netflixStyleEnabled: Boolean = false,
 )
 
 object PosterCardStyleRepository {
@@ -96,10 +98,19 @@ object PosterCardStyleRepository {
         persist()
     }
 
+    fun setNetflixStyleEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (_uiState.value.netflixStyleEnabled == enabled) return
+        _uiState.value = _uiState.value.copy(netflixStyleEnabled = enabled)
+        persist()
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
-        if (_uiState.value == PosterCardStyleUiState()) return
-        _uiState.value = PosterCardStyleUiState()
+        val netflixStyleEnabled = _uiState.value.netflixStyleEnabled
+        val defaults = PosterCardStyleUiState(netflixStyleEnabled = netflixStyleEnabled)
+        if (_uiState.value == defaults) return
+        _uiState.value = defaults
         persist()
     }
 
@@ -127,6 +138,7 @@ object PosterCardStyleRepository {
                 catalogLandscapeModeEnabled = stored.catalogLandscapeModeEnabled,
                 hideLabelsEnabled = stored.hideLabelsEnabled,
                 alwaysShowLandscapeClearlogo = stored.alwaysShowLandscapeClearlogo,
+                netflixStyleEnabled = stored.netflixStyleEnabled,
             )
         } else {
             PosterCardStyleUiState()
@@ -143,6 +155,7 @@ object PosterCardStyleRepository {
                     catalogLandscapeModeEnabled = _uiState.value.catalogLandscapeModeEnabled,
                     hideLabelsEnabled = _uiState.value.hideLabelsEnabled,
                     alwaysShowLandscapeClearlogo = _uiState.value.alwaysShowLandscapeClearlogo,
+                    netflixStyleEnabled = _uiState.value.netflixStyleEnabled,
                 ),
             ),
         )

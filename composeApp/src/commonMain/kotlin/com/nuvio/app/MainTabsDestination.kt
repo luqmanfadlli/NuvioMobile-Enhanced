@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.FloatingNavigationBar
+import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.FloatingNavigationItem
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioClassicNavigationBar
@@ -83,6 +84,7 @@ internal fun MainTabsDestination(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTabletLayout = useTabletFloatingTabBar || maxWidth >= 768.dp
+        val netflixStyleEnabled = rememberPosterCardStyleUiState().netflixStyleEnabled
         val nativeActiveTab by NativeTabBridge.activeTab.collectAsState()
         val highlightedTab = if (useNativeNavigation) nativeActiveTab.toAppScreenTab() else selectedTab
         val tabActions = remember(actions, isTabletLayout) { actions(isTabletLayout) }
@@ -201,6 +203,7 @@ internal fun MainTabsDestination(
                         items = floatingNavigationItems,
                         glowEnabled = navBarGlowEnabled,
                         inlineLabels = isTabletLayout,
+                        compactSize = netflixStyleEnabled,
                         glassStyle = navBarGlass,
                         defaultIconColorOverride = navBarDefaultIconColorOverride,
                     )
@@ -223,6 +226,7 @@ private fun MainFloatingNavigationBar(
     items: List<FloatingNavigationItem>,
     glowEnabled: Boolean,
     inlineLabels: Boolean,
+    compactSize: Boolean = false,
     glassStyle: LiquidGlassStyle,
     defaultIconColorOverride: Color?,
 ) {
@@ -240,6 +244,7 @@ private fun MainFloatingNavigationBar(
         liquidGlassBarEffects = liquidGlassBarEffects,
         liquidGlassSelectionEffects = liquidGlassSelectionEffects,
         inlineLabels = inlineLabels,
+        compactSize = compactSize,
         defaultIconColorOverride = defaultIconColorOverride,
     )
 }

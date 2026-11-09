@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -284,6 +285,7 @@ fun TabletDetailHero(
     onHeroTrailerMuteToggle: () -> Unit,
     onHeightChanged: (Int) -> Unit,
     actions: (@Composable () -> Unit)?,
+    netflixStyleEnabled: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val space = NuvioTokens.Space
@@ -294,7 +296,13 @@ fun TabletDetailHero(
     )
     var logoLoadError by remember(meta.id, meta.logo) { mutableStateOf(false) }
     val logoUrl = meta.logo?.takeIf { it.isNotBlank() }
-    val heroMinHeight = if (viewportHeight > 0.dp) viewportHeight else TabletHeroHeight
+    val heroMinHeight = if (netflixStyleEnabled && viewportHeight > 0.dp) {
+        (viewportHeight * 0.68f).coerceIn(420.dp, 760.dp)
+    } else if (viewportHeight > 0.dp) {
+        viewportHeight
+    } else {
+        TabletHeroHeight
+    }
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(
@@ -303,6 +311,24 @@ fun TabletDetailHero(
             .heightIn(min = heroMinHeight)
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
+        if (netflixStyleEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Black.copy(alpha = 0.48f),
+                                    0.26f to Color.Transparent,
+                                    0.55f to Color.Black.copy(alpha = 0.08f),
+                                    1.0f to Color.Black,
+                                ),
+                            ),
+                        )
+                    },
+            )
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)

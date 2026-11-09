@@ -39,6 +39,56 @@ data class ProfilePushPayload(
     @SerialName("profile_background_url") val profileBackgroundUrl: String? = null,
 )
 
+/**
+ * The profile sync RPC currently owns the server-supported profile fields only.
+ * Background selections are device-local presentation preferences, so never send
+ * them through the RPC where an older server function may silently discard them.
+ */
+@Serializable
+internal data class UpstreamProfilePushPayload(
+    @SerialName("profile_index") val profileIndex: Int,
+    val name: String,
+    @SerialName("avatar_color_hex") val avatarColorHex: String,
+    @SerialName("uses_primary_addons") val usesPrimaryAddons: Boolean = false,
+    @SerialName("uses_primary_plugins") val usesPrimaryPlugins: Boolean = false,
+    @SerialName("avatar_id") val avatarId: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
+internal fun ProfilePushPayload.toUpstreamProfilePushPayload() = UpstreamProfilePushPayload(
+    profileIndex = profileIndex,
+    name = name,
+    avatarColorHex = avatarColorHex,
+    usesPrimaryAddons = usesPrimaryAddons,
+    usesPrimaryPlugins = usesPrimaryPlugins,
+    avatarId = avatarId,
+    avatarUrl = normalizedAvatarUrl(avatarUrl),
+)
+
+internal fun mergeProfileBackgrounds(
+    remoteProfiles: List<NuvioProfile>,
+    localProfiles: List<NuvioProfile>,
+    backgroundOverrides: Map<Int, Pair<String?, String?>> = emptyMap(),
+): List<NuvioProfile> {
+    val localByIndex = localProfiles.associateBy { it.profileIndex }
+    return remoteProfiles.map { remote ->
+        val local = localByIndex[remote.profileIndex]
+        val override = backgroundOverrides[remote.profileIndex]
+        remote.copy(
+            profileBackgroundId = when {
+                override != null -> override.first
+                local != null -> local.profileBackgroundId
+                else -> remote.profileBackgroundId
+            },
+            profileBackgroundUrl = when {
+                override != null -> override.second
+                local != null -> local.profileBackgroundUrl
+                else -> remote.profileBackgroundUrl
+            },
+        )
+    }
+}
+
 @Serializable
 data class PinVerifyResult(
     val unlocked: Boolean = false,

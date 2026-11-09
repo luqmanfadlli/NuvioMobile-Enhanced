@@ -27,6 +27,7 @@ import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.LocalScreenActive
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.NETFLIX_HOME_POSTER_WIDTH_DP
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.nuvioCardDepth
@@ -99,22 +100,27 @@ private fun CollectionFolderCard(
     onClick: (() -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
-    val isLandscapeMode = posterCardStyle.catalogLandscapeModeEnabled
+    val netflixStyleEnabled = posterCardStyle.netflixStyleEnabled
+    val effectivePosterCardStyle = if (netflixStyleEnabled) {
+        val width = maxOf(posterCardStyle.widthDp, NETFLIX_HOME_POSTER_WIDTH_DP)
+        posterCardStyle.copy(widthDp = width, heightDp = (width * 3) / 2, cornerRadiusDp = minOf(posterCardStyle.cornerRadiusDp, 8), catalogLandscapeModeEnabled = false)
+    } else posterCardStyle
+    val isLandscapeMode = effectivePosterCardStyle.catalogLandscapeModeEnabled
     val shape = if (isLandscapeMode) PosterShape.Landscape else folder.posterShape
     val cardWidth: Dp
     val aspectRatio: Float
 
     when (shape) {
         PosterShape.Poster -> {
-            cardWidth = posterCardStyle.widthDp.dp
+            cardWidth = effectivePosterCardStyle.widthDp.dp
             aspectRatio = 0.675f
         }
         PosterShape.Landscape -> {
-            cardWidth = landscapePosterWidth(posterCardStyle.widthDp)
+            cardWidth = landscapePosterWidth(effectivePosterCardStyle.widthDp)
             aspectRatio = PosterLandscapeAspectRatio
         }
         PosterShape.Square -> {
-            cardWidth = posterCardStyle.widthDp.dp
+            cardWidth = effectivePosterCardStyle.widthDp.dp
             aspectRatio = 1f
         }
     }
@@ -123,7 +129,7 @@ private fun CollectionFolderCard(
         modifier = modifier.width(cardWidth),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val shapeCorner = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
+        val shapeCorner = RoundedCornerShape(effectivePosterCardStyle.cornerRadiusDp.dp)
         val imageUrl = collectionFolderCardImageUrl(folder)
         Card(
             modifier = Modifier

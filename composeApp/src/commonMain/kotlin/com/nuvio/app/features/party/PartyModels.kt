@@ -12,6 +12,7 @@ data class PartySource(
     @SerialName("info_hash") val infoHash: String? = null,
     @SerialName("file_idx") val fileIdx: Int? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("addon_id") val addonId: String? = null,
@@ -50,6 +51,7 @@ data class PartyStream(
     @SerialName("addon_id") val addonId: String = "",
     @SerialName("addon_logo") val addonLogo: String? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("stream_type") val streamType: String? = null,
@@ -67,6 +69,7 @@ data class PartyStream(
             bingeGroup = bingeGroup,
             videoSize = videoSize,
             filename = filename,
+            videoHash = videoHash,
             proxyHeaders = StreamProxyHeaders(request = headers, response = responseHeaders),
         ),
         badges = badges,
@@ -75,7 +78,80 @@ data class PartyStream(
 
 internal fun isShareableStreamUrl(url: String): Boolean = SHAREABLE_URL.containsMatchIn(url)
 
+/**
+ * True when a guest must replace its current source with the host's shared HTTP source.
+ * The host announcement is authoritative; stream labels are not sufficient to establish
+ * that independently resolved URLs are equivalent.
+ */
+internal fun shouldFollowSharedPartyStream(
+    isHost: Boolean,
+    sharingEnabled: Boolean,
+    partyMediaKey: String?,
+    localMediaKey: String,
+    sharedStream: PartyStream?,
+    activeSourceUrl: String,
+): Boolean {
+    if (isHost || !sharingEnabled || partyMediaKey != localMediaKey) return false
+    val stream = sharedStream ?: return false
+    return stream.mediaKey == localMediaKey &&
+        isShareableStreamUrl(stream.url) &&
+        stream.url != activeSourceUrl
+}
+
+/**
+ * Guests must stop when the host leaves or when a previously shared source is withdrawn.
+ * A host that has never shared anything does not interrupt independent guest playback.
+ */
+internal fun shouldWaitForPartyHostShare(
+    isHost: Boolean,
+    hostUnavailable: Boolean,
+    hasSharedBefore: Boolean,
+    sharingEnabled: Boolean,
+): Boolean =
+    !isHost && (hostUnavailable || (hasSharedBefore && !sharingEnabled))
+
+internal enum class PartyMediaChangeDecision {
+    Ignore,
+    AutoSwitch,
+}
+
+/** Keep host media changes authoritative while preventing stale or self-targeted switches. */
+internal fun decidePartyMediaChange(
+    isHost: Boolean,
+    localMediaKey: String,
+    media: PartyMedia,
+): PartyMediaChangeDecision =
+    if (isHost || media.key == localMediaKey) PartyMediaChangeDecision.Ignore
+    else PartyMediaChangeDecision.AutoSwitch
+
+/** A replacement host player must announce its media before its source can be shared. */
+internal fun shouldPublishHostPartyMedia(
+    isHost: Boolean,
+    partyMediaKey: String,
+    localMediaKey: String,
+    playerReady: Boolean,
+): Boolean = isHost && playerReady && partyMediaKey != localMediaKey
+
+/** Do not publish a new player's stream until the party has accepted that media identity. */
+internal fun shouldShareHostStreamForMedia(
+    isHost: Boolean,
+    sharingEnabled: Boolean,
+    partyMediaKey: String?,
+    localMediaKey: String,
+): Boolean = isHost && sharingEnabled && partyMediaKey == localMediaKey
+
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
+
+/** Freeze the shared playhead at the last estimated position when the host leaves. */
+internal fun pausePartyPlaybackForHostDeparture(
+    playback: PartyPlayback?,
+    at: Long,
+): PartyPlayback? {
+    playback ?: return null
+    val positionMs = if (playback.paused) playback.positionMs
+    else PartySync.expectedPositionMs(playback, at)
+    return playback.copy(paused = true, positionMs = positionMs, at = at, waiting = false)
+}
 
 internal fun partyMediaKey(metaType: String, metaId: String, season: Int?, episode: Int?): String =
     listOf(metaType.lowercase(), metaId, season?.toString().orEmpty(), episode?.toString().orEmpty())
@@ -231,6 +307,7 @@ sealed interface PartyEvent {
     data object Removed : PartyEvent
     data object Ended : PartyEvent
     data class MediaChanged(val media: PartyMedia) : PartyEvent
+    data object HostLeft : PartyEvent
     data class ControlChanged(val hostOnly: Boolean) : PartyEvent
 }
 

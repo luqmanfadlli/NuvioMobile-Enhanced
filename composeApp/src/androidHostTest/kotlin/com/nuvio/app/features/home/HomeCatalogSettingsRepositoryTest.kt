@@ -66,6 +66,92 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
+    fun mergedRowBlendSelectionPersistsAcrossCreateEditAndReload() {
+        val catalogs = listOf(addon(listOf("popular", "latest")))
+        HomeCatalogSettingsRepository.syncCatalogs(catalogs)
+
+        val eligibleKeys = HomeCatalogSettingsRepository.mergedRowSourceKeys()
+        assertEquals(setOf("test:movie:popular", "test:movie:latest"), eligibleKeys)
+
+        val createdId = HomeCatalogSettingsRepository.createMergedRow(
+            title = "Combined",
+            sourceKeys = eligibleKeys.toList(),
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+            blendMode = MergedHomeRowBlendMode.RATING_WEIGHTED,
+        )
+        assertNotNull(createdId)
+        val rowId = requireNotNull(createdId)
+        assertEquals(
+            MergedHomeRowBlendMode.RATING_WEIGHTED,
+            HomeCatalogSettingsRepository.uiState.value.mergedRows.single().resolvedBlendMode(),
+        )
+
+        assertTrue(
+            HomeCatalogSettingsRepository.updateMergedRow(
+                id = rowId,
+                title = "Combined edited",
+                sourceKeys = eligibleKeys.toList(),
+                displayMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
+                deduplicate = true,
+                blendMode = MergedHomeRowBlendMode.PROVIDER_PRIORITY,
+            ),
+        )
+        assertEquals(
+            MergedHomeRowBlendMode.PROVIDER_PRIORITY,
+            HomeCatalogSettingsRepository.uiState.value.mergedRows.single().resolvedBlendMode(),
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(catalogs)
+        assertEquals(
+            MergedHomeRowBlendMode.PROVIDER_PRIORITY,
+            HomeCatalogSettingsRepository.uiState.value.mergedRows.single().resolvedBlendMode(),
+        )
+    }
+
+    @Test
+    fun mergedRowsRejectMoreThanTheMaximumSourcesInsteadOfSilentlyTruncating() {
+        val catalogIds = (1..14).map { "catalog-$it" }
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(catalogIds)))
+        val sourceKeys = HomeCatalogSettingsRepository.mergedRowSourceKeys().sorted()
+
+        assertEquals(null, HomeCatalogSettingsRepository.createMergedRow(
+            title = "Too many",
+            sourceKeys = sourceKeys,
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+        ))
+
+        val allowedKeys = sourceKeys.take(MAX_MERGED_HOME_ROW_SOURCES)
+        val createdId = HomeCatalogSettingsRepository.createMergedRow(
+            title = "Within limit",
+            sourceKeys = allowedKeys,
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+        )
+        assertNotNull(createdId)
+        val before = HomeCatalogSettingsRepository.uiState.value.mergedRows.single()
+
+        assertTrue(!HomeCatalogSettingsRepository.updateMergedRow(
+            id = requireNotNull(createdId),
+            title = "Should not update",
+            sourceKeys = sourceKeys,
+            displayMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
+            deduplicate = true,
+        ))
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.mergedRows.single())
+    }
+
+    @Test
+    fun mergedRowsRejectUnavailableSourcesWithoutDroppingThemSilently() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+        val available = HomeCatalogSettingsRepository.mergedRowSourceKeys().sorted()
+        assertEquals(null, HomeCatalogSettingsRepository.createMergedRow(
+            title = "Missing source",
+            sourceKeys = available + "missing:catalog",
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+        ))
+    }
+
+    @Test
     fun unchangedCatalogsDoNotRewriteSettings() {
         val addons = listOf(addon())
         HomeCatalogSettingsRepository.syncCatalogs(addons)
@@ -75,6 +161,89 @@ class HomeCatalogSettingsRepositoryTest {
 
         assertEquals(editCount, preferences.editCount)
         assertEquals("test:movie:popular", HomeCatalogSettingsRepository.uiState.value.items.single().key)
+    }
+
+    @Test
+    fun rowPlacementSurvivesCatalogRefreshAndLocalReload() {
+        val initial = listOf(addon(listOf("popular", "latest")))
+        HomeCatalogSettingsRepository.syncCatalogs(initial)
+        val positionKey = "test:movie:popular"
+        val bottomKey = "test:movie:latest"
+
+        HomeCatalogSettingsRepository.setRowPlacement(positionKey, HomeCatalogRowPlacement.PINNED_POSITION)
+        HomeCatalogSettingsRepository.setRowPlacement(bottomKey, HomeCatalogRowPlacement.PINNED_BOTTOM)
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == bottomKey }.rowPlacement,
+        )
+
+        val refreshed = listOf(addon(listOf("popular", "latest", "new")))
+        HomeCatalogSettingsRepository.syncCatalogs(refreshed)
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == bottomKey }.rowPlacement,
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(refreshed)
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == bottomKey }.rowPlacement,
+        )
+    }
+
+    @Test
+    fun movingAnotherRowAcrossPositionPinnedRowDoesNotDisplaceTheAnchor() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "middle", "latest"))))
+        val pinnedKey = "test:movie:middle"
+        HomeCatalogSettingsRepository.setRowPlacement(
+            pinnedKey,
+            HomeCatalogRowPlacement.PINNED_POSITION,
+        )
+
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        val pinnedIndex = before.indexOf(pinnedKey)
+        assertTrue(pinnedIndex > 0)
+
+        HomeCatalogSettingsRepository.moveByIndex(fromIndex = 0, toIndex = pinnedIndex)
+
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == pinnedKey }.rowPlacement,
+        )
+    }
+
+    @Test
+    fun addonGroupLockSurvivesCatalogIdentifierChangesAndLocalReload() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("old", "older"))))
+        HomeCatalogSettingsRepository.setAddonLayoutMode("test", HomeAddonLayoutMode.LOCKED)
+        val initialGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals(HomeAddonLayoutMode.LOCKED, initialGroup.mode)
+
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("new", "latest"))))
+        val refreshedGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals("test", refreshedGroup.addonId)
+        assertEquals(HomeAddonLayoutMode.LOCKED, refreshedGroup.mode)
+        assertEquals(initialGroup.anchorOrder, refreshedGroup.anchorOrder)
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("new", "latest"))))
+        val reloadedGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals(HomeAddonLayoutMode.LOCKED, reloadedGroup.mode)
+        assertEquals(initialGroup.anchorOrder, reloadedGroup.anchorOrder)
     }
 
     @Test
@@ -228,7 +397,7 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(settings, HomeCatalogSettingsRepository.uiState.value)
     }
 
-    private fun addon() = ManagedAddon(
+    private fun addon(catalogIds: List<String> = listOf("popular")) = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(
             id = "test",
@@ -237,7 +406,9 @@ class HomeCatalogSettingsRepositoryTest {
             version = "1",
             resources = emptyList(),
             types = listOf("movie"),
-            catalogs = listOf(AddonCatalog(type = "movie", id = "popular", name = "Popular")),
+            catalogs = catalogIds.map { catalogId ->
+                AddonCatalog(type = "movie", id = catalogId, name = catalogId)
+            },
             transportUrl = "https://example.com",
         ),
     )

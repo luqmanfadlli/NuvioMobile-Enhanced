@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
+import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalFold
@@ -18,8 +19,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
+import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.p2p.P2pStreamRequest
 import com.nuvio.app.features.p2p.P2pStreamingEngine
@@ -79,6 +86,154 @@ private fun rememberNetworkCondition(): NetworkCondition {
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     val networkCondition = rememberNetworkCondition()
+    val partyState by PartyRepository.state.collectAsStateWithLifecycle()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsStateWithLifecycle()
+    val deadLinkScope = rememberCoroutineScope()
+    val deadLinkMonitor = remember(deadLinkScope) {
+        DeadLinkStartupMonitor(
+            scope = deadLinkScope,
+            timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
+            timeoutEnabled = {
+                val guestFollowingSharedStream = PartyRepository.state.value.party?.isHost == false && PartyRepository.hostSharingEnabled.value
+                PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled && !guestFollowingSharedStream
+            },
+            candidateStreams = {
+                val videoId = activeVideoId
+                if (videoId == null) {
+                    emptyList()
+                } else {
+                    val discovered = PlayerStreamsRepository.discoverSourceCandidates(
+                        type = contentType ?: parentMetaType,
+                        videoId = videoId,
+                        season = activeSeasonNumber,
+                        episode = activeEpisodeNumber,
+                    )
+                    val requestedQuality = args.semiAutoSelectedQuality
+                    if (requestedQuality == null) {
+                        if (P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled) {
+                            discovered
+                        } else {
+                            discovered.filterNot { it.p2pInfoHash != null }
+                        }
+                    } else {
+                        AddonRepository.initialize()
+                        val settings = PlayerSettingsRepository.uiState.value
+                        val installedAddonNames = AddonRepository.uiState.value.addons
+                            .enabledAddons()
+                            .mapNotNull { it.manifest?.name }
+                            .toSet()
+                        val sourceScoped = when (settings.streamAutoPlaySource) {
+                            StreamAutoPlaySource.ALL_SOURCES -> discovered
+                            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
+                                discovered.filter { it.serverTarget != null || it.addonName in installedAddonNames }
+                            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+                                discovered.filter { it.addonName !in installedAddonNames }
+                        }
+                        val selectedSources = sourceScoped.filter { stream ->
+                            when {
+                                stream.serverTarget != null -> true
+                                stream.addonName in installedAddonNames ->
+                                    settings.streamAutoPlaySelectedAddons.isEmpty() ||
+                                        stream.addonName in settings.streamAutoPlaySelectedAddons
+                                else ->
+                                    settings.streamAutoPlaySelectedPlugins.isEmpty() ||
+                                        stream.addonName in settings.streamAutoPlaySelectedPlugins
+                            }
+                        }
+                        val availableSourceNames = selectedSources.map { it.addonName }.distinct()
+                        val preferredSourceOrder = settings.streamAutoPlayAddonPriority
+                            .filter { it in availableSourceNames } +
+                            availableSourceNames.filterNot { it in settings.streamAutoPlayAddonPriority }
+                        QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                            streams = selectedSources,
+                            requestedQuality = requestedQuality,
+                            debridEnabled = DebridSettingsRepository.snapshot().canResolvePlayableLinks,
+                            preferredSourceOrder = preferredSourceOrder,
+                            p2pEnabled = P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled,
+                        )
+                    }
+                }
+            },
+            onFallback = { next ->
+                val sourceName = "${next.addonName} · ${next.streamLabel}"
+                errorMessage = null
+                deadLinkStatusMessage = "Trying next source · $sourceName"
+                Logger.withTag("DeadLinkFallback").i { "Fallback triggered to source: $sourceName (addonId=${next.addonId})" }
+                switchToSource(next)
+            },
+            onExhausted = {
+                errorMessage = errorMessage ?: "This source did not start and no alternate sources remain."
+                controlsVisible = !playerControlsLocked
+            },
+            sourceDiscoveryLoading = { PlayerStreamsRepository.isSourceDiscoveryLoading() },
+            onDeadLink = { failed, stableIdentityKey ->
+                PlayerStreamsRepository.pruneDeadSource(failed, stableIdentityKey)
+                deadLinkStatusMessage = "Unavailable · ${failed.addonName} · ${failed.streamLabel}"
+            },
+            // Semi-auto candidates are already ranked by quality tier and provider preference.
+            // Preserve that order during dead-link recovery instead of re-sorting by add-on type.
+            preserveCandidateOrder = { args.semiAutoSelectedQuality != null },
+            requestedQualityHeight = { args.semiAutoSelectedQuality?.targetHeight },
+        )
+    }
+    DisposableEffect(deadLinkMonitor) { onDispose { deadLinkMonitor.close() } }
+
+    LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber) {
+        deadLinkMonitor.resetForContent()
+        deadLinkStatusMessage = null
+        activeStream?.let { deadLinkMonitor.sourceSelected(it, activeSourceIdentityKey) }
+    }
+
+    LaunchedEffect(activeStream, activeSourceUrl, activeSourceIdentityKey, activePlaybackKey) {
+        val stream = activeStream
+        if (stream == null) {
+            deadLinkMonitor.sourceCleared()
+            return@LaunchedEffect
+        }
+        deadLinkMonitor.sourceSelected(stream, activeSourceIdentityKey)
+    }
+
+    LaunchedEffect(
+        activeStream,
+        activeSourceUrl,
+        activeSourceIdentityKey,
+        playbackSnapshot.isPlaying,
+        playbackSnapshot.isLoading,
+        playbackSnapshot.isEnded,
+        playbackSnapshotKey,
+        activePlaybackKey,
+    ) {
+        if (playbackSnapshotKey != activePlaybackKey) return@LaunchedEffect
+        if (playbackSnapshot.isPlaying && !playbackSnapshot.isLoading) {
+            deadLinkStatusMessage = null
+        }
+        deadLinkMonitor.playbackStateChanged(
+            activeStream,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            activeSourceIdentityKey,
+            isEnded = playbackSnapshot.isEnded,
+        )
+    }
+
+    LaunchedEffect(errorMessage, activeStream, activeSourceIdentityKey) {
+        if (errorMessage != null) {
+            deadLinkMonitor.playbackFailed(activeStream, activeSourceIdentityKey)
+        }
+    }
+
+    val deadLinkSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(
+        deadLinkSettings.deadLinkTimeoutEnabled,
+        deadLinkSettings.deadLinkTimeoutSeconds,
+        partyState.party?.id,
+        partyState.party?.memberId,
+        partyState.party?.isHost,
+        hostSharingEnabled,
+    ) {
+        // Guests following the host's shared stream must not independently fail over.
+        deadLinkMonitor.settingsChanged()
+    }
     val currentFeedback = liveGestureFeedback ?: gestureFeedback
     LaunchedEffect(currentFeedback) {
         if (currentFeedback != null) {
@@ -665,7 +820,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
 
     LaunchedEffect(
         activeVideoId, parentMetaId, parentMetaType, contentType, activeSeasonNumber, activeEpisodeNumber,
-        playerSettingsUiState.skipIntroEnabled, networkCondition,
+        playerSettingsUiState.skipIntroEnabled, playerSettingsUiState.movieRecommendationsEnabled, networkCondition,
     ) {
         skipIntervals = emptyList()
         apiSkipIntervals = emptyList()
@@ -681,13 +836,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         val season = activeSeasonNumber
         val episode = activeEpisodeNumber
         val vid = activeVideoId
-        if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
-        if ((contentType ?: parentMetaType).equals("movie", ignoreCase = true)) {
-            val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid)
+        val movie = (contentType ?: parentMetaType).equals("movie", ignoreCase = true)
+        if (!playerSettingsUiState.skipIntroEnabled && !(movie && playerSettingsUiState.movieRecommendationsEnabled)) return@LaunchedEffect
+        if (movie) {
+            val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid, requireSkipIntroEnabled = playerSettingsUiState.skipIntroEnabled)
             apiSkipIntervals = api
             recomputeMergedSkipIntervals()
             return@LaunchedEffect
         }
+        if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
         if (season == null || episode == null || vid == null) return@LaunchedEffect
         // Skip intervals come from remote providers: pointless to look them up without a network.
         if (isNetworkOffline()) return@LaunchedEffect
@@ -914,16 +1071,24 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         watchedUiState.watchedKeys,
         movieRecommendationDismissedStage,
         playerSettingsUiState.movieRecommendationsEnabled,
+        playerSettingsUiState.movieRecommendationsFallbackSeconds,
+        apiSkipIntervals,
+        chapterSkipIntervals,
     ) {
         if (!isMoviePlayback || !playerSettingsUiState.movieRecommendationsEnabled || movieRecommendationCandidates.isEmpty()) {
             showMovieRecommendationCard = false
             movieRecommendationStage = 0
+            movieRecommendationDismissedStage = 0
             return@LaunchedEffect
         }
+        val apiStart = apiSkipIntervals.firstOrNull { it.type.equals("movie-credits", true) || it.type.equals("outro", true) || it.type.equals("credits", true) || it.type.equals("ed", true) }?.startTime?.takeIf { it.isFinite() && it >= 0.0 }?.let { (it * 1000.0).toLong() }
+        val chapterStart = chapterSkipIntervals.firstOrNull { it.type.equals("outro", true) || it.type.equals("credits", true) || it.type.equals("ed", true) }?.startTime?.takeIf { it.isFinite() && it >= 0.0 }?.let { (it * 1000.0).toLong() }
         val stage = PlayerNextEpisodeRules.movieRecommendationStage(
             positionMs = playbackSnapshot.positionMs,
             durationMs = playbackSnapshot.durationMs,
             isEnded = playbackSnapshot.isEnded,
+            creditsStartMs = apiStart ?: chapterStart,
+            fallbackSeconds = playerSettingsUiState.movieRecommendationsFallbackSeconds,
         )
         if (stage == 0 && movieRecommendationDismissedStage != 0) {
             movieRecommendationDismissedStage = 0

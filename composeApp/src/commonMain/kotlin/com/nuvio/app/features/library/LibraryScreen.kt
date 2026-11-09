@@ -1155,7 +1155,7 @@ private fun CloudLibraryToolbar(
 }
 
 @Composable
-private fun LibraryChip(
+internal fun LibraryChip(
     label: String,
     selected: Boolean,
     loading: Boolean = false,

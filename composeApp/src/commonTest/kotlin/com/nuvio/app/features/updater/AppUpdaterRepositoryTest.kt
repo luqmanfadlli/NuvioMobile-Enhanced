@@ -9,6 +9,14 @@ class AppUpdaterRepositoryTest {
     fun channelsUseTheSameReleaseEndpointsAsTv() {
         assertEquals("releases/latest", AppUpdaterRepository.releasePath(UpdateChannel.STABLE))
         assertEquals("releases?per_page=100", AppUpdaterRepository.releasePath(UpdateChannel.BETA))
+        assertEquals(
+            "https://api.github.com/repos/Sam3110xavier/Zuvio/releases/latest",
+            AppUpdaterRepository.releaseApiUrl(UpdateChannel.STABLE),
+        )
+        assertEquals(
+            "https://api.github.com/repos/Sam3110xavier/Zuvio/releases?per_page=100",
+            AppUpdaterRepository.releaseApiUrl(UpdateChannel.BETA),
+        )
     }
 
     @Test

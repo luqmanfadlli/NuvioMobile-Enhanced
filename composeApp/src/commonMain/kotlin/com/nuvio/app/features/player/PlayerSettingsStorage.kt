@@ -51,6 +51,8 @@ internal expect object PlayerSettingsStorage {
     fun saveSeekPreviewEnabled(enabled: Boolean)
     fun loadMovieRecommendationsEnabled(): Boolean?
     fun saveMovieRecommendationsEnabled(enabled: Boolean)
+    fun loadMovieRecommendationsFallbackSeconds(): Int?
+    fun saveMovieRecommendationsFallbackSeconds(seconds: Int)
     fun loadAutoShowSubtitlesOnRewindEnabled(): Boolean?
     fun saveAutoShowSubtitlesOnRewindEnabled(enabled: Boolean)
     fun loadAutoShowSubtitlesOnMuteEnabled(): Boolean?
@@ -167,12 +169,18 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlaySource(source: String)
     fun loadStreamAutoPlaySelectedAddons(): Set<String>?
     fun saveStreamAutoPlaySelectedAddons(addons: Set<String>)
+    fun loadStreamAutoPlayAddonPriority(): List<String>?
+    fun saveStreamAutoPlayAddonPriority(priority: List<String>)
     fun loadStreamAutoPlaySelectedPlugins(): Set<String>?
     fun saveStreamAutoPlaySelectedPlugins(plugins: Set<String>)
     fun loadStreamAutoPlayRegex(): String?
     fun saveStreamAutoPlayRegex(regex: String)
     fun loadStreamAutoPlayTimeoutSeconds(): Int?
     fun saveStreamAutoPlayTimeoutSeconds(seconds: Int)
+    fun loadDeadLinkTimeoutEnabled(): Boolean?
+    fun saveDeadLinkTimeoutEnabled(enabled: Boolean)
+    fun loadDeadLinkTimeoutSeconds(): Int?
+    fun saveDeadLinkTimeoutSeconds(seconds: Int)
     fun loadSkipIntroEnabled(): Boolean?
     fun loadAutoSkipMovieCredits(): Boolean?
     fun loadAutoSkipSegmentTypes(): Set<String>?

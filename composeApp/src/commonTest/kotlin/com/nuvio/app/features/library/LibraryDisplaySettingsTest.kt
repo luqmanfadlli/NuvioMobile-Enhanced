@@ -199,6 +199,18 @@ class LibraryDisplaySettingsTest {
         )
         assertEquals(listOf("watchlist"), simklProjection.availableSections.map { it.type })
         assertEquals("watchlist", simklProjection.selectedSectionKey)
+
+        val allStatusesProjection = buildLibraryVerticalProjection(
+            sections = listOf(watchlist, personal.copy(items = emptyList())),
+            sourceMode = LibrarySourceMode.TRAKT,
+            selectedSectionKey = "watchlist",
+            selectedType = null,
+            sortOption = LibrarySortOption.DEFAULT,
+            selectSection = false,
+        )
+        assertEquals(null, allStatusesProjection.selectedSectionKey)
+        assertEquals(listOf("watchlist", "personal:1"), allStatusesProjection.availableSections.map { it.type })
+        assertEquals(listOf("a", "series", "z"), allStatusesProjection.entries.map { it.item.id })
     }
 
     @Test
@@ -213,6 +225,30 @@ class LibraryDisplaySettingsTest {
             LibraryDisplaySettingsUiState(),
             decodeLibraryDisplaySettings("""{"layout_mode":"unknown","sort_option":"unknown"}"""),
         )
+    }
+
+    @Test
+    fun `WeTrakr always exposes movie and series filters for each status`() {
+        val onlySeries = LibrarySection("planning", "Planning", listOf(item("show", type = "series")))
+        val projection = buildLibraryVerticalProjection(listOf(onlySeries), LibrarySourceMode.WETRAKR, "planning", "movie", LibrarySortOption.TITLE_ASC)
+        assertEquals(listOf("movie", "series"), projection.availableTypes)
+        assertEquals("movie", projection.selectedType)
+        assertEquals(emptyList(), projection.entries)
+    }
+
+    @Test
+    fun `media type aliases normalize consistently`() {
+        assertEquals("movie", normalizeLibraryMediaType("Movies"))
+        assertEquals("movie", normalizeLibraryMediaType("film"))
+        assertEquals("series", normalizeLibraryMediaType("TV"))
+        assertEquals("series", normalizeLibraryMediaType("shows"))
+    }
+
+    @Test
+    fun `partial provider order falls back to selected sort for unranked entries`() {
+        val items = listOf(item("newest", name = "Zulu", savedAt = 30L), item("oldest", name = "Alpha", savedAt = 10L), item("middle", name = "Mike", savedAt = 20L))
+        val order = mapOf(libraryDisplayItemKey(items[1]) to 0)
+        assertEquals(listOf("oldest", "newest", "middle"), sortLibraryItems(items, LibrarySortOption.ADDED_DESC, LibrarySourceMode.MDBLIST, providerOrder = order).map { it.id })
     }
 
     private fun item(

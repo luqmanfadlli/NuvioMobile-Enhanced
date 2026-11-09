@@ -56,6 +56,7 @@ object PlayerStreamsRepository {
     // source panel
     private val _sourceState = MutableStateFlow(StreamsUiState())
     val sourceState: StateFlow<StreamsUiState> = _sourceState.asStateFlow()
+    private val deadSourceIdentityKeys = MutableStateFlow<Set<String>>(emptySet())
     private var sourceJob: Job? = null
     private var sourceRequestKey: String? = null
 
@@ -107,16 +108,60 @@ object PlayerStreamsRepository {
         )
     }
 
-    fun stopSourcesLoading() {
-        PluginRepository.setLocalPluginSearchPaused(true)
-        cancelSourceJob()
-    }
+    /**
+     * Closing the source picker must not cancel discovery that the dead-link
+     * watchdog is observing in the background.
+     */
+    fun stopSourcesLoading() = Unit
 
+    /**
+     * Keep source and plugin discovery active while playback starts. Only
+     * preloaded episode requests are paused; clearAll() owns final cleanup.
+     */
     fun pauseSearchForPlayback() {
-        PluginRepository.setLocalPluginSearchPaused(true)
-        cancelSourceJob()
         cancelEpisodeStreamsJob()
     }
+
+    fun currentSourceCandidates(): List<StreamItem> =
+        _sourceState.value.groups.flatMap { it.streams }
+
+    fun pruneDeadSource(stream: StreamItem, identityKeyOverride: String? = null) {
+        val identityKey = identityKeyOverride ?: stream.playerSourceIdentityKey() ?: return
+        deadSourceIdentityKeys.update { it + identityKey }
+        _sourceState.update { current ->
+            val groups = current.groups.map { group ->
+                group.copy(streams = group.streams.filterNot { it.playerSourceIdentityKey() == identityKey })
+            }
+            val anyLoading = groups.any { it.isLoading }
+            current.copy(
+                groups = groups,
+                isAnyLoading = anyLoading,
+                emptyStateReason = groups.toEmptyStateReason(anyLoading),
+            )
+        }
+    }
+
+    private fun filterDeadSources(
+        stateFlow: MutableStateFlow<StreamsUiState>,
+        streams: List<StreamItem>,
+    ): List<StreamItem> {
+        if (stateFlow !== _sourceState) return streams
+        val deadKeys = deadSourceIdentityKeys.value
+        if (deadKeys.isEmpty()) return streams
+        return streams.filterNot { stream -> stream.playerSourceIdentityKey()?.let(deadKeys::contains) == true }
+    }
+
+    suspend fun discoverSourceCandidates(
+        type: String,
+        videoId: String,
+        season: Int? = null,
+        episode: Int? = null,
+    ): List<StreamItem> {
+        loadSources(type = type, videoId = videoId, season = season, episode = episode)
+        return currentSourceCandidates().distinctBy { it.playerSourceIdentityKey() }
+    }
+
+    fun isSourceDiscoveryLoading(): Boolean = _sourceState.value.isAnyLoading
 
     private fun cancelSourceJob() {
         val job = sourceJob ?: return
@@ -173,6 +218,7 @@ object PlayerStreamsRepository {
         PluginRepository.setLocalPluginSearchPaused(true)
         sourceJob?.cancel()
         sourceRequestKey = null
+        deadSourceIdentityKeys.value = emptySet()
         _sourceState.value = StreamsUiState()
         clearEpisodeStreams()
     }
@@ -207,6 +253,10 @@ object PlayerStreamsRepository {
             return
         }
 
+        if (stateFlow === _sourceState && cachedKey != requestKey) {
+            deadSourceIdentityKeys.value = emptySet()
+        }
+
         setRequestKey(requestKey)
         jobHolder()?.cancel()
         stateFlow.value = StreamsUiState()
@@ -217,7 +267,7 @@ object PlayerStreamsRepository {
         )
 
         val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
-        val embeddedStreams = MetaDetailsRepository.findEmbeddedStreams(videoId)
+        val embeddedStreams = filterDeadSources(stateFlow, MetaDetailsRepository.findEmbeddedStreams(videoId))
         if (embeddedStreams.isNotEmpty()) {
             log.d { "Using ${embeddedStreams.size} embedded streams for type=$type id=$videoId" }
             InAppLogger.info("Streams/PlayerStreamsRepository", "Using embedded streams count=${embeddedStreams.size} type=$type id=$videoId")
@@ -345,9 +395,12 @@ object PlayerStreamsRepository {
 
             fun publishStreamGroup(group: AddonStreamGroup) {
                 stateFlow.update { current ->
+                    // Filter inside the StateFlow update so a late provider result
+                    // cannot put a timed-out source back into the picker.
+                    val visibleGroup = group.copy(streams = filterDeadSources(stateFlow, group.streams))
                     val updated = StreamAutoPlaySelector.orderAddonStreams(
                         groups = current.groups.map { currentGroup ->
-                            if (currentGroup.addonId == group.addonId) group else currentGroup
+                            if (currentGroup.addonId == visibleGroup.addonId) visibleGroup else currentGroup
                         },
                         installedOrder = installedAddonOrder,
                         preferredGroupIds = preferredGroupIds,
@@ -491,6 +544,31 @@ object PlayerStreamsRepository {
                         publishStreamGroupAfterCacheCheck(completion.group)
                     }
 
+                    is StreamLoadCompletion.CloudStreamProvider -> {
+                        val group = presentStreamGroup(
+                            AddonStreamGroup(
+                                addonName = completion.addonName,
+                                addonId = completion.addonId,
+                                streams = filterDeadSources(stateFlow, completion.streams),
+                                isLoading = false,
+                                error = completion.error,
+                            ),
+                        )
+                        stateFlow.update { current ->
+                            val updated = StreamAutoPlaySelector.orderAddonStreams(
+                                groups = current.groups.filterNot { it.addonId == group.addonId } + group,
+                                installedOrder = installedAddonOrder,
+                                preferredGroupIds = preferredGroupIds,
+                            )
+                            val anyLoading = updated.any { it.isLoading }
+                            current.copy(
+                                groups = updated,
+                                isAnyLoading = anyLoading,
+                                emptyStateReason = updated.toEmptyStateReason(anyLoading),
+                            )
+                        }
+                    }
+
                     is StreamLoadCompletion.PluginScraper -> {
                         val remaining = (pluginRemainingByAddonId[completion.addonId] ?: 1) - 1
                         pluginRemainingByAddonId[completion.addonId] = remaining.coerceAtLeast(0)
@@ -504,10 +582,11 @@ object PlayerStreamsRepository {
                                     if (group.addonId != completion.addonId) {
                                         group
                                     } else {
-                                        val mergedStreams = if (completion.streams.isEmpty()) {
+                                        val incomingStreams = filterDeadSources(stateFlow, completion.streams)
+                                        val mergedStreams = if (incomingStreams.isEmpty()) {
                                             group.streams
                                         } else {
-                                            (group.streams + StreamBadgePresentation.applyToStreams(completion.streams, streamBadgeRules))
+                                            (group.streams + StreamBadgePresentation.applyToStreams(incomingStreams, streamBadgeRules))
                                                 .sortedForGroupedDisplay()
                                         }
                                         val stillLoading = remaining > 0

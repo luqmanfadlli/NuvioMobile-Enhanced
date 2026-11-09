@@ -110,27 +110,16 @@ object PlayerNextEpisodeRules {
         }
     }
 
-    /**
-     * How far a movie is into its ending, for the More Like This card:
-     * 0 = not yet, 1 = last 4 minutes, 2 = last 30 seconds, 3 = playback ended.
-     * The card shows while the stage is above the one the user last dismissed it at, so a
-     * dismissal in the 4-minute window brings it back at 30 seconds, and it always returns
-     * when playback really ends.
-     */
-    fun movieRecommendationStage(positionMs: Long, durationMs: Long, isEnded: Boolean): Int {
+    /** Actual credits timestamp wins; estimated end-time is only a last-resort fallback. */
+    fun movieRecommendationStage(positionMs: Long, durationMs: Long, isEnded: Boolean, creditsStartMs: Long?, fallbackSeconds: Int = 180): Int {
         if (isEnded) return MOVIE_RECOMMENDATION_STAGE_ENDED
-        if (durationMs <= 0L) return 0
-        val remainingMs = durationMs - positionMs
-        return when {
-            remainingMs <= MOVIE_RECOMMENDATION_FINAL_MS -> 2
-            remainingMs <= MOVIE_RECOMMENDATION_FIRST_MS -> 1
-            else -> 0
-        }
+        if (positionMs < 0L || durationMs <= 0L) return 0
+        val start = creditsStartMs?.takeIf { it in 0L..durationMs }
+        val trigger = start ?: (durationMs - fallbackSeconds.coerceIn(30, 600) * 1_000L).coerceAtLeast(0L)
+        return if (positionMs >= trigger) 1 else 0
     }
 
-    const val MOVIE_RECOMMENDATION_STAGE_ENDED = 3
-    private const val MOVIE_RECOMMENDATION_FIRST_MS = 4L * 60_000L
-    private const val MOVIE_RECOMMENDATION_FINAL_MS = 30_000L
+    const val MOVIE_RECOMMENDATION_STAGE_ENDED = 1
 
     fun hasEpisodeAired(raw: String?): Boolean {
         val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return true

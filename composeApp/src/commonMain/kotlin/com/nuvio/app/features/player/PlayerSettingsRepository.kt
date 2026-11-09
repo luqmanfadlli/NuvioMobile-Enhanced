@@ -54,6 +54,7 @@ data class PlayerSettingsUiState(
     val showSkipButtons: Boolean = true,
     val seekPreviewEnabled: Boolean = true,
     val movieRecommendationsEnabled: Boolean = true,
+    val movieRecommendationsFallbackSeconds: Int = 180,
     val autoShowSubtitlesOnRewindEnabled: Boolean = true,
     val autoShowSubtitlesOnMuteEnabled: Boolean = true,
     val externalPlayerEnabled: Boolean = false,
@@ -102,9 +103,12 @@ data class PlayerSettingsUiState(
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
     val streamAutoPlaySelectedAddons: Set<String> = emptySet(),
+    val streamAutoPlayAddonPriority: List<String> = emptyList(),
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
+    val deadLinkTimeoutEnabled: Boolean = true,
+    val deadLinkTimeoutSeconds: Int = 10,
     val skipIntroEnabled: Boolean = true,
     val skipIntroOffsetSeconds: Int = 0,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
@@ -169,6 +173,7 @@ object PlayerSettingsRepository {
     private var showSkipButtons = true
     private var seekPreviewEnabled = true
     private var movieRecommendationsEnabled = true
+    private var movieRecommendationsFallbackSeconds = 180
     private var autoShowSubtitlesOnRewindEnabled = true
     private var autoShowSubtitlesOnMuteEnabled = true
     private var externalPlayerEnabled = false
@@ -217,9 +222,12 @@ object PlayerSettingsRepository {
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
     private var streamAutoPlaySelectedAddons: Set<String> = emptySet()
+    private var streamAutoPlayAddonPriority: List<String> = emptyList()
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
     private var streamAutoPlayRegex = ""
     private var streamAutoPlayTimeoutSeconds = 3
+    private var deadLinkTimeoutEnabled = true
+    private var deadLinkTimeoutSeconds = 10
     private var skipIntroEnabled = true
     private var skipIntroOffsetSeconds = 0
     private var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
@@ -289,6 +297,7 @@ object PlayerSettingsRepository {
         showSkipButtons = true
         seekPreviewEnabled = true
         movieRecommendationsEnabled = true
+        movieRecommendationsFallbackSeconds = 180
         autoShowSubtitlesOnRewindEnabled = true
         autoShowSubtitlesOnMuteEnabled = true
         externalPlayerEnabled = false
@@ -337,9 +346,12 @@ object PlayerSettingsRepository {
         streamAutoPlayMode = StreamAutoPlayMode.MANUAL
         streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = emptySet()
+        streamAutoPlayAddonPriority = emptyList()
         streamAutoPlaySelectedPlugins = emptySet()
         streamAutoPlayRegex = ""
         streamAutoPlayTimeoutSeconds = 3
+        deadLinkTimeoutEnabled = true
+        deadLinkTimeoutSeconds = 10
         skipIntroEnabled = true
         skipIntroOffsetSeconds = 0
         autoSkipSegmentTypes = emptySet()
@@ -404,6 +416,7 @@ object PlayerSettingsRepository {
         showSkipButtons = PlayerSettingsStorage.loadShowSkipButtons() ?: true
         seekPreviewEnabled = PlayerSettingsStorage.loadSeekPreviewEnabled() ?: true
         movieRecommendationsEnabled = PlayerSettingsStorage.loadMovieRecommendationsEnabled() ?: true
+        movieRecommendationsFallbackSeconds = PlayerSettingsStorage.loadMovieRecommendationsFallbackSeconds()?.coerceIn(30, 600) ?: 180
         autoShowSubtitlesOnRewindEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnRewindEnabled() ?: true
         autoShowSubtitlesOnMuteEnabled = PlayerSettingsStorage.loadAutoShowSubtitlesOnMuteEnabled() ?: true
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
@@ -493,6 +506,9 @@ object PlayerSettingsRepository {
             ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = PlayerSettingsStorage.loadStreamAutoPlaySelectedAddons() ?: emptySet()
+        streamAutoPlayAddonPriority = (PlayerSettingsStorage.loadStreamAutoPlayAddonPriority() ?: emptyList())
+            .filter { it.isNotBlank() }
+            .distinct()
         streamAutoPlaySelectedPlugins = PlayerSettingsStorage.loadStreamAutoPlaySelectedPlugins() ?: emptySet()
         if (!AppFeaturePolicy.pluginsEnabled) {
             val normalizedSource = normalizeStreamAutoPlaySource(streamAutoPlaySource)
@@ -507,6 +523,10 @@ object PlayerSettingsRepository {
         }
         streamAutoPlayRegex = PlayerSettingsStorage.loadStreamAutoPlayRegex() ?: ""
         streamAutoPlayTimeoutSeconds = PlayerSettingsStorage.loadStreamAutoPlayTimeoutSeconds() ?: 3
+        deadLinkTimeoutEnabled = PlayerSettingsStorage.loadDeadLinkTimeoutEnabled() ?: true
+        deadLinkTimeoutSeconds = DeadLinkTimeoutPolicy.normalizeSeconds(
+            PlayerSettingsStorage.loadDeadLinkTimeoutSeconds() ?: DeadLinkTimeoutPolicy.DEFAULT_SECONDS,
+        )
         // Legacy migration: 11 was the old sentinel for "unlimited"
         if (streamAutoPlayTimeoutSeconds == 11) {
             streamAutoPlayTimeoutSeconds = Int.MAX_VALUE
@@ -731,6 +751,15 @@ object PlayerSettingsRepository {
         movieRecommendationsEnabled = enabled
         publish()
         PlayerSettingsStorage.saveMovieRecommendationsEnabled(enabled)
+    }
+
+    fun setMovieRecommendationsFallbackSeconds(seconds: Int) {
+        ensureLoaded()
+        val value = seconds.coerceIn(30, 600)
+        if (movieRecommendationsFallbackSeconds == value) return
+        movieRecommendationsFallbackSeconds = value
+        publish()
+        PlayerSettingsStorage.saveMovieRecommendationsFallbackSeconds(value)
     }
 
     fun setAutoShowSubtitlesOnRewindEnabled(enabled: Boolean) {
@@ -1149,6 +1178,15 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlaySelectedAddons(addons)
     }
 
+    fun setStreamAutoPlayAddonPriority(priority: List<String>) {
+        ensureLoaded()
+        val normalized = priority.filter { it.isNotBlank() }.distinct()
+        if (streamAutoPlayAddonPriority == normalized) return
+        streamAutoPlayAddonPriority = normalized
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayAddonPriority(normalized)
+    }
+
     fun setStreamAutoPlaySelectedPlugins(plugins: Set<String>) {
         ensureLoaded()
         val normalizedPlugins = if (AppFeaturePolicy.pluginsEnabled) plugins else emptySet()
@@ -1172,6 +1210,23 @@ object PlayerSettingsRepository {
         streamAutoPlayTimeoutSeconds = seconds
         publish()
         PlayerSettingsStorage.saveStreamAutoPlayTimeoutSeconds(seconds)
+    }
+
+    fun setDeadLinkTimeoutEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (deadLinkTimeoutEnabled == enabled) return
+        deadLinkTimeoutEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveDeadLinkTimeoutEnabled(enabled)
+    }
+
+    fun setDeadLinkTimeoutSeconds(seconds: Int) {
+        ensureLoaded()
+        val normalized = DeadLinkTimeoutPolicy.normalizeSeconds(seconds)
+        if (deadLinkTimeoutSeconds == normalized) return
+        deadLinkTimeoutSeconds = normalized
+        publish()
+        PlayerSettingsStorage.saveDeadLinkTimeoutSeconds(normalized)
     }
 
     fun setSkipIntroOffsetSeconds(seconds: Int) {
@@ -1539,6 +1594,7 @@ object PlayerSettingsRepository {
             showSkipButtons = showSkipButtons,
             seekPreviewEnabled = seekPreviewEnabled,
             movieRecommendationsEnabled = movieRecommendationsEnabled,
+            movieRecommendationsFallbackSeconds = movieRecommendationsFallbackSeconds,
             autoShowSubtitlesOnRewindEnabled = autoShowSubtitlesOnRewindEnabled,
             autoShowSubtitlesOnMuteEnabled = autoShowSubtitlesOnMuteEnabled,
             externalPlayerEnabled = externalPlayerEnabled,
@@ -1587,9 +1643,12 @@ object PlayerSettingsRepository {
             streamAutoPlayMode = streamAutoPlayMode,
             streamAutoPlaySource = streamAutoPlaySource,
             streamAutoPlaySelectedAddons = streamAutoPlaySelectedAddons,
+            streamAutoPlayAddonPriority = streamAutoPlayAddonPriority,
             streamAutoPlaySelectedPlugins = streamAutoPlaySelectedPlugins,
             streamAutoPlayRegex = streamAutoPlayRegex,
             streamAutoPlayTimeoutSeconds = streamAutoPlayTimeoutSeconds,
+            deadLinkTimeoutEnabled = deadLinkTimeoutEnabled,
+            deadLinkTimeoutSeconds = deadLinkTimeoutSeconds,
             skipIntroEnabled = skipIntroEnabled,
             skipIntroOffsetSeconds = skipIntroOffsetSeconds,
             autoSkipSegmentTypes = autoSkipSegmentTypes,
