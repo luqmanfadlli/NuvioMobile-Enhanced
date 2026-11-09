@@ -2,6 +2,8 @@
 
 package com.nuvio.app.features.player.seekpreview
 
+import kotlinx.cinterop.autoreleasepool
+
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import kotlinx.cinterop.addressOf
@@ -45,7 +47,9 @@ private class BridgedSeekPreviewFrameSource(
     private val generator: NuvioSeekPreviewGenerator,
 ) : SeekPreviewFrameSource {
     override fun frameAt(positionMs: Long, maxWidthPx: Int): ImageBitmap? {
-        val bytes = generator.frameJpeg(positionMs, maxWidthPx)?.toByteArray()
+        val bytes = autoreleasepool {
+            generator.frameJpeg(positionMs, maxWidthPx)?.toByteArray()
+        }
         if (bytes == null || bytes.isEmpty()) {
             throw IllegalStateException(generator.lastError() ?: "no frame")
         }

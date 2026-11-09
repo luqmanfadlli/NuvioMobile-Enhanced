@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.logging.InAppLogger
+import com.nuvio.app.core.ui.collectAfterPlayback
+import com.nuvio.app.core.ui.trimImageMemoryForPlayback
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.delay
@@ -76,6 +78,8 @@ actual fun PlatformPlayerSurface(
     var subtitleText by remember(sourceUrl) { mutableStateOf("") }
     var subtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
 
+    LaunchedEffect(Unit) { trimImageMemoryForPlayback() }
+    DisposableEffect(Unit) { onDispose { collectAfterPlayback() } }
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
     }

@@ -125,6 +125,10 @@ object NuvioPlayerBridgeFactory {
     fun create(): NuvioPlayerBridge? = factoryRef?.createBridge()
 
     val isRegistered: Boolean get() = factoryRef != null
+
+    fun closeParkedPictureInPicture() {
+        factoryRef?.closeParkedPictureInPicture()
+    }
 }
 
 /**
@@ -133,4 +137,6 @@ object NuvioPlayerBridgeFactory {
  */
 interface NuvioPlayerBridgeCreator {
     fun createBridge(): NuvioPlayerBridge
+
+    fun closeParkedPictureInPicture()
 }
