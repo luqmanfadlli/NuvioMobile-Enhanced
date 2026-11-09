@@ -222,7 +222,9 @@ fun NuvioTheme(
             colorScheme = colorScheme,
             typography = NuvioTypography,
         ) {
-            SkeletonAnimationProvider(content = content)
+            SharedCardStylesProvider {
+                SkeletonAnimationProvider(content = content)
+            }
         }
     }
 }

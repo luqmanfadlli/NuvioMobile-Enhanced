@@ -28,20 +28,24 @@ internal fun resolveAutoPlaybackEngine(
         return AndroidPlaybackEngine.ExoPlayer
     }
 
+    if (isAnimeContent(videoId, genres, country)) return AndroidPlaybackEngine.Libmpv
+
+    return AndroidPlaybackEngine.ExoPlayer
+}
+
+internal fun isAnimeContent(
+    videoId: String?,
+    genres: List<String>,
+    country: String?,
+): Boolean {
     val hasAnimeId = videoId?.startsWith("kitsu:") == true ||
         videoId?.startsWith("mal:") == true ||
         videoId?.startsWith("anilist:") == true
-    if (hasAnimeId) return AndroidPlaybackEngine.Libmpv
+    if (hasAnimeId) return true
 
-    if (genres.any { it.equals("anime", ignoreCase = true) }) {
-        return AndroidPlaybackEngine.Libmpv
-    }
+    if (genres.any { it.equals("anime", ignoreCase = true) }) return true
 
-    val isAnimationFromJapan = genres.any { it.equals("animation", ignoreCase = true) } &&
-        isJapan(country)
-    if (isAnimationFromJapan) return AndroidPlaybackEngine.Libmpv
-
-    return AndroidPlaybackEngine.ExoPlayer
+    return genres.any { it.equals("animation", ignoreCase = true) } && isJapan(country)
 }
 
 private val HDR_OR_DOLBY_VISION_REGEX = Regex("""(?i)\b(hdr|hdr10\+?|dv|dolby\s*vision)\b""")

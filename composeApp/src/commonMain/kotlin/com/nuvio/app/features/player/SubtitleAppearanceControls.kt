@@ -96,6 +96,12 @@ internal fun SubtitleAppearanceControls(
             SubtitleColorControl(stringResource(Res.string.compose_player_outline_color), style.outlineColor) {
                 onStyleChanged(style.copy(outlineColor = it))
             }
+            SubtitleValueControl(
+                stringResource(Res.string.subtitle_outline_blur),
+                style.appearance.outlineBlur,
+                SUBTITLE_OUTLINE_BLUR_MIN..SUBTITLE_OUTLINE_BLUR_MAX,
+                1,
+            ) { onStyleChanged(style.copy(appearance = style.appearance.copy(outlineBlur = it))) }
         }
         SubtitleToggleControl(stringResource(Res.string.subtitle_shadow), style.appearance.shadowEnabled) {
             onStyleChanged(style.copy(appearance = style.appearance.copy(shadowEnabled = it)))

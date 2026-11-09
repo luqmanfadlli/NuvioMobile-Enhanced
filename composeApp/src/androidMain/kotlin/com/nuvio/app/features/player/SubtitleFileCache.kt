@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.nuvio.app.core.diagnostics.SentryNetworkBreadcrumbInterceptor
+import com.nuvio.app.core.network.NetworkErrorInterceptor
 import com.nuvio.app.features.streams.redactedForLogs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +26,7 @@ object SubtitleFileCache {
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns(com.nuvio.app.core.network.NuvioDns)
+            .addInterceptor(NetworkErrorInterceptor())
             .addInterceptor(SentryNetworkBreadcrumbInterceptor())
             .build()
     }

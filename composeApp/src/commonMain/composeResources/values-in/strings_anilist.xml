@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracking_source_anilist">AniList</string>
+    <string name="settings_anilist_anime_section">Anime</string>
+    <string name="settings_anilist_library_description">Daftar anime AniList Anda: Watching, Planning, Completed, Paused, Dropped, dan Rewatching.</string>
+    <string name="settings_anilist_progress_description">Lanjutkan Menonton dan Berikutnya dari daftar Watching AniList Anda.</string>
+    <string name="library_anilist_title">Pustaka AniList</string>
+    <string name="library_anilist_load_failed">Tidak dapat memuat pustaka AniList Anda</string>
+    <string name="library_anilist_empty_title">Pustaka AniList Anda kosong</string>
+    <string name="library_anilist_empty_message">Tambahkan anime ke daftar AniList Anda untuk melihatnya di sini.</string>
+    <string name="settings_anilist_connect">Hubungkan AniList</string>
+    <string name="settings_anilist_connected_as">Terhubung sebagai %1$s</string>
+    <string name="settings_anilist_connected_description">Sinkronkan daftar anime, progres episode, skor, dan Lanjutkan Menonton dengan AniList.</string>
+    <string name="settings_anilist_sign_in_description">Hubungkan AniList untuk menyinkronkan daftar anime, progres episode, skor, dan Lanjutkan Menonton.</string>
+    <string name="settings_anilist_finish_sign_in">Selesaikan proses masuk</string>
+    <string name="settings_anilist_approval_description">Setujui Nuvio di browser Anda. Anda akan dikembalikan ke aplikasi secara otomatis.</string>
+    <string name="settings_anilist_open_login">Buka halaman masuk</string>
+    <string name="settings_anilist_disconnect">Putuskan AniList</string>
+    <string name="settings_anilist_missing_credentials">Koneksi AniList tidak tersedia di build ini.</string>
+    <string name="settings_anilist_sync_now">Sinkronkan sekarang</string>
+    <string name="settings_anilist_visit">Kunjungi AniList</string>
+    <string name="settings_anilist_disconnect_description">Berhenti mengirim pembaruan tontonan dari profil ini. Daftar AniList Anda tetap tersimpan.</string>
+    <string name="settings_anilist_account_fallback">Pengguna AniList</string>
+    <string name="settings_anilist_syncing">Menyinkronkan daftar AniList Anda…</string>
+    <string name="settings_anilist_last_synced">Terakhir disinkronkan %1$s</string>
+    <string name="settings_anilist_auth_denied">Koneksi ditolak. Coba lagi untuk menghubungkan akun Anda.</string>
+    <string name="settings_anilist_auth_invalid">AniList mengembalikan respons masuk yang tidak valid. Silakan coba lagi.</string>
+    <string name="settings_anilist_auth_revoked">Koneksi AniList Anda kedaluwarsa atau dicabut. Hubungkan lagi untuk melanjutkan sinkronisasi.</string>
+    <string name="settings_anilist_unavailable">Tidak dapat menyinkronkan dengan AniList. Silakan coba lagi.</string>
+    <string name="settings_anilist_rate_limited">Batas request AniList tercapai. Sinkronisasi akan berlanjut sebentar lagi.</string>
+</resources>

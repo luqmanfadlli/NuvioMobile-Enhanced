@@ -7,15 +7,20 @@ import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -170,6 +175,7 @@ import kotlinx.serialization.json.Json
 import com.nuvio.app.core.poster.CustomPosterScreen
 import com.nuvio.app.core.poster.CustomPosterUrlRepository
 import com.nuvio.app.core.poster.withCustomPosterUrl
+import com.nuvio.app.core.ui.rememberScreenActiveInfiniteFloat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -262,6 +268,7 @@ fun LibraryScreen(
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     var cloudSearchQuery by rememberSaveable { mutableStateOf("") }
+    var cloudSearchVisible by rememberSaveable { mutableStateOf(false) }
     val selectedType = remember(selectedTypeName) {
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
@@ -527,6 +534,25 @@ fun LibraryScreen(
                             )
                         }
                     }
+                    if (sourceMode == LibraryViewMode.Cloud) {
+                        val cloudSearchLabel = stringResource(Res.string.cloud_library_search_label)
+                        IconButton(
+                            onClick = {
+                                if (cloudSearchVisible) cloudSearchQuery = ""
+                                cloudSearchVisible = !cloudSearchVisible
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .semantics { contentDescription = cloudSearchLabel },
+                        ) {
+                            Icon(
+                                imageVector = if (cloudSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (onDownloadsClick != null) {
                         LibraryDownloadsButton(onClick = onDownloadsClick)
                     }
@@ -562,6 +588,7 @@ fun LibraryScreen(
                     selectedType = selectedType,
                     selectedCloudItemKey = selectedCloudItemKey,
                     searchQuery = cloudSearchQuery,
+                    searchVisible = cloudSearchVisible,
                     onSearchQueryChange = {
                         cloudSearchQuery = it
                         selectedCloudItemKey = null
@@ -768,6 +795,7 @@ private fun LazyListScope.cloudLibraryContent(
     selectedType: CloudLibraryItemType?,
     selectedCloudItemKey: String?,
     searchQuery: String,
+    searchVisible: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onProviderSelected: (String?) -> Unit,
     onTypeSelected: (CloudLibraryItemType?) -> Unit,
@@ -861,11 +889,21 @@ private fun LazyListScope.cloudLibraryContent(
                             onRefresh = onRefresh,
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
-                        CloudLibrarySearchField(
-                            query = searchQuery,
-                            onQueryChange = onSearchQueryChange,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
+                        AnimatedVisibility(
+                            visible = searchVisible,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut(),
+                        ) {
+                            val focusRequester = remember { FocusRequester() }
+                            LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+                            CloudLibrarySearchField(
+                                query = searchQuery,
+                                onQueryChange = onSearchQueryChange,
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .focusRequester(focusRequester),
+                            )
+                        }
                     }
                 }
 
@@ -1506,8 +1544,7 @@ private fun rememberCloudLibrarySkeletonBrush(): Brush {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
     )
-    val transition = rememberInfiniteTransition()
-    val translateAnim by transition.animateFloat(
+    val translateAnim by rememberScreenActiveInfiniteFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(

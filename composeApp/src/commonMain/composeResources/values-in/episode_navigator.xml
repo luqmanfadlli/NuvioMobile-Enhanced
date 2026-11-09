@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="episode_navigator_search_hint">Cari judul, alur cerita, atau nomor</string>
+    <string name="episode_navigator_clear_search">Hapus pencarian</string>
+    <string name="episode_navigator_go_to">Ke</string>
+    <string name="episode_navigator_sort">Urutkan</string>
+    <string name="episode_navigator_count">%1$d dari %2$d episode</string>
+    <string name="episode_navigator_no_match">Tidak ada episode yang cocok dengan ‘%1$s’</string>
+    <string name="episode_navigator_go_to_title">Lompat ke episode</string>
+    <string name="episode_navigator_episode_number">Nomor episode</string>
+    <string name="episode_navigator_go">Buka</string>
+    <string name="episode_navigator_go_to_help">Ketik nomor, atau pilih di bawah. Bergaris bawah = sudah ditonton, bergaris tepi = berikutnya.</string>
+    <string name="episode_navigator_out_of_range">%1$s memiliki episode %2$d–%3$d</string>
+    <string name="episode_navigator_sort_title">Urutkan episode</string>
+    <string name="episode_navigator_sort_first_to_last">Episode: pertama ke terakhir</string>
+    <string name="episode_navigator_sort_last_to_first">Episode: terakhir ke pertama</string>
+    <string name="episode_navigator_sort_highest_rated">Rating tertinggi</string>
+    <string name="episode_navigator_sort_newest_aired">Tayang terbaru</string>
+    <string name="episode_navigator_sort_unwatched_first">Belum ditonton dulu</string>
+</resources>

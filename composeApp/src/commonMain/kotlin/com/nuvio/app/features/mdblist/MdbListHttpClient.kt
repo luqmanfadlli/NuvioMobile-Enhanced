@@ -1,6 +1,6 @@
 package com.nuvio.app.features.mdblist
 
-import io.ktor.utils.io.errors.IOException
+import kotlinx.io.IOException
 import io.ktor.http.fromHttpToGmtDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex

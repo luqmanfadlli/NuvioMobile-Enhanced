@@ -111,8 +111,8 @@ object SkipIntroRepository {
         val aniSkip = aniSkipDeferred.await()
         return@coroutineScope mergeByPriority(
             introDb,
-            animeSkip,
             aniSkip,
+            animeSkip,
         ).also { merged ->
             InAppLogger.info(
                 "Player/SkipIntro",
@@ -172,7 +172,7 @@ object SkipIntroRepository {
         }
 
         val aniSkip = aniSkipDeferred.await()
-        return@coroutineScope mergeByPriority(introDb, animeSkip, aniSkip).also { merged ->
+        return@coroutineScope mergeByPriority(introDb, aniSkip, animeSkip).also { merged ->
             InAppLogger.info(
                 "Player/SkipIntro",
                 "skip lookup result mal=$malId e=$episode count=${merged.size} " +
@@ -237,7 +237,7 @@ object SkipIntroRepository {
         }
 
         val aniSkip = aniSkipDeferred.await()
-        return@coroutineScope mergeByPriority(introDb, animeSkip, aniSkip).also { merged ->
+        return@coroutineScope mergeByPriority(introDb, aniSkip, animeSkip).also { merged ->
             InAppLogger.info(
                 "Player/SkipIntro",
                 "skip lookup result kitsu=$kitsuId e=$episode count=${merged.size} " +
@@ -397,28 +397,16 @@ object SkipIntroRepository {
                 }
 
                 for (showId in showIds) {
-                    val query = "{ findEpisodesByShowId(showId: \"$showId\") { season number timestamps { at type { name } } } }"
+                    val query = "{ findEpisodesByShowId(showId: \"$showId\") { season number baseDuration timestamps { at type { name } } } }"
                     val response = SkipIntroApi.queryAnimeSkip(clientId, query) ?: continue
                     val episodes = response.data?.findEpisodesByShowId ?: continue
 
-                    val targetEpisode = episodes.firstOrNull { ep ->
-                        ep.number?.toIntOrNull() == episode &&
-                            (season == null || ep.season?.toIntOrNull() == season)
-                    } ?: continue
-
-                    val sorted = (targetEpisode.timestamps ?: continue).sortedBy { it.at }
-                    val result = sorted.mapIndexedNotNull { i, ts ->
-                        val endTime = sorted.getOrNull(i + 1)?.at ?: Double.MAX_VALUE
-                        val type = when (ts.type.name.lowercase()) {
-                            "intro", "new intro" -> "op"
-                            "credits", "new credits" -> "ed"
-                            "mixed intro" -> "mixed-op"
-                            "mixed credits" -> "mixed-ed"
-                            "recap" -> "recap"
-                            else -> return@mapIndexedNotNull null
+                    val result = episodes
+                        .filter { ep ->
+                            ep.number?.toIntOrNull() == episode &&
+                                (season == null || ep.season?.toIntOrNull() == season)
                         }
-                        SkipInterval(startTime = ts.at, endTime = endTime, type = type, provider = "animeskip")
-                    }
+                        .bestAnimeSkipIntervals()
                     if (result.isNotEmpty()) {
                         InAppLogger.debug(
                             "Player/SkipIntro",
@@ -580,6 +568,50 @@ internal suspend fun resolveMovieSkipImdbId(
             "mal", "kitsu" -> resolveAnime(parts.first().lowercase(), value)
             else -> null
         }?.trim()?.takeIf { imdbPattern.matches(it) }
+    }
+}
+
+/**
+ * A show can hold several community entries for the same episode number, some of them incomplete.
+ * Pick the entry covering the most segment categories (opening / ending / recap), then the one
+ * with the most segments; on a tie the earlier entry wins.
+ */
+internal fun List<AnimeSkipEpisode>.bestAnimeSkipIntervals(): List<SkipInterval> =
+    map { it.timestamps.orEmpty().toAnimeSkipIntervals(it.baseDuration) }
+        .filter { it.isNotEmpty() }
+        .maxWithOrNull(
+            compareBy<List<SkipInterval>>(
+                { intervals -> intervals.mapNotNull { segmentCategory(it.type) }.toSet().size },
+                { it.size }
+            )
+        )
+        .orEmpty()
+
+/**
+ * Anime-Skip timestamps only mark where a segment starts; each one ends where the next begins.
+ * The last timestamp has no known end. Only an ending may run to the end of the episode, and only
+ * when it starts in the second half of it (if the duration is known); an open-ended intro or recap
+ * is dropped, since stretching it would skip the whole episode.
+ */
+internal fun List<AnimeSkipTimestamp>.toAnimeSkipIntervals(baseDuration: Double? = null): List<SkipInterval> {
+    val sorted = sortedBy { it.at }
+    return sorted.mapIndexedNotNull { i, ts ->
+        val type = when (ts.type.name.lowercase()) {
+            "intro", "new intro" -> "op"
+            "credits", "new credits" -> "ed"
+            "mixed intro" -> "mixed-op"
+            "mixed credits" -> "mixed-ed"
+            "recap" -> "recap"
+            else -> return@mapIndexedNotNull null
+        }
+        val next = sorted.getOrNull(i + 1)
+        val endTime = when {
+            next != null -> next.at.takeIf { it > ts.at } ?: return@mapIndexedNotNull null
+            segmentCategory(type) == "ending" && (baseDuration == null || ts.at >= baseDuration / 2) ->
+                Double.MAX_VALUE
+            else -> return@mapIndexedNotNull null
+        }
+        SkipInterval(startTime = ts.at, endTime = endTime, type = type, provider = "animeskip")
     }
 }
 

@@ -15,18 +15,26 @@ class MdbListTrackingWrites(
     private val sync: MdbListSyncRepository,
     private val history: MdbListHistoryService,
     private val scrobble: MdbListScrobbleService,
+    private val episodeMappings: MdbListEpisodeMappingService,
 ) : TrackingHistoryWriter, TrackingScrobbler {
     override val providerId = TrackingProviderId.MDBLIST
     override val seekScrobblePolicy = TrackingSeekScrobblePolicy.STOP_AND_RESTART
 
+    // MDBList reads episode numbers in TMDB's numbering, which can differ from the addon's.
     override suspend fun addToHistory(profileId: Int, items: Collection<TrackingHistoryItem>) =
-        history.add(scope(profileId), TrackingAnimeIdMapper.toImdbHistoryItems(items))
+        scope(profileId).let { scope -> history.add(scope, items.map { it.copy(media = it.media.inMdbListNumbering()) }) }
 
     override suspend fun removeFromHistory(profileId: Int, items: Collection<TrackingMediaReference>) =
-        history.remove(scope(profileId), TrackingAnimeIdMapper.toImdbReferences(items))
+        scope(profileId).let { scope -> history.remove(scope, items.map { it.inMdbListNumbering() }) }
 
     override suspend fun scrobble(profileId: Int, action: TrackingScrobbleAction, event: TrackingScrobbleEvent) =
-        scrobble.scrobble(scope(profileId), action, event.copy(media = TrackingAnimeIdMapper.toImdbReference(event.media)))
+        scope(profileId).let { scope -> scrobble.scrobble(scope, action, event.copy(media = event.media.inMdbListNumbering())) }
+
+    private suspend fun TrackingMediaReference.inMdbListNumbering(): TrackingMediaReference {
+        val imdb = TrackingAnimeIdMapper.toImdbReference(this)
+        if (imdb != this) return imdb
+        return episodeMappings.toMdbListNumbering(this, sync.currentProjection())
+    }
 
     private fun scope(profileId: Int): MdbListAuthScope = sync.currentScope().also {
         if (it.profileId != profileId) throw CancellationException("MDBList profile changed")

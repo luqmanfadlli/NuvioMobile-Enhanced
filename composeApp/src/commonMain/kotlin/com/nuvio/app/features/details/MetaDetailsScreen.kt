@@ -32,8 +32,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.StarBorder
 import com.nuvio.app.features.ratings.UserRatingSheet
 import com.nuvio.app.features.ratings.UserRatingSheetRequest
@@ -66,7 +67,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -88,7 +88,11 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
+import com.nuvio.app.core.i18n.localizedEpisodeTitle
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
+import androidx.compose.ui.graphics.SolidColor
+import com.nuvio.app.core.ui.ArtworkBackdrop
+import com.nuvio.app.core.ui.LocalOnBackdrop
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.verticalBarWidth
@@ -101,6 +105,7 @@ import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.rememberArtworkBackdrop
 import com.nuvio.app.core.ui.rememberHeroStretchState
 import com.kyant.backdrop.Backdrop
 import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
@@ -114,6 +119,7 @@ import com.nuvio.app.features.details.components.DetailCastSection
 import com.nuvio.app.features.details.components.DetailCommentsSection
 import com.nuvio.app.features.details.components.DetailEpisodeRatingMap
 import com.nuvio.app.features.details.components.hasEpisodeRatingMap
+import com.nuvio.app.features.details.components.CinematicHeaderBackdrop
 import com.nuvio.app.features.details.components.DetailFloatingHeader
 import com.nuvio.app.features.details.components.DetailHero
 import com.nuvio.app.features.details.components.DetailMetaInfo
@@ -126,6 +132,7 @@ import com.nuvio.app.features.details.components.rememberEpisodeNavigatorState
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
 import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
+import com.nuvio.app.features.details.components.TabletArtworkBackdropAlignment
 import com.nuvio.app.features.details.components.TabletDetailBackdrop
 import com.nuvio.app.features.details.components.TabletDetailHero
 import com.nuvio.app.features.details.components.TabletDetailHeroActions
@@ -1151,6 +1158,7 @@ fun MetaDetailsScreen(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colorScheme = MaterialTheme.colorScheme
                     val useTabletLayout = minOf(maxWidth, maxHeight) >= 600.dp
+                    val screenHeight = maxHeight
                     val isTablet = useTabletLayout || maxWidth >= 720.dp
                     val tabletViewportHeight = maxHeight
                     val isTabletLandscape = maxWidth > maxHeight
@@ -1158,6 +1166,12 @@ fun MetaDetailsScreen(
                     val contentMaxWidth = detailTabletContentMaxWidth(maxWidth, isTablet)
                     val backdropUrl = meta.background ?: meta.poster
                     val backgroundMode = metaScreenSettingsUiState.backgroundMode
+                    val cinematicBackground = backgroundMode == MetaScreenBackgroundMode.Cinematic &&
+                        !backdropUrl.isNullOrBlank()
+                    val cinematicBackdrop = rememberArtworkBackdrop(
+                        imageUrl = backdropUrl.takeIf { cinematicBackground },
+                        enabled = deferredMetaWorkAllowed,
+                    )
                     val dominantColorEnabled = backgroundMode == MetaScreenBackgroundMode.DominantColor &&
                         !backdropUrl.isNullOrBlank()
                     val extractedDominantColor = rememberArtworkDominantColor(
@@ -1220,7 +1234,8 @@ fun MetaDetailsScreen(
                                     ) {
                                         TabletDetailBackdrop(
                                             meta = meta,
-                                            cinematic = backgroundMode == MetaScreenBackgroundMode.Cinematic,
+                                            cinematic = cinematicBackground,
+                                            backdropImage = cinematicBackdrop,
                                             scrollOffsetPx = detailScrollOffsetPx,
                                             heroHeightPx = { heroHeightPx.intValue },
                                             heroTrailerSourceUrl = heroTrailerSourceUrl,
@@ -1236,31 +1251,13 @@ fun MetaDetailsScreen(
                                     }
                                 } else when (backgroundMode) {
                                     MetaScreenBackgroundMode.Normal -> Unit
-                                    MetaScreenBackgroundMode.Cinematic -> if (backdropUrl != null) {
-                                        val cinematicModifier = Modifier
-                                            .fillMaxSize()
-                                            .blur(16.dp)
-                                            .nuvioBackdropSource(cinematicArtworkBackdrop)
-                                        val heroPainter = heroBackdropPainter
-                                        if (heroPainter != null) {
-                                            Image(
-                                                painter = heroPainter,
-                                                contentDescription = null,
-                                                modifier = cinematicModifier,
-                                                contentScale = ContentScale.Crop,
-                                            )
-                                        } else if (deferredMetaWorkAllowed) {
-                                            AsyncImage(
-                                                model = backdropUrl,
-                                                contentDescription = null,
-                                                modifier = cinematicModifier,
-                                                contentScale = ContentScale.Crop,
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(colorScheme.background.copy(alpha = 0.72f)),
+                                    MetaScreenBackgroundMode.Cinematic -> if (cinematicBackground) {
+                                        // Upstream's pre-blurred artwork backdrop, with the fork's
+                                        // glass source and its lighter background-tinted scrim.
+                                        ArtworkBackdrop(
+                                            image = cinematicBackdrop,
+                                            modifier = Modifier.nuvioBackdropSource(cinematicArtworkBackdrop),
+                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.48f)),
                                         )
                                     }
                                     MetaScreenBackgroundMode.DominantColor -> {
@@ -1332,6 +1329,7 @@ fun MetaDetailsScreen(
                                                 heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
                                                 heroTrailerMuted = heroTrailerMuted,
                                                 heroGradientColor = heroGradientColor,
+                                                cinematicBackground = cinematicBackground,
                                                 onBackdropLoaded = onBackdropLoaded,
                                                 onHeroTrailerMuteToggle = { HeroTrailerAudioState.toggleMuted(HeroTrailerSurface.Details) },
                                                 onHeroTrailerReady = onHeroTrailerReady,
@@ -1484,24 +1482,31 @@ fun MetaDetailsScreen(
                                 if (!useTabletLayout && backgroundMode.usesBackdropBackground && heroHeightPx.intValue > 0) {
                                     val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
                                         ?: colorScheme.background
+                                    // The blend band sits under the hero and darkens the backdrop around
+                                    // the hero's bottom edge. It used to start fully opaque exactly at that
+                                    // edge, which left a hard line and a dark box under the feathered
+                                    // artwork. Ramp it in across the artwork's feathered region and ease
+                                    // it back out below, so the artwork melts into the backdrop.
+                                    val blendFadeInPx = heroHeightPx.intValue * DETAIL_HERO_BLEND_FADE_IN_FRACTION
+                                    val blendFadeOutPx = with(density) { DETAIL_HERO_BLEND_FADE_OUT.toPx() }
+                                    val blendBandHeight = with(density) { (blendFadeInPx + blendFadeOutPx).toDp() }
+                                    val blendBrush = remember(blendColor, blendFadeInPx, blendFadeOutPx) {
+                                        detailHeroBlendBrush(
+                                            color = blendColor,
+                                            peakFraction = blendFadeInPx / (blendFadeInPx + blendFadeOutPx),
+                                        )
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .zIndex(0.5f)
                                             .fillMaxWidth()
-                                            .height(132.dp)
+                                            .height(blendBandHeight)
                                             .graphicsLayer {
-                                                translationY = heroHeightPx.intValue.toFloat() - detailScrollOffsetPx()
+                                                translationY = heroHeightPx.intValue.toFloat() -
+                                                    blendFadeInPx -
+                                                    detailScrollOffsetPx()
                                             }
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        blendColor.copy(alpha = 0.98f),
-                                                        blendColor.copy(alpha = 0.84f),
-                                                        blendColor.copy(alpha = 0.52f),
-                                                        Color.Transparent,
-                                                    ),
-                                                ),
-                                            ),
+                                            .background(blendBrush),
                                     )
                                 }
                             }
@@ -1512,6 +1517,7 @@ fun MetaDetailsScreen(
                             isSaved = isSaved,
                             isHeroCollapsed = isHeroCollapsed,
                             backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
+                            headerBackground = null,
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                             glassBackdrop = cinematicContentBackdrop.takeIf { cinematicGlassEnabled && it.isReady },
@@ -1986,7 +1992,11 @@ fun MetaDetailsScreen(
                             ),
                         )
                     }
-                    if (onPlayManually != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)) {
+                    if (
+                        onPlayManually != null &&
+                        StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) &&
+                        playbackAvailability.canStream(meta.type, selectedEpisode.id)
+                    ) {
                         add(
                             PosterZoomOverlayAction(
                                 icon = Icons.Default.PlayArrow,
@@ -2029,6 +2039,7 @@ fun MetaDetailsScreen(
                 },
             )
         }
+
     }
 }
 
@@ -2038,6 +2049,7 @@ private fun DetailHeaderOverlay(
     isSaved: Boolean,
     isHeroCollapsed: State<Boolean>,
     backgroundColor: Color?,
+    headerBackground: (@Composable () -> Unit)?,
     onBack: () -> Unit,
     onToggleSaved: () -> Unit,
     glassBackdrop: Backdrop? = null,
@@ -2073,6 +2085,7 @@ private fun DetailHeaderOverlay(
             isSaved = isSaved,
             progress = headerProgress,
             backgroundColor = backgroundColor,
+            background = headerBackground,
             onBack = onBack,
             onToggleSaved = onToggleSaved,
             modifier = Modifier.zIndex(2f),
@@ -2720,6 +2733,31 @@ private fun TabbedSectionGroup(
             content(activeKey)
         }
     }
+}
+
+// Matches the region of the hero artwork that featherArtwork() fades out (its bottom 42%).
+private const val DETAIL_HERO_BLEND_FADE_IN_FRACTION = 0.42f
+private val DETAIL_HERO_BLEND_FADE_OUT = 200.dp
+private const val DETAIL_HERO_BLEND_PEAK_ALPHA = 0.96f
+
+/**
+ * A single smooth bump: transparent at the top, [DETAIL_HERO_BLEND_PEAK_ALPHA] at [peakFraction]
+ * (the hero's bottom edge) and transparent again at the bottom, using smootherstep easing on both
+ * sides so neither end of the band shows an edge.
+ */
+private fun detailHeroBlendBrush(color: Color, peakFraction: Float): Brush {
+    val peak = peakFraction.coerceIn(0.01f, 0.99f)
+    val steps = 12
+    fun ease(t: Float) = t * t * t * (t * (t * 6f - 15f) + 10f)
+    val rampIn = Array(steps) { index ->
+        val t = index / steps.toFloat()
+        (t * peak) to color.copy(alpha = DETAIL_HERO_BLEND_PEAK_ALPHA * ease(t))
+    }
+    val rampOut = Array(steps + 1) { index ->
+        val t = index / steps.toFloat()
+        (peak + t * (1f - peak)) to color.copy(alpha = DETAIL_HERO_BLEND_PEAK_ALPHA * (1f - ease(t)))
+    }
+    return Brush.verticalGradient(colorStops = rampIn + rampOut)
 }
 
 private val tabletHeroSectionKeys = setOf(

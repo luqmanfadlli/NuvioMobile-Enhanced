@@ -113,6 +113,30 @@ internal fun PlaybackVideoSettings(
                     )
                 }
             }
+            SettingsSection(
+                title = stringResource(Res.string.settings_playback_section_anime_enhancement),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_anime_upscale),
+                        description = stringResource(Res.string.settings_playback_anime_upscale_description),
+                        checked = settings.androidAnimeUpscaleEnabled,
+                        enabled = decoderEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setAndroidAnimeUpscaleEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_anime_line_sharpen),
+                        description = stringResource(Res.string.settings_playback_anime_line_sharpen_description),
+                        checked = settings.androidAnimeLineSharpenEnabled,
+                        enabled = decoderEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setAndroidAnimeLineSharpenEnabled,
+                    )
+                }
+            }
         } else {
             SettingsSection(
                 title = stringResource(Res.string.settings_playback_ios_video_output),

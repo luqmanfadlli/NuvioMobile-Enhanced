@@ -21,6 +21,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.nuvio.app.core.network.NetworkErrorInterceptor
 import com.nuvio.app.core.storage.ProfileScopedKey
 import com.nuvio.app.features.settings.AppIconPlatform
 import io.ktor.client.HttpClient
@@ -80,7 +81,10 @@ internal actual object EpisodeReleaseNotificationPlatform {
                 connectTimeoutMillis = 15_000
                 socketTimeoutMillis = 15_000
             }
-            engine { preconfigured = com.nuvio.app.core.network.SharedOkHttpClient.base }
+            engine {
+                preconfigured = com.nuvio.app.core.network.SharedOkHttpClient.base
+                addInterceptor(NetworkErrorInterceptor())
+            }
         }
     }
 

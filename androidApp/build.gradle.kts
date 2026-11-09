@@ -19,6 +19,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.sentry.android.gradle)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 val localProps = Properties().apply {
@@ -90,7 +91,7 @@ android {
         jniLibs.directories.add("../composeApp/src/full/jniLibs")
     }
 
-    sourceSets.getByName("androidTest").assets.srcDir("../testFixtures")
+    sourceSets.getByName("androidTest").assets.directories.add("../testFixtures")
 
     packaging {
         resources {
@@ -247,8 +248,16 @@ sentry {
     }
 }
 
+baselineProfile {
+    mergeIntoMain = true
+    saveInSrc = true
+    automaticGenerationDuringBuild = false
+}
+
 dependencies {
     implementation(project(":composeApp"))
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.appcompat)
     implementation(libs.compose.runtime)
     coreLibraryDesugaring(libs.desugar.jdk.libs)

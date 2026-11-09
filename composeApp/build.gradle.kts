@@ -3,8 +3,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.CommandLineArgumentProvider
@@ -18,8 +17,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
-    @get:Optional
-    @get:InputFile
+    @get:InputFiles
     abstract val localPropertiesFile: RegularFileProperty
 
     @get:Input
@@ -342,6 +340,14 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
     dependsOn(generateRuntimeConfigs)
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+    if (providers.gradleProperty("nuvio.composeCompilerReports").map(String::toBoolean).getOrElse(false)) {
+        reportsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+        metricsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+    }
+}
+
 kotlin {
     android {
         namespace = "com.nuvio.app"
@@ -444,8 +450,18 @@ kotlin {
         }
     }
     
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     sourceSets {
-        val commonMain by getting {
+        all {
+            languageSettings.optIn("coil3.annotation.ExperimentalCoilApi")
+        }
+        matching { it.name.startsWith("ios") }.configureEach {
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+        }
+        val commonMain = getByName("commonMain") {
             kotlin.srcDir(generatedRuntimeConfigDir)
         }
         androidMain {
@@ -493,7 +509,7 @@ kotlin {
                 }
             }
         }
-        val androidHostTest by getting {
+        val androidHostTest = getByName("androidHostTest") {
             dependencies {
                 implementation("org.robolectric:robolectric:4.16")
                 implementation("androidx.compose.ui:ui-test-junit4:${libs.versions.composeMultiplatform.get()}")
@@ -523,7 +539,7 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.materialRipple)
-            implementation(compose.materialIconsExtended)
+            implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
@@ -555,7 +571,7 @@ kotlin {
     }
 }
 
-val bootIosTestSimulator by tasks.registering(Exec::class) {
+val bootIosTestSimulator = tasks.register<Exec>("bootIosTestSimulator") {
     val device = tasks.named<KotlinNativeSimulatorTest>("iosSimulatorArm64Test").flatMap { it.device }
     commandLine("xcrun", "simctl", "boot")
     argumentProviders.add(CommandLineArgumentProvider { listOf(device.get()) })

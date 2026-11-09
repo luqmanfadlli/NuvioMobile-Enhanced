@@ -59,7 +59,8 @@ final class FFmpegSeekPreviewGenerator: NSObject, NuvioSeekPreviewGenerator {
         ) else { return nil }
         var framePointer: UnsafeMutablePointer<AVFrame>? = frame
         defer { av_frame_free(&framePointer) }
-        guard let data = jpegData(from: frame, maxWidth: max(16, Int(maxWidth))) else {
+        let encoded = autoreleasepool { jpegData(from: frame, maxWidth: max(16, Int(maxWidth))) }
+        guard let data = encoded else {
             lastErrorMessage = lastErrorMessage ?? "frame conversion failed"
             return nil
         }

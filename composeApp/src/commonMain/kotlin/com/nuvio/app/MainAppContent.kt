@@ -145,6 +145,7 @@ import com.nuvio.app.features.podcasts.PodcastShowScreen
 import com.nuvio.app.features.sports.ui.SportsLeagueScreen
 import com.nuvio.app.features.sports.ui.SportsScreen
 import com.nuvio.app.features.livetv.LiveTvRepository
+import com.nuvio.app.features.livetv.LiveTvVodPlayback
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
@@ -1590,6 +1591,32 @@ internal fun MainAppContent(
             }
         }
 
+        val onLiveTvVodClick: (LiveTvVodPlayback) -> Unit = { vod ->
+            val launchId = PlayerLaunchStore.put(
+                PlayerLaunch(
+                    profileId = activePlaybackProfileId,
+                    title = vod.title,
+                    sourceUrl = vod.streamUrl,
+                    sourceHeaders = vod.headers,
+                    streamType = vod.streamType,
+                    poster = vod.posterUrl,
+                    background = vod.episodeThumbnail ?: vod.posterUrl,
+                    seasonNumber = vod.seasonNumber,
+                    episodeNumber = vod.episodeNumber,
+                    episodeTitle = vod.episodeTitle,
+                    episodeThumbnail = vod.episodeThumbnail,
+                    streamTitle = vod.episodeTitle ?: vod.title,
+                    providerName = "Live TV",
+                    providerAddonId = "live-tv",
+                    contentType = "vod",
+                    videoId = null,
+                    parentMetaId = vod.id,
+                    parentMetaType = "live",
+                ),
+            )
+            navController.navigate(PlayerRoute(launchId = launchId))
+        }
+
         AppUpdaterHost(
             controller = appUpdaterController,
             modifier = Modifier.fillMaxSize(),
@@ -1750,6 +1777,7 @@ internal fun MainAppContent(
                                 onContinueWatchingClick = onContinueWatchingClick,
                                 onContinueWatchingLongPress = onContinueWatchingLongPress,
                                 onLiveTvChannelClick = onLiveTvChannelClick,
+                                onLiveTvVodClick = onLiveTvVodClick,
                                 onSwitchProfile = onSwitchProfile,
                                 onEditProfile = pushEditProfile,
                                 onSettingsPageClick = if (useNativeNavigation && !isTabletLayout) {

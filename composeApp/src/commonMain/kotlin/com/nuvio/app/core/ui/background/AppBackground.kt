@@ -118,6 +118,10 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
         if (config.glassEnabled) config.imageModel() else null
     }
     val glassStyle = if (config.glassEnabled) config.glassPreset.style() else null
+    val glassUiActive = config.glassEnabled && model != null
+    LaunchedEffect(glassUiActive) {
+        com.nuvio.app.features.settings.ThemeSettingsRepository.onGlassUiActiveChanged(glassUiActive)
+    }
     val dim = glassStyle?.dim ?: DefaultBackgroundDim
     val baseTokens = MaterialTheme.nuvio
     val baseScheme = MaterialTheme.colorScheme

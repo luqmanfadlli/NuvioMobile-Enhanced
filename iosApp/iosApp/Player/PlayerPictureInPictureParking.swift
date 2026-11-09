@@ -53,6 +53,7 @@ final class PlayerPictureInPictureParking {
         parked = Parked(route: container.route, content: content, coordinator: coordinator, player: player)
         player.setParkedInPictureInPicture(true)
         OrientationLockCoordinator.shared.setParkedPlayerSuspension(true)
+        AppKt.setPlayerParkedInPictureInPicture(parked: true)
 
         let route = container.route
         var transaction = Transaction()
@@ -91,6 +92,7 @@ final class PlayerPictureInPictureParking {
         container.embed(parked.content)
         (parked.content as? RootComposeViewController)?.restoreAfterPictureInPictureParking()
         OrientationLockCoordinator.shared.setParkedPlayerSuspension(false)
+        AppKt.setPlayerParkedInPictureInPicture(parked: false)
         parked.player?.setParkedInPictureInPicture(false)
         InAppLogBridge.shared.info(tag: "Player/PiP", message: "parked player restored")
         return true
@@ -109,6 +111,7 @@ final class PlayerPictureInPictureParking {
         parked.player?.endPictureInPictureSession()
         parked.content.view.removeFromSuperview()
         parked.content.removeFromParent()
+        AppKt.setPlayerParkedInPictureInPicture(parked: false)
         AppKt.disposeRoute(route: parked.route)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             OrientationLockCoordinator.shared.setParkedPlayerSuspension(false)

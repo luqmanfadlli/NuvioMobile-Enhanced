@@ -25,8 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.VolumeOff
-import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.focusedAlignment
+import com.nuvio.app.core.ui.rememberBackdropFocusState
+import com.nuvio.app.core.ui.featherArtwork
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
 import com.nuvio.app.features.details.MetaDetails
@@ -72,6 +75,7 @@ fun DetailHero(
     heroTrailerPlayWhenReady: () -> Boolean = { false },
     heroTrailerMuted: Boolean = true,
     heroGradientColor: Color? = null,
+    cinematicBackground: Boolean = false,
     onBackdropLoaded: (Painter, ImageBitmap?) -> Unit = { _, _ -> },
     onHeroTrailerMuteToggle: () -> Unit = {},
     onHeroTrailerReady: () -> Unit = {},
@@ -114,58 +118,70 @@ fun DetailHero(
                     .fillMaxSize(),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                val imageUrl = meta.background ?: meta.poster
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = meta.name,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(heroHeight)
-                            .heroStretchZoom(stretchPx)
-                            .graphicsLayer {
-                                translationY = scrollOffset() * 0.5f
-                                scaleX = 1.08f
-                                scaleY = 1.08f
-                        },
-                        alignment = if (isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { state ->
-                            onBackdropLoaded(
-                                state.painter,
-                                loadedBackdropImageBitmap(state.result),
-                            )
-                        },
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface),
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (cinematicBackground) Modifier.featherArtwork() else Modifier),
+                ) {
+                    val imageUrl = meta.background ?: meta.poster
+                    if (imageUrl != null) {
+                        val backdropFocus = rememberBackdropFocusState(imageUrl)
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = meta.name,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .height(heroHeight)
+                                .heroStretchZoom(stretchPx)
+                                .graphicsLayer {
+                                    translationY = scrollOffset() * 0.5f
+                                    scaleX = 1.08f
+                                    scaleY = 1.08f
+                                },
+                            alignment = backdropFocus.focusedAlignment(
+                                if (isTablet) Alignment.TopCenter else Alignment.Center,
+                            ),
+                            contentScale = ContentScale.Crop,
+                            onSuccess = { state ->
+                                backdropFocus.onImageLoaded(state.result.image)
+                                onBackdropLoaded(
+                                    state.painter,
+                                    loadedBackdropImageBitmap(state.result),
+                                )
+                            },
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface),
+                        )
+                    }
+                    if (heroTrailerSourceUrl != null) {
+                        HeroTrailerPlayerSurface(
+                            sourceUrl = heroTrailerSourceUrl,
+                            sourceAudioUrl = heroTrailerSourceAudioUrl,
+                            playWhenReady = heroTrailerPlayWhenReady() && !MiniPlayerController.isActive,
+                            muted = heroTrailerMuted,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .height(heroHeight)
+                                .heroStretchZoom(stretchPx)
+                                .graphicsLayer {
+                                    alpha = trailerAlpha
+                                    translationY = scrollOffset() * 0.5f
+                                    scaleX = 1.08f
+                                    scaleY = 1.08f
+                                },
+                            onReady = onHeroTrailerReady,
+                            onEnded = onHeroTrailerEnded,
+                            onError = onHeroTrailerError,
+                        )
+                    }
                 }
                 if (heroTrailerSourceUrl != null) {
-                    HeroTrailerPlayerSurface(
-                        sourceUrl = heroTrailerSourceUrl,
-                        sourceAudioUrl = heroTrailerSourceAudioUrl,
-                        playWhenReady = heroTrailerPlayWhenReady() && !MiniPlayerController.isActive,
-                        muted = heroTrailerMuted,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(heroHeight)
-                            .heroStretchZoom(stretchPx)
-                            .graphicsLayer {
-                                alpha = trailerAlpha
-                                translationY = scrollOffset() * 0.5f
-                                scaleX = 1.08f
-                                scaleY = 1.08f
-                            },
-                        onReady = onHeroTrailerReady,
-                        onEnded = onHeroTrailerEnded,
-                        onError = onHeroTrailerError,
-                    )
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -200,7 +216,7 @@ fun DetailHero(
                         label = "detail_hero_trailer_mute_icon",
                     ) { muted ->
                         Icon(
-                            imageVector = if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                            imageVector = if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(muteIconSize),
@@ -208,25 +224,27 @@ fun DetailHero(
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (isTablet) 360.dp else 320.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.00f to Color.Transparent,
-                                    0.16f to bottomGradientColor.copy(alpha = 0.04f),
-                                    0.32f to bottomGradientColor.copy(alpha = 0.14f),
-                                    0.50f to bottomGradientColor.copy(alpha = 0.34f),
-                                    0.68f to bottomGradientColor.copy(alpha = 0.62f),
-                                    0.84f to bottomGradientColor.copy(alpha = 0.84f),
-                                    1.00f to bottomGradientColor,
+                if (!cinematicBackground) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (isTablet) 360.dp else 320.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0.00f to Color.Transparent,
+                                        0.16f to bottomGradientColor.copy(alpha = 0.04f),
+                                        0.32f to bottomGradientColor.copy(alpha = 0.14f),
+                                        0.50f to bottomGradientColor.copy(alpha = 0.34f),
+                                        0.68f to bottomGradientColor.copy(alpha = 0.62f),
+                                        0.84f to bottomGradientColor.copy(alpha = 0.84f),
+                                        1.00f to bottomGradientColor,
+                                    ),
                                 ),
                             ),
-                        ),
-                )
+                    )
+                }
 
                 Column(
                     modifier = Modifier

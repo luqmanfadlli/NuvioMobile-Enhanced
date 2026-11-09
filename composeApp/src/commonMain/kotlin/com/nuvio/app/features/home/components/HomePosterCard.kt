@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
+import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.core.ui.PosterPrefetchTarget
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
@@ -22,22 +24,14 @@ fun HomePosterCard(
     val posterCardStyle = rememberPosterCardStyleUiState()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
     val effectiveLandscapePoster = if (posterCardStyle.alwaysShowLandscapeClearlogo) null else item.landscapePoster
-    val imageUrl = if (isLandscapeMode) {
-        effectiveLandscapePoster ?: item.banner ?: item.poster
-    } else item.poster
-    val fallbackImageUrl = if (isLandscapeMode && !effectiveLandscapePoster.isNullOrBlank()) {
-        // Landscape custom poster -> fall back to original backdrop, then portrait
-        item.banner ?: item.rawPosterUrl
-    } else {
-        item.rawPosterUrl
-    }
+    val images = item.homePosterImages(posterCardStyle, useLandscapeBackdropMode)
 
     NuvioPosterCard(
         title = item.name,
-        imageUrl = imageUrl,
+        imageUrl = images.imageUrl,
         modifier = modifier,
-        fallbackImageUrl = fallbackImageUrl,
-        shape = if (isLandscapeMode) NuvioPosterShape.Landscape else item.posterShape.toNuvioPosterShape(),
+        fallbackImageUrl = images.fallbackImageUrl,
+        shape = images.shape,
         detailLine = if (isLandscapeMode || posterCardStyle.hideLabelsEnabled) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
         showTitleBelow = !posterCardStyle.hideLabelsEnabled,
         bottomLeftLogoUrl = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank()) item.logo else null,
@@ -46,6 +40,40 @@ fun HomePosterCard(
         onClick = onClick,
         onLongClick = onLongClick,
     )
+}
+
+internal data class HomePosterImages(
+    val imageUrl: String?,
+    val fallbackImageUrl: String?,
+    val shape: NuvioPosterShape,
+)
+
+internal fun MetaPreview.homePosterImages(
+    posterCardStyle: PosterCardStyleUiState,
+    useLandscapeBackdropMode: Boolean,
+): HomePosterImages {
+    val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
+    val effectiveLandscapePoster = if (posterCardStyle.alwaysShowLandscapeClearlogo) null else landscapePoster
+    val imageUrl = if (isLandscapeMode) {
+        effectiveLandscapePoster ?: banner ?: poster
+    } else poster
+    val fallbackImageUrl = if (isLandscapeMode && !effectiveLandscapePoster.isNullOrBlank()) {
+        // Landscape custom poster -> fall back to original backdrop, then portrait
+        banner ?: rawPosterUrl
+    } else {
+        rawPosterUrl
+    }
+    return HomePosterImages(
+        imageUrl = imageUrl,
+        fallbackImageUrl = fallbackImageUrl,
+        shape = if (isLandscapeMode) NuvioPosterShape.Landscape else posterShape.toNuvioPosterShape(),
+    )
+}
+
+internal fun HomePosterImages.toPrefetchTarget(): PosterPrefetchTarget? {
+    val url = imageUrl?.takeIf { it.isNotBlank() } ?: return null
+    val fallback = fallbackImageUrl?.takeIf { it.isNotBlank() && it != url }
+    return PosterPrefetchTarget(imageUrl = url, fallbackImageUrl = fallback, shape = shape)
 }
 
 private fun PosterShape.toNuvioPosterShape(): NuvioPosterShape =

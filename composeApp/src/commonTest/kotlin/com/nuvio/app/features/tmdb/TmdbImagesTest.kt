@@ -63,4 +63,44 @@ class TmdbImagesTest {
         assertEquals("es,es-MX,en,null", tmdbImageLanguages("es-419"))
         assertEquals("en,null", tmdbImageLanguages("en"))
     }
+
+    private val localFilmLogos = listOf(
+        TmdbImage("/indonesian.png", "id"),
+        TmdbImage("/textless.png", null),
+    )
+
+    @Test
+    fun titleLogoFallsBackToOriginalLanguageWhenNoAppLanguageOrEnglishLogo() {
+        assertEquals(
+            "/indonesian.png",
+            localFilmLogos.selectTitleLogoPath("en-US", originalLanguage = "id", preferOriginal = false),
+        )
+    }
+
+    @Test
+    fun titleLogoPrefersAppLanguageThenEnglishOverOriginalByDefault() {
+        val logos = localFilmLogos + TmdbImage("/english.png", "en")
+        assertEquals("/english.png", logos.selectTitleLogoPath("en-US", "id", preferOriginal = false))
+        assertEquals("/english.png", logos.selectTitleLogoPath("fr-FR", "id", preferOriginal = false))
+        val withFrench = logos + TmdbImage("/french.png", "fr")
+        assertEquals("/french.png", withFrench.selectTitleLogoPath("fr-FR", "id", preferOriginal = false))
+    }
+
+    @Test
+    fun titleLogoPrefersOriginalLanguageAndFallsBackToEnglish() {
+        val logos = localFilmLogos + TmdbImage("/english.png", "en")
+        assertEquals("/indonesian.png", logos.selectTitleLogoPath("en-US", "id", preferOriginal = true))
+        val noOriginal = listOf(TmdbImage("/english.png", "en"), TmdbImage("/textless.png", null))
+        assertEquals("/english.png", noOriginal.selectTitleLogoPath("en-US", "id", preferOriginal = true))
+    }
+
+    @Test
+    fun titleLogoIgnoresUnrelatedLanguages() {
+        val logos = listOf(TmdbImage("/japanese.png", "ja"))
+        assertNull(logos.selectTitleLogoPath("en-US", "id", preferOriginal = false))
+        assertEquals(
+            "/textless.png",
+            (logos + TmdbImage("/textless.png", null)).selectTitleLogoPath("en-US", "id", preferOriginal = false),
+        )
+    }
 }

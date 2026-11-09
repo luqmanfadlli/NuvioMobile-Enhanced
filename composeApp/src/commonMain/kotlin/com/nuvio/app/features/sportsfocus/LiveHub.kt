@@ -64,6 +64,7 @@ import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvEpgProgram
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.livetv.LiveTvScreen
+import com.nuvio.app.features.livetv.LiveTvVodPlayback
 import com.nuvio.app.features.livetv.rememberLiveTvEpgNowMillis
 import com.nuvio.app.features.sports.ChannelMatch
 import com.nuvio.app.features.sports.GameState
@@ -120,6 +121,7 @@ fun LiveHub(
     sportsActions: SportsActions?,
     modifier: Modifier = Modifier,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
+    onVodClick: (LiveTvVodPlayback) -> Unit = {},
 ) {
     var name by rememberSaveable { mutableStateOf(LiveSegment.Channels.name) }
     val segment = LiveSegment.entries.firstOrNull { it.name == name } ?: LiveSegment.Channels
@@ -129,7 +131,7 @@ fun LiveHub(
             modifier = modifier,
             scrollToTopRequests = scrollToTopRequests,
             onChannelClick = onChannelClick,
-            onSportsClick = null,
+            onVodClick = onVodClick,
             segments = { LiveSegmentedControl(segment, select, Modifier.padding(bottom = NuvioTokens.Space.s8)) },
         )
         LiveSegment.Guide -> LiveGuideScreen(segment, select, onChannelClick, modifier)
