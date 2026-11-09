@@ -48,7 +48,7 @@ object SportsWatch {
             val settings = SportsRepository.settings.value
             val ordered = SportsStreams.ordered(list, settings)
             when {
-                ordered.isEmpty() -> NuvioToastController.show("No stream found for this game yet")
+                ordered.isEmpty() -> NuvioToastController.show(if (SportsRepository.channelsReady) "No stream found for this game yet" else "Your channels are still loading, try again in a moment")
                 settings.choosePlayStream && ordered.size > 1 -> if (onChoose != null) onChoose(ordered) else actions.onOpenGame(ev)
                 else -> actions.onPlay(ordered.first().channel, ev.title)
             }

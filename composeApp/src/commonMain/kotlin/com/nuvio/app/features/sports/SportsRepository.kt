@@ -958,15 +958,13 @@ internal object SportsRepository {
             if (!foreground.value && viewers.value == 0) { matchMissed = true; return@collect }
             if (!settings.value.showInSidebar && viewers.value == 0) { matchMissed = true; return@collect }
             val status = liveRepo.status.value
-            // Never the very first match against a guide that's still being built.
-            if (!status.loadedOnce) { matchMissed = true; return@collect }
+            // A first round no longer waits for the guide: matching by channel name and network needs only the
+            // channel list, so games have streams at once; when the guide arrives (guideGeneration) the round
+            // runs again and adds what the guide knows. Only with no channels at all is there nothing to match.
+            val haveChannels = liveRepo.displayChannels.value.isNotEmpty()
+            if (!status.loadedOnce && !haveChannels) { matchMissed = true; return@collect }
             if (status.loading && _matches.value.isNotEmpty() && !pickPending) { matchMissed = true; return@collect }
             pickPending = false
-            if (_matches.value.isEmpty() && status.loading) {
-                _matching.value = true
-                withTimeoutOrNull(10 * MINUTE) { liveRepo.status.first { !it.loading } }
-                _matching.value = false
-            }
             // Not while the player is open (unless you're on the Sports page).
             awaitNotWatching()
             matchMissed = false
@@ -1039,6 +1037,9 @@ internal object SportsRepository {
         }
     }
 
+    /** False until Live TV has loaded any channels: before that no game can have a stream. */
+    val channelsReady: Boolean get() = liveRepo.displayChannels.value.isNotEmpty()
+
     private val nowMatching = HashMap<String, CompletableDeferred<List<ChannelMatch>>>()
     private val nowMatchingLock = SynchronizedObject()
 
@@ -1055,7 +1056,7 @@ internal object SportsRepository {
         try {
             val result = withContext(Dispatchers.Default) {
                 // Live TV may still be loading its channels on a cold start: wait a short while for them.
-                if (liveRepo.displayChannels.value.isEmpty()) withTimeoutOrNull(8_000) { liveRepo.displayChannels.first { it.isNotEmpty() } }
+                if (liveRepo.displayChannels.value.isEmpty()) withTimeoutOrNull(25_000) { liveRepo.displayChannels.first { it.isNotEmpty() } }
                 val channels = matchableChannels()
                 if (channels.isEmpty()) return@withContext emptyList<ChannelMatch>()
                 val user = prefs.currentUserState()

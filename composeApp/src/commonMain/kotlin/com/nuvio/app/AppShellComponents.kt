@@ -222,7 +222,9 @@ internal fun AppTabHost(
         profileId = state.profileId,
     ) { tab ->
         val experienceMode by ExperienceRepository.mode.collectAsStateWithLifecycle()
-        val musicTab = if (experienceMode == ExperienceMode.Music) {
+        val musicTab = if (experienceMode == ExperienceMode.Balanced && tab == AppScreenTab.Music) {
+            MusicTab.Home
+        } else if (experienceMode == ExperienceMode.Music) {
             when (tab) {
                 AppScreenTab.Home -> MusicTab.Home
                 AppScreenTab.Search -> MusicTab.Search
@@ -302,7 +304,7 @@ internal fun AppTabHost(
             }
 
             AppScreenTab.LiveTv -> {
-                if (experienceMode == ExperienceMode.SportsFocus && actions.sportsActions != null) {
+                if (actions.sportsActions != null) {
                     LiveHub(
                         onChannelClick = actions.onLiveTvChannelClick,
                         sportsActions = actions.sportsActions,

@@ -176,7 +176,7 @@ internal fun MainTabsDestination(
                             .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE && sportsExperience != ExperienceMode.SportsFocus) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                             .padding(innerPadding),
                     )
-                    if (tabsRouteActive && sportsExperience != ExperienceMode.Music) {
+                    if (tabsRouteActive && sportsExperience != ExperienceMode.Music && highlightedTab != AppScreenTab.Music) {
                         PodcastMiniPlayer(Modifier.align(Alignment.BottomCenter).padding(bottom = nuvioSafeBottomPadding(8.dp)))
                     }
                 }

@@ -431,7 +431,7 @@ extension BannerExperienceMode {
     func tabs(showLiveTv: Bool) -> [NuvioAppTab] {
         let ordered: [NuvioAppTab]
         switch self {
-        case .balanced: ordered = [.home, .liveTv, .search, .sports, .library]
+        case .balanced: ordered = [.home, .liveTv, .search, .music, .library]
         case .sports: ordered = [.home, .following, .search, .liveTv, .news]
         case .music: ordered = [.home, .search, .library]
         }

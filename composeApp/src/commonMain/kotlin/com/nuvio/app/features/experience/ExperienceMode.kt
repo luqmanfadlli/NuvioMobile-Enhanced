@@ -23,7 +23,7 @@ enum class ExperienceMode(val storageKey: String) {
     /** The bottom-bar tabs for this mode, in order. Settings sits last on Android; on iPhone it is the avatar (or, in Sports focus, a gear tab). */
     fun tabs(showLiveTv: Boolean): List<AppScreenTab> {
         val ordered = when (this) {
-            Balanced -> listOf(AppScreenTab.Home, AppScreenTab.LiveTv, AppScreenTab.Search, AppScreenTab.Sports, AppScreenTab.Library)
+            Balanced -> listOf(AppScreenTab.Home, AppScreenTab.LiveTv, AppScreenTab.Search, AppScreenTab.Music, AppScreenTab.Library)
             SportsFocus -> listOf(AppScreenTab.Home, AppScreenTab.Following, AppScreenTab.Search, AppScreenTab.LiveTv, AppScreenTab.News)
             Music -> listOf(AppScreenTab.Home, AppScreenTab.Search, AppScreenTab.Library)
         }
