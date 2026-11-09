@@ -1426,6 +1426,11 @@
     <string name="settings_playback_libmpv_hardware_decoding_description">Use mpv hardware decoding when available.</string>
     <string name="settings_playback_libmpv_yuv420p">libmpv YUV420P Compatibility</string>
     <string name="settings_playback_libmpv_yuv420p_description">Force YUV420P output for devices with renderer or color issues.</string>
+    <string name="settings_playback_section_anime_enhancement">ANIME ENHANCEMENT</string>
+    <string name="settings_playback_anime_upscale">Anime 2x Upscaler</string>
+    <string name="settings_playback_anime_upscale_description">Upscale anime with Anime4K to at least 1440p, or to the screen resolution when that is higher. Only used for anime. ExoPlayer skips it while tunneled playback is on.</string>
+    <string name="settings_playback_anime_line_sharpen">Anime Line Sharpener</string>
+    <string name="settings_playback_anime_line_sharpen_description">Restore and sharpen anime line art with Anime4K. Only used for anime. ExoPlayer skips it while tunneled playback is on.</string>
     <string name="settings_playback_section_next_episode">NEXT EPISODE</string>
     <string name="settings_playback_section_player">PLAYER</string>
     <string name="settings_playback_section_skip_segments">SKIP SEGMENTS</string>
@@ -2371,6 +2376,12 @@
     <string name="cloud_library_provider_unavailable">Cloud library is not available for %1$s.</string>
     <!-- Player iOS video settings modal -->
     <string name="player_video_settings_title">Video</string>
+    <string name="player_anime4k_title">Anime4K</string>
+    <string name="player_anime4k_badge_upscale">%1$dp → %2$dp</string>
+    <string name="player_anime4k_badge_sharpen">Sharpen</string>
+    <string name="player_anime4k_status_active">Active: %1$s</string>
+    <string name="player_anime4k_status_inactive">Enabled, but not active for this video</string>
+    <string name="player_anime4k_status_off">Off</string>
     <string name="player_video_settings_reset_tuning">Reset tuning</string>
     <string name="player_video_settings_output_preset">Output preset</string>
     <string name="player_video_settings_hdr_peak_detection">HDR peak detection</string>

@@ -25,7 +25,7 @@ final class PictureInPictureSubtitleComposer {
 
     /// PiP windows are small; composing at 4K kept a pool of 4K buffers plus a 4K overlay alive
     /// (well over 100 MB) while a 4K HDR/DV player sat close to the jetsam limit.
-    private static let maxOutputEdge: CGFloat = 1920
+    private static let maxOutputEdge: CGFloat = 1280
 
     func compose(_ buffer: CVPixelBuffer, text: String, bold: Bool) -> CVPixelBuffer? {
         let sourceWidth = CVPixelBufferGetWidth(buffer)

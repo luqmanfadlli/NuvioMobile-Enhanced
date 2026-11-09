@@ -298,6 +298,7 @@ internal fun FoldControls(
                 if (badges.isNotEmpty()) {
                     PlayerBadges(badges = badges, modifier = Modifier.padding(bottom = 10.dp))
                 }
+                AnimeEnhancementBadge(status = playbackSnapshot.animeEnhancement, modifier = Modifier.padding(bottom = 10.dp))
                 PlayerChapterTitle(chapters = chapters, positionMs = displayedPositionMs)
                 TimelineRow(
                     chapters = chapters,

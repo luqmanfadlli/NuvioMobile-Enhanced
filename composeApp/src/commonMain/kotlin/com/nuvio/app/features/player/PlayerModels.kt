@@ -304,6 +304,16 @@ data class PlayerPlaybackSnapshot(
     val chapters: List<PlayerChapter> = emptyList(),
     val castAvailable: Boolean = false,
     val castDeviceName: String? = null,
+    val animeEnhancement: AnimeEnhancementStatus? = null,
+)
+
+data class AnimeEnhancementStatus(
+    val lineSharpen: Boolean,
+    val upscale: Boolean,
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val outputWidth: Int,
+    val outputHeight: Int,
 )
 
 data class PlayerNowPlayingInfo(

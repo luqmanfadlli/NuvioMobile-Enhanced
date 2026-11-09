@@ -742,6 +742,8 @@ internal object SettingsConfigTransfer {
         PlayerSettingsStorage.loadAndroidLibmpvVideoOutput()?.let { put("android_libmpv_video_output", encodeSyncString(it)) }
         PlayerSettingsStorage.loadAndroidLibmpvHardwareDecodingEnabled()?.let { put("android_libmpv_hardware_decoding_enabled", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadAndroidLibmpvYuv420pEnabled()?.let { put("android_libmpv_yuv420p_enabled", encodeSyncBoolean(it)) }
+        PlayerSettingsStorage.loadAndroidAnimeUpscaleEnabled()?.let { put("android_anime_upscale_enabled", encodeSyncBoolean(it)) }
+        PlayerSettingsStorage.loadAndroidAnimeLineSharpenEnabled()?.let { put("android_anime_line_sharpen_enabled", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadDecoderPriority()?.let { put("decoder_priority", encodeSyncInt(it)) }
         PlayerSettingsStorage.loadMapDV7ToHevc()?.let { put("map_d_v7_to_hevc", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadTunnelingEnabled()?.let { put("tunneling_enabled", encodeSyncBoolean(it)) }
@@ -850,6 +852,8 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncString("android_libmpv_video_output")?.let { PlayerSettingsStorage.saveAndroidLibmpvVideoOutput(it) }
         payload.decodeSyncBoolean("android_libmpv_hardware_decoding_enabled")?.let { PlayerSettingsStorage.saveAndroidLibmpvHardwareDecodingEnabled(it) }
         payload.decodeSyncBoolean("android_libmpv_yuv420p_enabled")?.let { PlayerSettingsStorage.saveAndroidLibmpvYuv420pEnabled(it) }
+        payload.decodeSyncBoolean("android_anime_upscale_enabled")?.let { PlayerSettingsStorage.saveAndroidAnimeUpscaleEnabled(it) }
+        payload.decodeSyncBoolean("android_anime_line_sharpen_enabled")?.let { PlayerSettingsStorage.saveAndroidAnimeLineSharpenEnabled(it) }
         payload.decodeSyncInt("decoder_priority")?.let { PlayerSettingsStorage.saveDecoderPriority(it) }
         payload.decodeSyncBoolean("map_d_v7_to_hevc")?.let { PlayerSettingsStorage.saveMapDV7ToHevc(it) }
         payload.decodeSyncBoolean("tunneling_enabled")?.let { PlayerSettingsStorage.saveTunnelingEnabled(it) }

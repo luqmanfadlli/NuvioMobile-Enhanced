@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.6.10",
+          "buildVersion": "153",
+          "date": "2026-11-09T07:10:24Z",
+          "localizedDescription": "- perf(ios): memory optimization long sessions and 4K HDR/DV playback @luqmanfadlli\r\n- feat(player): add Anime4K 2x upscaler and line sharpener for ExoPlayer and mpv (#337) @chrisk325\r\n- fix(ios): detach the mpv metal layer before destroying mpv (#336) @luqmanfadlli\r\n- fix(player): start playback service as a normal service first (NUVIO-MOBILE-D9 NUVIO-MOBILE-9E NUVIO-MOBILE-9M NUVIO-MOBILE-PC) @tapframe\r\n- fix(player): cap buffer start times at the min buffer (NUVIO-MOBILE-1VH) @tapframe\r\n- fix(player): guard caption setting reads (NUVIO-MOBILE-25M) @tapframe\r\n- fix(network): treat SSL setup errors as failed requests (NUVIO-MOBILE-254 NUVIO-MOBILE-3N) @tapframe\r\n- fix(watched): copy unsynced keys before saving (NUVIO-MOBILE-260) @tapframe\r\n- i18n: add French translation for ratings strings (#2562) @SK-Gits\r\n- i18n(el): sync the Greek locale with 0.6.9 (playback audio, downmix, ratings) (#2561) @nosvasedis\r\n- i18n(he): translate party strings into Hebrew (#2557) @haveAnIssue\r\n- i18n(he): translate servers strings into Hebrew (#2556) @haveAnIssue\r\n- i18n(he): translate pip strings into Hebrew (#2555) @haveAnIssue\r\n- i18n(he): translate autosync strings into Hebrew (#2553) @haveAnIssue\r\n- i18n(he): translate mdblist strings into Hebrew (#2552) @haveAnIssue\r\n- i18n(he): translate ratings strings into Hebrew (#2551) @haveAnIssue\r\n- Update Japanese translation (#2559) @Joe00011\r\n- i18n(vi): translate ratings strings into Vietnamese (#2550) @blueocean2308\r\n- fix(player): reset addon subtitles only when the source changes @tapframe\r\n- feat(autosync): shared engine, enable on iOS (#2535) @skoruppa\r\n- fix(mdblist): remap anime episodes between addon and TMDB numbering (TV parity) (#2516) @kernexshadow",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.10-beta/nuvio-0.6.10-enhanced-release.ipa",
+          "size": 75374093,
+          "sha256": "a0fa29df60d0c7112c341c94293181ce81764b0e6a9da15e4006748a50797196",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.9",
           "buildVersion": "152",
           "date": "2026-11-06T23:21:17Z",

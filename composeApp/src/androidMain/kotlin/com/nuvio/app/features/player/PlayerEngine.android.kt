@@ -16,6 +16,7 @@ import android.os.Handler
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.common.Effect
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -89,6 +91,8 @@ import com.nuvio.app.features.autosync.LIBMPV_AUTOSYNC_FILE_PREFIX
 import com.nuvio.app.features.autosync.rememberAutoSyncCoordinator
 import com.nuvio.app.features.player.aiostreams.AiostreamsAss
 import com.nuvio.app.features.player.aiostreams.AiostreamsAssEngine
+import com.nuvio.app.features.player.anime.AnimeShaderStatusTracker
+import com.nuvio.app.features.player.anime.AnimeShaders
 import com.nuvio.app.features.player.swdecoder.SoftwareVideoRenderer
 import com.nuvio.app.features.autosync.rememberLibmpvAutoSyncCoordinator
 import com.nuvio.app.R
@@ -150,6 +154,7 @@ actual fun PlatformPlayerSurface(
     initialPositionRequestKey: String?,
     resizeMode: PlayerResizeMode,
     playbackEngine: AndroidPlaybackEngine?,
+    animeContent: Boolean,
     useNativeController: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
@@ -223,6 +228,7 @@ actual fun PlatformPlayerSurface(
             initialPositionRequestKey = initialPositionRequestKey,
             resizeMode = resizeMode,
             useNativeController = useNativeController,
+            animeContent = animeContent,
             onInitialPositionHandled = onInitialPositionHandled,
             onControllerReady = surfaceOnControllerReady,
             onSnapshot = surfaceOnSnapshot,
@@ -245,6 +251,9 @@ actual fun PlatformPlayerSurface(
                 videoOutput = playerSettings.androidLibmpvVideoOutput,
                 hardwareDecodingEnabled = playerSettings.androidLibmpvHardwareDecodingEnabled,
                 yuv420pEnabled = playerSettings.androidLibmpvYuv420pEnabled,
+                animeUpscaleEnabled = animeContent && playerSettings.androidAnimeUpscaleEnabled,
+                animeLineSharpenEnabled = animeContent && playerSettings.androidAnimeLineSharpenEnabled,
+                animeContent = animeContent,
                 preferredSubtitleLanguage = playerSettings.preferredSubtitleLanguage,
                 onControllerReady = surfaceOnControllerReady,
                 onSnapshot = surfaceOnSnapshot,
@@ -285,6 +294,7 @@ private fun ExoPlayerSurface(
     initialPositionRequestKey: String?,
     resizeMode: PlayerResizeMode,
     useNativeController: Boolean,
+    animeContent: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -294,6 +304,7 @@ private fun ExoPlayerSurface(
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
+    val latestAnimeContent = rememberUpdatedState(animeContent)
     val latestOnInitialPositionHandled = rememberUpdatedState(onInitialPositionHandled)
     val latestPlayWhenReady = rememberUpdatedState(playWhenReady)
     val coroutineScope = rememberCoroutineScope()
@@ -330,6 +341,13 @@ private fun ExoPlayerSurface(
     // Tracks whether an ASS track was actively selected and video effects need activation.
     // When this flips to true, the player remember key changes and player rebuilds with effects.
     var videoEffectsNeeded by remember(playerSourceKey) { mutableStateOf(false) }
+    var animeRebuildGeneration by remember(playerSourceKey) { mutableStateOf(0) }
+    var animeEnhancementStatus by remember(playerSourceKey) { mutableStateOf<AnimeEnhancementStatus?>(null) }
+    val animeStatusTracker = remember(playerSourceKey) {
+        val mainHandler = Handler(android.os.Looper.getMainLooper())
+        AnimeShaderStatusTracker { status -> mainHandler.post { animeEnhancementStatus = status } }
+    }
+    val exoVideoEffects = remember(playerSourceKey) { ExoVideoEffectsHolder() }
     val playbackDiagnostics = remember(playerSourceKey) { PlaybackDiagnostics() }
     var subtitleDelayMs by remember(playerSourceKey) { mutableStateOf(0) }
     var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
@@ -488,6 +506,7 @@ private fun ExoPlayerSurface(
         effectiveDecoderPriority,
         initialPositionRequestKey,
         videoEffectsNeeded,
+        animeRebuildGeneration,
     ) {
         aiostreamsAss?.reset(
             PlatformPlaybackDataSourceFactory.create(
@@ -552,12 +571,12 @@ private fun ExoPlayerSurface(
             val captioningManager = context.getSystemService(Context.CAPTIONING_SERVICE)
                 as? android.view.accessibility.CaptioningManager
             if (captioningManager != null) {
-                if (!captioningManager.isEnabled) {
+                if (!runCatching { captioningManager.isEnabled }.getOrDefault(false)) {
                     parameters = parameters.setIgnoredTextSelectionFlags(
                         parameters.build().ignoredTextSelectionFlags or C.SELECTION_FLAG_DEFAULT
                     )
                 }
-                captioningManager.locale?.let { locale ->
+                runCatching { captioningManager.locale }.getOrNull()?.let { locale ->
                     parameters = parameters.setPreferredTextLanguage(locale.isO3Language)
                 }
             }
@@ -573,11 +592,28 @@ private fun ExoPlayerSurface(
 
         val loadControl = playerSettings.buildPlaybackLoadControl(localFileSource = isLocalFileSource)
 
+        val liveAnimeSettings = PlayerSettingsRepository.uiState.value
+        val animeUpscaleEnabled = latestAnimeContent.value && liveAnimeSettings.androidAnimeUpscaleEnabled
+        val animeLineSharpenEnabled = latestAnimeContent.value && liveAnimeSettings.androidAnimeLineSharpenEnabled
+        val animeVideoEffects = if (playerSettings.tunnelingEnabled) {
+            emptyList()
+        } else {
+            AnimeShaders.exoVideoEffects(
+                context = context,
+                upscaleEnabled = animeUpscaleEnabled,
+                lineSharpenEnabled = animeLineSharpenEnabled,
+                statusTracker = animeStatusTracker,
+            )
+        }
+
         InAppLogger.info(
             "ExoPlayer/Android",
             "Initializing ExoPlayer decoderPriority=${effectiveDecoderPriority.decoderPriorityName()} " +
                 "decoderFallback=true tunneling=${playerSettings.tunnelingEnabled} libass=$useLibass " +
-                "libassRenderMode=$libassRenderMode mapDV7ToHevc=${playerSettings.mapDV7ToHevc}",
+                "libassRenderMode=$libassRenderMode mapDV7ToHevc=${playerSettings.mapDV7ToHevc} " +
+                "animeUpscale=$animeUpscaleEnabled " +
+                "animeLineSharpen=$animeLineSharpenEnabled " +
+                "animeEffects=${animeVideoEffects.isNotEmpty()}",
         )
 
         // Audio focus is handled by PlayerAudioFocus, so a denied request (e.g. during a call)
@@ -608,16 +644,29 @@ private fun ExoPlayerSurface(
                 // On first init videoEffectsNeeded is false. When onTracksChanged
                 // detects a selected ASS track, it flips to true which triggers a
                 // player rebuild via the remember key.
+                var assVideoEffects = emptyList<Effect>()
                 if (videoEffectsNeeded) {
-                    val effectiveMode = if (playerSettings.tunnelingEnabled) "OVERLAY" else playerSettings.libassRenderMode
+                    val effectiveMode = when {
+                        playerSettings.tunnelingEnabled -> "OVERLAY"
+                        animeVideoEffects.isNotEmpty() -> "VIDEO_EFFECT"
+                        else -> playerSettings.libassRenderMode
+                    }
                     if (effectiveMode != "OVERLAY") {
                         builtPlayer.getAssHandlerCompat()?.let { handler ->
-                            builtPlayer.setVideoEffects(
-                                listOf(com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler))
-                            )
+                            assVideoEffects = listOf(com.nuvio.tv.libass.media.effect.AssVideoEffectAsync(handler))
                         }
                     }
                 }
+                val videoEffects = animeVideoEffects + assVideoEffects
+                if (videoEffects.isNotEmpty()) {
+                    builtPlayer.setVideoEffects(videoEffects)
+                }
+                exoVideoEffects.update(
+                    pipelineConfigured = videoEffects.isNotEmpty(),
+                    animeBuilt = animeVideoEffects.isNotEmpty(),
+                    upscaleEnabled = animeUpscaleEnabled,
+                    lineSharpenEnabled = animeLineSharpenEnabled,
+                )
             }
         } else {
             val mediaSourceFactory = DefaultMediaSourceFactory(
@@ -630,6 +679,17 @@ private fun ExoPlayerSurface(
                 .setRenderersFactory(renderersFactory)
                 .setMediaSourceFactory(AudioDelayMediaSourceFactory(mediaSourceFactory, audioDelayUs::get))
                 .build()
+                .also { builtPlayer ->
+                    if (animeVideoEffects.isNotEmpty()) {
+                        builtPlayer.setVideoEffects(animeVideoEffects)
+                    }
+                    exoVideoEffects.update(
+                        pipelineConfigured = animeVideoEffects.isNotEmpty(),
+                        animeBuilt = animeVideoEffects.isNotEmpty(),
+                        upscaleEnabled = animeUpscaleEnabled,
+                        lineSharpenEnabled = animeLineSharpenEnabled,
+                    )
+                }
         }
 
         player.applySubtitleTrackPreferences(
@@ -667,7 +727,7 @@ private fun ExoPlayerSurface(
             initializedAudioDecoderName,
             playerChapters,
             exoMediaInfoCache,
-        )
+        ).copy(animeEnhancement = animeEnhancementStatus)
         latestOnSnapshot.value(snapshot)
         nowPlayingController.syncPlayback(snapshot)
     }
@@ -793,6 +853,47 @@ private fun ExoPlayerSurface(
         val selection = exoPlayer.captureSelectedTrack(C.TRACK_TYPE_AUDIO) ?: return
         pendingAudioTrackSelection.add(selection)
         Log.d(TAG, "$reason: preserving audio track index=${selection.index} id=${selection.id}")
+    }
+
+    LaunchedEffect(exoPlayer, animeEnhancementStatus) {
+        dispatchExoPlayerSnapshot()
+    }
+
+    val liveSettings by rememberAnimeToggles()
+    LaunchedEffect(
+        exoPlayer,
+        animeContent,
+        liveSettings.androidAnimeUpscaleEnabled,
+        liveSettings.androidAnimeLineSharpenEnabled,
+    ) {
+        val upscale = animeContent && liveSettings.androidAnimeUpscaleEnabled
+        val sharpen = animeContent && liveSettings.androidAnimeLineSharpenEnabled
+        if (playerSettings.tunnelingEnabled) return@LaunchedEffect
+        if (exoVideoEffects.matches(upscale, sharpen)) return@LaunchedEffect
+        if (!exoVideoEffects.pipelineConfigured && !upscale && !sharpen) {
+            exoVideoEffects.update(
+                pipelineConfigured = false,
+                animeBuilt = false,
+                upscaleEnabled = false,
+                lineSharpenEnabled = false,
+            )
+            return@LaunchedEffect
+        }
+        delay(ANIME_EFFECTS_REBUILD_DEBOUNCE_MS)
+        InAppLogger.info("ExoPlayer/Android", "anime effects changed, rebuilding player upscale=$upscale lineSharpen=$sharpen")
+        preserveAudioSelectionForReload("animeEffectsRebuild")
+        val selectedSubtitle = exoPlayer.currentTracks.selectedTextTrackOrdinal()
+        if (selectedSubtitle >= 0) {
+            pendingSubtitleTrackIndex.clear()
+            pendingSubtitleTrackIndex.add(selectedSubtitle)
+        }
+        if (useLibass && (upscale || sharpen) && !videoEffectsNeeded &&
+            exoPlayer.currentTracks.hasSelectedAssWithoutDolbyVision()
+        ) {
+            videoEffectsNeeded = true
+        }
+        fallbackStartPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+        animeRebuildGeneration += 1
     }
 
     DisposableEffect(exoPlayer) {
@@ -980,6 +1081,12 @@ private fun ExoPlayerSurface(
                         videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio
                     ) / videoSize.height.toFloat()
                 }
+                if (exoVideoEffects.pipelineConfigured) {
+                    val sourceFormat = exoPlayer.videoFormat
+                    if (sourceFormat != null && sourceFormat.width > 0 && sourceFormat.height > 0) {
+                        exoPlayer.getAssHandlerCompat()?.setVideoSize(sourceFormat.width, sourceFormat.height)
+                    }
+                }
                 dispatchExoPlayerSnapshot()
                 playerViewRef?.post {
                     playerViewRef?.syncLibassOverlayGeometry()
@@ -1011,7 +1118,7 @@ private fun ExoPlayerSurface(
                 }
                 // Trigger player rebuild with video effects when ASS track becomes selected
                 // and render mode is VIDEO_EFFECT.
-                if (!videoEffectsNeeded && useLibass && libassRenderMode != "OVERLAY") {
+                if (!videoEffectsNeeded && useLibass && exoVideoEffects.libassRenderMode(libassRenderMode) != "OVERLAY") {
                     val hasSelectedAss = tracks.groups.any { group ->
                         group.isSelected && group.type == C.TRACK_TYPE_TEXT &&
                             (0 until group.length).any { i ->
@@ -1578,7 +1685,7 @@ private fun ExoPlayerSurface(
                     syncLibassOverlay(
                         player = exoPlayer,
                         enabled = useLibass,
-                        renderMode = libassRenderMode,
+                        renderMode = exoVideoEffects.libassRenderMode(libassRenderMode),
                         tunnelingEnabled = playerSettings.tunnelingEnabled,
                     )
                     aiostreamsAss?.attach(this)
@@ -1598,7 +1705,7 @@ private fun ExoPlayerSurface(
                 playerView.syncLibassOverlay(
                     player = exoPlayer,
                     enabled = useLibass,
-                    renderMode = libassRenderMode,
+                    renderMode = exoVideoEffects.libassRenderMode(libassRenderMode),
                     tunnelingEnabled = playerSettings.tunnelingEnabled,
                 )
                 aiostreamsAss?.attach(playerView)
@@ -1629,6 +1736,9 @@ private fun LibmpvPlayerSurface(
     videoOutput: AndroidLibmpvVideoOutput,
     hardwareDecodingEnabled: Boolean,
     yuv420pEnabled: Boolean,
+    animeUpscaleEnabled: Boolean,
+    animeLineSharpenEnabled: Boolean,
+    animeContent: Boolean,
     preferredSubtitleLanguage: String?,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -1890,6 +2000,22 @@ private fun LibmpvPlayerSurface(
         )
     }
 
+    val liveAnimeSettings by rememberAnimeToggles()
+    LaunchedEffect(
+        playerViewRef,
+        animeContent,
+        liveAnimeSettings.androidAnimeUpscaleEnabled,
+        liveAnimeSettings.androidAnimeLineSharpenEnabled,
+    ) {
+        val view = playerViewRef ?: return@LaunchedEffect
+        val paths = AnimeShaders.mpvShaderPaths(
+            context = context,
+            upscaleEnabled = animeContent && liveAnimeSettings.androidAnimeUpscaleEnabled,
+            lineSharpenEnabled = animeContent && liveAnimeSettings.androidAnimeLineSharpenEnabled,
+        )
+        view.setAnimeShaderPaths(paths)
+    }
+
     LaunchedEffect(playerViewRef, playWhenReady) {
         val view = playerViewRef ?: return@LaunchedEffect
         view.setPaused(!latestPlayWhenReady.value)
@@ -1941,6 +2067,11 @@ private fun LibmpvPlayerSurface(
                     videoOutput = videoOutput,
                     hardwareDecodingEnabled = hardwareDecodingEnabled,
                     yuv420pEnabled = yuv420pEnabled,
+                    animeShaderPaths = AnimeShaders.mpvShaderPaths(
+                        context = viewContext,
+                        upscaleEnabled = animeUpscaleEnabled,
+                        lineSharpenEnabled = animeLineSharpenEnabled,
+                    ),
                 ).apply {
                     layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                     keepScreenOn = false
@@ -1987,7 +2118,22 @@ private class NuvioLibmpvView(
     private val videoOutput: AndroidLibmpvVideoOutput,
     private val hardwareDecodingEnabled: Boolean,
     private val yuv420pEnabled: Boolean,
+    private val animeShaderPaths: List<String>,
 ) : MpvSurfaceView(context, videoOutput.mpvValue) {
+    @Volatile
+    private var activeAnimeShaderPaths = animeShaderPaths
+
+    fun setAnimeShaderPaths(paths: List<String>) {
+        if (paths == activeAnimeShaderPaths) return
+        activeAnimeShaderPaths = paths
+        InAppLogger.info(
+            "MPV/Android",
+            "anime shaders updated live: ${paths.joinToString(",") { it.substringAfterLast('/') }.ifEmpty { "none" }}",
+        )
+        executeMpv {
+            mpv.setPropertyString("glsl-shaders", paths.joinToString(":"))
+        }
+    }
     private var currentSourceUrl: String? = null
     private var currentSourceAudioUrl: String? = null
     private var currentRequestHeaders: Map<String, String> = emptyMap()
@@ -2042,7 +2188,8 @@ private class NuvioLibmpvView(
     override fun initOptions() {
         InAppLogger.info(
             "MPV/Android",
-            "Initializing libmpv vo=${videoOutput.mpvValue} hwdec=${if (hardwareDecodingEnabled) "auto" else "no"} yuv420p=$yuv420pEnabled",
+            "Initializing libmpv vo=${videoOutput.mpvValue} hwdec=${if (hardwareDecodingEnabled) "auto" else "no"} yuv420p=$yuv420pEnabled " +
+                "animeShaders=${animeShaderPaths.joinToString(",") { it.substringAfterLast('/') }.ifEmpty { "none" }}",
         )
         mpv.setOptionString("profile", "fast")
         mpv.setOptionString("hwdec", if (hardwareDecodingEnabled) "auto" else "no")
@@ -2058,6 +2205,9 @@ private class NuvioLibmpvView(
         // Room above 100% for the player's amplification (+10 dB is about 316%).
         mpv.setOptionString("volume-max", "$LIBMPV_MAX_VOLUME_PERCENT").logIfMpvError("volume-max")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
+        if (animeShaderPaths.isNotEmpty()) {
+            mpv.setOptionString("glsl-shaders", animeShaderPaths.joinToString(":")).logIfMpvError("glsl-shaders")
+        }
         mpv.setPropertyBoolean("keep-open", true)
         mpv.setPropertyBoolean("input-default-bindings", true)
         mpv.setPropertyBoolean("audio-fallback-to-null", true)
@@ -2244,6 +2394,14 @@ private class NuvioLibmpvView(
             videoHeight = videoHeight,
             mediaInfoJson = buildLibmpvMediaInfoJson(),
             chapters = chaptersFor(durationMs),
+            animeEnhancement = AnimeShaders.mpvStatus(
+                context = context,
+                shaderPaths = activeAnimeShaderPaths,
+                videoWidth = mpv.getPropertyInt("video-params/w") ?: 0,
+                videoHeight = mpv.getPropertyInt("video-params/h") ?: 0,
+                outputWidth = mpv.getPropertyInt("osd-width") ?: width,
+                outputHeight = mpv.getPropertyInt("osd-height") ?: height,
+            ),
         )
     }
 
@@ -3032,6 +3190,88 @@ private class ExoMediaInfoCache {
     }
 }
 
+private data class AnimeToggles(
+    val androidAnimeUpscaleEnabled: Boolean,
+    val androidAnimeLineSharpenEnabled: Boolean,
+)
+
+private fun PlayerSettingsUiState.animeToggles() = AnimeToggles(
+    androidAnimeUpscaleEnabled = androidAnimeUpscaleEnabled,
+    androidAnimeLineSharpenEnabled = androidAnimeLineSharpenEnabled,
+)
+
+@Composable
+private fun rememberAnimeToggles(): androidx.compose.runtime.State<AnimeToggles> {
+    val toggles = remember {
+        PlayerSettingsRepository.uiState
+            .map { it.animeToggles() }
+            .distinctUntilChanged()
+    }
+    return toggles.collectAsState(initial = PlayerSettingsRepository.uiState.value.animeToggles())
+}
+
+private const val ANIME_EFFECTS_REBUILD_DEBOUNCE_MS = 700L
+
+private class ExoVideoEffectsHolder {
+    @Volatile
+    var pipelineConfigured = false
+        private set
+    @Volatile
+    var animeBuilt = false
+        private set
+    @Volatile
+    private var upscaleEnabled = false
+    @Volatile
+    private var lineSharpenEnabled = false
+
+    fun update(
+        pipelineConfigured: Boolean,
+        animeBuilt: Boolean,
+        upscaleEnabled: Boolean,
+        lineSharpenEnabled: Boolean,
+    ) {
+        this.pipelineConfigured = pipelineConfigured
+        this.animeBuilt = animeBuilt
+        this.upscaleEnabled = upscaleEnabled
+        this.lineSharpenEnabled = lineSharpenEnabled
+    }
+
+    fun matches(upscaleEnabled: Boolean, lineSharpenEnabled: Boolean): Boolean =
+        this.upscaleEnabled == upscaleEnabled && this.lineSharpenEnabled == lineSharpenEnabled
+
+    fun libassRenderMode(configuredMode: String): String =
+        if (animeBuilt) "VIDEO_EFFECT" else configuredMode
+}
+
+private fun androidx.media3.common.Tracks.hasSelectedAssWithoutDolbyVision(): Boolean {
+    val hasSelectedAss = groups.any { group ->
+        group.isSelected && group.type == C.TRACK_TYPE_TEXT &&
+            (0 until group.length).any { i ->
+                group.isTrackSelected(i) && group.getTrackFormat(i).isAssSubtitleFormat()
+            }
+    }
+    val hasDvVideo = groups.any { group ->
+        group.isSelected && group.type == C.TRACK_TYPE_VIDEO &&
+            (0 until group.length).any { i ->
+                group.getTrackFormat(i).sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION
+            }
+    }
+    return hasSelectedAss && !hasDvVideo
+}
+
+private fun androidx.media3.common.Tracks.selectedTextTrackOrdinal(): Int {
+    var ordinal = 0
+    var selected = -1
+    for (group in groups) {
+        if (group.type != C.TRACK_TYPE_TEXT) continue
+        for (i in 0 until group.length) {
+            if (group.isTrackSelected(i)) selected = ordinal
+            ordinal++
+        }
+    }
+    return selected
+}
+
 private fun ExoPlayer.snapshot(
     videoDecoder: String?,
     audioDecoder: String?,
@@ -3379,7 +3619,20 @@ private fun PlayerView.syncLibassOverlay(
         android.widget.FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
     )
     setTag(R.id.libass_overlay_bound_player, player)
+    ensureLibassOverlayLayoutSync()
     post { syncLibassOverlayGeometry() }
+}
+
+private fun PlayerView.ensureLibassOverlayLayoutSync() {
+    if (getTag(R.id.libass_overlay_layout_listener) != null) return
+    val listener = View.OnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+        if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+            syncLibassOverlayGeometry()
+        }
+    }
+    findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)?.addOnLayoutChangeListener(listener)
+    findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)?.addOnLayoutChangeListener(listener)
+    setTag(R.id.libass_overlay_layout_listener, listener)
 }
 private fun android.widget.FrameLayout.hasAssOverlayChild(): Boolean {
     for (index in 0 until childCount) {

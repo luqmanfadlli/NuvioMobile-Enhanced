@@ -19,5 +19,6 @@ internal actual fun createApiHttpClient(): HttpClient = HttpClient(OkHttp) {
             followSslRedirects(false)
             retryOnConnectionFailure(false)
         }
+        addInterceptor(NetworkErrorInterceptor())
     }
 }

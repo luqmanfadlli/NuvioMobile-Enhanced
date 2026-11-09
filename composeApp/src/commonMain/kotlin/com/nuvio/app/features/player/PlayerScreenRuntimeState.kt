@@ -222,6 +222,12 @@ internal class PlayerScreenRuntime(
     var episodeStreamsPanelState by mutableStateOf(EpisodeStreamsPanelState())
     var playerMetaVideos by mutableStateOf<List<MetaVideo>>(emptyList())
     var playerMeta by mutableStateOf<MetaDetails?>(null)
+    val isAnimePlayback: Boolean
+        get() {
+            val genres = playerMeta?.genres.orEmpty()
+            val country = playerMeta?.country
+            return isAnimeContent(activeVideoId, genres, country) || isAnimeContent(parentMetaId, genres, country)
+        }
     var skipIntervals by mutableStateOf<List<SkipInterval>>(emptyList())
     var chapterSkipIntervals: List<SkipInterval> = emptyList()
     var apiSkipIntervals: List<SkipInterval> = emptyList()
@@ -335,5 +341,6 @@ internal class PlayerScreenRuntime(
     var lastSyncedSettingsResizeMode: PlayerResizeMode? = null
     var lastResetPlaybackIdentity: PlaybackKey? = null
     var lastResetSourcePlaybackIdentity: PlaybackKey? = null
+    var lastAddonSubtitleSourceIdentity: PlaybackKey? = null
     var lastResetVideoIdentity: String? = null
 }
