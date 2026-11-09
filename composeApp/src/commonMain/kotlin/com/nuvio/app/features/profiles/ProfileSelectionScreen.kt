@@ -1,5 +1,6 @@
 package com.nuvio.app.features.profiles
 
+import com.nuvio.app.core.ui.tvFocusIndication
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -470,7 +471,7 @@ private fun ProfileAvatarCard(
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                indication = null,
+                indication = tvFocusIndication(),
                 onClickLabel = stringResource(
                     if (isEditMode) {
                         Res.string.profile_edit_accessibility
@@ -638,7 +639,7 @@ private fun AddProfileCard(
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                indication = null,
+                indication = tvFocusIndication(),
                 onClick = onClick,
             )
             .padding(8.dp),

@@ -94,7 +94,7 @@ internal fun Modifier.posterCardClickable(
     return posterModifier
         .combinedClickable(
             interactionSource = null,
-            indication = if (onPosterClickAnchor == null) LocalIndication.current else null,
+            indication = if (onPosterClickAnchor == null || LocalIsTv.current) LocalIndication.current else null,
             onClick = {
                 if (onClick != null) {
                     source.bounds?.let { bounds ->

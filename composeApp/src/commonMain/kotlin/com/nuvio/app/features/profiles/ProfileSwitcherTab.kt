@@ -1,5 +1,6 @@
 package com.nuvio.app.features.profiles
 
+import com.nuvio.app.core.ui.tvFocusIndication
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -248,7 +249,7 @@ fun ProfileSwitcherTab(
             .onGloballyPositioned { triggerCoordinates = it }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+                indication = tvFocusIndication(),
                 onClick = onClick,
             )
             .pointerInput(profiles, activeProfile?.profileIndex) {

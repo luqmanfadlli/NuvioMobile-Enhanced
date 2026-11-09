@@ -56,9 +56,9 @@ internal fun Modifier.playerKeyboardShortcuts(
         }
 
 private fun Key.toPlayerKeyboardShortcut(): PlayerKeyboardShortcut? = when (this) {
-    Key.Spacebar -> PlayerKeyboardShortcut.TogglePlayback
-    Key.DirectionLeft -> PlayerKeyboardShortcut.SeekBackward
-    Key.DirectionRight -> PlayerKeyboardShortcut.SeekForward
+    Key.Spacebar, Key.DirectionCenter, Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> PlayerKeyboardShortcut.TogglePlayback
+    Key.DirectionLeft, Key.MediaRewind -> PlayerKeyboardShortcut.SeekBackward
+    Key.DirectionRight, Key.MediaFastForward -> PlayerKeyboardShortcut.SeekForward
     Key.Escape -> PlayerKeyboardShortcut.Exit
     else -> null
 }

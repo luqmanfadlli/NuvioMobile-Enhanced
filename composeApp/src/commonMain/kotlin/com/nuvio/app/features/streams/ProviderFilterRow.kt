@@ -1,5 +1,6 @@
 package com.nuvio.app.features.streams
 
+import com.nuvio.app.core.ui.tvFocusIndication
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -292,7 +293,7 @@ private fun FilterChip(
             )
             .combinedClickable(
                 interactionSource = interactionSource,
-                indication = null,
+                indication = tvFocusIndication(),
                 onClick = onClick,
                 onLongClick = onLongClick,
             )

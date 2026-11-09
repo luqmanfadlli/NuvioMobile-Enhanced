@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui.background
 
+import com.nuvio.app.core.ui.TvIndicationScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -190,7 +191,7 @@ internal fun AppBackgroundHost(content: @Composable () -> Unit) {
                 colorScheme = scheme,
                 typography = typography,
                 shapes = MaterialTheme.shapes,
-                content = content,
+                content = { TvIndicationScope(content) },
             )
         }
     }
@@ -208,7 +209,7 @@ internal fun OpaqueAppSurfaces(enabled: Boolean = true, content: @Composable () 
             colorScheme = original?.colorScheme ?: MaterialTheme.colorScheme,
             typography = original?.typography ?: MaterialTheme.typography,
             shapes = MaterialTheme.shapes,
-            content = content,
+            content = { TvIndicationScope(content) },
         )
     }
 }

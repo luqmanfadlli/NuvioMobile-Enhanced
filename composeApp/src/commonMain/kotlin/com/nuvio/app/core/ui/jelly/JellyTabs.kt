@@ -1,5 +1,16 @@
 package com.nuvio.app.core.ui.jelly
 
+import kotlinx.coroutines.delay
+import com.nuvio.app.core.ui.LocalIsTv
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.nuvio.app.core.ui.tvFocusIndication
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -130,21 +141,36 @@ internal fun JellyTabTargets(
     defaultIconColorOverride: Color? = null,
 ) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // On a TV the remote's focus should stay on the tab just chosen, not jump back to the first one
+    // when the screen underneath changes.
+    val isTv = LocalIsTv.current
+    val focusRequesters = remember(items.size) { List(items.size) { FocusRequester() } }
+    var refocusSelected by remember { mutableStateOf(false) }
+    val selectedIndex = items.indexOfFirst { it.selected }
+    LaunchedEffect(selectedIndex) {
+        if (isTv && refocusSelected && selectedIndex >= 0) {
+            refocusSelected = false
+            delay(120)
+            runCatching { focusRequesters[selectedIndex].requestFocus() }
+        }
+    }
     Row(modifier.padding(horizontal = 4.dp).selectableGroup()) {
         items.forEachIndexed { index, item ->
             val visualIndex = visualNavIndex(index, items.size, isRtl)
             val onClick = {
                 JellySelectionSource.lastDragCommit = null
+                if (!item.selected) refocusSelected = true
                 motion.select(visualIndex)
                 item.onClick()
             }
             Box(
                 modifier = Modifier.weight(1f).fillMaxHeight()
+                    .focusRequester(focusRequesters[index])
                     .selectable(
                         selected = item.selected,
                         role = Role.Tab,
-                        interactionSource = null,
-                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = tvFocusIndication(),
                         onClick = onClick,
                     )
                     .clearAndSetSemantics {
