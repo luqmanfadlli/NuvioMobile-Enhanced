@@ -169,7 +169,12 @@ internal object TorBoxStreamResolver {
             val torrentId = (obj["id"] as? JsonPrimitive)?.intOrNull ?: continue
             val files = try { obj["files"]?.jsonArray } catch (_: Throwable) { continue } ?: continue
 
-            val matchedFile = findMatchingAudioFile(files.map { it.jsonObject }, title, artist)
+            // A torrent that is merely sitting in the account must really be this track: its name or file
+            // names have to carry the artist, and a file has to match the title (no "only file" fallback).
+            val torrentName = (obj["name"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            val fileObjects = files.map { it.jsonObject }
+            if (!mentionsArtist(artist, torrentName, fileObjects)) continue
+            val matchedFile = findMatchingAudioFile(fileObjects, title, artist, strict = true)
             if (matchedFile != null) {
                 val cdnUrl = requestTorrentDownloadLink(torrentId, matchedFile, apiKey)
                 if (cdnUrl != null) return ResolvedStream(cdnUrl, emptyMap(), null, "torbox")
@@ -178,7 +183,19 @@ internal object TorBoxStreamResolver {
         return null
     }
 
-    private fun findMatchingAudioFile(files: List<JsonObject>, title: String, artist: String): Int? {
+    private fun mentionsArtist(artist: String, torrentName: String, files: List<JsonObject>): Boolean {
+        val words = artist.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length > 2 }
+        if (words.isEmpty()) return true
+        val haystack = (torrentName + " " + files.joinToString(" ") { (it["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() })
+            .lowercase()
+        return words.any { haystack.contains(it) }
+    }
+
+    /**
+     * Picks the file that is [title]. With [strict] the title must really appear in the file name; without it
+     * (a torrent that was searched for this very track) a lone audio file is accepted as the track.
+     */
+    private fun findMatchingAudioFile(files: List<JsonObject>, title: String, artist: String, strict: Boolean = false): Int? {
         val audioFiles = files.filter { file ->
             val name = (file["name"] as? JsonPrimitive)?.contentOrNull.orEmpty()
             TorrentSearch.isAudioFile(name)
@@ -223,7 +240,12 @@ internal object TorBoxStreamResolver {
             }
         }
 
-        if (bestScore < 4 && audioFiles.size == 1) {
+        if (strict) {
+            val needed = if (titleWords.isEmpty()) 20 else titleWords.size * 4
+            val fileName = (bestFile?.get("name") as? JsonPrimitive)?.contentOrNull.orEmpty()
+            val normalised = fileName.substringAfterLast('/').lowercase().replace(Regex("\\d+\\.?\\s*-?\\s*"), "").replace('_', ' ').replace('-', ' ')
+            if (bestFile == null || (!normalised.contains(titleLower) && bestScore < needed)) return null
+        } else if (bestScore < 4 && audioFiles.size == 1) {
             bestFile = audioFiles.first()
         } else if (bestScore < 4) {
             return null
