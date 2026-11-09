@@ -1,4 +1,5 @@
 import Foundation
+import os
 import UIKit
 import AVFoundation
 import Metal
@@ -984,10 +985,8 @@ final class MPVPlayerViewController: UIViewController {
         setSetupOption("gpu-context", "moltenvk")
         setSetupOption("hwdec", "videotoolbox")
         setSetupOption("hwdec-software-fallback", "300")
-        // VideoToolbox surface pool beyond what the decoder needs (mpv default 6). A 4K 10-bit
-        // frame is ~12 MB, and iosurface reached ~410 MB during 4K HDR/DV playback, close to the
-        // jetsam limit. 3 still covers gpu-next's queued frames without stutter.
         setSetupOption("hwdec-extra-frames", "3")
+        setSetupOption("hwdec-extra-frames", Self.isMemoryConstrained ? "1" : "3")
         setSetupOption("ao", Self.defaultAudioOutput)
         setSetupOption("audio-exclusive", "yes")
         setSetupOption("audio-channels", "auto")
@@ -1009,8 +1008,13 @@ final class MPVPlayerViewController: UIViewController {
         setSetupOption("target-colorspace-hint", "yes")
         setSetupOption("tone-mapping", "auto")
         setSetupOption("hdr-compute-peak", "yes")
-        setSetupOption("demuxer-max-bytes", "\(Self.demuxerMaxBytes)")
-        setSetupOption("demuxer-max-back-bytes", "\(Self.demuxerMaxBackBytes)")
+        setSetupOption("demuxer-max-bytes", "\(Self.isMemoryConstrained ? Self.constrainedDemuxerMaxBytes : Self.demuxerMaxBytes)")
+        setSetupOption("demuxer-max-back-bytes", "\(Self.isMemoryConstrained ? Self.constrainedDemuxerMaxBackBytes : Self.demuxerMaxBackBytes)")
+        if Self.isMemoryConstrained {
+            setSetupOption("linear-downscaling", "no")
+            setSetupOption("correct-downscaling", "no")
+            setSetupOption("dscale", "bilinear")
+        }
         setSetupOption("demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]")
 
         checkError(mpv_initialize(mpv))
@@ -1034,6 +1038,14 @@ final class MPVPlayerViewController: UIViewController {
     private static let demuxerMaxBytes = 64 * 1024 * 1024
 
     private static let demuxerMaxBackBytes = 32 * 1024 * 1024
+
+    private static let constrainedDemuxerMaxBytes = 32 * 1024 * 1024
+
+    private static let constrainedDemuxerMaxBackBytes = 8 * 1024 * 1024
+
+    private static var isMemoryConstrained: Bool {
+        os_proc_available_memory() < 2 * 1024 * 1024 * 1024
+    }
 
     private func setSetupOption(_ name: String, _ value: String) {
         guard let ctx = mpv else { return }
