@@ -33,8 +33,8 @@ class SubtitleAppearanceTest {
     @Test
     fun outlineBlurReducesInkDensityAsSoftnessIncreases() {
         assertEquals(1f, subtitleOutlineBlurOpacity(0), 0.0001f)
-        assertEquals(1f / 1.4f, subtitleOutlineBlurOpacity(2), 0.0001f)
-        assertEquals(1f / 3f, subtitleOutlineBlurOpacity(10), 0.0001f)
+        assertEquals(1f / 1.8f, subtitleOutlineBlurOpacity(2), 0.0001f)
+        assertEquals(1f / 5f, subtitleOutlineBlurOpacity(10), 0.0001f)
     }
 
     @Test

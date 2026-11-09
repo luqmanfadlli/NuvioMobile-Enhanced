@@ -37,7 +37,7 @@ internal const val SUBTITLE_BLUR_OUTSET_SIGMAS = 3f
  */
 internal fun subtitleOutlineBlurOpacity(level: Int): Float {
     val safeLevel = level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX)
-    return 1f / (1f + safeLevel * 0.2f)
+    return 1f / (1f + safeLevel * 0.4f)
 }
 
 internal fun subtitleOutlineBlurSigmaXPx(level: Int, videoWidthPx: Float): Float {
