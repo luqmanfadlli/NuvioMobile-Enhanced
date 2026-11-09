@@ -34,6 +34,21 @@ internal enum class MusicTab { Home, Search, Library }
  */
 @Composable
 internal fun MusicRoot(tab: MusicTab, modifier: Modifier = Modifier) {
+    MusicHost(modifier) { push ->
+        when (tab) {
+            MusicTab.Home -> MusicHomeScreen(push)
+            MusicTab.Search -> MusicSearchScreen(push)
+            MusicTab.Library -> MusicLibraryScreen(push)
+        }
+    }
+}
+
+/**
+ * The shell shared by every screen that can open music pages: it keeps the page stack, the mini
+ * player and Now Playing. [content] is the base screen and gets a function that pushes a page.
+ */
+@Composable
+internal fun MusicHost(modifier: Modifier = Modifier, content: @Composable (push: (MusicDest) -> Unit) -> Unit) {
     val state by MusicPlayer.state.collectAsStateWithLifecycle()
     var stack by remember { mutableStateOf(listOf<MusicDest>()) }
     var showPlayer by remember { mutableStateOf(false) }
@@ -49,11 +64,7 @@ internal fun MusicRoot(tab: MusicTab, modifier: Modifier = Modifier) {
             if (top != null) {
                 MusicDestScreen(top, onBack = { stack = stack.dropLast(1) }, onOpen = push)
             } else {
-                when (tab) {
-                    MusicTab.Home -> MusicHomeScreen(push)
-                    MusicTab.Search -> MusicSearchScreen(push)
-                    MusicTab.Library -> MusicLibraryScreen(push)
-                }
+                content(push)
             }
             if (state.hasSong) {
                 MiniPlayer(onOpen = { showPlayer = true }, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = barPad + 6.dp))

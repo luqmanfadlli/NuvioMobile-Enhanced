@@ -258,7 +258,7 @@ fun SportsSearchScreen(
 }
 
 @Composable
-private fun Heading(text: String) {
+internal fun Heading(text: String) {
     val tokens = MaterialTheme.nuvio
     Text(text, style = MaterialTheme.typography.titleLarge, color = tokens.colors.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = NuvioTokens.Space.s16))
 }
@@ -289,7 +289,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit, busy: Boolean
 }
 
 @Composable
-private fun RowShell(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+internal fun RowShell(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     val tokens = MaterialTheme.nuvio
     Row(
         Modifier.padding(horizontal = NuvioTokens.Space.s16).fillMaxWidth().clip(RoundedCornerShape(NuvioTokens.Radius.lg)).background(tokens.colors.surface).clickable(onClick = onClick).padding(NuvioTokens.Space.s12),
@@ -299,12 +299,12 @@ private fun RowShell(onClick: () -> Unit, content: @Composable androidx.compose.
 }
 
 @Composable
-private fun Chevron() {
+internal fun Chevron() {
     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.nuvio.colors.textMuted, modifier = Modifier.size(20.dp))
 }
 
 @Composable
-private fun TeamRow(team: TeamInfo, onClick: () -> Unit) {
+internal fun TeamRow(team: TeamInfo, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
     RowShell(onClick) {
         TeamLogo(team, 40.dp)
@@ -317,7 +317,7 @@ private fun TeamRow(team: TeamInfo, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HitRow(hit: SearchHit, round: Boolean, person: Boolean = false, onClick: () -> Unit) {
+internal fun HitRow(hit: SearchHit, round: Boolean, person: Boolean = false, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
     RowShell(onClick) {
         Box(Modifier.size(44.dp).clip(if (round) CircleShape else RoundedCornerShape(8.dp)).background(tokens.colors.surfaceElevated), contentAlignment = Alignment.Center) {
@@ -333,7 +333,7 @@ private fun HitRow(hit: SearchHit, round: Boolean, person: Boolean = false, onCl
 }
 
 @Composable
-private fun MatchRow(ev: SportsEvent, use24h: Boolean, onClick: () -> Unit) {
+internal fun MatchRow(ev: SportsEvent, use24h: Boolean, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
     val league = SportsCatalog.league(ev.leagueId)
     val sides = ev.sides
@@ -355,7 +355,7 @@ private fun MatchRow(ev: SportsEvent, use24h: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LeagueRow(league: League, onClick: () -> Unit) {
+internal fun LeagueRow(league: League, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
     RowShell(onClick) {
         LeagueMark(league, 30.dp)

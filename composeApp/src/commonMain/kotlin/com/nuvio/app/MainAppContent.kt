@@ -1726,6 +1726,9 @@ internal fun MainAppContent(
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },
+                                onPersonClick = { id, name, photo ->
+                                    navController.navigate(PersonDetailRoute(personId = id, personName = name, personPhoto = photo))
+                                },
                                 onLibraryPosterClick = openLibraryItem,
                                 onLibraryCalendarEpisodeClick = openLibraryCalendarEpisode,
                                 onLibraryPosterLongClick = { item, section ->

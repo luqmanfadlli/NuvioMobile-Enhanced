@@ -103,6 +103,7 @@ import com.nuvio.app.features.profiles.ProfileSwitcherTab
 import com.nuvio.app.features.profiles.parseHexColor
 import com.nuvio.app.features.profiles.profileAvatarImageUrl
 import com.nuvio.app.features.search.SearchScreen
+import com.nuvio.app.features.search.UniversalSearchTab
 import com.nuvio.app.features.settings.AppBrandWordmark
 import com.nuvio.app.features.settings.SettingsScreen
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
@@ -200,6 +201,7 @@ internal data class AppTabActions(
     val onOpenArticle: (NewsArticle) -> Unit = {},
     val onOpenPodcasts: () -> Unit = {},
     val onOpenPodcastShow: (Podcast) -> Unit = {},
+    val onPersonClick: (id: Int, name: String, photo: String?) -> Unit = { _, _, _ -> },
     val onCheckForUpdatesClick: (() -> Unit)? = null,
     val onTestUpdateBannerClick: (() -> Unit)? = null,
     val onCollectionsSettingsClick: () -> Unit = {},
@@ -274,6 +276,18 @@ internal fun AppTabHost(
                     onOpenArticle = actions.onOpenArticle,
                     onOpenPodcast = actions.onOpenPodcastShow,
                     onOpenPodcasts = actions.onOpenPodcasts,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (experienceMode == ExperienceMode.Balanced && actions.sportsActions != null) {
+                UniversalSearchTab(
+                    sportsActions = actions.sportsActions,
+                    onPosterClick = actions.onPosterClick,
+                    onPosterLongClick = actions.onPosterLongClick,
+                    onPersonClick = actions.onPersonClick,
+                    onChannelClick = actions.onLiveTvChannelClick,
+                    onOpenPodcast = actions.onOpenPodcastShow,
+                    onOpenArticle = actions.onOpenArticle,
+                    listState = state.searchListState,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

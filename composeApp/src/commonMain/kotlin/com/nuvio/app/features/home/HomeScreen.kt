@@ -51,6 +51,7 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeriesPrimaryAction
 import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
+import com.nuvio.app.features.home.components.HomeTop10Row
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
@@ -135,6 +136,7 @@ fun HomeScreen(
         ContinueWatchingPreferencesRepository.ensureLoaded()
         WatchedRepository.ensureLoaded()
         WatchProgressRepository.ensureLoaded()
+        Top10Repository.ensureLoaded()
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) {
             WatchProgressSourceCoordinator.ensureStarted()
@@ -143,6 +145,7 @@ fun HomeScreen(
 
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
+    val top10Items by Top10Repository.items.collectAsStateWithLifecycle()
     val homeHeroState = rememberHomeHeroState(homeUiState.heroItems)
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
@@ -1192,6 +1195,18 @@ fun HomeScreen(
                             onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                         )
+
+                        if (top10Items.size >= 3) {
+                            item(key = "home_top10", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                HomeTop10Row(
+                                    items = top10Items,
+                                    sectionPadding = homeSectionPadding,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+                        }
 
                         keyedEnabledHomeItems.forEach { keyedSettingsItem ->
                             val settingsItem = keyedSettingsItem.value
