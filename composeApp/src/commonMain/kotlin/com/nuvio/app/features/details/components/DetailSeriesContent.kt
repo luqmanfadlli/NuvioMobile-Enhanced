@@ -952,7 +952,7 @@ private fun EpisodeHorizontalCard(
     val imdbRatingLabel = remember(imdbRating, showsRating) {
         imdbRating?.takeIf { it > 0.0 && showsRating }?.let(::formatEpisodeRating)
     }
-    val hasAnyRating = tmdbRatingLabel != null || imdbRatingLabel != null || userRating != null
+    val hasAnyRating = imdbRatingLabel != null || userRating != null
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
     val imageUrl = video.thumbnail ?: fallbackImage
@@ -1291,7 +1291,8 @@ private fun EpisodeRatingBadges(
     modifier: Modifier = Modifier,
     userRating: Int? = null,
 ) {
-    if (imdbRating == null && tmdbRating == null && userRating == null) return
+    // TMDB episode rating is intentionally not shown: IMDb only, like the original app.
+    if (imdbRating == null && userRating == null) return
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1301,14 +1302,6 @@ private fun EpisodeRatingBadges(
             TmdbEpisodeRatingBadge(
                 rating = rating,
                 isImdb = true,
-                logoSize = logoSize,
-                textSize = textSize,
-            )
-        }
-        tmdbRating?.let { rating ->
-            TmdbEpisodeRatingBadge(
-                rating = rating,
-                isImdb = false,
                 logoSize = logoSize,
                 textSize = textSize,
             )
@@ -1376,7 +1369,12 @@ private fun TmdbEpisodeRatingBadge(
             Image(
                 painter = painterResource(if (isImdb) Res.drawable.rating_imdb else Res.drawable.rating_tmdb),
                 contentDescription = stringResource(if (isImdb) Res.string.source_imdb else Res.string.source_tmdb),
-                modifier = Modifier.size(logoSize),
+                // IMDb logo is wide (2:1) in the original app; a square box made it look tiny.
+                modifier = if (isImdb) {
+                    Modifier.width(logoSize * 2).height(logoSize)
+                } else {
+                    Modifier.size(logoSize)
+                },
                 contentScale = ContentScale.Fit,
             )
         }
@@ -1428,7 +1426,7 @@ private fun EpisodeListCard(
     val imdbRatingLabel = remember(imdbRating, showsRating) {
         imdbRating?.takeIf { it > 0.0 && showsRating }?.let(::formatEpisodeRating)
     }
-    val hasAnyRating = tmdbRatingLabel != null || imdbRatingLabel != null || userRating != null
+    val hasAnyRating = imdbRatingLabel != null || userRating != null
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     Box(
         modifier = modifier
