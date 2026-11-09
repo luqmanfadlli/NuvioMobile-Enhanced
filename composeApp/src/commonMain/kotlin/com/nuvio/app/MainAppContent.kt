@@ -496,6 +496,17 @@ internal fun MainAppContent(
         }
     }
 
+    // Switching modes can leave you on a tab the new layout doesn't have (Sports in Balanced, Following in
+    // Sports focus). The native iOS bar does its own reselection, so only the in-app bars handle it here.
+    val experienceMode by com.nuvio.app.features.experience.ExperienceRepository.mode.collectAsStateWithLifecycle()
+    LaunchedEffect(experienceMode, showLiveTvInNavigation) {
+        if (!useNativeNavigation && selectedTab != AppScreenTab.Settings &&
+            selectedTab !in experienceMode.tabs(showLiveTvInNavigation)
+        ) {
+            activateTab(AppScreenTab.Home)
+        }
+    }
+
     LaunchedEffect(
         liquidGlassNativeTabBarSupported,
         liquidGlassNativeTabBarEnabled,

@@ -52,7 +52,7 @@ internal fun LazyListScope.experienceSettingsContent(isTablet: Boolean) {
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                ExperienceMode.entries.forEachIndexed { index, mode ->
+                ExperienceMode.selectable.forEachIndexed { index, mode ->
                     if (index > 0) SettingsGroupDivider(isTablet = isTablet)
                     ExperienceOptionRow(
                         mode = mode,

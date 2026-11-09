@@ -547,8 +547,6 @@ internal fun TabletFloatingTopBar(
                         ProfileSwitcherTab(
                             selected = selectedTab == AppScreenTab.Settings,
                             onClick = { onTabSelected(AppScreenTab.Settings) },
-                            onProfileSelected = onProfileSelected,
-                            onAddProfileRequested = onAddProfileRequested,
                         )
                         Text(
                             text = stringResource(Res.string.compose_nav_profile),

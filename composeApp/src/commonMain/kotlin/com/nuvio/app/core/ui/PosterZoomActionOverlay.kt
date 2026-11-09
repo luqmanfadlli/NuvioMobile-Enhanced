@@ -459,22 +459,7 @@ fun NuvioPosterZoomActionOverlay(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        NuvioPosterWatchedOverlay(
-                            isWatched = isWatched,
-                            modifier = Modifier.graphicsLayer {
-                                val slot = slotBounds
-                                if (slot != null && slot.width > 0f) {
-                                    val scale = posterScale(
-                                        anchor = anchor,
-                                        slot = slot,
-                                        progress = zoom.value,
-                                    ).coerceAtLeast(0.001f)
-                                    scaleX = 1f / scale
-                                    scaleY = 1f / scale
-                                    transformOrigin = TransformOrigin(1f, 0f)
-                                }
-                            },
-                        )
+                        NuvioPosterWatchedOverlay(isWatched = isWatched)
                     }
                 }
             }

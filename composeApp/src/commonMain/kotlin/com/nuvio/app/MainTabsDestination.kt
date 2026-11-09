@@ -359,9 +359,6 @@ internal fun mainFloatingNavigationItems(
                 ProfileSwitcherTab(
                     selected = highlightedTab == AppScreenTab.Settings,
                     onClick = onClick,
-                    onProfileSelected = onProfileSelected,
-                    onAddProfileRequested = onAddProfileRequested,
-                    backdrop = backdrop,
                     popupBelowAnchor = false,
                     defaultIconColorOverride = iconColorOverride ?: defaultIconColorOverride,
                 )
@@ -441,8 +438,6 @@ internal fun MainClassicNavigationBar(
             ProfileSwitcherTab(
                 selected = highlightedTab == AppScreenTab.Settings,
                 onClick = { onTabSelected(AppScreenTab.Settings) },
-                onProfileSelected = onProfileSelected,
-                onAddProfileRequested = onAddProfileRequested,
             )
         }
     }

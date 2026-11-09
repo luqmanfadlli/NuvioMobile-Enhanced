@@ -254,6 +254,13 @@ fun nativeTabSelect(tabName: String) {
     NativeTabBridge.requestTab(tabName)
 }
 
+/** The native iOS mode picker (long press on the profile icon) changes the layout through here. */
+fun nativeSetExperienceMode(key: String) {
+    com.nuvio.app.features.experience.ExperienceRepository.setMode(
+        com.nuvio.app.features.experience.ExperienceMode.fromKey(key),
+    )
+}
+
 fun publishProfileTabIconFrame(xDp: Float, yDp: Float, widthDp: Float, heightDp: Float) {
     NativeTabBridge.receiveProfileTabIconFrame(xDp, yDp, widthDp, heightDp)
 }

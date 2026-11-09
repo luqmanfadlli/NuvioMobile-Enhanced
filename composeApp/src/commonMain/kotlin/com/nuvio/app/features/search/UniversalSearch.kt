@@ -67,6 +67,7 @@ import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWid
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvRepository
+import com.nuvio.app.features.experience.ExperienceFeatures
 import com.nuvio.app.features.music.data.YtMusicRepository
 import com.nuvio.app.features.music.data.model.BrowseType
 import com.nuvio.app.features.music.data.model.SearchFilter
@@ -185,7 +186,7 @@ internal class UniversalSearchModel {
     }
 }
 
-/** The Search tab in Balanced mode: one box for movies, shows, people, sports, music, podcasts and channels. */
+/** The Search tab in Balanced mode: one box for movies, shows, people, sports, podcasts and channels (and music, when enabled). */
 @Composable
 internal fun UniversalSearchTab(
     sportsActions: SportsActions,
@@ -307,7 +308,9 @@ private fun UniversalSearchScreen(
         coroutineScope {
             launch { model.people = runCatching { UniversalSearchData.people(q) }.getOrDefault(emptyList()) }
             launch { model.sports = runCatching { SportsSearchData.remote(q) }.getOrDefault(RemoteSearch()) }
-            launch { model.music = runCatching { YtMusicRepository.searchPage(q, SearchFilter.ALL).getOrNull()?.rows }.getOrNull().orEmpty() }
+            if (ExperienceFeatures.MUSIC_ENABLED) {
+                launch { model.music = runCatching { YtMusicRepository.searchPage(q, SearchFilter.ALL).getOrNull()?.rows }.getOrNull().orEmpty() }
+            }
             launch { model.podcasts = runCatching { PodcastRepository.searchDirectory(q, 8) }.getOrDefault(emptyList()) }
         }
         model.resultsFor = q
@@ -380,7 +383,7 @@ private fun UniversalSearchScreen(
                         NuvioInputField(
                             value = query,
                             onValueChange = { model.query = it },
-                            placeholder = "Movies, shows, actors, teams, music…",
+                            placeholder = if (ExperienceFeatures.MUSIC_ENABLED) "Movies, shows, actors, teams, music…" else "Movies, shows, actors, teams…",
                             shape = RoundedCornerShape(NuvioTokens.Radius.xl),
                             modifier = Modifier.onFocusChanged { searchFocused = it.isFocused },
                             trailingContent = when {
@@ -397,7 +400,7 @@ private fun UniversalSearchScreen(
                     Spacer(Modifier.height(10.dp))
                     if (q.isNotBlank()) {
                         LazyRow(contentPadding = PaddingValues(horizontal = NuvioTokens.Space.s16), horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
-                            items(UniversalScope.entries.toList(), key = { it.name }) { s -> Chip(s.label, selected = scope == s, onClick = { model.scope = s }) }
+                            items(UniversalScope.entries.filter { it != UniversalScope.Music || ExperienceFeatures.MUSIC_ENABLED }, key = { it.name }) { s -> Chip(s.label, selected = scope == s, onClick = { model.scope = s }) }
                         }
                         Spacer(Modifier.height(10.dp))
                     } else {

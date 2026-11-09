@@ -60,6 +60,8 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.features.experience.ExperienceMode
+import com.nuvio.app.features.experience.ExperienceRepository
 import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvEpgProgram
 import com.nuvio.app.features.livetv.LiveTvRepository
@@ -87,15 +89,20 @@ import kotlinx.coroutines.flow.emptyFlow
 
 internal enum class LiveSegment(val label: String) { Channels("Channels"), Guide("Guide"), Sports("Sports") }
 
-/** A three-way switch under the Live title, the way StadiaTV lays it out. */
+/** Balanced has its own Sports tab, so Live stays channels and guide there; Sports focus keeps the games segment. */
+internal fun ExperienceMode.liveSegments(): List<LiveSegment> =
+    if (this == ExperienceMode.Balanced) LiveSegment.entries.filter { it != LiveSegment.Sports } else LiveSegment.entries
+
+/** A switch under the Live title, the way StadiaTV lays it out. */
 @Composable
 internal fun LiveSegmentedControl(selected: LiveSegment, onSelect: (LiveSegment) -> Unit, modifier: Modifier = Modifier) {
     val tokens = MaterialTheme.nuvio
+    val mode by ExperienceRepository.mode.collectAsStateWithLifecycle()
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(NuvioTokens.Radius.lg)).background(tokens.colors.surface).padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        LiveSegment.entries.forEach { segment ->
+        mode.liveSegments().forEach { segment ->
             val on = segment == selected
             Box(
                 Modifier.weight(1f).clip(RoundedCornerShape(NuvioTokens.Radius.md))
@@ -124,7 +131,9 @@ fun LiveHub(
     onVodClick: (LiveTvVodPlayback) -> Unit = {},
 ) {
     var name by rememberSaveable { mutableStateOf(LiveSegment.Channels.name) }
-    val segment = LiveSegment.entries.firstOrNull { it.name == name } ?: LiveSegment.Channels
+    val mode by ExperienceRepository.mode.collectAsStateWithLifecycle()
+    // A Sports segment left selected from the other mode falls back to Channels.
+    val segment = mode.liveSegments().firstOrNull { it.name == name } ?: LiveSegment.Channels
     val select: (LiveSegment) -> Unit = { name = it.name }
     when (segment) {
         LiveSegment.Channels -> LiveTvScreen(

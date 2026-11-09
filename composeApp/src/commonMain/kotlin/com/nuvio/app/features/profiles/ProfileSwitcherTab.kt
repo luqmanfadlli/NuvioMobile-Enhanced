@@ -14,7 +14,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -76,6 +78,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.features.experience.ModeSwitcherPopup
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.kyant.backdrop.Backdrop
@@ -88,22 +91,22 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.max
 import kotlin.math.min
 
+/**
+ * The profile icon in the nav bar. Tapping it opens Settings (via [onClick]); a long press opens the
+ * mode picker, so profiles are switched from Settings rather than from here.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProfileSwitcherTab(
     selected: Boolean,
     onClick: () -> Unit,
-    onProfileSelected: (NuvioProfile) -> Unit,
-    onAddProfileRequested: () -> Unit,
     triggerContent: (@Composable (selected: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    backdrop: Backdrop? = null,
     popupBelowAnchor: Boolean = false,
     defaultIconColorOverride: Color? = null,
 ) {
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     val activeProfile = profileState.activeProfile
-    val profiles = profileState.profiles
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
@@ -111,173 +114,18 @@ fun ProfileSwitcherTab(
     }
 
     val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
-
-    var showPopup by remember { mutableStateOf(false) }
-    // Keep popup composed while exit animation plays
-    var popupVisible by remember { mutableStateOf(false) }
-    var pinProfile by remember { mutableStateOf<NuvioProfile?>(null) }
-    var biometricAuthenticating by remember { mutableStateOf(false) }
-    var dragTargetProfileIndex by remember { mutableStateOf<Int?>(null) }
-    var triggerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val profileBubbleBounds = remember(profiles.map { it.profileIndex }) {
-        mutableStateMapOf<Int, Rect>()
-    }
-
-    fun performProfileHoldHaptic() {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-    }
-
-    fun performProfileHoverHaptic() {
-        if (isIos) {
-            ProfileHoverHapticFeedback.perform()
-        } else {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
-    }
-
-    fun updateDragTarget(localPosition: Offset) {
-        if (pinProfile != null) return
-        val trigger = triggerCoordinates ?: return
-        val screenPosition = trigger.localToScreen(localPosition)
-        val nextTargetProfileIndex = profileBubbleBounds.entries
-            .firstOrNull { (_, bounds) -> bounds.contains(screenPosition) }
-            ?.key
-        if (nextTargetProfileIndex != null && nextTargetProfileIndex != dragTargetProfileIndex) {
-            performProfileHoverHaptic()
-        }
-        dragTargetProfileIndex = nextTargetProfileIndex
-    }
-
-    fun routeProfileNormally(profile: NuvioProfile) {
-        routeProfileSelection(
-            profile = profile,
-            isEditMode = false,
-            activeProfileIndex = ProfileRepository.state.value.activeProfile?.profileIndex,
-            onEditProfile = {},
-            onActiveProfileSelected = {
-                scope.launch {
-                    showAlreadyActiveProfileToast(it)
-                    showPopup = false
-                }
-            },
-            onPinRequired = { pinProfile = it },
-            onProfileSelected = {
-                showPopup = false
-                onProfileSelected(it)
-            },
-        )
-    }
-
-    fun chooseProfile(profile: NuvioProfile) {
-        if (biometricAuthenticating) return
-        val isLockedPrimary = profile.profileIndex == 1 &&
-            profile.pinEnabled &&
-            profile.userId.isNotBlank() &&
-            profile.profileIndex != ProfileRepository.state.value.activeProfile?.profileIndex
-        if (!isLockedPrimary) {
-            routeProfileNormally(profile)
-            return
-        }
-
-        biometricAuthenticating = true
-        scope.launch {
-            val result = try {
-                ProfileBiometricAuth.authenticate(profile.profileIndex, profile.userId)
-            } catch (error: CancellationException) {
-                biometricAuthenticating = false
-                throw error
-            } catch (_: Exception) {
-                ProfileBiometricResult.Failed
-            }
-            biometricAuthenticating = false
-            when (result) {
-                ProfileBiometricResult.Success -> {
-                    pinProfile = null
-                    showPopup = false
-                    onProfileSelected(profile)
-                }
-                ProfileBiometricResult.Cancelled -> Unit
-                ProfileBiometricResult.FallbackRequested,
-                ProfileBiometricResult.Invalidated,
-                ProfileBiometricResult.Unavailable,
-                ProfileBiometricResult.NotConfigured,
-                ProfileBiometricResult.Failed,
-                -> routeProfileNormally(profile)
-            }
-        }
-    }
-
-    fun chooseDragTarget() {
-        val profile = profiles.firstOrNull { it.profileIndex == dragTargetProfileIndex }
-        dragTargetProfileIndex = null
-        if (profile != null) {
-            chooseProfile(profile)
-        }
-    }
-
-    // Popup entrance/exit animation
-    val popupAlpha = remember { Animatable(0f) }
-    val popupScale = remember { Animatable(0.96f) }
-
-    LaunchedEffect(showPopup) {
-        if (showPopup) {
-            popupVisible = true
-            launch { popupAlpha.animateTo(1f, tween(180, easing = FastOutSlowInEasing)) }
-            launch {
-                popupScale.animateTo(
-                    1f,
-                    tween(180, easing = FastOutSlowInEasing),
-                )
-            }
-        } else {
-            ProfileHoverHapticFeedback.release()
-            // Animate out
-            launch { popupAlpha.animateTo(0f, tween(140, easing = FastOutSlowInEasing)) }
-            launch {
-                popupScale.animateTo(0.96f, tween(160, easing = FastOutSlowInEasing))
-                // Remove from composition after animation completes
-                popupVisible = false
-                pinProfile = null
-                dragTargetProfileIndex = null
-            }
-        }
-    }
+    var showModes by remember { mutableStateOf(false) }
 
     Box(
-        modifier = modifier
-            .onGloballyPositioned { triggerCoordinates = it }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = tvFocusIndication(),
-                onClick = onClick,
-            )
-            .pointerInput(profiles, activeProfile?.profileIndex) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { startOffset ->
-                        if (profiles.isNotEmpty()) {
-                            performProfileHoldHaptic()
-                            ProfileHoverHapticFeedback.prepare()
-                            profileBubbleBounds.clear()
-                            dragTargetProfileIndex = null
-                            showPopup = true
-                            updateDragTarget(startOffset)
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        updateDragTarget(change.position)
-                    },
-                    onDragEnd = {
-                        ProfileHoverHapticFeedback.release()
-                        chooseDragTarget()
-                    },
-                    onDragCancel = {
-                        ProfileHoverHapticFeedback.release()
-                        dragTargetProfileIndex = null
-                    },
-                )
+        modifier = modifier.combinedClickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = tvFocusIndication(),
+            onClick = onClick,
+            onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showModes = true
             },
+        ),
         contentAlignment = Alignment.Center,
     ) {
         if (triggerContent != null) {
@@ -292,63 +140,11 @@ fun ProfileSwitcherTab(
             )
         }
 
-        // Floating profile popup (stays composed during exit animation)
-        if (popupVisible && profiles.isNotEmpty()) {
-            var opensBelow by remember { mutableStateOf(popupBelowAnchor) }
-            var availableHeight by remember { mutableStateOf<Dp?>(null) }
-            val dismissPopup = { if (pinProfile != null) pinProfile = null else showPopup = false }
-            Popup(
-                popupPositionProvider = remember(density, popupBelowAnchor) {
-                    ProfilePopupPositionProvider(
-                        margin = with(density) { 16.dp.roundToPx() },
-                        gap = with(density) { 18.dp.roundToPx() },
-                        preferBelow = popupBelowAnchor,
-                        onPositioned = { below, height ->
-                            opensBelow = below
-                            availableHeight = with(density) { height.toDp() }
-                        },
-                    )
-                },
-                properties = PopupProperties(focusable = true),
-                onDismissRequest = dismissPopup,
-            ) {
-                ProfilePopupContent(
-                    profiles = profiles,
-                    avatars = avatars,
-                    activeProfileIndex = activeProfile?.profileIndex,
-                    hoveredProfileIndex = dragTargetProfileIndex,
-                    pinProfile = pinProfile,
-                    backdrop = backdrop,
-                    opensBelow = opensBelow,
-                    availableHeight = availableHeight,
-                    modifier = Modifier.graphicsLayer {
-                        alpha = popupAlpha.value
-                        scaleX = popupScale.value
-                        scaleY = popupScale.value
-                        transformOrigin = TransformOrigin(
-                            0.5f,
-                            if (opensBelow) 0f else 1f,
-                        )
-                    },
-                    onBoundsChanged = { index, bounds -> profileBubbleBounds[index] = bounds },
-                    onDismissRequest = dismissPopup,
-                    onProfileSelected = ::chooseProfile,
-                    onAddProfileRequested = {
-                        showPopup = false
-                        onAddProfileRequested()
-                    },
-                    onPinCancelled = { pinProfile = null },
-                    onPinVerified = { profile ->
-                        if (
-                            showPopup && pinProfile?.profileIndex == profile.profileIndex &&
-                            profile.profileIndex != ProfileRepository.state.value.activeProfile?.profileIndex
-                        ) {
-                            onProfileSelected(profile)
-                            showPopup = false
-                        }
-                    },
-                )
-            }
+        if (showModes) {
+            ModeSwitcherPopup(
+                onDismissRequest = { showModes = false },
+                popupBelowAnchor = popupBelowAnchor,
+            )
         }
     }
 }

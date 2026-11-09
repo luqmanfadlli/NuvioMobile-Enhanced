@@ -420,8 +420,12 @@ enum BannerExperienceMode: String {
 
     static let storageKey = "BannerExperienceMode"
 
+    /// Music is parked for now (mirrors `ExperienceFeatures.MUSIC_ENABLED` in Kotlin); a stored "music" choice opens Balanced.
+    static let musicEnabled = false
+
     static func current() -> BannerExperienceMode {
-        BannerExperienceMode(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .balanced
+        let stored = BannerExperienceMode(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .balanced
+        return stored == .music && !musicEnabled ? .balanced : stored
     }
 }
 
@@ -431,7 +435,7 @@ extension BannerExperienceMode {
     func tabs(showLiveTv: Bool) -> [NuvioAppTab] {
         let ordered: [NuvioAppTab]
         switch self {
-        case .balanced: ordered = [.home, .liveTv, .search, .music, .library]
+        case .balanced: ordered = [.home, .liveTv, .search, .sports, .library]
         case .sports: ordered = [.home, .following, .search, .liveTv, .news]
         case .music: ordered = [.home, .search, .library]
         }
@@ -1005,6 +1009,7 @@ final class AppNavigationCoordinator: ObservableObject {
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published private(set) var localizedSwitchProfileTitle = ""
     @Published private(set) var localizedAddProfileTitle = ""
+    /// Presents the mode picker (long press on the profile icon). The name predates it replacing the profile switcher.
     @Published var isProfileSwitcherPresented = false
 
     private var tabBarTransitionTask: Task<Void, Never>?
@@ -1884,6 +1889,65 @@ private struct NativeProfileSwitcherView: View {
     }
 }
 
+/// What a long press on the profile icon opens: pick how the app is arranged. Profiles are switched from Settings.
+@available(iOS 26.0, *)
+private struct NativeModeSwitcherView: View {
+    private struct ModeChoice: Identifiable {
+        let mode: BannerExperienceMode
+        let title: String
+        let detail: String
+        var id: String { mode.rawValue }
+    }
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var appCoordinator: AppNavigationCoordinator
+
+    private let choices = [
+        ModeChoice(mode: .balanced, title: "Balanced", detail: "Movies, shows, live TV and sports in equal measure."),
+        ModeChoice(mode: .sports, title: "Sports", detail: "Sports first: a scoreboard home, following, and live games."),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Switch mode")
+                .font(.headline)
+                .padding(.bottom, 6)
+
+            ForEach(choices) { choice in
+                let isCurrent = appCoordinator.experienceMode == choice.mode
+                Button {
+                    NativeTabBridgeKt.nativeSetExperienceMode(key: choice.mode.rawValue)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(choice.title)
+                                .font(.body.weight(isCurrent ? .bold : .medium))
+                            Text(choice.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        if isCurrent {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.tint)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(18)
+        .frame(minWidth: 250, idealWidth: 330, maxWidth: 360)
+        .presentationCompactAdaptation(.popover)
+        .presentationSizing(.fitted)
+    }
+}
+
 @available(iOS 16.0, *)
 struct NativeNavContentView: View {
     @StateObject private var appCoordinator = AppNavigationCoordinator()
@@ -2114,40 +2178,36 @@ struct ProfileCornerButton: View {
     @ObservedObject var iconStore: NativeTabIconStore
 
     var body: some View {
-        Button {
-            guard appCoordinator.isAppReady else { return }
-            appCoordinator.selectedTab = .settings
-        } label: {
-            Image(uiImage: iconStore.image(for: .settings, selected: false))
-                .renderingMode(.original)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 34, height: 34)
-                .clipShape(Circle())
-                .padding(3)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
-                .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(appCoordinator.title(for: .settings)))
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+        // Tap and long press are separate gestures (not a Button plus a simultaneous long press), so
+        // holding to pick a mode never also counts as a tap and jumps to Settings on release.
+        Image(uiImage: iconStore.image(for: .settings, selected: false))
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 34, height: 34)
+            .clipShape(Circle())
+            .padding(3)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+            .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
+            .contentShape(Circle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(Text(appCoordinator.title(for: .settings)))
+            .onTapGesture {
+                guard appCoordinator.isAppReady else { return }
+                appCoordinator.selectedTab = .settings
+            }
+            .onLongPressGesture(minimumDuration: 0.45) {
                 guard appCoordinator.isAppReady else { return }
                 appCoordinator.isProfileSwitcherPresented = true
             }
-        )
         .popover(
             isPresented: $appCoordinator.isProfileSwitcherPresented,
             attachmentAnchor: .rect(.bounds),
             arrowEdge: .top
         ) {
-            NativeProfileSwitcherView(
-                controller: appCoordinator.profileSwitcherController,
-                title: appCoordinator.localizedSwitchProfileTitle,
-                addProfileTitle: appCoordinator.localizedAddProfileTitle,
-                onManageProfiles: appCoordinator.openProfileManagement
-            )
+            NativeModeSwitcherView(appCoordinator: appCoordinator)
         }
     }
 }

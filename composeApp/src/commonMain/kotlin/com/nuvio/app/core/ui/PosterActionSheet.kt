@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,7 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.Color
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.episodes_cd_watched
 import org.jetbrains.compose.resources.stringResource
@@ -59,16 +60,23 @@ fun NuvioAnimatedWatchedBadge(
     }
 }
 
+/**
+ * Marks a watched title: the whole cover is dimmed by a 20% black scrim rather than carrying a badge.
+ * Must sit inside the (clipped) poster box so the scrim follows its rounded corners.
+ */
 @Composable
 fun BoxScope.NuvioPosterWatchedOverlay(
     isWatched: Boolean,
     modifier: Modifier = Modifier,
-    padding: Dp = NuvioTokens.Space.s6,
 ) {
-    NuvioAnimatedWatchedBadge(
-        isVisible = isWatched,
-        modifier = modifier
-            .align(Alignment.TopEnd)
-            .padding(padding),
-    )
+    AnimatedVisibility(
+        visible = isWatched,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier.matchParentSize(),
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = WATCHED_SCRIM_ALPHA)))
+    }
 }
+
+private const val WATCHED_SCRIM_ALPHA = 0.2f
