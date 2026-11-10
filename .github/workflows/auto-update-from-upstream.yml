@@ -10,11 +10,11 @@ name: Auto-update from upstream
 #
 # GitHub runs a schedule on behalf of whoever last changed it. Run this workflow once with
 # "refresh_schedule" ticked to re-save the schedule as the AUTO_UPDATE_TOKEN owner.
-# Schedule owner: not refreshed yet
+# Schedule owner: lalith14 (saved 2026-11-10)
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "18 * * * *"
   workflow_dispatch:
     inputs:
       refresh_schedule:
