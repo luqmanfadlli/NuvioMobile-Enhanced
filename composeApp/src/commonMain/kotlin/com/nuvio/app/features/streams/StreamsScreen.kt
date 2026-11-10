@@ -529,6 +529,18 @@ private fun MobileStreamsLayout(
                         onFilterSelected = { addonId -> StreamsRepository.selectFilter(addonId) },
                         onRefresh = onRefresh,
                     )
+                    // Fork: sort, filters and "Play best for this device" (SmartStreamControls.kt).
+                    val smartStreams = rememberSmartStreams(
+                        listState = rememberStreamSearchResult(uiState, searchQuery, showSearchField).uiState,
+                        allState = uiState,
+                        debridEnabled = debridEnabled,
+                        isEpisode = isEpisode,
+                    )
+                    SmartStreamControls(
+                        state = smartStreams,
+                        onPlay = { stream -> onStreamSelected(stream, resumePositionMs, resumeProgressFraction) },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
 
                     if (showSearchField) {
                         StreamSearchField(
@@ -543,9 +555,15 @@ private fun MobileStreamsLayout(
                         StreamSearchEmptyBlock(modifier = Modifier.weight(1f))
                         return@Column
                     }
+                    if (smartStreams.result.emptyBecauseOfFilters) {
+                        SmartFiltersEmptyBlock(modifier = Modifier.weight(1f))
+                        return@Column
+                    }
 
                     StreamList(
-                        uiState = listUiState.uiState,
+                        uiState = smartStreams.result.listState,
+                        smartStreams = smartStreams.result.sortedStreams,
+                        bestStream = smartStreams.result.best?.stream,
                         debridEnabled = debridEnabled,
                         appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                         onStreamSelected = onStreamSelected,
@@ -775,6 +793,8 @@ internal fun StreamList(
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
     modifier: Modifier = Modifier,
+    smartStreams: List<StreamItem>? = null,
+    bestStream: StreamItem? = null,
 ) {
     val filteredGroups = uiState.filteredGroups
     val hasGroups = filteredGroups.isNotEmpty()
@@ -791,8 +811,12 @@ internal fun StreamList(
         StreamBadgeSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val pinnedSourceIds by rememberPinnedStreamSourceIds()
-    val pinnedFirst = remember(filteredGroups, pinnedSourceIds) {
-        splitPinnedSources(filteredGroups, pinnedSourceIds)
+    val pinnedFirst = remember(filteredGroups, pinnedSourceIds, smartStreams) {
+        if (smartStreams != null) {
+            PinnedFirstStreamGroups(emptyList(), emptyList())
+        } else {
+            splitPinnedSources(filteredGroups, pinnedSourceIds)
+        }
     }
 
     CompositionLocalProvider(LocalStreamSizeLabelFormat provides formatStreamSize) {
@@ -875,6 +899,21 @@ internal fun StreamList(
                         badgePlacement = streamBadgeSettings.badgePlacement,
                         torrentNotSupportedText = torrentNotSupportedText,
                         fetchingText = fetchingText,
+                        onStreamSelected = onStreamSelected,
+                        onStreamLongPress = onStreamLongPress,
+                        resumePositionMs = resumePositionMs,
+                        resumeProgressFraction = resumeProgressFraction,
+                    )
+                }
+                if (smartStreams != null) {
+                    smartSortedStreamSection(
+                        streams = smartStreams,
+                        bestStream = bestStream,
+                        debridEnabled = debridEnabled,
+                        appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                        showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                        badgePlacement = streamBadgeSettings.badgePlacement,
+                        torrentNotSupportedText = torrentNotSupportedText,
                         onStreamSelected = onStreamSelected,
                         onStreamLongPress = onStreamLongPress,
                         resumePositionMs = resumePositionMs,

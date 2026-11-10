@@ -1,0 +1,41 @@
+name: Kotlin compile check
+
+# Fast (~15 min) check that the shared Kotlin code compiles, before spending an hour on an iOS build.
+# Runs on pushes to feature/* branches of this fork.
+
+on:
+  push:
+    branches:
+      - "feature/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kotlin-compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile shared Kotlin (Android target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Empty runtime properties
+        run: touch local.properties
+
+      - name: Compile
+        run: ./gradlew :composeApp:compileAndroidMain -Pnuvio.android.distribution=full --stacktrace
