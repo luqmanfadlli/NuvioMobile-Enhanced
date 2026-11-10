@@ -12,6 +12,11 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
+    inputs:
+      self_test:
+        description: Also test that the token can update workflow files and start builds
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,6 +65,32 @@ jobs:
 
       - name: Check push access
         run: git push --dry-run origin "HEAD:${BRANCH}"
+
+      - name: Token self-test
+        if: inputs.self_test
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+        run: |
+          # Workflows permission: push a throwaway commit that edits a workflow
+          # file to a temporary branch, then delete that branch.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c token-selftest
+          echo "# token self-test" >> .github/workflows/auto-update-from-upstream.yml
+          git commit -qam "token self-test (temporary)"
+          if ! git push -q origin HEAD:refs/heads/token-selftest; then
+            echo "::error::The token cannot update workflow files. Give it the Workflows permission (or the workflow scope)."
+            exit 1
+          fi
+          git push -q origin --delete token-selftest
+          git switch -q -
+          echo "Workflows permission: OK"
+          # Actions permission: re-enable an already enabled workflow (no effect).
+          if ! gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/ios-test-build.yml/enable" >/dev/null; then
+            echo "::error::The token cannot start builds. Give it the Actions permission (read and write)."
+            exit 1
+          fi
+          echo "Actions permission: OK"
 
       - name: Find newest upstream release
         id: find
