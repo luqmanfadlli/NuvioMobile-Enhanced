@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import com.nuvio.app.features.home.components.HomeComingToDigitalRow
 import androidx.compose.foundation.layout.PaddingValues
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.core.ui.NuvioShelfSection
@@ -140,7 +141,7 @@ fun HomeScreen(
         ContinueWatchingPreferencesRepository.ensureLoaded()
         WatchedRepository.ensureLoaded()
         WatchProgressRepository.ensureLoaded()
-        Top10Repository.ensureLoaded()
+        HomeTrendingRepository.ensureLoaded()
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) {
             WatchProgressSourceCoordinator.ensureStarted()
@@ -149,7 +150,7 @@ fun HomeScreen(
 
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
-    val top10Items by Top10Repository.items.collectAsStateWithLifecycle()
+    val trending by HomeTrendingRepository.state.collectAsStateWithLifecycle()
     val homeHeroState = rememberHomeHeroState(homeUiState.heroItems)
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
@@ -1205,12 +1206,27 @@ fun HomeScreen(
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                         )
 
-                        if (top10Items.size >= 3) {
-                            item(key = "home_top10", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                        // Two ranked rows, as Netflix has them: movies and shows are different lists, and a mixed
+                        // chart lets one kind crowd the other out.
+                        if (trending.topMovies.size >= 3) {
+                            item(key = "home_top10_movies", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 HomeTop10Row(
-                                    items = top10Items,
+                                    items = trending.topMovies,
                                     sectionPadding = homeSectionPadding,
                                     modifier = Modifier.padding(bottom = 12.dp),
+                                    title = "Top 10 Movies Today",
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+                        }
+                        if (trending.topShows.size >= 3) {
+                            item(key = "home_top10_shows", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                HomeTop10Row(
+                                    items = trending.topShows,
+                                    sectionPadding = homeSectionPadding,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    title = "Top 10 Shows Today",
                                     onPosterClick = onPosterClick,
                                     onPosterLongClick = onPosterLongClick,
                                 )
@@ -1234,6 +1250,18 @@ fun HomeScreen(
                                         onLongClick = onPosterLongClick?.let { { it(pick) } },
                                     )
                                 }
+                            }
+                        }
+
+                        if (trending.comingSoon.isNotEmpty()) {
+                            item(key = "home_coming_to_digital", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                HomeComingToDigitalRow(
+                                    items = trending.comingSoon,
+                                    sectionPadding = homeSectionPadding,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
                             }
                         }
 

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import com.nuvio.app.core.ui.LocalIsTv
 import com.nuvio.app.core.ui.TvSideRail
 import nuvio.composeapp.generated.resources.compose_nav_music
-import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Star
@@ -292,14 +291,6 @@ internal fun mainFloatingNavigationItems(
                     label = stringResource(Res.string.compose_nav_home),
                 ),
             )
-            AppScreenTab.NewHot -> add(
-                FloatingNavigationItem(
-                    selected = highlightedTab == AppScreenTab.NewHot,
-                    onClick = { onTabSelected(AppScreenTab.NewHot) },
-                    icon = Icons.Rounded.LocalFireDepartment,
-                    label = "New & Hot",
-                ),
-            )
             AppScreenTab.Search -> add(
                 FloatingNavigationItem(
                     selected = highlightedTab == AppScreenTab.Search,
@@ -394,12 +385,6 @@ internal fun MainClassicNavigationBar(
                     onClick = { onTabSelected(AppScreenTab.Home) },
                     icon = Icons.Filled.Home,
                     contentDescription = stringResource(Res.string.compose_nav_home),
-                )
-                AppScreenTab.NewHot -> NavItem(
-                    selected = highlightedTab == AppScreenTab.NewHot,
-                    onClick = { onTabSelected(AppScreenTab.NewHot) },
-                    icon = Icons.Rounded.LocalFireDepartment,
-                    contentDescription = "New & Hot",
                 )
                 AppScreenTab.Search -> NavItem(
                     selected = highlightedTab == AppScreenTab.Search,

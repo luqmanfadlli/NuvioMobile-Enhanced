@@ -26,7 +26,6 @@ import kotlinx.coroutines.launch
 
 internal enum class NativeNavigationTab {
     Home,
-    NewHot,
     Search,
     Library,
     LiveTv,

@@ -1,4 +1,4 @@
-package com.nuvio.app.features.newhot
+package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.music.data.systemLanguageTag

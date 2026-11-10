@@ -487,7 +487,6 @@ internal fun MainAppContent(
             AppScreenTab.Music -> Unit
             AppScreenTab.Following -> Unit
             AppScreenTab.News -> Unit
-            AppScreenTab.NewHot -> Unit
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
     }

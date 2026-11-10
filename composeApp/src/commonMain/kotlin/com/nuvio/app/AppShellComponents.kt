@@ -1,8 +1,6 @@
 package com.nuvio.app
 
 import nuvio.composeapp.generated.resources.compose_nav_music
-import androidx.compose.material.icons.rounded.LocalFireDepartment
-import com.nuvio.app.features.newhot.NewAndHotScreen
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Explore
@@ -246,11 +244,6 @@ internal fun AppTabHost(
         } else if (sportsHome) {
             SportsFocusHome(actions.sportsActions!!, onOpenNews = actions.onOpenNews, onOpenArticle = actions.onOpenArticle, onOpenFollowing = actions.onOpenFollowing, onOpenLive = actions.onOpenLive, modifier = Modifier.fillMaxSize())
         } else when (tab) {
-            AppScreenTab.NewHot -> NewAndHotScreen(
-                onPosterClick = { actions.onPosterClick?.invoke(it) },
-                onPosterLongClick = actions.onPosterLongClick,
-                modifier = Modifier.fillMaxSize(),
-            )
             AppScreenTab.Following -> actions.sportsActions?.let { SportsFocusFollowing(it, actions.onOpenArticle, Modifier.fillMaxSize()) }
             AppScreenTab.News -> DiscoverScreen(
                 onOpenArticle = actions.onOpenArticle,
@@ -528,12 +521,6 @@ internal fun TabletFloatingTopBar(
                                     },
                                 )
                             },
-                        )
-                        AppScreenTab.NewHot -> TabletTopPillItem(
-                            label = "New & Hot",
-                            selected = selectedTab == AppScreenTab.NewHot,
-                            onClick = { onTabSelected(AppScreenTab.NewHot) },
-                            icon = { Icon(imageVector = Icons.Rounded.LocalFireDepartment, contentDescription = "New & Hot", modifier = Modifier.size(18.dp), tint = if (selectedTab == AppScreenTab.NewHot) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) },
                         )
                         AppScreenTab.Following -> TabletTopPillItem(
                             label = "Following",

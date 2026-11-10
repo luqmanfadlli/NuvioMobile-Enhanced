@@ -1,7 +1,6 @@
-package com.nuvio.app.features.newhot
+package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.httpGetText
-import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.sports.compat.LiveTvClock
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
@@ -26,28 +25,26 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
-data class NewHotState(
+data class HomeTrendingState(
     /** Titles not out yet, soonest first. */
     val comingSoon: List<MetaPreview> = emptyList(),
-    /** What people are watching this week, across movies and shows. */
-    val everyoneWatching: List<MetaPreview> = emptyList(),
     val topMovies: List<MetaPreview> = emptyList(),
     val topShows: List<MetaPreview> = emptyList(),
     val isLoading: Boolean = false,
 )
 
 /**
- * The data behind the New & Hot tab, all from TMDB: what is coming out, what everyone is watching this week,
- * and today's top ten movies and shows. Refreshed a few times a day.
+ * The trending rows on Home, all from TMDB: films about to reach digital, and today's top ten movies and shows.
+ * Everything here can be watched at home. Refreshed a few times a day.
  */
-object NewHotRepository {
+object HomeTrendingRepository {
     private const val MAX_AGE_MS = 3L * 60 * 60 * 1000
     private val TALK_AND_NEWS = setOf(10767, 10763)
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val _state = MutableStateFlow(NewHotState())
-    val state: StateFlow<NewHotState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(HomeTrendingState())
+    val state: StateFlow<HomeTrendingState> = _state.asStateFlow()
     private var loadedAtMs = 0L
     private var job: Job? = null
 
@@ -68,14 +65,12 @@ object NewHotRepository {
         }
     }
 
-    private suspend fun fetchAll(): NewHotState = coroutineScope {
+    private suspend fun fetchAll(): HomeTrendingState = coroutineScope {
         val soon = async { comingToDigital() }
-        val watching = async { trendingAvailable("all", "week", limit = 15) }
         val movies = async { trendingAvailable("movie", "day", limit = 10) }
         val shows = async { trendingAvailable("tv", "day", limit = 10) }
-        NewHotState(
+        HomeTrendingState(
             comingSoon = soon.await(),
-            everyoneWatching = watching.await(),
             topMovies = movies.await(),
             topShows = shows.await(),
             isLoading = false,
