@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import androidx.compose.foundation.layout.Column
 import com.nuvio.app.features.home.components.HomeComingToDigitalRow
 import androidx.compose.foundation.layout.PaddingValues
 import com.nuvio.app.features.home.components.HomePosterCard
@@ -170,8 +171,9 @@ fun HomeScreen(
     val continueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val becauseYouWatched by BecauseYouWatchedRepository.state.collectAsStateWithLifecycle()
-    LaunchedEffect(watchedUiState.items.size, watchedUiState.watchedKeys.size) {
-        BecauseYouWatchedRepository.refresh(watchedUiState.items, watchedUiState.watchedKeys)
+    val fullyWatchedForBecause by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
+    LaunchedEffect(watchedUiState.items.size, watchedUiState.watchedKeys.size, fullyWatchedForBecause) {
+        BecauseYouWatchedRepository.refresh(watchedUiState.items, watchedUiState.watchedKeys, fullyWatchedForBecause)
     }
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
@@ -926,8 +928,13 @@ fun HomeScreen(
     val sectionsMap = remember(homeUiState.sections) {
         homeUiState.sections.associateBy(HomeCatalogSection::key)
     }
-    val enabledHomeItems = remember(homeSettingsUiState.items) {
-        homeSettingsUiState.items.filter { it.enabled }
+    // The curated rows replace the stock Cinemeta catalogs ("Popular - Movies" and the like). Catalogs a person added
+    // themselves stay. If TMDB couldn't be reached, the stock rows come back so Home is never bare.
+    val hideStockCatalogs = trending.rows.isNotEmpty() || !trending.loadedOnce
+    val enabledHomeItems = remember(homeSettingsUiState.items, hideStockCatalogs) {
+        homeSettingsUiState.items.filter {
+            it.enabled && !(hideStockCatalogs && !it.isCollection && it.addonName.equals("Cinemeta", ignoreCase = true))
+        }
     }
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)
@@ -1233,8 +1240,8 @@ fun HomeScreen(
                             }
                         }
 
-                        becauseYouWatched?.let { picks ->
-                            item(key = "home_because_you_watched", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                        becauseYouWatched.forEach { picks ->
+                            item(key = "home_because_${picks.title}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 NuvioShelfSection(
                                     title = "Because you watched ${picks.title}",
                                     entries = picks.items,
@@ -1262,6 +1269,34 @@ fun HomeScreen(
                                     onPosterClick = onPosterClick,
                                     onPosterLongClick = onPosterLongClick,
                                 )
+                            }
+                        }
+
+                        // Home's own lists, the same for everyone: new, then trending, popular and top rated.
+                        if (!trending.loadedOnce) {
+                            item(key = "home_curated_skeleton", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                Column {
+                                    repeat(2) { HomeSkeletonRow(modifier = Modifier.padding(start = homeSectionPadding, bottom = 16.dp)) }
+                                }
+                            }
+                        }
+                        trending.rows.forEach { row ->
+                            item(key = "home_curated_${row.key}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                NuvioShelfSection(
+                                    title = row.title,
+                                    entries = row.items,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    headerHorizontalPadding = homeSectionPadding,
+                                    rowContentPadding = PaddingValues(horizontal = homeSectionPadding),
+                                    key = { it.stableKey() },
+                                ) { pick ->
+                                    HomePosterCard(
+                                        item = pick,
+                                        isWatched = WatchingState.isPosterWatched(watchedUiState.watchedKeys, pick, fullyWatchedForBecause),
+                                        onClick = onPosterClick?.let { { it(pick) } },
+                                        onLongClick = onPosterLongClick?.let { { it(pick) } },
+                                    )
+                                }
                             }
                         }
 

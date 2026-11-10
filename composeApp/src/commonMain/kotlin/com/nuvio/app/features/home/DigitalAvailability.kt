@@ -5,6 +5,8 @@ import com.nuvio.app.features.music.data.systemLanguageTag
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import com.nuvio.app.features.music.data.MusicStorage
+import com.nuvio.app.features.sports.compat.LiveTvClock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -33,7 +35,34 @@ data class AvailableTitle(
 object DigitalAvailability {
     private const val TYPE_DIGITAL = 4
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val cache = HashMap<String, AvailableTitle?>()
+
+    private class Entry(val title: AvailableTitle?, val at: Long)
+
+    private const val STORE = "digital_availability"
+    private const val KEY = "entries"
+    private const val AVAILABLE_TTL_MS = 24L * 60 * 60 * 1000
+    private const val UNAVAILABLE_TTL_MS = 6L * 60 * 60 * 1000
+    private const val MAX_ENTRIES = 1200
+    private val cache = HashMap<String, Entry>().also { loadInto(it) }
+
+    /** "key|imdb|date|at" lines; an empty imdb means "checked, not available yet". */
+    private fun loadInto(into: HashMap<String, Entry>) {
+        MusicStorage.getString(STORE, KEY)?.lineSequence()?.forEach { line ->
+            val p = line.split('|')
+            if (p.size < 4) return@forEach
+            val at = p[3].toLongOrNull() ?: return@forEach
+            into[p[0]] = Entry(if (p[1].isBlank()) null else AvailableTitle(p[1], p[2].ifBlank { null }), at)
+        }
+    }
+
+    /** Writes what has been learned to the device, so the next launch doesn't ask about the same titles again. */
+    suspend fun persist() {
+        val text = cacheLock.withLock {
+            cache.entries.sortedByDescending { it.value.at }.take(MAX_ENTRIES)
+                .joinToString("\n") { (k, e) -> "$k|${e.title?.imdbId.orEmpty()}|${e.title?.digitalDate.orEmpty()}|${e.at}" }
+        }
+        MusicStorage.putString(STORE, KEY, text)
+    }
 
     /** The viewer's two-letter country, from the device language ("en-CA" -> "CA"); the US when it isn't known. */
     fun region(): String {
@@ -44,10 +73,16 @@ object DigitalAvailability {
     /** The title's availability, or null when it can't be watched at home yet. */
     suspend fun check(mediaType: String, tmdbId: Int): AvailableTitle? {
         val key = "$mediaType:$tmdbId"
-        cacheLock.withLock { if (cache.containsKey(key)) return cache[key] }
+        val now = LiveTvClock.nowMs()
+        cacheLock.withLock {
+            cache[key]?.let { e ->
+                val ttl = if (e.title != null) AVAILABLE_TTL_MS else UNAVAILABLE_TTL_MS
+                if (now - e.at < ttl) return e.title
+            }
+        }
         // A lookup that fails (no network) throws and is not remembered, so it is asked again next time.
         val result = runCatching { load(mediaType, tmdbId) }.getOrElse { return null }
-        cacheLock.withLock { cache[key] = result }
+        cacheLock.withLock { cache[key] = Entry(result, now) }
         return result
     }
 

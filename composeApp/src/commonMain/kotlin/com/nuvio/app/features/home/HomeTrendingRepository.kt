@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -25,17 +27,28 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
+/** One curated row: a title and what is in it. */
+data class CuratedRow(val key: String, val title: String, val items: List<MetaPreview>)
+
 data class HomeTrendingState(
-    /** Titles not out yet, soonest first. */
+    /** Films whose digital release is still ahead, soonest first. */
     val comingSoon: List<MetaPreview> = emptyList(),
     val topMovies: List<MetaPreview> = emptyList(),
     val topShows: List<MetaPreview> = emptyList(),
-    val isLoading: Boolean = false,
+    /** The rest of Home's curated lists, in the order they are shown. */
+    val rows: List<CuratedRow> = emptyList(),
+    /** True once the first load has finished, whether or not it found anything. */
+    val loadedOnce: Boolean = false,
 )
 
 /**
- * The trending rows on Home, all from TMDB: films about to reach digital, and today's top ten movies and shows.
- * Everything here can be watched at home. Refreshed a few times a day.
+ * Home's own lists, the same for every user and built from TMDB rather than from whichever catalog addons a
+ * person has installed. Everything in them can be watched at home today (see [DigitalAvailability]); the one
+ * exception, Coming to Digital, is by definition what is about to be.
+ *
+ * Order, newest and most relevant first: Top 10 Movies, Top 10 Shows, Coming to Digital, then New on Digital,
+ * Trending Movies, Trending Series, New Series, Popular Movies, Popular Series, and Top Rated Movies and Series.
+ * A title appears in only one of these rows, so they don't repeat one another.
  */
 object HomeTrendingRepository {
     private const val MAX_AGE_MS = 3L * 60 * 60 * 1000
@@ -43,6 +56,7 @@ object HomeTrendingRepository {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val permits = Semaphore(10)
     private val _state = MutableStateFlow(HomeTrendingState())
     val state: StateFlow<HomeTrendingState> = _state.asStateFlow()
     private var loadedAtMs = 0L
@@ -51,30 +65,56 @@ object HomeTrendingRepository {
     fun ensureLoaded() {
         if (job?.isActive == true) return
         val s = _state.value
-        val hasData = s.comingSoon.isNotEmpty() || s.topMovies.isNotEmpty()
-        if (hasData && LiveTvClock.nowMs() - loadedAtMs < MAX_AGE_MS) return
-        _state.value = s.copy(isLoading = !hasData)
+        if (s.loadedOnce && s.topMovies.isNotEmpty() && LiveTvClock.nowMs() - loadedAtMs < MAX_AGE_MS) return
         job = scope.launch {
-            val fresh = runCatching { fetchAll() }.getOrNull()
-            if (fresh != null && (fresh.comingSoon.isNotEmpty() || fresh.topMovies.isNotEmpty())) {
-                _state.value = fresh
-                loadedAtMs = LiveTvClock.nowMs()
-            } else {
-                _state.value = _state.value.copy(isLoading = false)
-            }
+            runCatching { load() }
+            _state.value = _state.value.copy(loadedOnce = true)
+            runCatching { DigitalAvailability.persist() }
         }
     }
 
-    private suspend fun fetchAll(): HomeTrendingState = coroutineScope {
-        val soon = async { comingToDigital() }
-        val movies = async { trendingAvailable("movie", "day", limit = 10) }
-        val shows = async { trendingAvailable("tv", "day", limit = 10) }
-        HomeTrendingState(
-            comingSoon = soon.await(),
-            topMovies = movies.await(),
-            topShows = shows.await(),
-            isLoading = false,
+    private suspend fun load() = coroutineScope {
+        val today = CurrentDateProvider.todayIsoDate()
+        val region = DigitalAvailability.region()
+
+        // First the rows at the top of the page, so they appear before the rest has finished.
+        val movies = async { available("trending/movie/day", emptyMap(), "movie", 10) }
+        val shows = async { available("trending/tv/day", emptyMap(), "tv", 10) }
+        val soon = async { comingToDigital(today, region) }
+        val topMovies = movies.await()
+        val topShows = shows.await()
+        _state.value = _state.value.copy(topMovies = topMovies, topShows = topShows)
+        _state.value = _state.value.copy(comingSoon = soon.await())
+
+        val digitalNow = mapOf(
+            "region" to region, "with_release_type" to "4",
+            "release_date.gte" to today.plusDays(-45), "release_date.lte" to today, "sort_by" to "popularity.desc",
         )
+        val newShows = mapOf(
+            "first_air_date.gte" to today.plusDays(-120), "first_air_date.lte" to today,
+            "sort_by" to "popularity.desc", "without_genres" to "10767,10763",
+        )
+        val wanted = 14
+        val specs = listOf(
+            Triple("new-digital", "New on Digital", suspend { available("discover/movie", digitalNow, "movie", wanted + 10) }),
+            Triple("trending-movies", "Trending Movies", suspend { available("trending/movie/week", emptyMap(), "movie", wanted + 10) }),
+            Triple("trending-series", "Trending Series", suspend { available("trending/tv/week", emptyMap(), "tv", wanted + 10) }),
+            Triple("new-series", "New Series", suspend { available("discover/tv", newShows, "tv", wanted + 10) }),
+            Triple("popular-movies", "Popular Movies", suspend { available("movie/popular", emptyMap(), "movie", wanted + 10) }),
+            Triple("popular-series", "Popular Series", suspend { available("tv/popular", emptyMap(), "tv", wanted + 10) }),
+            Triple("top-rated-movies", "Top Rated Movies", suspend { available("movie/top_rated", emptyMap(), "movie", wanted + 10) }),
+            Triple("top-rated-series", "Top Rated Series", suspend { available("tv/top_rated", emptyMap(), "tv", wanted + 10) }),
+        )
+        val fetched = specs.map { (key, title, fetch) -> async { Triple(key, title, runCatching { fetch() }.getOrDefault(emptyList())) } }.awaitAll()
+
+        // Each title shows once down the page: a later row skips anything an earlier one (or a Top 10) already has.
+        val seen = (topMovies + topShows).mapTo(HashSet()) { it.id }
+        val rows = fetched.mapNotNull { (key, title, items) ->
+            val fresh = items.filter { seen.add(it.id) }.take(wanted)
+            if (fresh.size >= 4) CuratedRow(key, title, fresh) else null
+        }
+        _state.value = _state.value.copy(rows = rows)
+        loadedAtMs = LiveTvClock.nowMs()
     }
 
     private suspend fun results(endpoint: String, query: Map<String, String>): List<JsonObject> {
@@ -86,30 +126,43 @@ object HomeTrendingRepository {
         return arr.mapNotNull { it as? JsonObject }
     }
 
+    /** A TMDB list narrowed to what can be watched at home, in the list's own order, with the ids the app opens titles by. */
+    private suspend fun available(endpoint: String, query: Map<String, String>, mediaType: String, limit: Int): List<MetaPreview> {
+        val picks = results(endpoint, query)
+            .filter { it.str("poster_path") != null }
+            // Late-night and news shows chart every day and say nothing about what is worth watching.
+            .filterNot { o -> (o["genre_ids"] as? JsonArray).orEmpty().any { (it as? JsonPrimitive)?.intOrNull in TALK_AND_NEWS } }
+            .take(limit * 2)
+        return coroutineScope {
+            picks.map { o ->
+                async {
+                    val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
+                    val found = permits.withPermit { DigitalAvailability.check(mediaType, tmdbId) } ?: return@async null
+                    o.toPreview(found.imdbId, mediaType == "tv")
+                }
+            }.awaitAll().filterNotNull().take(limit)
+        }
+    }
+
     /**
-     * Movies whose digital release (streaming, rent or buy) is still to come, soonest first: what the
-     * viewer can look forward to watching at home, not what is only in cinemas.
+     * Films whose digital release (streaming, rent or buy) is still to come, soonest first: what the viewer
+     * can look forward to watching at home, not what is only in cinemas.
      */
-    private suspend fun comingToDigital(): List<MetaPreview> {
-        val region = DigitalAvailability.region()
-        val today = CurrentDateProvider.todayIsoDate()
+    private suspend fun comingToDigital(today: String, region: String): List<MetaPreview> {
         val picks = results(
             "discover/movie",
             mapOf(
-                "region" to region,
-                "with_release_type" to "4",
-                "release_date.gte" to tomorrow(today),
-                "release_date.lte" to today.plusDays(90),
-                "sort_by" to "popularity.desc",
-                "include_adult" to "false",
+                "region" to region, "with_release_type" to "4",
+                "release_date.gte" to today.plusDays(1), "release_date.lte" to today.plusDays(90),
+                "sort_by" to "popularity.desc", "include_adult" to "false",
             ),
         ).filter { it.str("backdrop_path") != null && it.str("overview") != null }.take(18)
         return coroutineScope {
             picks.map { o ->
                 async {
                     val id = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
-                    val date = DigitalAvailability.digitalReleaseDate(id) ?: return@async null
-                    // Only dates still ahead: a movie whose digital release has arrived belongs on the available rows.
+                    val date = permits.withPermit { DigitalAvailability.digitalReleaseDate(id) } ?: return@async null
+                    // A date that has already arrived belongs on the available rows instead.
                     if (date <= today) return@async null
                     o.toPreview(id = "tmdb:$id", tv = false)?.copy(rawReleaseDate = date)
                 }
@@ -117,28 +170,7 @@ object HomeTrendingRepository {
         }
     }
 
-    /** Trending titles that can be watched at home today, in trending order, with the ids the app opens them by. */
-    private suspend fun trendingAvailable(mediaType: String, window: String, limit: Int): List<MetaPreview> {
-        val picks = results("trending/$mediaType/$window", emptyMap())
-            .filter { it.str("poster_path") != null && (mediaType != "all" || it.str("media_type") in setOf("movie", "tv")) }
-            // Late-night and news shows chart every day and say nothing about what is worth watching.
-            .filterNot { o -> (o["genre_ids"] as? JsonArray).orEmpty().any { (it as? JsonPrimitive)?.intOrNull in TALK_AND_NEWS } }
-            .take(limit * 3)
-        return coroutineScope {
-            picks.map { o ->
-                async {
-                    val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
-                    val tv = (o.str("media_type") ?: if (mediaType == "tv") "tv" else "movie") == "tv"
-                    val available = DigitalAvailability.check(if (tv) "tv" else "movie", tmdbId) ?: return@async null
-                    o.toPreview(available.imdbId, tv)
-                }
-            }.awaitAll().filterNotNull().take(limit)
-        }
-    }
-
-    private fun tomorrow(today: String): String = today.plusDays(1)
-
-    /** ISO date arithmetic, enough for "tomorrow" and "ninety days out". */
+    /** ISO date arithmetic, enough for "45 days ago" and "ninety days out". */
     private fun String.plusDays(days: Int): String {
         val (y, m, d) = split("-").map { it.toInt() }
         var year = y; var month = m; var day = d + days
@@ -148,6 +180,7 @@ object HomeTrendingRepository {
             else -> if (yr % 4 == 0 && (yr % 100 != 0 || yr % 400 == 0)) 29 else 28
         }
         while (day > dim(year, month)) { day -= dim(year, month); month++; if (month > 12) { month = 1; year++ } }
+        while (day < 1) { month--; if (month < 1) { month = 12; year-- }; day += dim(year, month) }
         return "${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
     }
 
