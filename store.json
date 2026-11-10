@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.6.11",
+          "buildVersion": "154",
+          "date": "2026-11-10T08:54:47Z",
+          "localizedDescription": "- feature/subtitle shadow outline blur (#356) @3l-franco\r\n- perf(ios): free more app memory before playback on iPhones @luqmanfadlli\r\n- perf(ios): lighter mpv setup under the iPhone jetsam limit @luqmanfadlli\r\n- fix(mdblist): reuse progress and watched lists until a remap changes them @tapframe\r\n- fix(auth): stay signed in when session refresh fails @tapframe\r\n- fix(player): center opening overlay backdrop on tall screens (#2585) @yvngjoon\r\n- fix(player): show mpv error details on the error screen @tapframe\r\n- fix(autosync): allow AutoSync without a preferred language, enable forced subs and AutoSync by default (#2578) @skoruppa\r\n- feat(hero): smart horizontal framing for cropped backdrops (#2538) @skoruppa\r\n- Add and update Bulgarian strings in strings.xml (#2576) @viiktr\r\n- i18n: harmonize French wording with Nuvio TV (#2575) @SK-Gits\r\n- fix(autosync): search further when a restored subtitle does not fit (#2537) @skoruppa",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.11-beta/nuvio-0.6.11-enhanced-release.ipa",
+          "size": 75396411,
+          "sha256": "dd1fae561b4862a40534fd2ad97c8a461986b27b8a4f2e58eac0bb8208bfc188",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.10",
           "buildVersion": "153",
           "date": "2026-11-09T07:10:24Z",
