@@ -1,6 +1,6 @@
 name: Auto-update from upstream
 
-# Every few hours: if luqmanfadlli/NuvioMobile-Enhanced has a newer release tag,
+# Every hour: if luqmanfadlli/NuvioMobile-Enhanced has a newer release tag,
 # merge it into "enhanced" (keeping our own changes) and start a Release IPA build.
 # "Publish IPA for Feather" then publishes the finished IPA.
 #
@@ -10,7 +10,7 @@ name: Auto-update from upstream
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       self_test:
