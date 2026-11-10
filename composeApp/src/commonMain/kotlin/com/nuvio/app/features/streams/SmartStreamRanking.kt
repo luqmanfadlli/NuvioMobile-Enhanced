@@ -59,12 +59,12 @@ object SmartStreamRanking {
         when {
             lines <= 800 -> { low = 1.5; high = 5.0 }
             lines <= 1300 -> { low = 4.0; high = 12.0 }
-            lines <= 1700 -> { low = 6.0; high = 18.0 }
+            lines <= 1700 -> { low = 6.0; high = 25.0 }
             else -> { low = 12.0; high = 40.0 }
         }
         if (saveData) {
             low = min(low, 2.5)
-            high = min(high, 5.0)
+            high = min(high, 6.0)
         }
         return SmartTarget(lines, explicitLimit, low, high, saveData)
     }
@@ -100,7 +100,7 @@ object SmartStreamRanking {
             mbps < target.sweetLowMbps -> 10.0 * mbps / target.sweetLowMbps
             mbps <= target.sweetHighMbps -> 10.0
             else -> {
-                val perDoubling = if (target.saveData) 30.0 else 10.0
+                val perDoubling = if (target.saveData) 20.0 else 10.0
                 10.0 - min(40.0, perDoubling * log2(mbps / target.sweetHighMbps))
             }
         }
@@ -194,7 +194,7 @@ object SmartStreamRanking {
         }
         info.resolution?.let { resolution ->
             if (resolution.lines > target.lines) {
-                add("${resolution.label}; your screen shows about ${device.videoLines} lines")
+                add("${resolution.label}, sharpest for this screen (about ${device.videoLines} lines)")
             } else {
                 add("${resolution.label}, the sharpest within your limit")
             }
