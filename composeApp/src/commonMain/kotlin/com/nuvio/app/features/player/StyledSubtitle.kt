@@ -136,6 +136,7 @@ internal fun StyledSubtitleText(
         )
         val radius = with(density) { (style.appearance.backgroundRadius.dp * scale).toPx() }
         val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
+        val shadowOpacity = style.appearance.shadowOpacity.coerceIn(0, 100) / 100f
 
         Box(
             Modifier.requiredWidth(boxWidth)
@@ -155,9 +156,39 @@ internal fun StyledSubtitleText(
                 )
             }
 
+            if (style.appearance.shadowEnabled && shadowOpacity > 0f) {
+                Canvas(Modifier.fillMaxSize()) {
+                    // Tight, dense shadow gives the opacity control real visual weight.
+                    drawText(
+                        layout,
+                        color = Color.Transparent,
+                        topLeft = origin,
+                        drawStyle = Fill,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = shadowOpacity),
+                            offset = Offset(shadowSize * 0.55f, shadowSize * 0.55f),
+                            blurRadius = (shadowSize * 0.35f).coerceAtLeast(0.5f),
+                        ),
+                    )
+                    // A wider, lighter pass keeps the shadow soft without washing out its core.
+                    drawText(
+                        layout,
+                        color = Color.Transparent,
+                        topLeft = origin,
+                        drawStyle = Fill,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = shadowOpacity * 0.45f),
+                            offset = Offset(shadowSize, shadowSize),
+                            blurRadius = shadowSize * 1.8f,
+                        ),
+                    )
+                }
+            }
+
             if (outlineEnabled) {
+                val outlineBlurOpacity = subtitleOutlineBlurOpacity(outlineBlur)
                 val outlineColor = style.outlineColor.copy(
-                    alpha = style.outlineColor.alpha * style.textColor.alpha,
+                    alpha = style.outlineColor.alpha * style.textColor.alpha * outlineBlurOpacity,
                 )
                 if (outlineBlur > 0) {
                     if (useNativeBlur) {
@@ -213,17 +244,7 @@ internal fun StyledSubtitleText(
                     color = style.textColor,
                     topLeft = origin,
                     drawStyle = Fill,
-                    shadow = if (style.appearance.shadowEnabled) {
-                        Shadow(
-                            color = Color.Black.copy(
-                                alpha = style.appearance.shadowOpacity / 100f * style.textColor.alpha,
-                            ),
-                            offset = Offset(shadowSize, shadowSize),
-                            blurRadius = shadowSize * 2,
-                        )
-                    } else {
-                        Shadow.None
-                    },
+                    shadow = Shadow.None,
                 )
             }
         }

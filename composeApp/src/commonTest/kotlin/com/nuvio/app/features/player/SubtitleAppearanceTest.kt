@@ -31,21 +31,28 @@ class SubtitleAppearanceTest {
     }
 
     @Test
+    fun outlineBlurReducesInkDensityAsSoftnessIncreases() {
+        assertEquals(1f, subtitleOutlineBlurOpacity(0), 0.0001f)
+        assertEquals(1f / 1.8f, subtitleOutlineBlurOpacity(2), 0.0001f)
+        assertEquals(1f / 5f, subtitleOutlineBlurOpacity(10), 0.0001f)
+    }
+
+    @Test
     fun outlineBlurUsesIndependentLibassHorizontalAndVerticalScales() {
         assertEquals(0f, subtitleOutlineBlurSigmaXPx(0, 1280f))
         assertEquals(0f, subtitleOutlineBlurSigmaYPx(0, 720f))
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaXPx(1, 1280f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaYPx(1, 720f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaXPx(1, 1920f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 1.5f, subtitleOutlineBlurSigmaYPx(1, 1080f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 3f, subtitleOutlineBlurSigmaXPx(1, 3840f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 3f, subtitleOutlineBlurSigmaYPx(1, 2160f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaXPx(10, 1280f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaYPx(10, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE, subtitleOutlineBlurSigmaXPx(1, 1280f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE, subtitleOutlineBlurSigmaYPx(1, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 1.5f, subtitleOutlineBlurSigmaXPx(1, 1920f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 1.5f, subtitleOutlineBlurSigmaYPx(1, 1080f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 3f, subtitleOutlineBlurSigmaXPx(1, 3840f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 3f, subtitleOutlineBlurSigmaYPx(1, 2160f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 10f, subtitleOutlineBlurSigmaXPx(10, 1280f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 10f, subtitleOutlineBlurSigmaYPx(10, 720f), 0.0001f)
         assertEquals(0f, subtitleOutlineBlurSigmaXPx(-1, 1280f))
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * 10f, subtitleOutlineBlurSigmaYPx(11, 720f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaXPx(1, 0f), 0.0001f)
-        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR, subtitleOutlineBlurSigmaYPx(1, Float.NaN), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE * 10f, subtitleOutlineBlurSigmaYPx(11, 720f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE, subtitleOutlineBlurSigmaXPx(1, 0f), 0.0001f)
+        assertEquals(SUBTITLE_BLUR_SIGMA_FACTOR * SUBTITLE_BLUR_SOFTNESS_SCALE, subtitleOutlineBlurSigmaYPx(1, Float.NaN), 0.0001f)
     }
 
     @Test
@@ -73,6 +80,9 @@ class SubtitleAppearanceTest {
         assertTrue(blurOnly.usesStyledOverlay)
         assertFalse(blurOnly.requiresComposeStyledOverlay)
         assertEquals(4, blurOnly.mpvNativeOutlineBlurLevel)
+        assertEquals(6f, blurOnly.mpvNativeOutlineBlurAmount)
+        val maximumBlur = blurOnly.copy(appearance = blurOnly.appearance.copy(outlineBlur = 10))
+        assertEquals(15f, maximumBlur.mpvNativeOutlineBlurAmount)
 
         val customFont = blurOnly.copy(appearance = blurOnly.appearance.copy(fontId = "serif"))
         assertTrue(customFont.requiresComposeStyledOverlay)
@@ -80,6 +90,7 @@ class SubtitleAppearanceTest {
 
         val outlineOff = blurOnly.copy(outlineEnabled = false)
         assertEquals(0, outlineOff.mpvNativeOutlineBlurLevel)
+        assertEquals(0f, outlineOff.mpvNativeOutlineBlurAmount)
         assertEquals(4, outlineOff.appearance.outlineBlur)
 
         val zeroWidth = blurOnly.copy(outlineWidth = 0)
