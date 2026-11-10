@@ -5,6 +5,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.uikit.OnFocusBehavior
 import androidx.compose.ui.window.ComposeUIViewController
 import com.nuvio.app.core.ui.LocalFold
+import com.nuvio.app.core.ui.LocalFoldRailPadding
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.NativeProfileSwitcherController
 import com.nuvio.app.features.profiles.ProfileBiometricAuth
@@ -96,7 +97,10 @@ fun AppGateViewController(
         opaque = false
     },
     content = {
-        CompositionLocalProvider(LocalVerticalBarPadding provides verticalBar.padding) {
+        CompositionLocalProvider(
+        LocalVerticalBarPadding provides verticalBar.padding,
+        LocalFoldRailPadding provides verticalBar.rail,
+    ) {
             AppGateOverlay(
                 onActivate = { tab -> onActivate(tab.name) },
                 onAppReady = onAppReady,
@@ -123,6 +127,7 @@ private fun nuvioComposeViewController(
         content = {
             CompositionLocalProvider(
                 LocalVerticalBarPadding provides verticalBar.padding,
+                LocalFoldRailPadding provides verticalBar.rail,
                 LocalFold provides hinge.fold,
                 content = content,
             )

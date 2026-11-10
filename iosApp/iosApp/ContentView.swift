@@ -59,6 +59,7 @@ final class RootComposeViewController: UIViewController {
     private let hinge: Hinge?
     private let onTabBarControllerAvailable: ((UITabBarController) -> Void)?
     private var immersiveSystemUIObserver: NSObjectProtocol?
+    private var foldRailObserver: NSObjectProtocol?
     private let verticalBar: VerticalBar?
     private var leadingConstraint: NSLayoutConstraint?
     private var trailingConstraint: NSLayoutConstraint?
@@ -125,6 +126,14 @@ final class RootComposeViewController: UIViewController {
         }
         contentController.didMove(toParent: self)
 
+        foldRailObserver = NotificationCenter.default.addObserver(
+            forName: NuvioFoldPosture.railInsetDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateVerticalBar()
+        }
+
         immersiveSystemUIObserver = NotificationCenter.default.addObserver(
             forName: nuvioPlayerImmersiveSystemUIVisibilityDidChange,
             object: nil,
@@ -137,6 +146,9 @@ final class RootComposeViewController: UIViewController {
     deinit {
         if let immersiveSystemUIObserver {
             NotificationCenter.default.removeObserver(immersiveSystemUIObserver)
+        }
+        if let foldRailObserver {
+            NotificationCenter.default.removeObserver(foldRailObserver)
         }
     }
 
@@ -155,6 +167,13 @@ final class RootComposeViewController: UIViewController {
 
     private func updateFold() {
         guard let hinge else { return }
+        #if DEBUG
+        if NuvioFoldPosture.simulated {
+            let middle = view.bounds.height / 2
+            hinge.update(top: Double(middle - 12), bottom: Double(middle + 12))
+            return
+        }
+        #endif
         guard #available(iOS 27.1, *), isHalfOpen,
               let fold = view.reservedRegions(kind: .division).first(where: { $0.frame.width > $0.frame.height })
         else {
@@ -166,11 +185,13 @@ final class RootComposeViewController: UIViewController {
 
     private func updateVerticalBar() {
         let insets = verticalBarInsets
+        let rail = NuvioFoldPosture.shared.railInset
         if let verticalBar {
-            verticalBar.update(start: Double(insets.leading), end: Double(insets.trailing))
+            verticalBar.update(start: Double(insets.leading), end: Double(insets.trailing + rail))
+            verticalBar.updateRail(rail: Double(rail))
         } else {
             leadingConstraint?.constant = insets.leading
-            trailingConstraint?.constant = -insets.trailing
+            trailingConstraint?.constant = -(insets.trailing + rail)
         }
     }
 
@@ -1952,6 +1973,15 @@ private struct NativeModeSwitcherView: View {
 struct NativeNavContentView: View {
     @StateObject private var appCoordinator = AppNavigationCoordinator()
     @StateObject private var iconStore = NativeTabIconStore()
+    @ObservedObject private var foldPosture = NuvioFoldPosture.shared
+
+    /// iPhone Duo half-open: the bottom bar becomes a trailing rail. Never true on regular iPhones.
+    private var showsFoldRail: Bool {
+        foldPosture.isHalfOpen &&
+            appCoordinator.usesGlassTabBarOverlay &&
+            appCoordinator.isAppReady &&
+            appCoordinator.isSelectedTabAtRoot
+    }
 
     private var usesNativeTabBar: Bool {
         let idiom = UIDevice.current.userInterfaceIdiom
@@ -2085,7 +2115,10 @@ struct NativeNavContentView: View {
             appCoordinator.tabBarBehavior == .autoHide && appCoordinator.experienceMode != .sports ? .onScrollDown : .never
         )
         .overlay(alignment: .bottom) {
-            if appCoordinator.usesGlassTabBarOverlay &&
+            if showsFoldRail {
+                NuvioFoldTabRail(appCoordinator: appCoordinator, iconStore: iconStore)
+                    .ignoresSafeArea(.all)
+            } else if appCoordinator.usesGlassTabBarOverlay &&
                 appCoordinator.isAppReady &&
                 appCoordinator.isSelectedTabAtRoot {
                 GeometryReader { proxy in
@@ -2100,6 +2133,11 @@ struct NativeNavContentView: View {
             }
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        .background(NuvioFoldPostureReader().ignoresSafeArea())
+        .onAppear { NuvioFoldPosture.shared.setRailVisible(showsFoldRail) }
+        .onChange(of: showsFoldRail) { visible in
+            NuvioFoldPosture.shared.setRailVisible(visible)
+        }
     }
 
     @ViewBuilder
