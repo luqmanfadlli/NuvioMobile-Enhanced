@@ -82,6 +82,7 @@ import com.nuvio.app.core.ui.rememberDynamicArtworkBackgroundEnabled
 import com.nuvio.app.core.ui.PrefetchArtworkDominantColors
 import com.nuvio.app.core.ui.focusedAlignment
 import com.nuvio.app.core.ui.rememberBackdropFocusState
+import com.nuvio.app.core.ui.revealAlpha
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.ScreenActivityEffect
@@ -463,7 +464,7 @@ internal fun HomeHeroSection(
                                         .graphicsLayer {
                                             val offset = heroPageOffset(pagerState, layer.page)
                                             val visibility = (1f - abs(offset)).coerceIn(0f, 1f)
-                                            alpha = when {
+                                            alpha = backdropFocus.revealAlpha * when {
                                                 isCurrentLayer -> visibility
                                                 visibility > 0f -> 1f
                                                 else -> 0f
@@ -480,6 +481,7 @@ internal fun HomeHeroSection(
                                     ),
                                     contentScale = ContentScale.Crop,
                                     onSuccess = { state -> backdropFocus.onImageLoaded(state.result.image) },
+                                    onError = { backdropFocus.onImageFailed() },
                                 )
                             }
                         }
