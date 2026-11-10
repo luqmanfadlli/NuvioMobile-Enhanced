@@ -6,6 +6,11 @@ on:
     branches: [enhanced]
   workflow_dispatch:
 
+# Simkl AUTH V2 client ID ("Mobile, desktop & browser apps"). It is public (sent in every API
+# URL), so it is pinned here and overrides any SIMKL_CLIENT_ID in NUVIO_LOCAL_PROPERTIES_BASE64.
+env:
+  SIMKL_CLIENT_ID: "4b4cf9e56b4566b1e1e0e5f54e9adda72a41aba849794eca208092c09f46c4aa"
+
 permissions:
   contents: read
 
@@ -41,6 +46,10 @@ jobs:
           else
             touch local.properties
           fi
+          # Always use the pinned Simkl AUTH V2 client ID instead of the one in the secret.
+          { grep -Ev '^[[:space:]]*SIMKL_CLIENT_ID[[:space:]]*=' local.properties || true
+            printf 'SIMKL_CLIENT_ID=%s\n' "${SIMKL_CLIENT_ID}"
+          } > local.properties.tmp && mv local.properties.tmp local.properties
 
       - name: Set up Rust
         run: |

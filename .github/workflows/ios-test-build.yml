@@ -22,6 +22,11 @@ on:
           - skip-devirtualization
           - skip-both
 
+# Simkl AUTH V2 client ID ("Mobile, desktop & browser apps"). It is public (sent in every API
+# URL), so it is pinned here and overrides any SIMKL_CLIENT_ID in NUVIO_LOCAL_PROPERTIES_BASE64.
+env:
+  SIMKL_CLIENT_ID: "4b4cf9e56b4566b1e1e0e5f54e9adda72a41aba849794eca208092c09f46c4aa"
+
 permissions:
   contents: read
 
@@ -72,10 +77,17 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
 
       - name: Configure runtime properties
-        if: env.RELEASE_PROPERTIES_BASE64 != ''
         run: |
-          printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
-          sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          if [[ -n "${RELEASE_PROPERTIES_BASE64}" ]]; then
+            printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
+            sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          else
+            touch local.properties
+          fi
+          # Always use the pinned Simkl AUTH V2 client ID instead of the one in the secret.
+          { grep -Ev '^[[:space:]]*SIMKL_CLIENT_ID[[:space:]]*=' local.properties || true
+            printf 'SIMKL_CLIENT_ID=%s\n' "${SIMKL_CLIENT_ID}"
+          } > local.properties.tmp && mv local.properties.tmp local.properties
           if [[ -n "${CONTRIBUTIONS_URL}" ]]; then
             printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}" >> local.properties
           fi
