@@ -123,10 +123,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git merge --no-edit -m "Merge upstream ${TAG} into ${BRANCH}" "${SHA}"; then
-            git diff --name-only --diff-filter=U | sed 's/^/Conflict: /'
-            git merge --abort
-            echo "::error::Upstream ${TAG} conflicts with our changes. Nothing was pushed; this needs a manual merge."
-            exit 1
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            if [[ "${conflicts}" == "README.md" ]]; then
+              # Our README is our own; keep it whatever upstream changes.
+              git checkout --ours README.md
+              git add README.md
+              git commit --no-edit
+            else
+              printf '%s\n' "${conflicts}" | sed 's/^/Conflict: /'
+              git merge --abort
+              echo "::error::Upstream ${TAG} conflicts with our changes. Nothing was pushed; this needs a manual merge."
+              exit 1
+            fi
           fi
           git push origin "HEAD:${BRANCH}"
           {
