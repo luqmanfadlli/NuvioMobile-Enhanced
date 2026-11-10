@@ -35,6 +35,21 @@ jobs:
             echo "::error::The AUTO_UPDATE_TOKEN secret is missing. Add it in Settings > Secrets and variables > Actions."
             exit 1
           fi
+          # Classic tokens report their scopes; fine-grained tokens report none.
+          if ! headers="$(GH_TOKEN="${AUTO_UPDATE_TOKEN}" gh api -i "repos/${GITHUB_REPOSITORY}" 2>&1)"; then
+            echo "::error::AUTO_UPDATE_TOKEN was rejected by GitHub. It may be expired or revoked; make a new one."
+            exit 1
+          fi
+          scopes="$(printf '%s\n' "${headers}" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-oauth-scopes"{print $2}')"
+          if [[ -n "${scopes}" ]]; then
+            echo "Token scopes: ${scopes}"
+            for needed in repo workflow; do
+              if ! tr ', ' '\n\n' <<<"${scopes}" | grep -qx "${needed}"; then
+                echo "::error::AUTO_UPDATE_TOKEN is missing the '${needed}' scope."
+                exit 1
+              fi
+            done
+          fi
 
       - name: Check out ${{ env.BRANCH }}
         uses: actions/checkout@v6
@@ -42,6 +57,9 @@ jobs:
           ref: ${{ env.BRANCH }}
           fetch-depth: 0
           token: ${{ secrets.AUTO_UPDATE_TOKEN }}
+
+      - name: Check push access
+        run: git push --dry-run origin "HEAD:${BRANCH}"
 
       - name: Find newest upstream release
         id: find
