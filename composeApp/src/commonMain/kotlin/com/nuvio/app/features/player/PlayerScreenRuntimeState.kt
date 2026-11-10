@@ -209,6 +209,7 @@ internal class PlayerScreenRuntime(
     var showSpeedPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
     var showChaptersPanel by mutableStateOf(false)
+    var showDiscTitlesPanel by mutableStateOf(false)
     var showLiveChannelsPanel by mutableStateOf(false)
     /** The file's chapters, sorted; empty when it has fewer than two. */
     var chapters by mutableStateOf<List<PlayerChapter>>(emptyList())
@@ -272,7 +273,7 @@ internal class PlayerScreenRuntime(
             showPartyPanel || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal ||
             // Fork panels
             showChaptersPanel || showQualityPanel || showSpeedPanel || showLiveChannelsPanel ||
-            showStreamInfoModal || showUserRatingSheet
+            showDiscTitlesPanel || showStreamInfoModal || showUserRatingSheet
     var partyBehind by mutableStateOf(false)
     var partyBehindMs by mutableStateOf<Long?>(null)
     var partyRateNudge: Float? = null
@@ -333,6 +334,7 @@ internal class PlayerScreenRuntime(
             showSpeedPanel ||
             showEpisodesPanel ||
             showChaptersPanel ||
+            showDiscTitlesPanel ||
             showLiveChannelsPanel ||
             showSubmitIntroModal ||
             showParentalGuide ||

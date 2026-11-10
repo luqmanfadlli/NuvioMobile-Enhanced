@@ -64,6 +64,7 @@ actual fun PlatformPlayerSurface(
     playbackEngine: AndroidPlaybackEngine?,
     animeContent: Boolean,
     useNativeController: Boolean,
+    discPlaybackEnabled: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
