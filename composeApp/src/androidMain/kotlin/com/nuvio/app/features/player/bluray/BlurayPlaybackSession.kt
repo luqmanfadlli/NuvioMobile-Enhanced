@@ -49,14 +49,18 @@ internal class BlurayPlaybackSession(
         if (resolved) return@withLock disc
         resolved = true
         if (!BlurayDiscResolver.isCandidate(sourceUrl)) return@withLock null
-        val timeoutMs = if (BlurayIsoImage.isLikelyIsoUrl(sourceUrl)) ISO_TIMEOUT_MS else FOLDER_TIMEOUT_MS
+        val timeoutMs = when {
+            BlurayIsoImage.isLikelyIsoUrl(sourceUrl) -> ISO_TIMEOUT_MS
+            BlurayDiscResolver.isDiscEntryUrl(sourceUrl) -> ENTRY_TIMEOUT_MS
+            else -> FOLDER_TIMEOUT_MS
+        }
         val found = withTimeoutOrNull(timeoutMs) {
             runInterruptible(Dispatchers.IO) {
                 runCatching { BlurayDiscResolver.resolveBeforePlayback(sourceUrl, metadataFactory) }
                     .onFailure { Log.w(TAG, "disc resolve failed: ${it.javaClass.simpleName}: ${it.message}") }
                     .getOrNull()
             }
-        }
+        } ?: BlurayDiscResolver.singleClipDisc(sourceUrl).takeIf { BlurayDiscResolver.isLikelyBdavM2tsUrl(sourceUrl) }
         adopt(found)
         found
     }
@@ -143,6 +147,7 @@ internal class BlurayPlaybackSession(
     private companion object {
         const val TAG = "BlurayPlayback"
         const val FOLDER_TIMEOUT_MS = 8_000L
+        const val ENTRY_TIMEOUT_MS = 20_000L
         const val ISO_TIMEOUT_MS = 45_000L
     }
 }

@@ -72,6 +72,17 @@ class BlurayDiscResolverTest {
             streams.reduce { a, b -> a + b }
     }
 
+    private val movieObjects: ByteArray by lazy {
+        fun command(head: Int, options: Int, destination: Int): ByteArray =
+            byteArrayOf(head.toByte(), options.toByte(), 0, 0) +
+                byteArrayOf((destination shr 24).toByte(), (destination shr 16).toByte(), (destination shr 8).toByte(), destination.toByte()) +
+                ByteArray(4)
+        val first = byteArrayOf(0, 0, 0, 3) + command(0x22, 0x80, 0) + command(0x50, 0x80, 7) + command(0x22, 0x00, 2)
+        val second = byteArrayOf(0, 0, 0, 2) + command(0x22, 0x81, 3) + command(0x22, 0x80, 0)
+        val body = byteArrayOf(0, 2) + first + second
+        "MOBJ0200".toByteArray() + ByteArray(32) + byteArrayOf(0, 0, 0, body.size.toByte()) + ByteArray(4) + body
+    }
+
     @Before fun start() {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -85,6 +96,16 @@ class BlurayDiscResolverTest {
                 }
                 if (path == "/folder/BDMV/PLAYLIST/") {
                     return MockResponse().setBody(playlists.keys.joinToString("") { "<a href=\"$it\">$it</a>\n" })
+                }
+                if (path.startsWith("/nolist/")) {
+                    if (!path.endsWith("?token=abc")) return MockResponse().setResponseCode(403)
+                    val bare = path.removeSuffix("?token=abc")
+                    if (bare == "/nolist/BDMV/MovieObject.bdmv") return MockResponse().setBody(Buffer().write(movieObjects))
+                    val listed = bare.removePrefix("/nolist/BDMV/PLAYLIST/")
+                    if (listed in setOf("00000.mpls", "00003.mpls")) {
+                        return MockResponse().setBody(Buffer().write(playlists.getValue(listed)))
+                    }
+                    return MockResponse().setResponseCode(404)
                 }
                 val name = path.removePrefix("/disc/BDMV/PLAYLIST/").removePrefix("/folder/BDMV/PLAYLIST/")
                 return playlists[name]?.let { MockResponse().setBody(Buffer().write(it)) } ?: MockResponse().setResponseCode(404)
@@ -137,6 +158,35 @@ class BlurayDiscResolverTest {
         val disc = resolve("00001.m2ts")!!
         assertEquals(listOf("eng", "por") to listOf("por", "eng"), BlurayDiscResolver.titleLanguages(disc.feature, factory))
         assertEquals(emptyList<String>() to emptyList<String>(), BlurayDiscResolver.titleLanguages(disc.titles.last(), factory))
+    }
+
+    @Test fun `an index bdmv url plays the disc it belongs to`() {
+        val disc = BlurayDiscResolver.resolveBeforePlayback(clip("/disc/BDMV/index.bdmv"), factory)!!
+        assertEquals("00000.mpls", disc.feature.name)
+        assertEquals(listOf(clip("/disc/BDMV/STREAM/00001.m2ts"), clip("/disc/BDMV/STREAM/00002.m2ts")), disc.feature.clipUris)
+        assertEquals(listOf("00000.mpls", "00003.mpls", "00002.mpls"), disc.titles.map { it.name })
+    }
+
+    @Test fun `an mpls url plays that playlist and offers the disc's other titles`() {
+        val disc = BlurayDiscResolver.resolveBeforePlayback(clip("/disc/BDMV/PLAYLIST/00003.mpls"), factory)!!
+        assertEquals("00003.mpls", disc.feature.name)
+        assertEquals(listOf(clip("/disc/BDMV/STREAM/00001.m2ts")), disc.feature.clipUris)
+        assertEquals(listOf("00000.mpls", "00003.mpls", "00002.mpls"), disc.titles.map { it.name })
+    }
+
+    @Test fun `without a listing the playlists come from the movie objects, keeping the url's query`() {
+        val disc = BlurayDiscResolver.resolveBeforePlayback(clip("/nolist/BDMV/index.bdmv?token=abc"), factory)!!
+        assertEquals("00000.mpls", disc.feature.name)
+        assertEquals(
+            listOf(clip("/nolist/BDMV/STREAM/00001.m2ts?token=abc"), clip("/nolist/BDMV/STREAM/00002.m2ts?token=abc")),
+            disc.feature.clipUris,
+        )
+        assertEquals(listOf("00000.mpls", "00003.mpls"), disc.titles.map { it.name })
+    }
+
+    @Test fun `movie objects name the playlists their play commands start`() {
+        assertEquals(listOf(0, 3), BlurayDiscResolver.parseMovieObjectPlaylists(movieObjects))
+        assertEquals(emptyList<Int>(), BlurayDiscResolver.parseMovieObjectPlaylists(ByteArray(64)))
     }
 
     @Test fun `titles shorter than a minute or repeating another are left out`() {

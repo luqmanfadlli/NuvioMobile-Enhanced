@@ -52,6 +52,9 @@ internal object BlurayDiscResolver {
     private const val MAX_TITLES = 30
     private val CLIP_PATH = Regex("(?i)/BDMV/(STREAM)/(\\d{5})\\.(m2ts)$")
     private val CLIP_NAME = Regex("(?i)^(\\d{5})\\.m2ts$")
+    private val BDMV_FILE_PATH = Regex("(?i)/(BDMV)/(index\\.bdmv|movieobject\\.bdmv)$")
+    private val MPLS_PATH = Regex("(?i)/(BDMV)/(PLAYLIST)/\\d{5}\\.mpls$")
+    private val CANDIDATE_PLAYLISTS = ((0..19) + (800..819) + (1..9).map { it * 100 }).distinct()
 
     data class ParsedMpls(
         val name: String,
@@ -69,6 +72,13 @@ internal object BlurayDiscResolver {
         return path.endsWith(".m2ts") || path.endsWith(".mts")
     }
 
+    fun isDiscEntryUrl(url: String): Boolean {
+        val path = extractPath(url)
+        return BDMV_FILE_PATH.containsMatchIn(path) || MPLS_PATH.containsMatchIn(path)
+    }
+
+    fun singleClipDisc(url: String): BlurayDisc = singleClip(url)
+
     fun isCandidate(url: String): Boolean =
         BlurayIsoImage.isLikelyIsoUrl(url) || isLikelyBdavM2tsUrl(url) || looksLikeBlurayPath(url)
 
@@ -79,8 +89,14 @@ internal object BlurayDiscResolver {
         toLocalFile(url)?.let { local ->
             resolveLocal(local, url)?.let { return it }
         }
-        if (isHttp(url) && CLIP_PATH.containsMatchIn(extractPath(url))) {
-            probeHttpClipFolder(url, metadataFactory)?.let { return it }
+        if (isHttp(url)) {
+            val path = extractPath(url)
+            when {
+                CLIP_PATH.containsMatchIn(path) -> probeHttpClipFolder(url, metadataFactory)
+                BDMV_FILE_PATH.containsMatchIn(path) -> probeHttpBdmvFile(url, metadataFactory)
+                MPLS_PATH.containsMatchIn(path) -> probeHttpPlaylistFile(url, metadataFactory)
+                else -> null
+            }?.let { return it }
         }
         if (isLikelyBdavM2tsUrl(url)) return singleClip(url)
         return null
@@ -179,39 +195,133 @@ internal object BlurayDiscResolver {
         return disc ?: if (clipMatch != null) singleClip(url) else null
     }
 
+    private class HttpBdmv(private val bdmv: HttpUrl, val upper: Boolean, private val query: String?) {
+        fun child(path: String): HttpUrl? =
+            bdmv.resolve(path)?.let { url -> if (query == null) url else url.newBuilder().encodedQuery(query).build() }
+
+        val playlistDir: HttpUrl? get() = child(if (upper) "PLAYLIST/" else "playlist/")
+
+        fun playlist(name: String): HttpUrl? = child((if (upper) "PLAYLIST/" else "playlist/") + name)
+
+        fun clip(id: String, extension: String = "m2ts"): HttpUrl? = child((if (upper) "STREAM/" else "stream/") + "$id.$extension")
+
+        val movieObjects: List<HttpUrl>
+            get() = listOf("MovieObject.bdmv", "MOVIEOBJECT.BDMV", "movieobject.bdmv").mapNotNull(::child)
+    }
+
     private fun probeHttpClipFolder(url: String, metadataFactory: DataSource.Factory): BlurayDisc? {
         val httpUrl = url.toHttpUrlOrNull() ?: return null
         val match = CLIP_PATH.find(httpUrl.encodedPath) ?: return null
         val (stream, clipId, extension) = match.destructured
-        val playlistDir = if (stream == stream.lowercase(Locale.US)) "playlist" else "PLAYLIST"
-        val playlistDirUrl = httpUrl.resolve("../$playlistDir/") ?: return null
-        val playlists = fetchHttpPlaylists(playlistDirUrl, metadataFactory)
+        val bdmv = HttpBdmv(httpUrl.resolve("../") ?: return null, stream != stream.lowercase(Locale.US), httpUrl.encodedQuery)
+        val playlists = fetchHttpPlaylists(bdmv, metadataFactory)
         if (playlists.isEmpty()) return null
         return buildDisc(playlists, currentClipId = clipId, currentClipUri = url) { id ->
-            if (id == clipId) url else httpUrl.resolve("$id.$extension")?.toString()
+            if (id == clipId) url else bdmv.clip(id, extension)?.toString()
+        }
+    }
+
+    private fun probeHttpBdmvFile(url: String, metadataFactory: DataSource.Factory): BlurayDisc? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        val match = BDMV_FILE_PATH.find(httpUrl.encodedPath) ?: return null
+        val folder = match.groupValues[1]
+        val bdmv = HttpBdmv(httpUrl.resolve("./") ?: return null, folder != folder.lowercase(Locale.US), httpUrl.encodedQuery)
+        val playlists = fetchHttpPlaylists(bdmv, metadataFactory)
+        if (playlists.isEmpty()) {
+            Log.w(TAG, "no playlists found beside ${httpUrl.encodedPath}")
+            return null
+        }
+        return buildDisc(playlists, currentClipId = null) { id -> bdmv.clip(id)?.toString() }
+    }
+
+    private fun probeHttpPlaylistFile(url: String, metadataFactory: DataSource.Factory): BlurayDisc? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        val match = MPLS_PATH.find(httpUrl.encodedPath) ?: return null
+        val folder = match.groupValues[2]
+        val name = httpUrl.pathSegments.lastOrNull().orEmpty()
+        val bdmv = HttpBdmv(httpUrl.resolve("../") ?: return null, folder != folder.lowercase(Locale.US), httpUrl.encodedQuery)
+        val selected = readBytes(metadataFactory, Uri.parse(url), MPLS_BYTES)?.let { parseMpls(name, it) } ?: return null
+        val others = fetchHttpPlaylists(bdmv, metadataFactory, probeCandidates = false)
+            .filterNot { it.name.equals(name, ignoreCase = true) }
+        return buildDisc(listOf(selected) + others, currentClipId = null, preferredFeature = name) { id ->
+            bdmv.clip(id)?.toString()
         }
     }
 
     private fun probeHttpDirectory(url: String, metadataFactory: DataSource.Factory): BlurayDisc? {
         val httpUrl = url.toHttpUrlOrNull() ?: return null
         val rootUrl = if (httpUrl.encodedPath.endsWith("/")) httpUrl else httpUrl.newBuilder().addPathSegment("").build()
-        val playlistDirUrl = rootUrl.resolve("BDMV/PLAYLIST/") ?: return null
-        val streamDirUrl = rootUrl.resolve("BDMV/STREAM/") ?: return null
-        val playlists = fetchHttpPlaylists(playlistDirUrl, metadataFactory)
+        val bdmv = HttpBdmv(rootUrl.resolve("BDMV/") ?: return null, upper = true, query = httpUrl.encodedQuery)
+        val playlists = fetchHttpPlaylists(bdmv, metadataFactory)
         if (playlists.isEmpty()) {
-            Log.w(TAG, "HTTP Blu-ray folder has no .mpls at ${playlistDirUrl.encodedPath}")
+            Log.w(TAG, "HTTP Blu-ray folder has no .mpls at ${bdmv.playlistDir?.encodedPath}")
             return null
         }
-        return buildDisc(playlists, currentClipId = null) { id -> streamDirUrl.resolve("$id.m2ts")?.toString() }
+        return buildDisc(playlists, currentClipId = null) { id -> bdmv.clip(id)?.toString() }
     }
 
-    private fun fetchHttpPlaylists(dir: HttpUrl, metadataFactory: DataSource.Factory): List<ParsedMpls> {
-        val listing = readBytes(metadataFactory, Uri.parse(dir.toString()), LISTING_BYTES) ?: return emptyList()
-        val names = extractPlaylistNames(String(listing, Charsets.UTF_8)).take(MAX_PLAYLISTS)
+    private fun fetchHttpPlaylists(
+        bdmv: HttpBdmv,
+        metadataFactory: DataSource.Factory,
+        probeCandidates: Boolean = true,
+    ): List<ParsedMpls> {
+        val listed = bdmv.playlistDir
+            ?.let { readBytes(metadataFactory, Uri.parse(it.toString()), LISTING_BYTES, quiet = true) }
+            ?.let { extractPlaylistNames(String(it, Charsets.UTF_8)) }
+            .orEmpty()
+        fetchPlaylistNames(bdmv, listed.take(MAX_PLAYLISTS), metadataFactory).takeIf { it.isNotEmpty() }?.let { return it }
+        val fromMovieObjects = bdmv.movieObjects.firstNotNullOfOrNull { url ->
+            readBytes(metadataFactory, Uri.parse(url.toString()), MPLS_BYTES, quiet = true)
+                ?.let(::parseMovieObjectPlaylists)
+                ?.takeIf { it.isNotEmpty() }
+        }.orEmpty()
+        if (fromMovieObjects.isNotEmpty()) {
+            Log.i(TAG, "playlists from movie objects: ${fromMovieObjects.size}")
+            fetchPlaylistNames(bdmv, fromMovieObjects.map(::playlistName), metadataFactory)
+                .takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
+        if (!probeCandidates) return emptyList()
+        return fetchPlaylistNames(bdmv, CANDIDATE_PLAYLISTS.map(::playlistName), metadataFactory)
+    }
+
+    private fun fetchPlaylistNames(bdmv: HttpBdmv, names: List<String>, metadataFactory: DataSource.Factory): List<ParsedMpls> {
         if (names.isEmpty()) return emptyList()
         return parallel(names) { name ->
-            dir.resolve(name)?.let { readBytes(metadataFactory, Uri.parse(it.toString()), MPLS_BYTES) }?.let { parseMpls(name, it) }
+            bdmv.playlist(name)
+                ?.let { readBytes(metadataFactory, Uri.parse(it.toString()), MPLS_BYTES, quiet = true) }
+                ?.let { parseMpls(name, it) }
         }
+    }
+
+    private fun playlistName(number: Int): String = "%05d.mpls".format(Locale.US, number)
+
+    fun parseMovieObjectPlaylists(data: ByteArray): List<Int> {
+        if (data.size < 46 || readAscii(data, 0, 4) != "MOBJ") return emptyList()
+        val objectCount = readUInt16(data, 48)
+        var cursor = 50
+        val out = LinkedHashSet<Int>()
+        repeat(objectCount) {
+            if (cursor + 4 > data.size) return out.toList()
+            val commandCount = readUInt16(data, cursor + 2)
+            cursor += 4
+            repeat(commandCount) {
+                if (cursor + 12 > data.size) return out.toList()
+                val head = data[cursor].toInt() and 0xFF
+                val options = data[cursor + 1].toInt() and 0xFF
+                val operands = head ushr 5
+                val group = (head ushr 3) and 0x3
+                val subGroup = head and 0x7
+                val immediate = options and 0x80 != 0
+                val branch = options and 0x0F
+                if (operands >= 1 && group == 0 && subGroup == 2 && immediate && branch <= 2) {
+                    val playlist = readUInt32(data, cursor + 4)
+                    if (playlist in 0..99_999) out += playlist.toInt()
+                }
+                cursor += 12
+            }
+        }
+        return out.toList()
     }
 
     private fun buildDisc(
@@ -316,7 +426,7 @@ internal object BlurayDiscResolver {
     fun extractPlaylistNames(content: String): List<String> =
         Regex("""(?i)(\d{5}\.mpls)""").findAll(content).map { it.groupValues[1] }.distinct().toList()
 
-    fun readBytes(factory: DataSource.Factory, uri: Uri, maxBytes: Int): ByteArray? {
+    fun readBytes(factory: DataSource.Factory, uri: Uri, maxBytes: Int, quiet: Boolean = false): ByteArray? {
         val source = factory.createDataSource()
         return try {
             source.open(DataSpec.Builder().setUri(uri).setLength(maxBytes.toLong()).build())
@@ -329,7 +439,7 @@ internal object BlurayDiscResolver {
             }
             out.toByteArray()
         } catch (error: Exception) {
-            Log.w(TAG, "read failed for ${uri.lastPathSegment}: ${error.javaClass.simpleName}: ${error.message}")
+            if (!quiet) Log.w(TAG, "read failed for ${uri.lastPathSegment}: ${error.javaClass.simpleName}: ${error.message}")
             null
         } finally {
             runCatching { source.close() }
