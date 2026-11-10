@@ -435,7 +435,7 @@ extension BannerExperienceMode {
     func tabs(showLiveTv: Bool) -> [NuvioAppTab] {
         let ordered: [NuvioAppTab]
         switch self {
-        case .balanced: ordered = [.home, .liveTv, .search, .sports, .library]
+        case .balanced: ordered = [.home, .newHot, .liveTv, .search, .sports, .library]
         case .sports: ordered = [.home, .following, .search, .liveTv, .news]
         case .music: ordered = [.home, .search, .library]
         }
@@ -451,6 +451,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
     case sports = "Sports"
     case music = "Music"
     case following = "Following"
+    case newHot = "NewHot"
     case news = "News"
     case library = "Library"
     case settings = "Settings"
@@ -465,6 +466,8 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
             return "Music"
         case .following:
             return "Following"
+        case .newHot:
+            return "New & Hot"
         case .news:
             return "Discover"
         default:
@@ -481,6 +484,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case "sports": return .sports
         case "music": return .music
         case "following": return .following
+        case "newhot", "new_hot", "new & hot": return .newHot
         case "news": return .news
         case "settings", "profile": return .settings
         default: return nil
@@ -496,6 +500,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case .sports: return "NuvioTabSports"
         case .music: return "NuvioTabMusic"
         case .following: return "NuvioTabFollowing"
+        case .newHot: return "NuvioTabNewHot"
         case .news: return "NuvioTabNews"
         case .settings: return "NuvioTabProfile"
         }
@@ -510,6 +515,7 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
         case .sports: return "soccerball"
         case .music: return "music.note"
         case .following: return "star.fill"
+        case .newHot: return "flame.fill"
         case .news: return "safari.fill"
         case .settings: return "person.crop.circle.fill"
         }
@@ -1021,6 +1027,7 @@ final class AppNavigationCoordinator: ObservableObject {
     let sportsCoordinator = TabNavigationCoordinator()
     let musicCoordinator = TabNavigationCoordinator()
     let followingCoordinator = TabNavigationCoordinator()
+    let newHotCoordinator = TabNavigationCoordinator()
     let newsCoordinator = TabNavigationCoordinator()
     let settingsCoordinator = TabNavigationCoordinator()
     let appGateController = AppGateController()
@@ -1059,7 +1066,7 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     private var allCoordinators: [TabNavigationCoordinator] {
-        [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, sportsCoordinator, musicCoordinator, followingCoordinator, newsCoordinator, settingsCoordinator]
+        [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, sportsCoordinator, musicCoordinator, followingCoordinator, newHotCoordinator, newsCoordinator, settingsCoordinator]
     }
 
     var availableTabs: [NuvioAppTab] {
@@ -1178,6 +1185,7 @@ final class AppNavigationCoordinator: ObservableObject {
         case .sports: return sportsCoordinator
         case .music: return musicCoordinator
         case .following: return followingCoordinator
+        case .newHot: return newHotCoordinator
         case .news: return newsCoordinator
         case .settings: return settingsCoordinator
         }

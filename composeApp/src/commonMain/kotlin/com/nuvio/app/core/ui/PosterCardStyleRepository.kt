@@ -18,7 +18,7 @@ private data class StoredPosterCardStylePreferences(
     val heightDp: Int = DefaultPosterCardHeightDp,
     val cornerRadiusDp: Int = DefaultPosterCardCornerRadiusDp,
     val catalogLandscapeModeEnabled: Boolean = false,
-    val hideLabelsEnabled: Boolean = false,
+    val hideLabelsEnabled: Boolean = true,
     val alwaysShowLandscapeClearlogo: Boolean = false,
 )
 
@@ -27,7 +27,7 @@ data class PosterCardStyleUiState(
     val heightDp: Int = DefaultPosterCardHeightDp,
     val cornerRadiusDp: Int = DefaultPosterCardCornerRadiusDp,
     val catalogLandscapeModeEnabled: Boolean = false,
-    val hideLabelsEnabled: Boolean = false,
+    val hideLabelsEnabled: Boolean = true,
     val alwaysShowLandscapeClearlogo: Boolean = false,
 )
 
@@ -131,6 +131,11 @@ object PosterCardStyleRepository {
         } else {
             PosterCardStyleUiState()
         }
+        // Netflix-style rows: artwork only, names live on the detail page. Applied once to existing settings.
+        if (UiDefaultsMigration.applyOnce("poster_labels_hidden_v1") {
+                _uiState.value = _uiState.value.copy(hideLabelsEnabled = true)
+            }
+        ) persist()
     }
 
     private fun persist() {

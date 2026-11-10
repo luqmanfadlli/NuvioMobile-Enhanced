@@ -1,6 +1,8 @@
 package com.nuvio.app
 
 import nuvio.composeapp.generated.resources.compose_nav_music
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import com.nuvio.app.features.newhot.NewAndHotScreen
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Explore
@@ -203,6 +205,7 @@ internal data class AppTabActions(
     val onOpenPodcasts: () -> Unit = {},
     val onOpenPodcastShow: (Podcast) -> Unit = {},
     val onPersonClick: (id: Int, name: String, photo: String?) -> Unit = { _, _, _ -> },
+    val onHeroPlayClick: ((MetaPreview) -> Unit)? = null,
     val onCheckForUpdatesClick: (() -> Unit)? = null,
     val onTestUpdateBannerClick: (() -> Unit)? = null,
     val onCollectionsSettingsClick: () -> Unit = {},
@@ -243,6 +246,11 @@ internal fun AppTabHost(
         } else if (sportsHome) {
             SportsFocusHome(actions.sportsActions!!, onOpenNews = actions.onOpenNews, onOpenArticle = actions.onOpenArticle, onOpenFollowing = actions.onOpenFollowing, onOpenLive = actions.onOpenLive, modifier = Modifier.fillMaxSize())
         } else when (tab) {
+            AppScreenTab.NewHot -> NewAndHotScreen(
+                onPosterClick = { actions.onPosterClick?.invoke(it) },
+                onPosterLongClick = actions.onPosterLongClick,
+                modifier = Modifier.fillMaxSize(),
+            )
             AppScreenTab.Following -> actions.sportsActions?.let { SportsFocusFollowing(it, actions.onOpenArticle, Modifier.fillMaxSize()) }
             AppScreenTab.News -> DiscoverScreen(
                 onOpenArticle = actions.onOpenArticle,
@@ -260,6 +268,7 @@ internal fun AppTabHost(
                             scrollToTopRequests = requests.homeScrollToTopRequests,
                             onCatalogClick = actions.onCatalogClick,
                             onPosterClick = actions.onPosterClick,
+                            onHeroPlayClick = actions.onHeroPlayClick,
                             onPosterLongClick = actions.onPosterLongClick,
                             onContinueWatchingClick = actions.onContinueWatchingClick,
                             onContinueWatchingLongPress = actions.onContinueWatchingLongPress,
@@ -519,6 +528,12 @@ internal fun TabletFloatingTopBar(
                                     },
                                 )
                             },
+                        )
+                        AppScreenTab.NewHot -> TabletTopPillItem(
+                            label = "New & Hot",
+                            selected = selectedTab == AppScreenTab.NewHot,
+                            onClick = { onTabSelected(AppScreenTab.NewHot) },
+                            icon = { Icon(imageVector = Icons.Rounded.LocalFireDepartment, contentDescription = "New & Hot", modifier = Modifier.size(18.dp), tint = if (selectedTab == AppScreenTab.NewHot) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) },
                         )
                         AppScreenTab.Following -> TabletTopPillItem(
                             label = "Following",

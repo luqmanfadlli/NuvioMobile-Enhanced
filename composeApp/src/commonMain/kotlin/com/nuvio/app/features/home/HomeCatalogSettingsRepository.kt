@@ -37,7 +37,7 @@ data class HomeCatalogSettingsItem(
 internal data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
     val heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
-    val heroTrailerPlaybackEnabled: Boolean = false,
+    val heroTrailerPlaybackEnabled: Boolean = true,
     val heroTrailerStartDelaySeconds: Int = HomeCatalogSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
     val showCatalogType: Boolean = true,
@@ -130,7 +130,7 @@ private data class StoredHomeCatalogPreference(
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
     val heroStyle: String = HomeHeroStyle.FULL_BLEED.storageValue,
-    val heroTrailerPlaybackEnabled: Boolean = false,
+    val heroTrailerPlaybackEnabled: Boolean = true,
     val heroTrailerStartDelaySeconds: Int = HomeCatalogSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
     val showCatalogType: Boolean = true,
@@ -144,7 +144,7 @@ object HomeCatalogSettingsRepository {
     /** Bounds for the "start hero trailer after N seconds" preference. */
     const val MIN_HERO_TRAILER_START_DELAY_SECONDS = 0
     const val MAX_HERO_TRAILER_START_DELAY_SECONDS = 10
-    const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 0
+    const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 1
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -167,7 +167,7 @@ object HomeCatalogSettingsRepository {
         }
     private var heroEnabled = true
     private var heroStyle = HomeHeroStyle.FULL_BLEED
-    private var heroTrailerPlaybackEnabled = false
+    private var heroTrailerPlaybackEnabled = true
     private var heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
     private var heroTrailerStartUnmuted = false
     private var showCatalogType = true
@@ -178,7 +178,7 @@ object HomeCatalogSettingsRepository {
         preferences = emptyMap()
         heroEnabled = true
         heroStyle = HomeHeroStyle.FULL_BLEED
-        heroTrailerPlaybackEnabled = false
+        heroTrailerPlaybackEnabled = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         showCatalogType = true
@@ -199,7 +199,7 @@ object HomeCatalogSettingsRepository {
         preferences = emptyMap()
         heroEnabled = true
         heroStyle = HomeHeroStyle.FULL_BLEED
-        heroTrailerPlaybackEnabled = false
+        heroTrailerPlaybackEnabled = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         showCatalogType = true
@@ -358,7 +358,7 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         heroEnabled = true
         heroStyle = HomeHeroStyle.FULL_BLEED
-        heroTrailerPlaybackEnabled = false
+        heroTrailerPlaybackEnabled = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         showCatalogType = true
@@ -423,7 +423,14 @@ object HomeCatalogSettingsRepository {
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             preferences = parsedPayload.items.associateBy { it.key }
+            // The hero plays a muted trailer a second after it settles, as Netflix's does. Applied once to existing settings.
+            val migrated = com.nuvio.app.core.ui.UiDefaultsMigration.applyOnce("hero_trailer_home_v1") {
+                heroTrailerPlaybackEnabled = true
+                heroTrailerStartDelaySeconds = 1
+                heroTrailerStartUnmuted = false
+            }
             publish()
+            if (migrated) persist()
             return
         }
 

@@ -1,5 +1,11 @@
 package com.nuvio.app.features.home.components
 
+import com.nuvio.app.features.library.toLibraryItem
+import com.nuvio.app.features.library.LibraryClock
+import com.nuvio.app.features.library.LibraryRepository
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
@@ -212,6 +218,7 @@ internal fun HomeHeroSection(
     showImdbRating: Boolean = true,
     showMdbListRatings: Boolean = false,
     onItemClick: ((MetaPreview) -> Unit)? = null,
+    onPlayClick: ((MetaPreview) -> Unit)? = null,
     onActiveArtworkChange: ((String?) -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
@@ -618,6 +625,7 @@ internal fun HomeHeroSection(
                                             showImdbRating = showImdbRating,
                                             showMdbListRatings = showMdbListRatings,
                                             onItemClick = onItemClick,
+                                            onPlayClick = onPlayClick,
                                         )
                                     }
                                     }
@@ -800,6 +808,7 @@ private fun HeroContentBlock(
     showImdbRating: Boolean,
     showMdbListRatings: Boolean,
     onItemClick: ((MetaPreview) -> Unit)?,
+    onPlayClick: ((MetaPreview) -> Unit)?,
 ) {
     var logoLoadError by remember(item.type, item.id, item.logo) {
         mutableStateOf(false)
@@ -893,6 +902,56 @@ private fun HeroContentBlock(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+
+        if (onPlayClick != null) {
+            Spacer(modifier = Modifier.height(14.dp))
+            HeroActionButtons(item = item, isTablet = layout.isTablet, onPlay = { onPlayClick(item) })
+        }
+    }
+}
+
+/** The two actions under a hero title, as Netflix lays them out: a white Play pill and a "+ My List" button. */
+@Composable
+private fun HeroActionButtons(item: MetaPreview, isTablet: Boolean, onPlay: () -> Unit) {
+    val libraryState by LibraryRepository.uiState.collectAsStateWithLifecycle()
+    val saved = remember(libraryState, item.id, item.type) { LibraryRepository.isSaved(item.id, item.type) }
+    val scope = rememberCoroutineScope()
+    val pill = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, if (isTablet) Alignment.Start else Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier
+                .height(44.dp)
+                .clip(pill)
+                .background(Color.White)
+                .clickable(onClick = onPlay)
+                .padding(horizontal = 26.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
+            Text("Play", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        }
+        Row(
+            modifier = Modifier
+                .height(44.dp)
+                .clip(pill)
+                .background(Color.White.copy(alpha = 0.22f))
+                .clickable {
+                    scope.launch {
+                        runCatching { LibraryRepository.toggleSaved(item.toLibraryItem(LibraryClock.nowEpochMs())) }
+                    }
+                }
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(if (saved) Icons.Rounded.Check else Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Text("My List", color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

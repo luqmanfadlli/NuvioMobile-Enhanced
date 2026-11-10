@@ -106,6 +106,7 @@ import com.nuvio.app.features.cloud.providerPosterUrl
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.CollectionSyncService
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.downloads.DownloadSubtitles
@@ -486,6 +487,7 @@ internal fun MainAppContent(
             AppScreenTab.Music -> Unit
             AppScreenTab.Following -> Unit
             AppScreenTab.News -> Unit
+            AppScreenTab.NewHot -> Unit
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
     }
@@ -1197,6 +1199,88 @@ internal fun MainAppContent(
             )
         }
 
+        // The Home hero's Play: a movie starts straight away (resuming if it was begun); a series resumes the episode
+        // you were on, or starts at the first one. Anything that can't be resolved falls back to the title's page.
+        fun playHeroItem(item: MetaPreview) {
+            coroutineScope.launch {
+                val isSeries = item.type.equals("series", ignoreCase = true) || item.type.equals("tv", ignoreCase = true)
+                if (!isSeries) {
+                    val progress = WatchProgressRepository.progressForVideo(videoId = item.id, parentMetaId = item.id)
+                        ?.takeIf { !it.isCompleted }
+                    launchPlaybackWithDownloadPreference(
+                        type = item.type,
+                        videoId = item.id,
+                        parentMetaId = item.id,
+                        parentMetaType = item.type,
+                        title = item.name,
+                        logo = item.logo,
+                        poster = item.poster,
+                        background = item.banner,
+                        seasonNumber = null,
+                        episodeNumber = null,
+                        episodeTitle = null,
+                        episodeThumbnail = null,
+                        pauseDescription = item.description,
+                        resumePositionMs = progress?.lastPositionMs,
+                        resumeProgressFraction = null,
+                        manualSelection = false,
+                        startFromBeginning = false,
+                    )
+                    return@launch
+                }
+                val resume = WatchProgressRepository.resumeEntryForSeries(item.id)
+                if (resume != null) {
+                    launchPlaybackWithDownloadPreference(
+                        type = resume.contentType,
+                        videoId = resume.videoId,
+                        parentMetaId = resume.parentMetaId,
+                        parentMetaType = resume.parentMetaType,
+                        title = resume.title,
+                        logo = resume.logo ?: item.logo,
+                        poster = resume.poster ?: item.poster,
+                        background = resume.background ?: item.banner,
+                        seasonNumber = resume.seasonNumber,
+                        episodeNumber = resume.episodeNumber,
+                        episodeTitle = resume.episodeTitle,
+                        episodeThumbnail = resume.episodeThumbnail,
+                        pauseDescription = resume.pauseDescription,
+                        resumePositionMs = resume.lastPositionMs,
+                        resumeProgressFraction = null,
+                        manualSelection = false,
+                        startFromBeginning = false,
+                    )
+                    return@launch
+                }
+                val meta = runCatching { MetaDetailsRepository.fetch(item.type, item.id) }.getOrNull()
+                val first = meta?.videos
+                    ?.filter { (it.season ?: 0) > 0 && it.episode != null }
+                    ?.minWithOrNull(compareBy({ it.season }, { it.episode }))
+                if (meta != null && first != null) {
+                    launchPlaybackWithDownloadPreference(
+                        type = meta.type,
+                        videoId = first.id,
+                        parentMetaId = meta.id,
+                        parentMetaType = meta.type,
+                        title = meta.name,
+                        logo = meta.logo ?: item.logo,
+                        poster = meta.poster ?: item.poster,
+                        background = meta.background ?: item.banner,
+                        seasonNumber = first.season,
+                        episodeNumber = first.episode,
+                        episodeTitle = first.title,
+                        episodeThumbnail = first.thumbnail,
+                        pauseDescription = first.overview ?: meta.description,
+                        resumePositionMs = null,
+                        resumeProgressFraction = null,
+                        manualSelection = false,
+                        startFromBeginning = false,
+                    )
+                } else {
+                    navController.openPreview(item)
+                }
+            }
+        }
+
         fun openPartyMedia(media: PartyMedia) {
             if (navController.currentRoute is PlayerRoute) navController.popBackStack()
             val resumePositionMs = PartyRepository.playback.value
@@ -1734,6 +1818,7 @@ internal fun MainAppContent(
                             AppTabActions(
                                 onCatalogClick = onCatalogClick,
                                 onPosterClick = navController::openPreview,
+                                onHeroPlayClick = ::playHeroItem,
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },

@@ -44,7 +44,7 @@ data class MetaScreenSettingsUiState(
     val items: List<MetaScreenSectionItem> = emptyList(),
     val backgroundMode: MetaScreenBackgroundMode = MetaScreenBackgroundMode.Normal,
     val cinematicBackground: Boolean = false,
-    val heroTrailerPlayback: Boolean = false,
+    val heroTrailerPlayback: Boolean = true,
     val heroTrailerStartDelaySeconds: Int = MetaScreenSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
     val iconActionRow: Boolean = true,
@@ -129,7 +129,7 @@ private data class StoredMetaScreenSettingsPayload(
     val backgroundMode: String? = null,
     val cinematicBackground: Boolean = false,
     @SerialName("hero_trailer_playback")
-    val heroTrailerPlayback: Boolean = false,
+    val heroTrailerPlayback: Boolean = true,
     @SerialName("hero_trailer_start_delay_seconds")
     val heroTrailerStartDelaySeconds: Int = MetaScreenSettingsRepository.DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
     val heroTrailerStartUnmuted: Boolean = false,
@@ -163,7 +163,7 @@ object MetaScreenSettingsRepository {
     private const val LAYOUT_VERSION = 2
     const val MIN_HERO_TRAILER_START_DELAY_SECONDS = 0
     const val MAX_HERO_TRAILER_START_DELAY_SECONDS = 10
-    const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 0
+    const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 1
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -229,7 +229,7 @@ object MetaScreenSettingsRepository {
     private var hasLoaded = false
     private var preferences: MutableMap<MetaScreenSectionKey, StoredMetaScreenSectionPreference> = mutableMapOf()
     private var backgroundMode: MetaScreenBackgroundMode = MetaScreenBackgroundMode.Normal
-    private var heroTrailerPlayback: Boolean = false
+    private var heroTrailerPlayback: Boolean = true
     private var heroTrailerStartDelaySeconds: Int = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
     private var heroTrailerStartUnmuted: Boolean = false
     private var iconActionRow: Boolean = true
@@ -278,6 +278,10 @@ object MetaScreenSettingsRepository {
             }
         }
 
+        com.nuvio.app.core.ui.UiDefaultsMigration.applyOnce("hero_trailer_meta_v1") {
+            heroTrailerPlayback = true
+            heroTrailerStartDelaySeconds = 1
+        }
         normalizePreferences()
         publish()
         persist()
@@ -287,7 +291,7 @@ object MetaScreenSettingsRepository {
         hasLoaded = false
         preferences.clear()
         backgroundMode = MetaScreenBackgroundMode.Normal
-        heroTrailerPlayback = false
+        heroTrailerPlayback = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         iconActionRow = true
@@ -420,7 +424,7 @@ object MetaScreenSettingsRepository {
         hasLoaded = false
         preferences.clear()
         backgroundMode = MetaScreenBackgroundMode.Normal
-        heroTrailerPlayback = false
+        heroTrailerPlayback = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         iconActionRow = true
@@ -437,7 +441,7 @@ object MetaScreenSettingsRepository {
     internal fun applyFromSync(
         items: List<MetaScreenSectionItem>,
         cinematicBackground: Boolean,
-        heroTrailerPlayback: Boolean = false,
+        heroTrailerPlayback: Boolean = true,
         heroTrailerStartDelaySeconds: Int = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS,
         heroTrailerStartUnmuted: Boolean = false,
         iconActionRow: Boolean = true,
@@ -489,7 +493,7 @@ object MetaScreenSettingsRepository {
         ensureLoaded()
         preferences.clear()
         backgroundMode = MetaScreenBackgroundMode.Normal
-        heroTrailerPlayback = false
+        heroTrailerPlayback = true
         heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
         heroTrailerStartUnmuted = false
         iconActionRow = true
