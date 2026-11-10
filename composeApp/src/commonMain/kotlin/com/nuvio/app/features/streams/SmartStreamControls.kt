@@ -902,6 +902,7 @@ internal fun LazyListScope.smartSortedStreamSection(
     debridEnabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
     badgePlacement: StreamBadgePlacement,
     torrentNotSupportedText: String,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
@@ -925,8 +926,7 @@ internal fun LazyListScope.smartSortedStreamSection(
             enabled = isSelectable || isUnsupportedTorrentStream,
             appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
             showFileSizeBadges = showFileSizeBadges,
-            // One merged list mixes addons, so each card says which addon it comes from.
-            showAddonLogo = true,
+            showAddonLogo = showAddonLogo,
             badgePlacement = badgePlacement,
             isCurrent = stream == bestStream,
             currentLabel = if (stream == bestStream) "Best match" else null,

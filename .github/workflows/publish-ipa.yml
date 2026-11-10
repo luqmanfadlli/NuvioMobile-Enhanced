@@ -96,6 +96,11 @@ jobs:
             echo "::error::Unexpected bundle ID ${bundle}"
             exit 1
           fi
+          # Remove ~50 MB of leftover debugging names from the app. Only internal (local) symbol
+          # names go; the export table and dynamic-linking info the app needs stay identical.
+          if ! bash src/.github/strip-ipa.sh "${ipa}" >> "${GITHUB_STEP_SUMMARY}"; then
+            echo "::warning::Could not remove debugging data; publishing the IPA unchanged."
+          fi
           mkdir -p out
           final="out/Nuvio-IMDb-${version}-${build}.ipa"
           mv "${ipa}" "${final}"

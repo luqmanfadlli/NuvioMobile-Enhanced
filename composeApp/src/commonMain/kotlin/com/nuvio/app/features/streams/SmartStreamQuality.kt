@@ -105,7 +105,8 @@ object SmartStreamQuality {
     private val lowQuality = Regex("${B}(cam|camrip|hdcam|hdts|telesync|hdtc|telecine|scr|screener|dvdscr|r5)$E")
 
     private val instantMarkers = Regex("(\\+]|⚡|${B}(instant|cached)$E)")
-    private val notInstantMarkers = Regex("${B}(download|uncached|not cached)$E")
+    // Debrid addons mark streams that still have to download with ⬇️ (Comet/TorBox) or ⏳ (MediaFusion, AIOStreams).
+    private val notInstantMarkers = Regex("(⬇|⏳|${B}(download|uncached|not cached)$E)")
     private val sizePattern = Regex("(\\d+(?:[.,]\\d+)?)\\s?(tb|gb|gib|mb|mib)$E")
     private val separators = Regex("[._\\-\\[\\]()|/,:]+")
 
