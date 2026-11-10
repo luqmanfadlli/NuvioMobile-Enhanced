@@ -50,8 +50,9 @@ data class PersonDetailRoute(
     val castAvatarTransitionKey: String? = null,
     val preferCrew: Boolean = false,
 ) : AppRoute {
+    // The page shows the name itself; a navigation-bar title would repeat it above the profile.
     override val title: String
-        get() = personName
+        get() = ""
 }
 
 @Serializable

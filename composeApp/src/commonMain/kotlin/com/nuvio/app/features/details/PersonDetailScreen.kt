@@ -300,7 +300,7 @@ private fun PersonDetailContent(
                             .fillMaxSize()
                             .verticalScroll(scrollState)
                             .windowInsetsPadding(WindowInsets.statusBars)
-                            .padding(top = 48.dp),
+                            .padding(top = 8.dp),
                     ) {
                         HeroSection(
                             person = person,
