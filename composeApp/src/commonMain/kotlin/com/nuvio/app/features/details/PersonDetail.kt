@@ -13,4 +13,8 @@ data class PersonDetail(
     val knownFor: String?,
     val movieCredits: List<MetaPreview>,
     val tvCredits: List<MetaPreview>,
+    /** Titles they directed (or created), most notable first. */
+    val directedCredits: List<MetaPreview> = emptyList(),
+    /** Titles they acted in, most notable first. */
+    val actingCredits: List<MetaPreview> = emptyList(),
 )

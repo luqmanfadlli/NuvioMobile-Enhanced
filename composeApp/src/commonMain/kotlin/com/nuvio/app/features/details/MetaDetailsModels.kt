@@ -81,6 +81,8 @@ data class MetaPerson(
     val role: String? = null,
     val photo: String? = null,
     val tmdbId: Int? = null,
+    /** A director, writer or creator rather than a cast member; shown apart from the actors. */
+    val isCrew: Boolean = false,
 )
 
 data class MetaCompany(

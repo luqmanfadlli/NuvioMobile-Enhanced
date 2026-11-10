@@ -47,6 +47,7 @@ import org.jetbrains.compose.resources.stringResource
 fun DetailCastSection(
     cast: List<MetaPerson>,
     modifier: Modifier = Modifier,
+    title: String? = null,
     showHeader: Boolean = true,
     horizontalScrollPadding: Dp = 0.dp,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
@@ -56,7 +57,7 @@ fun DetailCastSection(
     if (cast.isEmpty()) return
 
     DetailSection(
-        title = stringResource(Res.string.settings_meta_cast),
+        title = title ?: stringResource(Res.string.settings_meta_cast),
         modifier = modifier,
         showHeader = showHeader,
     ) {

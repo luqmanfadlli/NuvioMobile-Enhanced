@@ -237,6 +237,15 @@ object TmdbMetadataService {
                     castCredits = castTvCredits,
                     crewCredits = crewTvCredits,
                 ),
+                // Directing and acting are kept apart so a director's page can show both.
+                directedCredits = run {
+                    val directing = credits?.crew.orEmpty().filter { it.job.equals("Director", true) || it.job.equals("Creator", true) }
+                    (
+                        mapPersonMovieCreditsFromCrew(directing, language, englishTitlesById) +
+                            mapPersonTvCreditsFromCrew(directing, language, englishTitlesById)
+                        ).distinctBy { it.id }.sortedByDescending { it.popularity ?: 0.0 }
+                },
+                actingCredits = (castMovieCredits + castTvCredits).distinctBy { it.id }.sortedByDescending { it.popularity ?: 0.0 },
             )
             personCache[cacheKey] = detail
             detail
@@ -1788,6 +1797,7 @@ private fun buildPeople(
                 role = creatorRole,
                 photo = buildImageUrl(creator.profilePath, "w500"),
                 tmdbId = creator.id,
+                isCrew = true,
             )
         }
     } else {
@@ -1810,6 +1820,7 @@ private fun buildPeople(
                 role = directorRole,
                 photo = buildImageUrl(crew.profilePath, "w500"),
                 tmdbId = crew.id,
+                isCrew = true,
             )
         }
 
@@ -1832,6 +1843,7 @@ private fun buildPeople(
                 role = writerRole,
                 photo = buildImageUrl(crew.profilePath, "w500"),
                 tmdbId = crew.id,
+                isCrew = true,
             )
         }
 

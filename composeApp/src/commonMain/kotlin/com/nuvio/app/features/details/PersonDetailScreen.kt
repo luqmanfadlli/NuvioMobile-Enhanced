@@ -147,6 +147,7 @@ fun PersonDetailScreen(
             )
             is PersonDetailUiState.Success -> PersonDetailContent(
                 person = state.personDetail,
+                preferCrew = preferCrew,
                 watchedKeys = watchedUiState.watchedKeys,
                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                 onOpenMeta = onOpenMeta,
@@ -179,6 +180,7 @@ fun PersonDetailScreen(
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun PersonDetailContent(
     person: PersonDetail,
+    preferCrew: Boolean = false,
     watchedKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     onOpenMeta: (MetaPreview) -> Unit,
@@ -201,17 +203,29 @@ private fun PersonDetailContent(
     }
     val accentColor = MaterialTheme.colorScheme.primary
 
-    val allCredits = remember(person.movieCredits, person.tvCredits) {
-        (person.movieCredits + person.tvCredits)
+    val directed = person.directedCredits
+    val acting = person.actingCredits
+    val allCredits = remember(person) {
+        (directed + acting).ifEmpty { person.movieCredits + person.tvCredits }
             .distinctBy { it.id }
     }
+    // A director's page leads with what they directed, then what they acted in; an actor's page the other way
+    // round, with anything they directed after it.
+    val crewFirst = directed.isNotEmpty() &&
+        (preferCrew || person.knownFor.equals("Directing", ignoreCase = true) || directed.size > acting.size)
 
     val todayDate = remember { CurrentDateProvider.todayIsoDate() }
 
-    val popularCredits = remember(allCredits) {
-        allCredits
+    val popularCredits = remember(allCredits, acting) {
+        (acting.ifEmpty { allCredits })
             .sortedByDescending { it.popularity ?: 0.0 }
     }
+    val popularTitle = stringResource(Res.string.person_popular)
+    val leadRails: List<Pair<String, List<MetaPreview>>> = if (crewFirst) {
+        listOf("Directed" to directed, "Acting" to acting)
+    } else {
+        listOf(popularTitle to popularCredits, "Directed" to directed)
+    }.filter { it.second.isNotEmpty() }
 
     val latestCredits = remember(allCredits, todayDate) {
         allCredits
@@ -283,7 +297,7 @@ private fun PersonDetailContent(
                 if (useWideLayout) {
                     WidePersonDetailContent(
                         person = person,
-                        popularCredits = popularCredits,
+                        leadRails = leadRails,
                         latestCredits = latestCredits,
                         upcomingCredits = upcomingCredits,
                         watchedKeys = watchedKeys,
@@ -311,11 +325,11 @@ private fun PersonDetailContent(
                             animatedVisibilityScope = animatedVisibilityScope,
                         )
 
-                        if (popularCredits.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                        leadRails.forEachIndexed { railIndex, (railTitle, railItems) ->
+                            Spacer(modifier = Modifier.height(if (railIndex == 0) 12.dp else 24.dp))
                             DetailPosterRailSection(
-                                title = stringResource(Res.string.person_popular),
-                                items = popularCredits,
+                                title = railTitle,
+                                items = railItems,
                                 watchedKeys = watchedKeys,
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 headerHorizontalPadding = 20.dp,
@@ -365,7 +379,7 @@ private const val HAPTIC_TRIGGER_SCROLL_THRESHOLD_PX = 56
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun WidePersonDetailContent(
     person: PersonDetail,
-    popularCredits: List<MetaPreview>,
+    leadRails: List<Pair<String, List<MetaPreview>>>,
     latestCredits: List<MetaPreview>,
     upcomingCredits: List<MetaPreview>,
     watchedKeys: Set<String>,
@@ -407,10 +421,10 @@ private fun WidePersonDetailContent(
                 .padding(start = 40.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(34.dp),
         ) {
-            if (popularCredits.isNotEmpty()) {
+            leadRails.forEach { (railTitle, railItems) ->
                 DetailPosterRailSection(
-                    title = stringResource(Res.string.person_popular),
-                    items = popularCredits,
+                    title = railTitle,
+                    items = railItems,
                     watchedKeys = watchedKeys,
                     fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     headerHorizontalPadding = 0.dp,

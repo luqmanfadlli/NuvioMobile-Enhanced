@@ -2555,14 +2555,30 @@ private fun ConfiguredMetaSections(
                 }
             }
             MetaScreenSectionKey.CAST -> {
-                DetailCastSection(
-                    cast = meta.cast,
-                    showHeader = showHeader,
-                    horizontalScrollPadding = horizontalScrollPadding,
-                    onCastClick = onCastClick,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                )
+                val actors = meta.cast.filterNot { it.isCrew }
+                val crew = meta.cast.filter { it.isCrew }
+                // The two rows are stacked in a column: this slot is a Box, which would draw them on top of each other.
+                Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                    DetailCastSection(
+                        cast = actors,
+                        showHeader = showHeader,
+                        horizontalScrollPadding = horizontalScrollPadding,
+                        onCastClick = onCastClick,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                    if (crew.isNotEmpty()) {
+                        DetailCastSection(
+                            cast = crew,
+                            title = "Crew",
+                            showHeader = true,
+                            horizontalScrollPadding = horizontalScrollPadding,
+                            onCastClick = onCastClick,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                }
             }
             MetaScreenSectionKey.COMMENTS -> {
                 if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
