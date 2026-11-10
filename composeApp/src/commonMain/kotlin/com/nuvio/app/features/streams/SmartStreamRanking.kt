@@ -1,5 +1,7 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlin.math.log2
 import kotlin.math.min
 
@@ -41,6 +43,9 @@ internal data class SmartTarget(
 )
 
 object SmartStreamRanking {
+
+    /** All sorting work runs here, off the main thread and one job at a time. */
+    val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
 
     fun runtimeSeconds(isEpisode: Boolean): Int = if (isEpisode) 45 * 60 else 120 * 60
 
@@ -220,8 +225,7 @@ object SmartStreamRanking {
     ): SmartStreamsResult {
         val runtime = runtimeSeconds(isEpisode)
         val target = target(device, settings)
-        val infoCache = HashMap<StreamItem, SmartStreamInfo>()
-        fun infoOf(stream: StreamItem): SmartStreamInfo = infoCache.getOrPut(stream) { SmartStreamQuality.read(stream) }
+        fun infoOf(stream: StreamItem): SmartStreamInfo = SmartStreamQuality.cached(stream)
 
         // Best for this device: across every addon, ignoring the user's filters.
         val candidates = allState.groups.flatMap { it.streams }

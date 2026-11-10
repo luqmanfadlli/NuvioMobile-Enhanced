@@ -107,14 +107,46 @@ object SmartStreamQuality {
     private val instantMarkers = Regex("(\\+]|⚡|${B}(instant|cached)$E)")
     private val notInstantMarkers = Regex("${B}(download|uncached|not cached)$E")
     private val sizePattern = Regex("(\\d+(?:[.,]\\d+)?)\\s?(tb|gb|gib|mb|mib)$E")
+    private val separators = Regex("[._\\-\\[\\]()|/,:]+")
+
+    // Reading a stream is the slow part, so each stream is read once and remembered.
+    // Only called from SmartStreamRanking.dispatcher (one thread), so a plain map is safe.
+    private const val CACHE_LIMIT = 3000
+    private val cache = LinkedHashMap<String, SmartStreamInfo>()
+
+    fun cached(stream: StreamItem): SmartStreamInfo {
+        val key = cacheKey(stream)
+        cache[key]?.let { return it }
+        val info = read(stream)
+        if (cache.size >= CACHE_LIMIT) cache.remove(cache.keys.first())
+        cache[key] = info
+        return info
+    }
+
+    private fun cacheKey(stream: StreamItem): String = buildString {
+        append(stream.addonId).append('|')
+        append(stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash.orEmpty()).append('|')
+        append(stream.fileIdx ?: -1).append('|')
+        append(stream.externalUrl.orEmpty()).append('|')
+        append(stream.name.orEmpty()).append('|')
+        append(stream.title.orEmpty()).append('|')
+        append(stream.description.orEmpty()).append('|')
+        append(stream.debridCacheStatus?.state?.name.orEmpty()).append('|')
+        append(stream.behaviorHints.videoSize ?: -1L)
+        stream.badges.forEach { append('|').append(it.name) }
+    }
 
     fun read(stream: StreamItem): SmartStreamInfo {
+        // The matcher may add one last entry that repeats all the others joined; skip only that repeat.
+        val candidates = StreamBadgeMatcher.badgeMatchCandidates(stream).let { list ->
+            if (list.size > 1 && list.last() == list.dropLast(1).joinToString(" ")) list.dropLast(1) else list
+        }
         val raw = buildList {
-            addAll(StreamBadgeMatcher.badgeMatchCandidates(stream))
+            addAll(candidates)
             stream.badges.forEach { add(it.name) }
         }.joinToString(" ").lowercase()
         // "WEB-DL" -> "web dl", "H.265" -> "h 265", "DD+5.1" stays readable as "dd+5 1".
-        val text = raw.replace(Regex("[._\\-\\[\\]()|/,:]+"), " ")
+        val text = raw.replace(separators, " ")
         val parsed = stream.clientResolve?.stream?.raw?.parsed
 
         return SmartStreamInfo(

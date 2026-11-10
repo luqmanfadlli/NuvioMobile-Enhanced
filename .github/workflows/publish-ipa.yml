@@ -67,6 +67,7 @@ jobs:
         with:
           ref: ${{ steps.run.outputs.sha }}
           path: src
+          fetch-depth: 0
 
       - name: Download IPA and read its version
         if: steps.run.outputs.skip == 'false'
@@ -106,22 +107,62 @@ jobs:
         env:
           VERSION: ${{ steps.ipa.outputs.version }}
           BUILD: ${{ steps.ipa.outputs.build }}
+          TAG: ${{ steps.ipa.outputs.tag }}
+          SHA: ${{ steps.run.outputs.sha }}
         run: |
+          # What changed since the last published build:
+          # - "Release-note:" lines in this fork's own commits (plain-language notes for the user)
+          # - upstream releases merged by the auto-update
+          prev_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=5" --jq '.[0] // {}')"
+          prev="$(jq -r '.body // ""' <<<"${prev_json}" | grep -oE 'built-from: [0-9a-f]{40}' | head -n 1 | cut -d' ' -f2 || true)"
+          if [[ -z "${prev}" ]]; then
+            prev="$(jq -r '.target_commitish // ""' <<<"${prev_json}")"
+          fi
+          if [[ -n "${prev}" ]] && git -C src cat-file -e "${prev}^{commit}" 2>/dev/null; then
+            range="${prev}..HEAD"
+          else
+            range="HEAD~30..HEAD"
+          fi
+          echo "Collecting notes from ${range}"
+          git -C src log --first-parent --no-merges \
+            --format='%(trailers:key=Release-note,valueonly,separator=%x0A)' "${range}" \
+            | sed '/^[[:space:]]*$/d' > fork-notes.txt || true
+          git -C src log --first-parent --merges --format='%s' "${range}" \
+            | sed -n 's/^Merge upstream \([^ ]*\).*/\1/p' > upstream-merges.txt || true
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            export SAME_VERSION=1
+          fi
           python3 - <<'PY'
           import json, os
-          version, build = os.environ["VERSION"], os.environ["BUILD"]
-          notes = ""
+          version, build, sha = os.environ["VERSION"], os.environ["BUILD"], os.environ["SHA"]
+          read = lambda p: [l.strip() for l in open(p, encoding="utf-8") if l.strip()]
+          fork_notes = list(dict.fromkeys(read("fork-notes.txt")))
+          upstream = list(dict.fromkeys(read("upstream-merges.txt")))
+          upstream_notes = ""
           try:
               store = json.load(open("src/store.json", encoding="utf-8"))
               for v in store["apps"][0]["versions"]:
                   if v.get("version") == version:
-                      notes = v.get("localizedDescription", "")
+                      upstream_notes = v.get("localizedDescription", "").strip()
                       break
           except Exception:
               pass
-          header = (f"Nuvio Enhanced {version} ({build}) with IMDb-only episode ratings.\n"
-                    "Unsigned: sign it in Feather with the same certificate as your installed Nuvio.")
-          open("release-notes.md", "w", encoding="utf-8").write(header + ("\n\n" + notes if notes.strip() else "") + "\n")
+
+          new = [f"Updated to Nuvio Enhanced {u} (luqmanfadlli's newest release)" for u in upstream] + fork_notes
+          if not new:
+              new = ["Rebuilt with no visible changes"]
+          parts = ["What's new in this build:", *[f"• {line}" for line in new]]
+          if os.environ.get("SAME_VERSION"):
+              parts += ["", "Same version number as before, so Feather won't show this as an update: "
+                            "install it again from the source to get these changes."]
+          parts += ["", "Install: sign it in Feather with the same certificate as your installed Nuvio "
+                        "and install it over the existing app (don't delete the old one)."]
+          if upstream_notes:
+              parts += ["", f"Changes in Nuvio Enhanced {version} itself:", upstream_notes]
+          text = "\n".join(parts) + "\n"
+          open("release-notes.md", "w", encoding="utf-8").write(text)
+          open("release-body.md", "w", encoding="utf-8").write(text + f"\n<!-- built-from: {sha} -->\n")
+          print(text)
           PY
 
       - name: Publish GitHub release
@@ -135,11 +176,12 @@ jobs:
         run: |
           if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "${FILE}" --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --notes-file release-body.md --latest
           else
             gh release create "${TAG}" "${FILE}" --repo "${GITHUB_REPOSITORY}" \
               --target "${SHA}" \
               --title "Nuvio IMDb build ${VERSION} (${BUILD})" \
-              --notes-file release-notes.md \
+              --notes-file release-body.md \
               --latest
           fi
 

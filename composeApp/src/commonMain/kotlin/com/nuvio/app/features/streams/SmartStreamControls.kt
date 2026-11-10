@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -62,9 +63,11 @@ import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvio
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal data class SmartStreamsState(
-    val result: SmartStreamsResult,
+    /** Null for the first moment after the screen opens, while the background sort finishes. */
+    val result: SmartStreamsResult?,
     val settings: SmartStreamSettings,
     val device: SmartDeviceProfile,
 )
@@ -81,15 +84,21 @@ internal fun rememberSmartStreams(
     DisposableEffect(Unit) {
         onDispose { SmartStreamSettingsRepository.onStreamsScreenClosed() }
     }
-    val result = remember(listState, allState, settings, device, debridEnabled, isEpisode) {
-        SmartStreamRanking.compute(
-            listState = listState,
-            allState = allState,
-            settings = settings,
-            device = device,
-            debridEnabled = debridEnabled,
-            isEpisode = isEpisode,
-        )
+    // Sorting runs in the background; the screen keeps showing the last result until the new one is ready.
+    val result by produceState<SmartStreamsResult?>(
+        initialValue = null,
+        listState, allState, settings, device, debridEnabled, isEpisode,
+    ) {
+        value = withContext(SmartStreamRanking.dispatcher) {
+            SmartStreamRanking.compute(
+                listState = listState,
+                allState = allState,
+                settings = settings,
+                device = device,
+                debridEnabled = debridEnabled,
+                isEpisode = isEpisode,
+            )
+        }
     }
     return SmartStreamsState(result, settings, device)
 }
@@ -115,7 +124,8 @@ internal fun SmartStreamControls(
     var showSort by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     var showBest by remember { mutableStateOf(false) }
-    val best = state.result.best
+    val result = state.result
+    val best = result?.best
     val filters = state.settings.filters
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -258,7 +268,7 @@ internal fun SmartStreamControls(
             }
         }
 
-        if (state.result.totalCount > 0) {
+        if (result != null && result.totalCount > 0) {
             val order = when (state.settings.sortMode) {
                 SmartSortMode.BEST_MATCH -> "BEST MATCH FIRST"
                 SmartSortMode.HIGHEST_QUALITY -> "HIGHEST QUALITY FIRST"
@@ -267,7 +277,7 @@ internal fun SmartStreamControls(
                 SmartSortMode.ADDON_ORDER -> "BY ADDON"
             }
             Text(
-                text = "${state.result.shownCount} OF ${state.result.totalCount} STREAMS · $order",
+                text = "${result.shownCount} OF ${result.totalCount} STREAMS · $order",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp),
                 color = colors.textMuted,
                 modifier = Modifier.padding(top = 2.dp),
@@ -722,7 +732,7 @@ private fun SmartFiltersSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             PrimaryButton(
-                text = "Show ${state.result.shownCount} streams",
+                text = "Show ${state.result?.shownCount ?: 0} streams",
                 onClick = close,
                 modifier = Modifier.weight(2f),
             )

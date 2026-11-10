@@ -555,15 +555,15 @@ private fun MobileStreamsLayout(
                         StreamSearchEmptyBlock(modifier = Modifier.weight(1f))
                         return@Column
                     }
-                    if (smartStreams.result.emptyBecauseOfFilters) {
+                    if (smartStreams.result?.emptyBecauseOfFilters == true) {
                         SmartFiltersEmptyBlock(modifier = Modifier.weight(1f))
                         return@Column
                     }
 
                     StreamList(
-                        uiState = smartStreams.result.listState,
-                        smartStreams = smartStreams.result.sortedStreams,
-                        bestStream = smartStreams.result.best?.stream,
+                        uiState = smartStreams.result?.listState ?: listUiState.uiState,
+                        smartStreams = smartStreams.result?.sortedStreams,
+                        bestStream = smartStreams.result?.best?.stream,
                         debridEnabled = debridEnabled,
                         appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                         onStreamSelected = onStreamSelected,
