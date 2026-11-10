@@ -479,19 +479,23 @@ object MetaDetailsRepository {
                 )
             }
         }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: result
+        // Faces for the cast row by default, whether or not the full TMDB enrichment switch is on.
+        val withFaces = runCatching {
+            withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) { TmdbMetadataService.withDefaultCastFaces(tmdbEnriched, id) }
+        }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: tmdbEnriched
         val enriched = if (includeMdbList) {
             MdbListSettingsRepository.ensureLoaded()
             runCatching {
                 withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
                     MdbListMetadataService.enrichMeta(
-                        meta = tmdbEnriched,
+                        meta = withFaces,
                         fallbackItemId = id,
                         settings = MdbListSettingsRepository.snapshot(),
                     )
                 }
-            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: tmdbEnriched
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: withFaces
         } else {
-            tmdbEnriched
+            withFaces
         }
         log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
         InAppLogger.info(

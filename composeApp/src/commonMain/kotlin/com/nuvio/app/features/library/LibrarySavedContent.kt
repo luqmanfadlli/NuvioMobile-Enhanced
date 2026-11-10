@@ -11,6 +11,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.i18n.localizedMediaTypeLabel
@@ -44,12 +48,24 @@ internal fun LibrarySavedControls(
     onTypeSelected: (String?) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     modifier: Modifier = Modifier,
+    /** A heading shown on the left of the same row, so the sort control sits beside it instead of under it. */
+    title: String? = null,
 ) {
     val sortOptions = availableLibrarySortOptions(sourceMode)
     val allTypesLabel = stringResource(Res.string.library_filter_all_types)
 
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    if (title != null) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
+        )
+    }
     Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
+        modifier = if (title == null) Modifier.horizontalScroll(rememberScrollState()) else Modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode.isRemoteTrackingSource) {
@@ -102,6 +118,7 @@ internal fun LibrarySavedControls(
                     ?.let(onSortSelected)
             },
         )
+    }
     }
 }
 

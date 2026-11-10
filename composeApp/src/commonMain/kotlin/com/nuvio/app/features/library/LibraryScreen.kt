@@ -658,15 +658,6 @@ fun LibraryScreen(
                     }
 
                     else -> {
-                        item(key = "library-my-list-title") {
-                            Text(
-                                text = "My List",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                            )
-                        }
                         stickyHeader(
                             key = "library-saved-controls:${uiState.sourceMode}:" +
                                 "${displaySettings.layoutMode}:$effectiveSortOption",
@@ -689,6 +680,7 @@ fun LibraryScreen(
                                     },
                                     onTypeSelected = { type -> selectedLibraryType = type },
                                     onSortSelected = LibraryDisplaySettingsRepository::setSortOption,
+                                    title = "My List",
                                     modifier = libraryContentTransitionModifier()
                                         .padding(horizontal = 16.dp)
                                         .padding(top = 8.dp, bottom = 14.dp),

@@ -93,8 +93,8 @@ object TmdbMetadataService {
         personId: Int,
         preferCrewCredits: Boolean? = null,
     ): PersonDetail? = withContext(Dispatchers.Default) {
+        // A cast member's page works out of the box; it does not wait for the TMDB enrichment switch.
         val settings = TmdbSettingsRepository.snapshot()
-        if (!settings.enabled) return@withContext null
         val language = normalizeTmdbLanguage(settings.language)
         val cacheKey = "$personId:${preferCrewCredits?.toString() ?: "auto"}:$language"
         personCache[cacheKey]?.let { return@withContext it }
@@ -276,7 +276,8 @@ object TmdbMetadataService {
         val seen = mutableSetOf<Int>()
         return cast
             .filter { it.mediaType == "movie" && (it.posterPath != null || it.backdropPath != null) }
-            .sortedByDescending { it.voteAverage ?: 0.0 }
+            .filterNot { it.isTalkOrNews() }
+            .sortedWith(castCreditRanking)
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = resolvePersonName(
@@ -298,7 +299,7 @@ object TmdbMetadataService {
                     description = credit.overview?.takeIf { it.isNotBlank() },
                     releaseInfo = credit.releaseDate?.take(4),
                     rawReleaseDate = credit.releaseDate,
-                    popularity = credit.popularity,
+                    popularity = credit.relevance(),
                 )
             }
     }
@@ -311,7 +312,8 @@ object TmdbMetadataService {
         val seen = mutableSetOf<Int>()
         return crew
             .filter { it.mediaType == "movie" && (it.posterPath != null || it.backdropPath != null) }
-            .sortedByDescending { it.voteAverage ?: 0.0 }
+            .filterNot { it.isTalkOrNews() }
+            .sortedWith(crewCreditRanking)
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = resolvePersonName(
@@ -333,7 +335,7 @@ object TmdbMetadataService {
                     description = credit.overview?.takeIf { it.isNotBlank() },
                     releaseInfo = credit.releaseDate?.take(4),
                     rawReleaseDate = credit.releaseDate,
-                    popularity = credit.popularity,
+                    popularity = credit.relevance(),
                 )
             }
     }
@@ -346,7 +348,8 @@ object TmdbMetadataService {
         val seen = mutableSetOf<Int>()
         return cast
             .filter { it.mediaType == "tv" && (it.posterPath != null || it.backdropPath != null) }
-            .sortedByDescending { it.voteAverage ?: 0.0 }
+            .filterNot { it.isTalkOrNews() }
+            .sortedWith(castCreditRanking)
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = resolvePersonName(
@@ -368,7 +371,7 @@ object TmdbMetadataService {
                     description = credit.overview?.takeIf { it.isNotBlank() },
                     releaseInfo = credit.firstAirDate?.take(4),
                     rawReleaseDate = credit.firstAirDate,
-                    popularity = credit.popularity,
+                    popularity = credit.relevance(),
                 )
             }
     }
@@ -381,7 +384,8 @@ object TmdbMetadataService {
         val seen = mutableSetOf<Int>()
         return crew
             .filter { it.mediaType == "tv" && (it.posterPath != null || it.backdropPath != null) }
-            .sortedByDescending { it.voteAverage ?: 0.0 }
+            .filterNot { it.isTalkOrNews() }
+            .sortedWith(crewCreditRanking)
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = resolvePersonName(
@@ -403,7 +407,7 @@ object TmdbMetadataService {
                     description = credit.overview?.takeIf { it.isNotBlank() },
                     releaseInfo = credit.firstAirDate?.take(4),
                     rawReleaseDate = credit.firstAirDate,
-                    popularity = credit.popularity,
+                    popularity = credit.relevance(),
                 )
             }
     }
@@ -741,6 +745,53 @@ object TmdbMetadataService {
             episodeMap = episodeMap.orEmpty(),
             settings = settings,
         )
+    }
+
+    /**
+     * Gives a title's cast faces and TMDB ids even with the TMDB enrichment switch off, so the cast row always
+     * shows actors' photos and each one opens their page. Names the addon already supplied are matched to TMDB's
+     * by name; an addon that sent no cast at all gets TMDB's leading cast.
+     */
+    suspend fun withDefaultCastFaces(meta: MetaDetails, fallbackItemId: String): MetaDetails = withContext(Dispatchers.Default) {
+        val settings = TmdbSettingsRepository.snapshot()
+        // Full enrichment already supplies cast with faces.
+        if (settings.enabled && settings.useCredits) return@withContext meta
+        if (meta.cast.isNotEmpty() && meta.cast.all { it.tmdbId != null && !it.photo.isNullOrBlank() }) return@withContext meta
+        val mediaType = normalizeMetaType(meta.type)
+        if (mediaType != "movie" && mediaType != "tv") return@withContext meta
+        val tmdbId = TmdbService.ensureTmdbId(meta.id, mediaType, fallbackImdbId = meta.imdbId)
+            ?: TmdbService.ensureTmdbId(fallbackItemId, mediaType, fallbackImdbId = meta.imdbId)
+            ?: return@withContext meta
+        val query = mapOf("language" to "en-US")
+        val credits = if (mediaType == "tv") {
+            fetch<TmdbAggregateCreditsResponse>(endpoint = "tv/$tmdbId/aggregate_credits", query = query)?.toStandard()
+        } else {
+            fetch<TmdbCreditsResponse>(endpoint = "movie/$tmdbId/credits", query = query)
+        } ?: return@withContext meta
+        val tmdbCast = credits.cast.filter { !it.name.isNullOrBlank() && it.id != null && it.id > 0 }.take(30)
+        if (tmdbCast.isEmpty()) return@withContext meta
+        fun key(name: String) = name.lowercase().filter { it.isLetterOrDigit() }
+        val byName = tmdbCast.associateBy { key(it.name.orEmpty()) }
+        val merged = if (meta.cast.isEmpty()) {
+            tmdbCast.take(20).map { member ->
+                MetaPerson(
+                    name = member.name.orEmpty(),
+                    role = member.character?.trim()?.takeIf(String::isNotBlank),
+                    photo = buildImageUrl(member.profilePath, "w500"),
+                    tmdbId = member.id,
+                )
+            }
+        } else {
+            meta.cast.map { person ->
+                val match = byName[key(person.name)] ?: return@map person
+                person.copy(
+                    photo = person.photo?.takeIf { it.isNotBlank() } ?: buildImageUrl(match.profilePath, "w500"),
+                    tmdbId = person.tmdbId ?: match.id,
+                    role = person.role ?: match.character?.trim()?.takeIf(String::isNotBlank),
+                )
+            }
+        }
+        meta.copy(cast = merged)
     }
 
     suspend fun prefetchEnrichment(
@@ -2246,6 +2297,10 @@ private data class TmdbPersonCreditCast(
     @SerialName("release_date") val releaseDate: String? = null,
     @SerialName("first_air_date") val firstAirDate: String? = null,
     @SerialName("vote_average") val voteAverage: Double? = null,
+    @SerialName("vote_count") val voteCount: Int? = null,
+    @SerialName("genre_ids") val genreIds: List<Int> = emptyList(),
+    @SerialName("episode_count") val episodeCount: Int? = null,
+    val order: Int? = null,
     val popularity: Double? = null,
 )
 
@@ -2264,6 +2319,8 @@ private data class TmdbPersonCreditCrew(
     @SerialName("release_date") val releaseDate: String? = null,
     @SerialName("first_air_date") val firstAirDate: String? = null,
     @SerialName("vote_average") val voteAverage: Double? = null,
+    @SerialName("vote_count") val voteCount: Int? = null,
+    @SerialName("genre_ids") val genreIds: List<Int> = emptyList(),
     val popularity: Double? = null,
 )
 
@@ -2376,3 +2433,44 @@ private fun originalImagePath(images: List<TmdbImage>?, originalLanguage: String
         ?.filePath
         ?.trim()
 }
+
+
+// ---- Filmography ranking -------------------------------------------------------------------------
+// A person's credits used to be ordered by vote_average, which puts every talk-show booking first: a late-night
+// show the actor merely visited as "Self" has a high average and few votes. Titles are ranked by how many
+// people have rated them instead (a hit film has tens of thousands of votes), talk and news bookings are
+// dropped, and "Self" cameos go to the back.
+
+private const val GENRE_NEWS = 10763
+private const val GENRE_TALK = 10767
+private val SELF_ROLE = Regex("""(^|[^a-z])(self|himself|herself|themselves|host|guest|presenter|archive footage)([^a-z]|$)""", RegexOption.IGNORE_CASE)
+
+private fun TmdbPersonCreditCast.isTalkOrNews(): Boolean = GENRE_TALK in genreIds || GENRE_NEWS in genreIds
+private fun TmdbPersonCreditCrew.isTalkOrNews(): Boolean = GENRE_TALK in genreIds || GENRE_NEWS in genreIds
+private fun TmdbPersonCreditCast.isSelfRole(): Boolean = character?.let { SELF_ROLE.containsMatchIn(it) } == true
+
+/**
+ * How much a credit says about the person's career. Rated-by count is the base (a hit film has tens of thousands
+ * of votes, a one-off sketch has few); a TV guest spot of one or two episodes, a "Self" booking, and a minor
+ * billing all count for much less than a lead role. The person page's Popular row sorts on this.
+ */
+private fun relevanceScore(votes: Int?, popularity: Double?, episodes: Int?, isTv: Boolean, isSelf: Boolean, order: Int?): Double {
+    var score = kotlin.math.ln((votes ?: 0) + 1.0) * 10.0 + kotlin.math.ln((popularity ?: 0.0) + 1.0)
+    if (isTv && episodes != null && episodes in 1..2) score *= 0.25
+    if (isSelf) score *= 0.15
+    if (order != null) score *= when {
+        order <= 3 -> 1.3
+        order <= 15 -> 1.0
+        else -> 0.7
+    }
+    return score
+}
+
+private fun TmdbPersonCreditCast.relevance(): Double =
+    relevanceScore(voteCount, popularity, episodeCount, mediaType == "tv", isSelfRole(), order)
+
+private fun TmdbPersonCreditCrew.relevance(): Double =
+    relevanceScore(voteCount, popularity, null, false, false, null)
+
+private val castCreditRanking: Comparator<TmdbPersonCreditCast> = compareByDescending { it.relevance() }
+private val crewCreditRanking: Comparator<TmdbPersonCreditCrew> = compareByDescending { it.relevance() }
