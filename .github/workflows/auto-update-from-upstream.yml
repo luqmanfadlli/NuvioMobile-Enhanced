@@ -60,6 +60,10 @@ jobs:
           sed -i "s/^# Schedule owner: .*/# Schedule owner: ${login} (saved $(date -u +%Y-%m-%d))/" "${f}"
           git commit -am "ci: save the hourly upstream check under ${login}"
           git push origin HEAD:enhanced
+          # Forks keep schedules off until the owner enables the workflow, so switch it off and on as them.
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/auto-update-from-upstream.yml/disable"
+          sleep 5
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/auto-update-from-upstream.yml/enable"
 
   sync:
     name: Merge new upstream release and build
