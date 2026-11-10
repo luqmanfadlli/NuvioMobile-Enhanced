@@ -175,6 +175,15 @@ internal fun LazyListScope.homescreenSettingsContent(
                     onCheckedChange = HomeCatalogSettingsRepository::setShowCatalogType,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                val homeSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
+                SettingsSwitchRow(
+                    title = "Show addon catalogs on Home",
+                    description = "Home is built from BannerTV's own lists. Turn this on to also show the catalogs your addons provide, such as Trakt lists, under them.",
+                    checked = homeSettings.showAddonCatalogs,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setShowAddonCatalogs,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.layout_hide_unreleased),
                     description = stringResource(Res.string.layout_hide_unreleased_sub),

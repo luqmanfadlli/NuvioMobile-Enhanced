@@ -42,6 +42,8 @@ internal data class HomeCatalogSettingsUiState(
     val heroTrailerStartUnmuted: Boolean = false,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
+    /** Whether catalogs from installed addons (Trakt lists and the like) appear on Home under the built-in rows. */
+    val showAddonCatalogs: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
 ) {
     val signature: String
@@ -59,6 +61,8 @@ internal data class HomeCatalogSettingsUiState(
             append(showCatalogType)
             append('|')
             append(hideUnreleasedContent)
+            append('|')
+            append(showAddonCatalogs)
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
@@ -135,6 +139,7 @@ private data class StoredHomeCatalogSettingsPayload(
     val heroTrailerStartUnmuted: Boolean = false,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
+    val showAddonCatalogs: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
 )
 
@@ -171,6 +176,7 @@ object HomeCatalogSettingsRepository {
     private var heroTrailerStartDelaySeconds = DEFAULT_HERO_TRAILER_START_DELAY_SECONDS
     private var heroTrailerStartUnmuted = false
     private var showCatalogType = true
+    private var showAddonCatalogs = false
     private var hideUnreleasedContent = false
 
     fun onProfileChanged() {
@@ -310,6 +316,15 @@ object HomeCatalogSettingsRepository {
         persist()
     }
 
+    /** Shows or hides addon catalogs on Home. Display only: the addons stay installed and keep working elsewhere. */
+    fun setShowAddonCatalogs(enabled: Boolean) {
+        ensureLoaded()
+        if (showAddonCatalogs == enabled) return
+        showAddonCatalogs = enabled
+        publish()
+        persist()
+    }
+
     fun setShowCatalogType(enabled: Boolean) {
         ensureLoaded()
         if (showCatalogType == enabled) return
@@ -422,6 +437,7 @@ object HomeCatalogSettingsRepository {
             heroTrailerStartUnmuted = parsedPayload.heroTrailerStartUnmuted
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
+            showAddonCatalogs = parsedPayload.showAddonCatalogs
             preferences = parsedPayload.items.associateBy { it.key }
             // The hero plays a muted trailer a second after it settles, as Netflix's does. Applied once to existing settings.
             val migrated = com.nuvio.app.core.ui.UiDefaultsMigration.applyOnce("hero_trailer_home_v1") {
@@ -534,6 +550,7 @@ object HomeCatalogSettingsRepository {
             heroTrailerStartUnmuted = heroTrailerStartUnmuted,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            showAddonCatalogs = showAddonCatalogs,
             items = items,
         )
     }
@@ -549,6 +566,7 @@ object HomeCatalogSettingsRepository {
                     heroTrailerStartUnmuted = heroTrailerStartUnmuted,
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
+                    showAddonCatalogs = showAddonCatalogs,
                     items = preferences.values.sortedBy { it.order },
                 ),
             ),

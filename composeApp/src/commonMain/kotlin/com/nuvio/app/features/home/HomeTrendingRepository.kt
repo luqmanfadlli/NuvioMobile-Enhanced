@@ -46,9 +46,10 @@ data class HomeTrendingState(
  * person has installed. Everything in them can be watched at home today (see [DigitalAvailability]); the one
  * exception, Coming to Digital, is by definition what is about to be.
  *
- * Order, newest and most relevant first: Top 10 Movies, Top 10 Shows, Coming to Digital, then New on Digital,
- * Trending Movies, Trending Series, New Series, Popular Movies, Popular Series, and Top Rated Movies and Series.
- * A title appears in only one of these rows, so they don't repeat one another.
+ * The order follows how Netflix paces a page: the two Top 10s first, then new and trending titles, with movies and
+ * series taking turns so neither runs on, then themed rows ("Feel-Good Comedies", "Binge-Worthy Series") that
+ * each have a mood rather than a catalog name, and the broad popular and top-rated lists last. Personal
+ * "Because you watched" rows are slotted in between by the Home screen. A title appears in only one row.
  */
 object HomeTrendingRepository {
     private const val MAX_AGE_MS = 3L * 60 * 60 * 1000
@@ -94,26 +95,50 @@ object HomeTrendingRepository {
             "first_air_date.gte" to today.plusDays(-120), "first_air_date.lte" to today,
             "sort_by" to "popularity.desc", "without_genres" to "10767,10763",
         )
+        fun movies(genres: String, extra: Map<String, String> = emptyMap()) =
+            mapOf("with_genres" to genres, "sort_by" to "popularity.desc", "vote_count.gte" to "300", "include_adult" to "false") + extra
+        fun series(extra: Map<String, String>) =
+            mapOf("sort_by" to "popularity.desc", "vote_count.gte" to "300", "without_genres" to "10767,10763") + extra
         val wanted = 14
+        val fill = wanted + 6
+        class Spec(val key: String, val title: String, val fetch: suspend () -> List<MetaPreview>)
+        fun m(key: String, title: String, endpoint: String, q: Map<String, String> = emptyMap()) =
+            Spec(key, title) { available(endpoint, q, "movie", fill) }
+        fun t(key: String, title: String, endpoint: String, q: Map<String, String> = emptyMap()) =
+            Spec(key, title) { available(endpoint, q, "tv", fill) }
+        // Movies and series take turns, personal rows and Coming to Digital are slotted in by the Home screen.
         val specs = listOf(
-            Triple("new-digital", "New on Digital", suspend { available("discover/movie", digitalNow, "movie", wanted + 10) }),
-            Triple("trending-movies", "Trending Movies", suspend { available("trending/movie/week", emptyMap(), "movie", wanted + 10) }),
-            Triple("trending-series", "Trending Series", suspend { available("trending/tv/week", emptyMap(), "tv", wanted + 10) }),
-            Triple("new-series", "New Series", suspend { available("discover/tv", newShows, "tv", wanted + 10) }),
-            Triple("popular-movies", "Popular Movies", suspend { available("movie/popular", emptyMap(), "movie", wanted + 10) }),
-            Triple("popular-series", "Popular Series", suspend { available("tv/popular", emptyMap(), "tv", wanted + 10) }),
-            Triple("top-rated-movies", "Top Rated Movies", suspend { available("movie/top_rated", emptyMap(), "movie", wanted + 10) }),
-            Triple("top-rated-series", "Top Rated Series", suspend { available("tv/top_rated", emptyMap(), "tv", wanted + 10) }),
+            m("new-digital", "New on Digital", "discover/movie", digitalNow),
+            t("trending-series", "Trending Series", "trending/tv/week"),
+            m("trending-movies", "Trending Movies", "trending/movie/week"),
+            t("new-series", "New Series", "discover/tv", newShows),
+            m("comedies", "Feel-Good Comedies", "discover/movie", movies("35", mapOf("without_genres" to "27,53,80,10752"))),
+            t("binge", "Binge-Worthy Series", "discover/tv", series(mapOf("vote_average.gte" to "8", "vote_count.gte" to "1500"))),
+            m("thrillers", "Edge-of-Your-Seat Thrillers", "discover/movie", movies("53")),
+            t("crime", "Crime Dramas", "discover/tv", series(mapOf("with_genres" to "80"))),
+            m("scifi", "Sci-Fi & Fantasy", "discover/movie", movies("878|14")),
+            t("anime", "Anime", "discover/tv", series(mapOf("with_genres" to "16", "with_original_language" to "ja"))),
+            m("family", "Family Movie Night", "discover/movie", movies("10751")),
+            t("kdramas", "Korean Dramas", "discover/tv", series(mapOf("with_genres" to "18", "with_original_language" to "ko"))),
+            m("acclaimed", "Critically Acclaimed Movies", "movie/top_rated"),
+            m("documentaries", "Documentaries", "discover/movie", movies("99")),
+            m("horror", "Scary Good Horror", "discover/movie", movies("27")),
+            t("popular-series", "Popular Series", "tv/popular"),
+            m("popular-movies", "Popular Movies", "movie/popular"),
         )
-        val fetched = specs.map { (key, title, fetch) -> async { Triple(key, title, runCatching { fetch() }.getOrDefault(emptyList())) } }.awaitAll()
 
+        // Fetched a few at a time and shown as each batch lands, so the top of the page doesn't wait for the bottom.
         // Each title shows once down the page: a later row skips anything an earlier one (or a Top 10) already has.
         val seen = (topMovies + topShows).mapTo(HashSet()) { it.id }
-        val rows = fetched.mapNotNull { (key, title, items) ->
-            val fresh = items.filter { seen.add(it.id) }.take(wanted)
-            if (fresh.size >= 4) CuratedRow(key, title, fresh) else null
+        val rows = ArrayList<CuratedRow>()
+        for (batch in specs.chunked(4)) {
+            val fetched = batch.map { spec -> async { spec to runCatching { spec.fetch() }.getOrDefault(emptyList()) } }.awaitAll()
+            fetched.forEach { (spec, items) ->
+                val fresh = items.filter { seen.add(it.id) }.take(wanted)
+                if (fresh.size >= 4) rows += CuratedRow(spec.key, spec.title, fresh)
+            }
+            _state.value = _state.value.copy(rows = rows.toList())
         }
-        _state.value = _state.value.copy(rows = rows)
         loadedAtMs = LiveTvClock.nowMs()
     }
 
@@ -126,22 +151,29 @@ object HomeTrendingRepository {
         return arr.mapNotNull { it as? JsonObject }
     }
 
-    /** A TMDB list narrowed to what can be watched at home, in the list's own order, with the ids the app opens titles by. */
+    /**
+     * A TMDB list narrowed to what can be watched at home, in the list's own order, with the ids the app opens
+     * titles by. Candidates are checked ten at a time and the checking stops as soon as the row is full.
+     */
     private suspend fun available(endpoint: String, query: Map<String, String>, mediaType: String, limit: Int): List<MetaPreview> {
-        val picks = results(endpoint, query)
+        val candidates = results(endpoint, query)
             .filter { it.str("poster_path") != null }
             // Late-night and news shows chart every day and say nothing about what is worth watching.
             .filterNot { o -> (o["genre_ids"] as? JsonArray).orEmpty().any { (it as? JsonPrimitive)?.intOrNull in TALK_AND_NEWS } }
-            .take(limit * 2)
-        return coroutineScope {
-            picks.map { o ->
-                async {
-                    val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
-                    val found = permits.withPermit { DigitalAvailability.check(mediaType, tmdbId) } ?: return@async null
-                    o.toPreview(found.imdbId, mediaType == "tv")
-                }
-            }.awaitAll().filterNotNull().take(limit)
+        val found = ArrayList<MetaPreview>()
+        for (window in candidates.chunked(10)) {
+            if (found.size >= limit) break
+            coroutineScope {
+                window.map { o ->
+                    async {
+                        val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
+                        val ok = permits.withPermit { DigitalAvailability.check(mediaType, tmdbId) } ?: return@async null
+                        o.toPreview(ok.imdbId, mediaType == "tv")
+                    }
+                }.awaitAll().filterNotNull()
+            }.let { found += it }
         }
+        return found.take(limit)
     }
 
     /**
