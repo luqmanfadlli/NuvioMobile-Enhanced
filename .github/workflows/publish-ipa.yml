@@ -1,0 +1,218 @@
+name: Publish IPA for Feather
+
+# After a successful Release "Build Test IPA" run on "enhanced", publish the IPA
+# as a GitHub Release and add it to the Feather/AltStore source on the
+# "feather-source" branch:
+# https://raw.githubusercontent.com/<owner>/<repo>/feather-source/source.json
+
+on:
+  workflow_run:
+    workflows: ["Build Test IPA"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: ID of a successful Release "Build Test IPA" run
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-ipa
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish IPA
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'enhanced')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+      HAS_PRIVATE_PROPERTIES: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 != '' }}
+      SOURCE_BRANCH: feather-source
+    steps:
+      - name: Find the build's IPA
+        id: run
+        run: |
+          if [[ "${HAS_PRIVATE_PROPERTIES}" == "true" ]]; then
+            echo "::error::NUVIO_LOCAL_PROPERTIES_BASE64 is set, so the IPA contains private keys. Not publishing it publicly."
+            exit 1
+          fi
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}")"
+          if [[ "$(jq -r .conclusion <<<"${run_json}")" != "success" ]]; then
+            echo "::error::Run ${RUN_ID} did not succeed."
+            exit 1
+          fi
+          artifact="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '[.artifacts[] | select(.name | startswith("nuvio-test-Release-ipa-")) | .name][0] // empty')"
+          if [[ -z "${artifact}" ]]; then
+            echo "Run ${RUN_ID} has no Release IPA (Debug build?). Nothing to publish."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "skip=false" >> "${GITHUB_OUTPUT}"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+          echo "sha=$(jq -r .head_sha <<<"${run_json}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out the built commit
+        if: steps.run.outputs.skip == 'false'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.run.outputs.sha }}
+          path: src
+
+      - name: Download IPA and read its version
+        if: steps.run.outputs.skip == 'false'
+        id: ipa
+        env:
+          ARTIFACT: ${{ steps.run.outputs.artifact }}
+        run: |
+          gh run download "${RUN_ID}" --repo "${GITHUB_REPOSITORY}" -n "${ARTIFACT}" -D artifact
+          ipa="$(find artifact -name '*.ipa' -print -quit)"
+          [[ -n "${ipa}" ]] || { echo "::error::No IPA in ${ARTIFACT}"; exit 1; }
+          python3 - "${ipa}" > ipa-info.env <<'PY'
+          import plistlib, re, sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              name = next(n for n in z.namelist() if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", n))
+              info = plistlib.loads(z.read(name))
+          for key, value in (("version", info["CFBundleShortVersionString"]),
+                             ("build", info["CFBundleVersion"]),
+                             ("bundle", info["CFBundleIdentifier"])):
+              if not re.fullmatch(r"[A-Za-z0-9._-]+", value):
+                  raise SystemExit(f"unexpected {key}: {value!r}")
+              print(f"{key}={value}")
+          PY
+          cat ipa-info.env >> "${GITHUB_OUTPUT}"
+          . ./ipa-info.env
+          if [[ "${bundle}" != "com.nuvio.media" ]]; then
+            echo "::error::Unexpected bundle ID ${bundle}"
+            exit 1
+          fi
+          mkdir -p out
+          final="out/Nuvio-IMDb-${version}-${build}.ipa"
+          mv "${ipa}" "${final}"
+          echo "file=${final}" >> "${GITHUB_OUTPUT}"
+          echo "tag=imdb-${version}-${build}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write release notes
+        if: steps.run.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.ipa.outputs.version }}
+          BUILD: ${{ steps.ipa.outputs.build }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          version, build = os.environ["VERSION"], os.environ["BUILD"]
+          notes = ""
+          try:
+              store = json.load(open("src/store.json", encoding="utf-8"))
+              for v in store["apps"][0]["versions"]:
+                  if v.get("version") == version:
+                      notes = v.get("localizedDescription", "")
+                      break
+          except Exception:
+              pass
+          header = (f"Nuvio Enhanced {version} ({build}) with IMDb-only episode ratings.\n"
+                    "Unsigned: sign it in Feather with the same certificate as your installed Nuvio.")
+          open("release-notes.md", "w", encoding="utf-8").write(header + ("\n\n" + notes if notes.strip() else "") + "\n")
+          PY
+
+      - name: Publish GitHub release
+        if: steps.run.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.ipa.outputs.tag }}
+          FILE: ${{ steps.ipa.outputs.file }}
+          SHA: ${{ steps.run.outputs.sha }}
+          VERSION: ${{ steps.ipa.outputs.version }}
+          BUILD: ${{ steps.ipa.outputs.build }}
+        run: |
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${FILE}" --repo "${GITHUB_REPOSITORY}" --clobber
+          else
+            gh release create "${TAG}" "${FILE}" --repo "${GITHUB_REPOSITORY}" \
+              --target "${SHA}" \
+              --title "Nuvio IMDb build ${VERSION} (${BUILD})" \
+              --notes-file release-notes.md \
+              --latest
+          fi
+
+      - name: Update Feather source
+        if: steps.run.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.ipa.outputs.tag }}
+          FILE: ${{ steps.ipa.outputs.file }}
+          VERSION: ${{ steps.ipa.outputs.version }}
+        run: |
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+          asset="$(basename "${FILE}")"
+          url="$(jq -r --arg n "${asset}" '.assets[] | select(.name == $n) | .browser_download_url' <<<"${release_json}")"
+          date="$(jq -r '.published_at' <<<"${release_json}")"
+
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "${remote}" "${SOURCE_BRANCH}" >/dev/null; then
+            git clone --depth 1 --branch "${SOURCE_BRANCH}" "${remote}" source
+          else
+            git init -b "${SOURCE_BRANCH}" source
+            git -C source remote add origin "${remote}"
+          fi
+
+          python3 - <<'PY'
+          import json, os
+          path = "source/source.json"
+          version = os.environ["VERSION"]
+          owner_repo = os.environ["GITHUB_REPOSITORY"]
+          if os.path.exists(path):
+              data = json.load(open(path, encoding="utf-8"))
+          else:
+              data = json.load(open("src/store.json", encoding="utf-8"))
+              data["name"] = "Nuvio Enhanced (IMDb build)"
+              data["news"] = []
+              data["apps"] = [a for a in data["apps"] if a.get("bundleIdentifier") == "com.nuvio.media"][:1]
+              data["apps"][0]["name"] = "Nuvio Enhanced (IMDb)"
+              data["apps"][0]["versions"] = []
+          app = data["apps"][0]
+          # A rebuilt version replaces the old entry for that version.
+          app["versions"] = [v for v in app["versions"] if v.get("version") != version]
+          json.dump(data, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          PY
+
+          python3 src/scripts/update-store-source.py \
+            --source source/source.json \
+            --ipa "${FILE}" \
+            --release-notes release-notes.md \
+            --release-version "${VERSION}" \
+            --release-date "${date}" \
+            --download-url "${url}"
+
+          python3 - <<'PY'
+          import json
+          path = "source/source.json"
+          data = json.load(open(path, encoding="utf-8"))
+          data["apps"][0]["versions"] = data["apps"][0]["versions"][:10]
+          json.dump(data, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          open(path, "a", encoding="utf-8").write("\n")
+          PY
+
+          cd source
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source.json
+          if git diff --cached --quiet; then
+            echo "Feather source already current."
+            exit 0
+          fi
+          git commit -m "Publish ${TAG}"
+          git push origin "HEAD:${SOURCE_BRANCH}"
+          {
+            echo "## Published ${TAG}"
+            echo
+            echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+            echo "- Feather source: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${SOURCE_BRANCH}/source.json"
+          } >> "${GITHUB_STEP_SUMMARY}"

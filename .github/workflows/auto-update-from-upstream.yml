@@ -1,0 +1,98 @@
+name: Auto-update from upstream
+
+# Every few hours: if luqmanfadlli/NuvioMobile-Enhanced has a newer release tag,
+# merge it into "enhanced" (keeping our own changes) and start a Release IPA build.
+# "Publish IPA for Feather" then publishes the finished IPA.
+#
+# Needs the AUTO_UPDATE_TOKEN secret: a fine-grained token for this repository
+# with Contents, Workflows and Actions set to "Read and write". The built-in
+# token cannot push merges that touch workflow files, which upstream often changes.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-update-from-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge new upstream release and build
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_URL: https://github.com/luqmanfadlli/NuvioMobile-Enhanced.git
+      BRANCH: enhanced
+      AUTO_UPDATE_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+    steps:
+      - name: Check token
+        run: |
+          if [[ -z "${AUTO_UPDATE_TOKEN}" ]]; then
+            echo "::error::The AUTO_UPDATE_TOKEN secret is missing. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Check out ${{ env.BRANCH }}
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.AUTO_UPDATE_TOKEN }}
+
+      - name: Find newest upstream release
+        id: find
+        run: |
+          git fetch --no-tags "${UPSTREAM_URL}" '+refs/tags/*:refs/upstream-tags/*'
+          tag="$(git -c versionsort.suffix=-beta for-each-ref --sort=-v:refname \
+            --format='%(refname:strip=2)' refs/upstream-tags \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-beta)?$' | head -n 1)"
+          if [[ -z "${tag}" ]]; then
+            echo "::error::No release tags found upstream."
+            exit 1
+          fi
+          sha="$(git rev-parse "refs/upstream-tags/${tag}^{commit}")"
+          echo "Newest upstream release: ${tag} (${sha})"
+          if git merge-base --is-ancestor "${sha}" HEAD; then
+            echo "Already up to date with ${tag}."
+            echo "update=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "update=true" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Merge ${{ steps.find.outputs.tag }}
+        if: steps.find.outputs.update == 'true'
+        env:
+          TAG: ${{ steps.find.outputs.tag }}
+          SHA: ${{ steps.find.outputs.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git merge --no-edit -m "Merge upstream ${TAG} into ${BRANCH}" "${SHA}"; then
+            git diff --name-only --diff-filter=U | sed 's/^/Conflict: /'
+            git merge --abort
+            echo "::error::Upstream ${TAG} conflicts with our changes. Nothing was pushed; this needs a manual merge."
+            exit 1
+          fi
+          git push origin "HEAD:${BRANCH}"
+          {
+            echo "## Merged upstream ${TAG}"
+            echo
+            echo "A Release IPA build has been started."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Start Release IPA build
+        if: steps.find.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+        run: |
+          gh workflow run ios-test-build.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "${BRANCH}" \
+            -f configuration=Release \
+            -f disable_phases=skip-both
