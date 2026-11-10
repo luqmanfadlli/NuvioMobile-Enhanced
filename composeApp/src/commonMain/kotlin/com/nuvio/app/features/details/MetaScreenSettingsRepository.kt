@@ -147,6 +147,9 @@ private data class StoredMetaScreenSettingsPayload(
     val episodeRatingsVisibility: String = EpisodeRatingsVisibility.SHOW_ALL.name,
     @SerialName("show_rating_map")
     val showRatingMap: Boolean = true,
+    /** Bumped when the default section order changes; an older saved layout is re-ordered once to the new default. */
+    @SerialName("layout_version")
+    val layoutVersion: Int = 0,
 )
 
 private data class MetaScreenSectionDefinition(
@@ -157,6 +160,7 @@ private data class MetaScreenSectionDefinition(
 
 object MetaScreenSettingsRepository {
     /** Bounds for the "start hero trailer after N seconds" preference. */
+    private const val LAYOUT_VERSION = 2
     const val MIN_HERO_TRAILER_START_DELAY_SECONDS = 0
     const val MAX_HERO_TRAILER_START_DELAY_SECONDS = 10
     const val DEFAULT_HERO_TRAILER_START_DELAY_SECONDS = 0
@@ -178,9 +182,9 @@ object MetaScreenSettingsRepository {
             descriptionRes = Res.string.meta_section_overview_description,
         ),
         MetaScreenSectionDefinition(
-            key = MetaScreenSectionKey.PRODUCTION,
-            titleRes = Res.string.meta_section_production_title,
-            descriptionRes = Res.string.meta_section_production_description,
+            key = MetaScreenSectionKey.EPISODES,
+            titleRes = Res.string.settings_meta_episodes,
+            descriptionRes = Res.string.meta_section_episodes_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.CAST,
@@ -188,24 +192,14 @@ object MetaScreenSettingsRepository {
             descriptionRes = Res.string.meta_section_cast_description,
         ),
         MetaScreenSectionDefinition(
-            key = MetaScreenSectionKey.COMMENTS,
-            titleRes = Res.string.settings_meta_comments,
-            descriptionRes = Res.string.meta_section_comments_description,
-        ),
-        MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.TRAILERS,
             titleRes = Res.string.settings_meta_trailers,
             descriptionRes = Res.string.meta_section_trailers_description,
         ),
         MetaScreenSectionDefinition(
-            key = MetaScreenSectionKey.EPISODES,
-            titleRes = Res.string.settings_meta_episodes,
-            descriptionRes = Res.string.meta_section_episodes_description,
-        ),
-        MetaScreenSectionDefinition(
-            key = MetaScreenSectionKey.DETAILS,
-            titleRes = Res.string.meta_section_details_title,
-            descriptionRes = Res.string.meta_section_details_description,
+            key = MetaScreenSectionKey.MORE_LIKE_THIS,
+            titleRes = Res.string.meta_section_more_like_this_title,
+            descriptionRes = Res.string.meta_section_more_like_this_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.COLLECTION,
@@ -213,9 +207,19 @@ object MetaScreenSettingsRepository {
             descriptionRes = Res.string.meta_section_collection_description,
         ),
         MetaScreenSectionDefinition(
-            key = MetaScreenSectionKey.MORE_LIKE_THIS,
-            titleRes = Res.string.meta_section_more_like_this_title,
-            descriptionRes = Res.string.meta_section_more_like_this_description,
+            key = MetaScreenSectionKey.COMMENTS,
+            titleRes = Res.string.settings_meta_comments,
+            descriptionRes = Res.string.meta_section_comments_description,
+        ),
+        MetaScreenSectionDefinition(
+            key = MetaScreenSectionKey.DETAILS,
+            titleRes = Res.string.meta_section_details_title,
+            descriptionRes = Res.string.meta_section_details_description,
+        ),
+        MetaScreenSectionDefinition(
+            key = MetaScreenSectionKey.PRODUCTION,
+            titleRes = Res.string.meta_section_production_title,
+            descriptionRes = Res.string.meta_section_production_description,
         ),
     )
 
@@ -267,7 +271,9 @@ object MetaScreenSettingsRepository {
                 showRatingMap = parsed.showRatingMap
                 preferences = parsed.items.mapNotNull { item ->
                     val key = runCatching { MetaScreenSectionKey.valueOf(item.key) }.getOrNull() ?: return@mapNotNull null
-                    key to item
+                    // An older saved order is dropped once (the choice of which sections are on is kept), so the
+                    // new default order (cast up high, production last) applies to existing profiles too.
+                    key to if (parsed.layoutVersion < LAYOUT_VERSION) item.copy(order = Int.MAX_VALUE) else item
                 }.toMap().toMutableMap()
             }
         }
@@ -591,6 +597,7 @@ object MetaScreenSettingsRepository {
                     showOverallRatings = showOverallRatings,
                     episodeRatingsVisibility = episodeRatingsVisibility.name,
                     showRatingMap = showRatingMap,
+                    layoutVersion = LAYOUT_VERSION,
                 ),
             ),
         )

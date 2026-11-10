@@ -2536,6 +2536,9 @@ private fun ConfiguredMetaSections(
                     iconActionRow = settings.iconActionRow,
                     userRating = userRating,
                     onRateClick = onRateClick,
+                    onTrailerClick = (selectHeroTrailer(meta.trailers) ?: meta.trailers.firstOrNull())?.let { trailer ->
+                        { onTrailerClick(trailer) }
+                    },
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {

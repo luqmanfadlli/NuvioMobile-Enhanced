@@ -117,16 +117,26 @@ object PlayerNextEpisodeRules {
      * dismissal in the 4-minute window brings it back at 30 seconds, and it always returns
      * when playback really ends.
      */
-    fun movieRecommendationStage(positionMs: Long, durationMs: Long, isEnded: Boolean): Int {
+    fun movieRecommendationStage(positionMs: Long, durationMs: Long, isEnded: Boolean, creditsStartMs: Long? = null): Int {
         if (isEnded) return MOVIE_RECOMMENDATION_STAGE_ENDED
         if (durationMs <= 0L) return 0
         val remainingMs = durationMs - positionMs
         return when {
             remainingMs <= MOVIE_RECOMMENDATION_FINAL_MS -> 2
+            // When the player knows where the credits begin, the card floats in a few seconds after they roll
+            // rather than on a fixed "minutes left" guess.
+            creditsStartMs != null -> if (positionMs >= creditsStartMs + MOVIE_RECOMMENDATION_CREDITS_DELAY_MS) 1 else 0
             remainingMs <= MOVIE_RECOMMENDATION_FIRST_MS -> 1
             else -> 0
         }
     }
+
+    /** Where the credits start, from the skip data (an outro segment), or null when the player has none. */
+    fun creditsStartMs(skipIntervals: List<SkipInterval>): Long? =
+        skipIntervals.filter { it.type in OUTRO_SEGMENT_TYPES }
+            .minOfOrNull { (it.startTime * 1_000.0).toLong() }
+
+    private const val MOVIE_RECOMMENDATION_CREDITS_DELAY_MS = 4_000L
 
     const val MOVIE_RECOMMENDATION_STAGE_ENDED = 3
     private const val MOVIE_RECOMMENDATION_FIRST_MS = 4L * 60_000L

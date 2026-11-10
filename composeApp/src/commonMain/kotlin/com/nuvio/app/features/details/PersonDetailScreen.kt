@@ -312,7 +312,7 @@ private fun PersonDetailContent(
                         )
 
                         if (popularCredits.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             DetailPosterRailSection(
                                 title = stringResource(Res.string.person_popular),
                                 items = popularCredits,
@@ -617,7 +617,8 @@ private fun HeroSection(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
-    val avatarSize = lerp(140.dp, 72.dp, collapseProgress)
+    // A compact identity row (photo beside name and details) keeps the credits close to the top of the page.
+    val avatarSize = 96.dp
     val heroScale = 1f - (collapseProgress * 0.12f)
     val heroAlpha = 1f - (collapseProgress * 0.35f)
     val avatarUrl = person.profilePhoto?.takeIf { it.isNotBlank() } ?: fallbackProfilePhoto
@@ -658,8 +659,9 @@ private fun HeroSection(
                 alpha = heroAlpha
                 translationY = -(collapseProgress * 40f)
             },
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         // Profile Photo
         Box(
             modifier = Modifier
@@ -685,8 +687,7 @@ private fun HeroSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
+        Column(modifier = Modifier.weight(1f)) {
         // Name
         Text(
             text = person.name,
@@ -699,7 +700,7 @@ private fun HeroSection(
             overflow = TextOverflow.Ellipsis,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Personal info
         val infoItems = buildList {
@@ -736,16 +737,19 @@ private fun HeroSection(
             }
         }
 
+        }
+        }
+
         // Biography
         person.biography?.let { bio ->
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             ExpandableDescription(
                 text = bio,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     lineHeight = 20.sp,
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                collapsedMaxLines = 8,
+                collapsedMaxLines = 5,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

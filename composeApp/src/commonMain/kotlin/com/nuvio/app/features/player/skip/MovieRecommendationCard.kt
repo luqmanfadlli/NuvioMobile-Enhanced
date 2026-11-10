@@ -4,8 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -87,10 +90,13 @@ fun MovieRecommendationCard(
 
     AnimatedVisibility(
         visible = visible,
-        enter = slideInHorizontally(animationSpec = tween(260), initialOffsetX = { it / 2 }) +
-            fadeIn(animationSpec = tween(220)),
-        exit = slideOutHorizontally(animationSpec = tween(200), targetOffsetX = { it / 2 }) +
-            fadeOut(animationSpec = tween(160)),
+        // Floats up from the bottom edge, easing in softly and settling, so it arrives without a jolt over the credits.
+        enter = slideInVertically(animationSpec = tween(520, easing = FastOutSlowInEasing), initialOffsetY = { it / 2 }) +
+            fadeIn(animationSpec = tween(520, easing = FastOutSlowInEasing)) +
+            scaleIn(animationSpec = tween(520, easing = FastOutSlowInEasing), initialScale = 0.94f),
+        exit = slideOutVertically(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetY = { it / 2 }) +
+            fadeOut(animationSpec = tween(260)) +
+            scaleOut(animationSpec = tween(320, easing = FastOutSlowInEasing), targetScale = 0.96f),
         modifier = modifier,
     ) {
         val shape = RoundedCornerShape(16.dp)
@@ -174,4 +180,4 @@ fun MovieRecommendationCard(
     }
 }
 
-private const val MOVIE_RECOMMENDATION_AUTO_HIDE_MS = 10_000L
+private const val MOVIE_RECOMMENDATION_AUTO_HIDE_MS = 20_000L

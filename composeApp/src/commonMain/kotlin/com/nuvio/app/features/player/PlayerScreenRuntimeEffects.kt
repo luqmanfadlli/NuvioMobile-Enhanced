@@ -914,6 +914,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         watchedUiState.watchedKeys,
         movieRecommendationDismissedStage,
         playerSettingsUiState.movieRecommendationsEnabled,
+        skipIntervals,
     ) {
         if (!isMoviePlayback || !playerSettingsUiState.movieRecommendationsEnabled || movieRecommendationCandidates.isEmpty()) {
             showMovieRecommendationCard = false
@@ -924,6 +925,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             positionMs = playbackSnapshot.positionMs,
             durationMs = playbackSnapshot.durationMs,
             isEnded = playbackSnapshot.isEnded,
+            creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals),
         )
         if (stage == 0 && movieRecommendationDismissedStage != 0) {
             movieRecommendationDismissedStage = 0

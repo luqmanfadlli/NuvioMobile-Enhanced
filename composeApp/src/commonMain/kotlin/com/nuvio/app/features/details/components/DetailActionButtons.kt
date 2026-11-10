@@ -25,6 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -105,6 +109,10 @@ fun DetailActionButtons(
     onDownloadClick: (() -> Unit)? = null,
     iconActionRow: Boolean = false,
     iconActions: List<DetailSecondaryAction> = emptyList(),
+    /** Shown as round buttons in the same row as Play (e.g. Download, add to library). */
+    inlineActions: List<DetailSecondaryAction> = emptyList(),
+    /** Everything else, tucked behind a ⋯ menu at the end of that row. */
+    overflowActions: List<DetailSecondaryAction> = emptyList(),
     userRating: Int? = null,
     onRateClick: (() -> Unit)? = null,
 ) {
@@ -127,6 +135,81 @@ fun DetailActionButtons(
             .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (iconActionRow && (inlineActions.isNotEmpty() || overflowActions.isNotEmpty())) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PlayButton(
+                    playLabel = playLabel,
+                    playEnabled = playEnabled,
+                    playPainter = playPainter,
+                    playShape = playShape,
+                    buttonHeight = buttonHeight,
+                    isTablet = isTablet,
+                    onPlayClick = onPlayClick,
+                    onPlayLongClick = onPlayLongClick,
+                    modifier = Modifier.weight(1f),
+                )
+                inlineActions.forEach { action ->
+                    DetailIconAction(
+                        label = action.label,
+                        icon = action.icon,
+                        drawable = action.drawable,
+                        active = action.isActive,
+                        progress = 1f,
+                        size = iconButtonSize,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            action.onClick()
+                        },
+                        onLongClick = action.onLongClick?.let { longClick ->
+                            {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                longClick()
+                            }
+                        },
+                    )
+                }
+                if (overflowActions.isNotEmpty()) {
+                    Box {
+                        Surface(
+                            modifier = Modifier.size(iconButtonSize),
+                            shape = CircleShape,
+                            color = backdropControlColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)),
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(iconButtonSize)
+                                    .clickable(role = Role.Button) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        actionsExpanded = true
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = actionsMenuLabel, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                            overflowActions.forEach { action ->
+                                DropdownMenuItem(
+                                    text = { Text(action.label) },
+                                    leadingIcon = { Icon(action.icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                    onClick = {
+                                        actionsExpanded = false
+                                        action.onClick()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            return@Column
+        }
+
         if (iconActionRow) {
             PlayButton(
                 playLabel = playLabel,
@@ -372,6 +455,7 @@ fun DetailActions(
     iconActionRow: Boolean = false,
     userRating: Int? = null,
     onRateClick: (() -> Unit)? = null,
+    onTrailerClick: (() -> Unit)? = null,
 ) {
     val actionSet = detailActionSet(
         isSaved = isSaved,
@@ -389,12 +473,32 @@ fun DetailActions(
     val watchedAction = actionSet.watched
     val saveAction = actionSet.save
     val iconActions = actionSet.icons
+    val rateAction = onRateClick?.let { rate ->
+        DetailSecondaryAction(
+            label = if (userRating != null) "Your rating: $userRating" else "Rate this title",
+            icon = Icons.Default.Star,
+            isActive = userRating != null,
+            onClick = rate,
+        )
+    }
+    val trailerAction = onTrailerClick?.let { trailer ->
+        DetailSecondaryAction(label = "Watch trailer", icon = Icons.Default.PlayArrow, onClick = trailer)
+    }
     DetailActionButtons(
         playLabel = if (playEnabled) playLabel else stringResource(Res.string.playback_unavailable),
         playEnabled = playEnabled,
         pinnedAction = shuffleAction?.takeIf { shuffleEnabled },
         iconActionRow = iconActionRow,
         iconActions = iconActions,
+        inlineActions = listOfNotNull(actionSet.download, saveAction),
+        overflowActions = listOfNotNull(
+            trailerAction,
+            actionSet.playFromStart,
+            shuffleAction,
+            actionSet.external,
+            watchedAction,
+            rateAction,
+        ),
         secondaryActions = buildList {
             if (!shuffleEnabled) shuffleAction?.let(::add)
             add(watchedAction)
@@ -414,6 +518,9 @@ private class DetailActionSet(
     val watched: DetailSecondaryAction,
     val save: DetailSecondaryAction,
     val icons: List<DetailSecondaryAction>,
+    val download: DetailSecondaryAction? = null,
+    val playFromStart: DetailSecondaryAction? = null,
+    val external: DetailSecondaryAction? = null,
 )
 
 @Composable
@@ -454,27 +561,24 @@ private fun detailActionSet(
     val downloadLabel = stringResource(Res.string.details_download_action)
     val playFromStartLabel = stringResource(Res.string.details_action_start_from_beginning)
     val externalLabel = stringResource(Res.string.streams_open_external_player)
+    val downloadAction = onDownloadClick?.let { download ->
+        DetailSecondaryAction(label = downloadLabel, icon = Icons.Rounded.Download, onClick = download)
+    }
+    val playFromStartAction = onPlayFromStartClick?.let { playFromStart ->
+        DetailSecondaryAction(label = playFromStartLabel, icon = Icons.Rounded.Replay, onClick = playFromStart)
+    }
+    val externalAction = onPlayExternallyClick?.let { playExternally ->
+        DetailSecondaryAction(label = externalLabel, icon = Icons.AutoMirrored.Rounded.OpenInNew, onClick = playExternally)
+    }
     val iconActions = buildList {
-        onDownloadClick?.let { download ->
-            add(DetailSecondaryAction(label = downloadLabel, icon = Icons.Rounded.Download, onClick = download))
-        }
-        onPlayFromStartClick?.let { playFromStart ->
-            add(DetailSecondaryAction(label = playFromStartLabel, icon = Icons.Rounded.Replay, onClick = playFromStart))
-        }
+        downloadAction?.let(::add)
+        playFromStartAction?.let(::add)
         shuffleAction?.let(::add)
-        onPlayExternallyClick?.let { playExternally ->
-            add(
-                DetailSecondaryAction(
-                    label = externalLabel,
-                    icon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = playExternally,
-                ),
-            )
-        }
+        externalAction?.let(::add)
         add(watchedAction)
         add(saveAction)
     }
-    return DetailActionSet(shuffleAction, watchedAction, saveAction, iconActions)
+    return DetailActionSet(shuffleAction, watchedAction, saveAction, iconActions, downloadAction, playFromStartAction, externalAction)
 }
 
 @Composable

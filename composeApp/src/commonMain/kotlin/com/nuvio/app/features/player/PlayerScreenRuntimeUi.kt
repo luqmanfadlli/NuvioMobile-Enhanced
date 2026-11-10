@@ -914,6 +914,7 @@ private fun BoxScope.RenderPlaybackOverlays(
                 positionMs = playbackSnapshot.positionMs,
                 durationMs = playbackSnapshot.durationMs,
                 isEnded = playbackSnapshot.isEnded,
+                creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals),
             )
             showMovieRecommendationCard = false
         },
