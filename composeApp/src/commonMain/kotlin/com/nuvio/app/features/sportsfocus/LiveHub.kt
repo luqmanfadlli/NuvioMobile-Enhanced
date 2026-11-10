@@ -1,5 +1,9 @@
 package com.nuvio.app.features.sportsfocus
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.rounded.Star
+import com.nuvio.app.core.ui.NuvioToastController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -167,22 +171,26 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
     val use24h = use24h()
     var mineOnly by rememberSaveable { mutableStateOf(true) }
     var query by rememberSaveable { mutableStateOf("") }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    val myGuide by GuideChannelStore.selected.collectAsStateWithLifecycle()
     val windowStart = remember(now / HALF_HOUR_MS) { (now / HALF_HOUR_MS) * HALF_HOUR_MS }
     val windowEnd = windowStart + GUIDE_WINDOW_HOURS * 60 * 60_000L
     val timelineWidth = (GUIDE_WINDOW_HOURS * 60 * GUIDE_DP_PER_MINUTE).dp
     val shared = rememberScrollState()
+    // My Guide with nothing chosen yet offers to build it, rather than guessing at favourites.
+    val needsSetup = mineOnly && myGuide.isEmpty()
 
-    val rows = remember(ui.channels, ui.epgPrograms, ui.favoriteChannelIds, ui.lastWatchedChannelId, mineOnly, query, windowStart) {
-        val withPrograms = ui.channels.mapNotNull { channel ->
+    val rows = remember(ui.channels, ui.epgPrograms, myGuide, mineOnly, query, windowStart) {
+        val candidates = if (mineOnly) ui.channels.filter { it.id in myGuide } else ui.channels
+        val built = candidates.mapNotNull { channel ->
             val programs = ui.epgPrograms[channel.id].orEmpty()
                 .filter { it.endMillis > windowStart && it.startMillis < windowEnd }
                 .sortedBy { it.startMillis }
-            if (programs.isEmpty()) null else GuideRow(channel, programs)
+            // A channel you chose stays in your guide even when its listings haven't arrived.
+            if (programs.isEmpty() && !mineOnly) null else GuideRow(channel, programs)
         }
-        val mine = withPrograms.filter { it.channel.id in ui.favoriteChannelIds || it.channel.id == ui.lastWatchedChannelId }
-        val scoped = if (mineOnly) mine.ifEmpty { withPrograms.take(30) } else withPrograms
         val q = query.trim().lowercase()
-        (if (q.isEmpty()) scoped else scoped.filter { row -> row.channel.name.lowercase().contains(q) || row.programs.any { it.title.lowercase().contains(q) } }).take(200)
+        (if (q.isEmpty()) built else built.filter { row -> row.channel.name.lowercase().contains(q) || row.programs.any { it.title.lowercase().contains(q) } }).take(200)
     }
 
     Column(modifier.fillMaxSize().background(tokens.colors.background).statusBarsPadding()) {
@@ -194,7 +202,32 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
         ) {
             Chip("My Guide", selected = mineOnly, onClick = { mineOnly = true })
             Chip("All Channels", selected = !mineOnly, onClick = { mineOnly = false })
+            if (!needsSetup) Chip(if (myGuide.isEmpty()) "Build My Guide" else "Edit My Guide (${myGuide.size})", selected = false, onClick = { showPicker = true })
         }
+        if (needsSetup) {
+            Column(
+                Modifier.fillMaxSize().padding(NuvioTokens.Space.s24),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12, Alignment.CenterVertically),
+            ) {
+                Text("Build Your Guide", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = tokens.colors.textPrimary)
+                Text(
+                    "Choose what you actually watch.\nYou can change this anytime.",
+                    style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted, textAlign = TextAlign.Center,
+                )
+                Box(
+                    Modifier.clip(RoundedCornerShape(NuvioTokens.Radius.full)).background(tokens.colors.textPrimary).clickable { showPicker = true }
+                        .padding(horizontal = NuvioTokens.Space.s24, vertical = NuvioTokens.Space.s12),
+                ) { Text("Get Started", color = tokens.colors.background, fontWeight = FontWeight.Bold) }
+                Text(
+                    "Browse All Channels", style = MaterialTheme.typography.titleSmall, color = tokens.colors.textMuted,
+                    modifier = Modifier.clickable { mineOnly = false }.padding(NuvioTokens.Space.s8),
+                )
+            }
+            if (showPicker) GuideChannelPicker(ui.channels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false }
+            return@Column
+        }
+        if (showPicker) GuideChannelPicker(ui.channels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false; mineOnly = true }
         GuideSearchField(query, { query = it }, Modifier.padding(horizontal = NuvioTokens.Space.s16))
         Spacer(Modifier.height(NuvioTokens.Space.s8))
         if (rows.isEmpty()) {
@@ -224,9 +257,19 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
             LazyColumn(contentPadding = PaddingValues(bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16))) {
                 items(rows, key = { it.channel.id }) { row ->
                     Row(Modifier.fillMaxWidth().height(GUIDE_ROW_HEIGHT)) {
-                        GuideChannelCell(row.channel, Modifier.width(GUIDE_CHANNEL_WIDTH).fillMaxHeight()) { onChannelClick(row.channel) }
+                        GuideChannelCell(
+                            row.channel, row.channel.id in myGuide, Modifier.width(GUIDE_CHANNEL_WIDTH).fillMaxHeight(),
+                            onLongClick = {
+                                val adding = row.channel.id !in myGuide
+                                GuideChannelStore.toggle(row.channel.id)
+                                NuvioToastController.show(if (adding) "Added to My Guide" else "Removed from My Guide")
+                            },
+                        ) { onChannelClick(row.channel) }
                         Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(shared)) {
                             Box(Modifier.width(timelineWidth).fillMaxHeight()) {
+                                if (row.programs.isEmpty()) {
+                                    Text("No guide data for this channel", style = MaterialTheme.typography.labelMedium, color = tokens.colors.textMuted, modifier = Modifier.padding(start = 12.dp, top = 26.dp))
+                                }
                                 row.programs.forEach { program ->
                                     GuideProgram(program, windowStart, windowEnd, now, use24h) { onChannelClick(row.channel) }
                                 }
@@ -265,18 +308,22 @@ private fun GuideSearchField(query: String, onChange: (String) -> Unit, modifier
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GuideChannelCell(channel: LiveTvChannel, modifier: Modifier, onClick: () -> Unit) {
+private fun GuideChannelCell(channel: LiveTvChannel, inGuide: Boolean, modifier: Modifier, onLongClick: () -> Unit, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
-    Column(
-        modifier.clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        if (channel.logoUrl != null) {
-            AsyncImage(model = channel.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(width = 56.dp, height = 30.dp))
+    Box(modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (channel.logoUrl != null) {
+                AsyncImage(model = channel.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(width = 56.dp, height = 30.dp))
+            }
+            Text(channel.name, style = MaterialTheme.typography.labelSmall, color = tokens.colors.textPrimary, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Text(channel.name, style = MaterialTheme.typography.labelSmall, color = tokens.colors.textPrimary, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (inGuide) Icon(Icons.Rounded.Star, contentDescription = "In My Guide", tint = tokens.colors.accent, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(12.dp))
     }
 }
 

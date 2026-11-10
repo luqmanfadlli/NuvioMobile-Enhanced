@@ -11,6 +11,7 @@ import com.nuvio.app.features.news.NewsArticle
 import com.nuvio.app.features.podcasts.Podcast
 import com.nuvio.app.features.sportsfocus.LiveHub
 import com.nuvio.app.features.sportsfocus.SportsSearchScreen
+import com.nuvio.app.features.sportsfocus.BalancedSportsTab
 import com.nuvio.app.features.sportsfocus.SportsFocusFollowing
 import com.nuvio.app.features.sportsfocus.SportsFocusHome
 import com.nuvio.app.features.discover.DiscoverScreen
@@ -343,9 +344,12 @@ internal fun AppTabHost(
 
             AppScreenTab.Sports -> {
                 actions.sportsActions?.let { sportsActions ->
-                    SportsScreen(
-                        onBack = null,
+                    BalancedSportsTab(
                         actions = sportsActions,
+                        onOpenArticle = actions.onOpenArticle,
+                        onOpenPodcast = actions.onOpenPodcastShow,
+                        onOpenPodcasts = actions.onOpenPodcasts,
+                        onOpenLive = actions.onOpenLive,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

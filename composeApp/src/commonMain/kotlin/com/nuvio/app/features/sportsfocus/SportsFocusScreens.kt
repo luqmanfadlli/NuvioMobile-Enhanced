@@ -104,6 +104,8 @@ fun SportsFocusHome(
     onOpenFollowing: () -> Unit,
     onOpenLive: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The Balanced Sports tab is this same page without the "Good evening" line. */
+    showGreeting: Boolean = true,
 ) {
     val tokens = MaterialTheme.nuvio
     val repo = SportsRepository
@@ -168,7 +170,8 @@ fun SportsFocusHome(
         contentPadding = PaddingValues(bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16)),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
     ) {
-        item { HomeGreeting() }
+        // Without the greeting, keep the same clearance for the status bar and the corner profile icon.
+        item { if (showGreeting) HomeGreeting() else Spacer(Modifier.statusBarsPadding().height(56.dp)) }
         if (loading && all.isEmpty()) {
             item { Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
         }

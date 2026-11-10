@@ -40,7 +40,14 @@ object SportsWatch {
             if (list.isEmpty()) {
                 _finding.update { it + ev.id }
                 list = try {
-                    runCatching { SportsRepository.matchNow(ev) }.getOrDefault(emptyList())
+                    var found = runCatching { SportsRepository.matchNow(ev) }.getOrDefault(emptyList())
+                    // Just after launch Live TV is still loading its channels and guide, which can leave a game
+                    // looking stream-less. Wait for it to finish and look once more before saying none was found.
+                    if (found.isEmpty() && SportsRepository.liveTvSettling) {
+                        SportsRepository.awaitLiveTvSettled()
+                        found = runCatching { SportsRepository.matchNow(ev) }.getOrDefault(emptyList())
+                    }
+                    found
                 } finally {
                     _finding.update { it - ev.id }
                 }

@@ -1040,6 +1040,17 @@ internal object SportsRepository {
     /** False until Live TV has loaded any channels: before that no game can have a stream. */
     val channelsReady: Boolean get() = liveRepo.displayChannels.value.isNotEmpty()
 
+    /**
+     * True while Live TV is still fetching its channels or guide (right after launch). A game with no stream
+     * in that window may only be waiting on it, so "no stream found" is not yet an answer.
+     */
+    val liveTvSettling: Boolean get() = liveRepo.status.value.loading || liveRepo.displayChannels.value.isEmpty()
+
+    /** Waits (up to [timeoutMs]) for Live TV to finish loading its channels and guide. */
+    suspend fun awaitLiveTvSettled(timeoutMs: Long = 25_000) {
+        withTimeoutOrNull(timeoutMs) { liveRepo.status.first { !it.loading && it.loadedOnce } }
+    }
+
     private val nowMatching = HashMap<String, CompletableDeferred<List<ChannelMatch>>>()
     private val nowMatchingLock = SynchronizedObject()
 

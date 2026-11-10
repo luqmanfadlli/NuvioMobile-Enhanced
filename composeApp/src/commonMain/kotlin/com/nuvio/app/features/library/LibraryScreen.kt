@@ -223,10 +223,12 @@ fun LibraryScreen(
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
-    val displaySettings by remember {
+    val storedDisplaySettings by remember {
         LibraryDisplaySettingsRepository.ensureLoaded()
         LibraryDisplaySettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+    // The Library is always the row layout now; the grid ("compact") option is gone.
+    val displaySettings = remember(storedDisplaySettings) { storedDisplaySettings.copy(layoutMode = LibraryLayoutMode.HORIZONTAL) }
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     val unknownReleaseLabel = stringResource(Res.string.generic_unknown)
     var observedOfflineState by remember { mutableStateOf(false) }
@@ -237,9 +239,11 @@ fun LibraryScreen(
     }.collectAsStateWithLifecycle()
     val hasServers = serversUiState.connections.any { it.enabled }
     var sourceModeName by rememberSaveable { mutableStateOf(LibraryViewMode.Saved.name) }
-    val sourceMode = remember(sourceModeName, hasServers) {
+    val cloudAccountSetUp = cloudSettings.canUseCloudLibrary
+    // Saved by default; Cloud (and Servers) only exist once the matching account is set up in Settings.
+    val sourceMode = remember(sourceModeName, hasServers, cloudAccountSetUp) {
         runCatching { LibraryViewMode.valueOf(sourceModeName) }.getOrDefault(LibraryViewMode.Saved)
-            .takeUnless { it == LibraryViewMode.Servers && !hasServers }
+            .takeUnless { (it == LibraryViewMode.Servers && !hasServers) || (it == LibraryViewMode.Cloud && !cloudAccountSetUp) }
             ?: LibraryViewMode.Saved
     }
     var showReleaseCalendar by rememberSaveable { mutableStateOf(false) }
@@ -462,77 +466,12 @@ fun LibraryScreen(
                     .padding(LocalVerticalBarPadding.current),
             ) {
                 NuvioScreenHeader(
-                    title = if (sourceMode != LibraryViewMode.Saved) {
-                        stringResource(Res.string.library_title)
-                    } else {
-                        when (uiState.sourceMode) {
-                            LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
-                            LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
-                            LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
-                            LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
-                            LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_title)
-                            LibrarySourceMode.WETRAKR -> stringResource(Res.string.library_wetrakr_title)
-                            LibrarySourceMode.PUBLICMETADB -> stringResource(Res.string.library_publicmetadb_title)
-                        }
-                    },
+                    title = stringResource(Res.string.library_title),
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
-                LibrarySourceSwitch(
-                    selectedMode = sourceMode,
-                    showServers = hasServers,
-                    onModeSelected = { mode ->
-                        sourceModeName = mode.name
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
+                val sourceActions: @Composable RowScope.() -> Unit = {
                     if (sourceMode == LibraryViewMode.Saved) {
                         LibraryListManagementButton()
-                        val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
-                            LibraryLayoutMode.VERTICAL
-                        } else {
-                            LibraryLayoutMode.HORIZONTAL
-                        }
-                        IconButton(
-                            onClick = {
-                                LibraryDisplaySettingsRepository.setLayoutMode(targetLayout)
-                            },
-                        ) {
-                            Crossfade(
-                                targetState = targetLayout,
-                                animationSpec = tween(durationMillis = 140),
-                                label = "libraryLayoutAction",
-                            ) { animatedTargetLayout ->
-                                Icon(
-                                    imageVector = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                        Icons.Rounded.GridView
-                                    } else {
-                                        Icons.Rounded.ViewAgenda
-                                    },
-                                    contentDescription = if (animatedTargetLayout == LibraryLayoutMode.VERTICAL) {
-                                        stringResource(Res.string.library_layout_show_vertical)
-                                    } else {
-                                        stringResource(Res.string.library_layout_show_horizontal)
-                                    },
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    if (sourceMode == LibraryViewMode.Saved) {
-                        val openCalendarLabel = stringResource(Res.string.library_calendar_open)
-                        IconButton(
-                            onClick = { showReleaseCalendar = true },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .semantics { contentDescription = openCalendarLabel },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.CalendarMonth,
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
                     if (sourceMode == LibraryViewMode.Cloud) {
                         val cloudSearchLabel = stringResource(Res.string.cloud_library_search_label)
@@ -553,9 +492,23 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    if (onDownloadsClick != null) {
-                        LibraryDownloadsButton(onClick = onDownloadsClick)
-                    }
+                }
+                if (cloudAccountSetUp || hasServers) {
+                    LibrarySourceSwitch(
+                        selectedMode = sourceMode,
+                        showServers = hasServers,
+                        showCloud = cloudAccountSetUp,
+                        onModeSelected = { mode -> sourceModeName = mode.name },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        trailingActions = sourceActions,
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = sourceActions,
+                    )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
             }
@@ -628,6 +581,15 @@ fun LibraryScreen(
                     onRetry = { serverShelvesRequest++ },
                 )
             } else {
+                // Downloads and the release calendar lead the page, as large cards rather than small header icons.
+                item(key = "library-profile-header") { LibraryProfileHeader() }
+                item(key = "library-quick-access") {
+                    LibraryQuickAccess(
+                        onDownloadsClick = onDownloadsClick,
+                        onCalendarClick = { showReleaseCalendar = true },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 14.dp),
+                    )
+                }
                 when {
                     !uiState.isLoaded || (uiState.isLoading && uiState.sections.isEmpty()) -> {
                         if (displaySettings.layoutMode == LibraryLayoutMode.VERTICAL) {
@@ -696,6 +658,15 @@ fun LibraryScreen(
                     }
 
                     else -> {
+                        item(key = "library-my-list-title") {
+                            Text(
+                                text = "My List",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
                         stickyHeader(
                             key = "library-saved-controls:${uiState.sourceMode}:" +
                                 "${displaySettings.layoutMode}:$effectiveSortOption",
@@ -725,7 +696,8 @@ fun LibraryScreen(
                             }
                         }
                         when (displaySettings.layoutMode) {
-                            LibraryLayoutMode.HORIZONTAL -> librarySections(
+                            LibraryLayoutMode.HORIZONTAL -> {
+                            librarySections(
                                 displaySections = librarySectionsDisplay,
                                 releaseInfoFor = releaseInfoFor,
                                 watchedKeys = watchedUiState.watchedKeys,
@@ -737,6 +709,8 @@ fun LibraryScreen(
                                 onPosterLongClick = onPosterLongClick,
                                 onDisintegrated = disintegration::onExited,
                             )
+                            libraryHistoryRows(onPreviewClick = onPreviewClick, onPreviewLongClick = onPreviewLongClick)
+                            }
                             LibraryLayoutMode.VERTICAL -> libraryVerticalContent(
                                 projection = verticalProjection,
                                 columns = gridColumns,
@@ -1028,6 +1002,7 @@ private fun LazyListScope.cloudLibrarySkeletonItems() {
 private fun LibrarySourceSwitch(
     selectedMode: LibraryViewMode,
     showServers: Boolean,
+    showCloud: Boolean,
     onModeSelected: (LibraryViewMode) -> Unit,
     modifier: Modifier = Modifier,
     trailingActions: @Composable RowScope.() -> Unit = {},
@@ -1042,11 +1017,13 @@ private fun LibrarySourceSwitch(
             selected = selectedMode == LibraryViewMode.Saved,
             onClick = { onModeSelected(LibraryViewMode.Saved) },
         )
-        LibraryChip(
-            label = stringResource(Res.string.library_source_cloud),
-            selected = selectedMode == LibraryViewMode.Cloud,
-            onClick = { onModeSelected(LibraryViewMode.Cloud) },
-        )
+        if (showCloud) {
+            LibraryChip(
+                label = stringResource(Res.string.library_source_cloud),
+                selected = selectedMode == LibraryViewMode.Cloud,
+                onClick = { onModeSelected(LibraryViewMode.Cloud) },
+            )
+        }
         if (showServers) {
             LibraryChip(
                 label = stringResource(Res.string.library_source_servers),

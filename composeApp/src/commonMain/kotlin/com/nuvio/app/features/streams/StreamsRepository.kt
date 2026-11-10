@@ -5,7 +5,9 @@ import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
+import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
 import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
 import com.nuvio.app.features.debrid.DebridSettingsRepository
@@ -17,6 +19,7 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.servers.ServerStreams
+import com.nuvio.app.features.sports.compat.LiveTvClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,6 +29,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.update
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -39,6 +44,24 @@ object StreamsRepository {
 
     private var activeJob: Job? = null
     private var activeRequestKey: String? = null
+
+    private val processStartMs = LiveTvClock.nowMs()
+
+    /** Manifests still loading, or (only in the first moments after launch) no addons arrived yet. */
+    private fun addonsStillLoading(addons: List<ManagedAddon>): Boolean =
+        addons.isWaitingForFirstEnabledManifest() ||
+            (addons.isEmpty() && LiveTvClock.nowMs() - processStartMs < EMPTY_ADDONS_GRACE_WINDOW_MS)
+
+    private suspend fun awaitAddonsReady() {
+        val startedEmpty = AddonRepository.uiState.value.addons.isEmpty()
+        withTimeoutOrNull(if (startedEmpty) EMPTY_ADDONS_WAIT_MS else MANIFEST_WAIT_MS) {
+            AddonRepository.uiState.first { !addonsStillLoading(it.addons) }
+        }
+    }
+
+    private const val EMPTY_ADDONS_GRACE_WINDOW_MS = 20_000L
+    private const val EMPTY_ADDONS_WAIT_MS = 3_000L
+    private const val MANIFEST_WAIT_MS = 15_000L
 
     fun requestToken(
         type: String,
@@ -75,7 +98,7 @@ object StreamsRepository {
         )
     }
 
-    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
+    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean, addonsReady: Boolean = false) {
         val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.uiState.value
@@ -169,6 +192,27 @@ object StreamsRepository {
                 activeAddonIds = setOf("embedded"),
                 isAnyLoading = false,
             )
+            return
+        }
+
+        // Just after launch the installed addons are still fetching their manifests (or the saved list is still
+        // arriving), and an addon with no manifest is skipped below. Looking up streams in that window reports
+        // "no streams" for a title that would have played a moment later, so wait for the addons first.
+        if (!addonsReady && !ServerStreams.isNativeRequest(videoId) && addonsStillLoading(AddonRepository.uiState.value.addons)) {
+            InAppLogger.info("Streams/StreamsRepository", "Addons still loading; waiting before looking up streams type=$type id=$videoId")
+            _uiState.value = StreamsUiState(
+                requestToken = requestToken,
+                isAnyLoading = true,
+                isDirectAutoPlayFlow = isDirectAutoPlayFlow,
+                autoPlayDecided = true,
+                showDirectAutoPlayOverlay = isDirectAutoPlayFlow,
+            )
+            activeJob = scope.launch {
+                awaitAddonsReady()
+                if (activeRequestKey != requestKey) return@launch
+                activeJob = null
+                load(type, videoId, parentMetaId, season, episode, manualSelection, forceRefresh = true, addonsReady = true)
+            }
             return
         }
 

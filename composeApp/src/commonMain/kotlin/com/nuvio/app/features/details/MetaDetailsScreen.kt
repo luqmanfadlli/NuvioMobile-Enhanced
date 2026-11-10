@@ -778,6 +778,14 @@ fun MetaDetailsScreen(
                 }
                 val resolveTrailer: (MetaTrailer) -> Unit = remember(meta.id, inAppTrailerPlaybackEnabled, uriHandler) {
                     { trailer ->
+                        com.nuvio.app.features.library.TrailerHistory.record(
+                            id = meta.id,
+                            type = meta.type,
+                            name = meta.name,
+                            poster = meta.poster,
+                            background = meta.background,
+                            nowMs = com.nuvio.app.features.watched.WatchedClock.nowEpochMs(),
+                        )
                         val youtubeUrl = trailer.youtubePlaybackUrl()
                         if (!inAppTrailerPlaybackEnabled) {
                             runCatching { uriHandler.openUri(youtubeUrl) }
