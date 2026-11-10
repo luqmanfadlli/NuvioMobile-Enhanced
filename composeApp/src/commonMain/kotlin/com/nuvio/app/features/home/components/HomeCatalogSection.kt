@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home.components
 
+import com.nuvio.app.features.home.friendlyCatalogTitle
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,7 +82,7 @@ private fun HomeCatalogRowSectionContent(
     PosterRowImagePrefetchEffect(state = rowState, targets = prefetchTargets)
 
     NuvioShelfSection(
-        title = section.title,
+        title = friendlyCatalogTitle(section.title),
         entries = entries,
         modifier = modifier,
         headerHorizontalPadding = sectionPadding,

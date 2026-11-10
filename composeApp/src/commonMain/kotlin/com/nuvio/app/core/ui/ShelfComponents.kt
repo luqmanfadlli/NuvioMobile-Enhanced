@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -97,6 +98,8 @@ fun <T> NuvioShelfSection(
             contentPadding = rowContentPadding.withVerticalBar(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
             cacheWindow = ShelfRowCacheWindow,
+            // Rows settle on a poster edge instead of stopping mid-card.
+            flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
         ) {
             if (key != null) {
                 items(

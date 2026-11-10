@@ -1,5 +1,8 @@
 package com.nuvio.app.features.home
 
+import androidx.compose.foundation.layout.PaddingValues
+import com.nuvio.app.features.home.components.HomePosterCard
+import com.nuvio.app.core.ui.NuvioShelfSection
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
@@ -165,6 +168,10 @@ fun HomeScreen(
     val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
     val continueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
+    val becauseYouWatched by BecauseYouWatchedRepository.state.collectAsStateWithLifecycle()
+    LaunchedEffect(watchedUiState.items.size, watchedUiState.watchedKeys.size) {
+        BecauseYouWatchedRepository.refresh(watchedUiState.items, watchedUiState.watchedKeys)
+    }
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
     val effectiveWatchProgressSource = watchProgressUiState.source
@@ -1207,6 +1214,26 @@ fun HomeScreen(
                                     onPosterClick = onPosterClick,
                                     onPosterLongClick = onPosterLongClick,
                                 )
+                            }
+                        }
+
+                        becauseYouWatched?.let { picks ->
+                            item(key = "home_because_you_watched", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                NuvioShelfSection(
+                                    title = "Because you watched ${picks.title}",
+                                    entries = picks.items,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    headerHorizontalPadding = homeSectionPadding,
+                                    rowContentPadding = PaddingValues(horizontal = homeSectionPadding),
+                                    key = { it.stableKey() },
+                                ) { pick ->
+                                    HomePosterCard(
+                                        item = pick,
+                                        isWatched = false,
+                                        onClick = onPosterClick?.let { { it(pick) } },
+                                        onLongClick = onPosterLongClick?.let { { it(pick) } },
+                                    )
+                                }
                             }
                         }
 

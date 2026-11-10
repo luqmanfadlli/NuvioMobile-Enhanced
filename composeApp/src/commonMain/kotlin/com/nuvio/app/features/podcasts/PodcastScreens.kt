@@ -349,7 +349,11 @@ fun PodcastShowScreen(podcast: Podcast, onBack: () -> Unit, modifier: Modifier =
                 }
             }
             when (load) {
-                ShowLoad.Loading -> item { Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                ShowLoad.Loading -> item {
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        repeat(4) { com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(), height = 64.dp, cornerRadius = 12.dp) }
+                    }
+                }
                 ShowLoad.Failed -> item { Text("This show's episodes couldn't be loaded right now.", style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted, modifier = Modifier.padding(NuvioTokens.Space.s16)) }
                 is ShowLoad.Ready -> {
                     val episodes = (load as ShowLoad.Ready).show.episodes

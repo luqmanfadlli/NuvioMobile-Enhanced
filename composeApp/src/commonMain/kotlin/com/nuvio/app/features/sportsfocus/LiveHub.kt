@@ -237,7 +237,18 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
                 ui.epgPrograms.isEmpty() -> "No guide data yet. Add or refresh an EPG source in Live TV settings."
                 else -> "Nothing matches in the next $GUIDE_WINDOW_HOURS hours."
             }
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted, modifier = Modifier.padding(NuvioTokens.Space.s16))
+            if (ui.isEpgLoading || ui.isLoading) {
+                Column(Modifier.padding(NuvioTokens.Space.s16), verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                    repeat(6) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                            com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.width(GUIDE_CHANNEL_WIDTH), height = GUIDE_ROW_HEIGHT - 6.dp)
+                            com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.weight(1f), height = GUIDE_ROW_HEIGHT - 6.dp)
+                        }
+                    }
+                }
+            } else {
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted, modifier = Modifier.padding(NuvioTokens.Space.s16))
+            }
         } else {
             Row(Modifier.fillMaxWidth().height(32.dp)) {
                 Text("CH", style = MaterialTheme.typography.labelLarge, color = tokens.colors.textMuted, textAlign = TextAlign.Center, modifier = Modifier.width(GUIDE_CHANNEL_WIDTH).padding(top = 6.dp))

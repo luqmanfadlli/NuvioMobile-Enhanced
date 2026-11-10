@@ -2,7 +2,6 @@ package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.sports.compat.LiveTvClock
-import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
 import kotlinx.coroutines.CoroutineScope
@@ -67,14 +66,17 @@ object Top10Repository {
         val results = json.parseToJsonElement(httpGetText(url)).jsonObject["results"] as? JsonArray ?: return emptyList()
         // A few spare titles, since some have no IMDb id the catalogs could open.
         val picks = results.mapNotNull { (it as? JsonObject)?.takeIf { o -> o.str("media_type") in setOf("movie", "tv") && o.str("poster_path") != null } }
-            .take(SIZE + 6)
+            // Late-night and news shows chart every day and say nothing about what is worth watching.
+            .filterNot { o -> (o["genre_ids"] as? JsonArray).orEmpty().any { (it as? JsonPrimitive)?.intOrNull in setOf(10767, 10763) } }
+            .take(SIZE * 3)
         return coroutineScope {
             picks.map { o ->
                 async {
                     val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
                     val tv = o.str("media_type") == "tv"
-                    val imdb = runCatching { TmdbService.tmdbToImdb(tmdbId, if (tv) "tv" else "movie") }.getOrNull() ?: return@async null
-                    o.toPreview(imdb, tv)
+                    // Only what can be watched at home today: a film still in cinemas has no business in a Top 10 to press Play on.
+                    val available = com.nuvio.app.features.newhot.DigitalAvailability.check(if (tv) "tv" else "movie", tmdbId) ?: return@async null
+                    o.toPreview(available.imdbId, tv)
                 }
             }.awaitAll().filterNotNull().take(SIZE)
         }

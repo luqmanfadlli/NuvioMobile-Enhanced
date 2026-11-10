@@ -2,7 +2,13 @@ package com.nuvio.app.core.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
@@ -91,9 +97,24 @@ internal fun Modifier.posterCardClickable(
         }
         .then(this)
     if (onClick == null && onLongClick == null) return posterModifier
-    return posterModifier
+    // The card dips slightly under a finger and grows a little when a remote focuses it, as Netflix's tiles do.
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = when {
+            pressed -> 0.96f
+            focused && LocalIsTv.current -> 1.07f
+            else -> 1f
+        },
+        animationSpec = tween(durationMillis = 140),
+        label = "posterPressScale",
+    )
+    return Modifier
+        .graphicsLayer { scaleX = cardScale; scaleY = cardScale }
+        .then(posterModifier)
         .combinedClickable(
-            interactionSource = null,
+            interactionSource = interaction,
             indication = if (onPosterClickAnchor == null || LocalIsTv.current) LocalIndication.current else null,
             onClick = {
                 if (onClick != null) {

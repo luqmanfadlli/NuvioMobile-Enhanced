@@ -173,7 +173,15 @@ fun SportsFocusHome(
         // Without the greeting, keep the same clearance for the status bar and the corner profile icon.
         item { if (showGreeting) HomeGreeting() else Spacer(Modifier.statusBarsPadding().height(56.dp)) }
         if (loading && all.isEmpty()) {
-            item { Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            item {
+                Column(Modifier.padding(horizontal = NuvioTokens.Space.s16), verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12)) {
+                    com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(), height = 210.dp, cornerRadius = 20.dp)
+                    com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(), height = 110.dp, cornerRadius = 20.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                        repeat(3) { com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.weight(1f), height = 84.dp, cornerRadius = 16.dp) }
+                    }
+                }
+            }
         }
         featured?.let { ev ->
             item(key = "featured") {

@@ -258,8 +258,7 @@ private class NuvioNavigationBarScopeImpl(
             ) {
                 Icon(
                     modifier = Modifier
-                        .size(iconSize)
-                        .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
+                        .size(iconSize),
                     imageVector = icon,
                     contentDescription = contentDescription,
                     tint = if (selected) Color.White else iconColor,
@@ -307,8 +306,7 @@ private class NuvioNavigationBarScopeImpl(
             ) {
                 Icon(
                     modifier = Modifier
-                        .size(iconSize)
-                        .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
+                        .size(iconSize),
                     painter = painterResource(icon),
                     contentDescription = contentDescription,
                     tint = if (selected) Color.White else iconColor,
@@ -453,8 +451,7 @@ private class NuvioClassicNavigationBarScopeImpl(
                         onClick = onClick,
                     )
                     .padding(NuvioTokens.Space.s10)
-                    .size(tokens.components.navIconSize)
-                    .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
+                    .size(tokens.components.navIconSize),
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = if (selected) Color.White else iconColor,
@@ -491,8 +488,7 @@ private class NuvioClassicNavigationBarScopeImpl(
                         onClick = onClick,
                     )
                     .padding(NuvioTokens.Space.s10)
-                    .size(tokens.components.navIconSize)
-                    .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
+                    .size(tokens.components.navIconSize),
                 painter = painterResource(icon),
                 contentDescription = contentDescription,
                 tint = if (selected) Color.White else iconColor,

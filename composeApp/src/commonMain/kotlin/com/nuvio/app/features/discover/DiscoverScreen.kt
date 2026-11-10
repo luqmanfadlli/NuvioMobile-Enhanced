@@ -1,5 +1,7 @@
 package com.nuvio.app.features.discover
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -141,7 +143,20 @@ fun DiscoverScreen(
             }
         }
         if (news.loading && articles.isEmpty()) {
-            item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            item {
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(), height = 200.dp, cornerRadius = 16.dp)
+                    repeat(3) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.width(96.dp), height = 72.dp, cornerRadius = 10.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(), height = 16.dp, cornerRadius = 6.dp)
+                                com.nuvio.app.core.ui.SkeletonBlock(modifier = Modifier.fillMaxWidth(0.6f), height = 16.dp, cornerRadius = 6.dp)
+                            }
+                        }
+                    }
+                }
+            }
         }
         news.error?.let { message ->
             if (articles.isEmpty()) item { Text(message, style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted, modifier = Modifier.padding(NuvioTokens.Space.s16)) }

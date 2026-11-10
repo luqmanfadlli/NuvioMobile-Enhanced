@@ -2,7 +2,10 @@ package com.nuvio.app
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -46,8 +49,14 @@ internal fun RootTabHost(
         val displayedTabs = remember(selectedTab) { (visitedTabs + selectedTab).toList() }
         SideEffect { visitedTabs += selectedTab }
 
+        // A short fade as a tab comes in, so switching tabs eases rather than snaps.
+        val tabFade = remember { Animatable(1f) }
+        LaunchedEffect(selectedTab) {
+            tabFade.snapTo(0.3f)
+            tabFade.animateTo(1f, tween(durationMillis = 220))
+        }
         Layout(
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize().graphicsLayer { alpha = tabFade.value },
             content = {
                 displayedTabs.forEach { tab ->
                     key(tab) {
