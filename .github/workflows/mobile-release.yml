@@ -166,7 +166,10 @@ jobs:
             fi
             echo "Release notes start after the given commit ${notes_from}."
           else
-            notes_from="$(git log "${notes_to}" -n 1 --format=%H --grep='^chore(store): publish ')"
+            # --first-parent: only this branch's own publish commits count. Upstream merges bring in
+            # upstream's publish commits, which would otherwise pull every fork-only commit since
+            # the branches diverged into the notes (and one slow GitHub API lookup per commit).
+            notes_from="$(git log --first-parent "${notes_to}" -n 1 --format=%H --grep='^chore(store): publish ')"
             if [[ -n "${notes_from}" ]]; then
               echo "Release notes start after the last store publish commit ${notes_from}."
             else
@@ -268,6 +271,39 @@ jobs:
         run: |
           rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
           cargo install cargo-ndk --locked
+
+      # The runner image doesn't ship this NDK, so AGP downloads it while configuring the project,
+      # and a single bad download (e.g. "Archive is not a ZIP archive") fails the whole build.
+      # Install it up front with retries instead. Keep in sync with AGP's default NDK version.
+      - name: Install Android NDK
+        env:
+          NDK_VERSION: "28.2.13676358"
+        run: |
+          sdkmanager="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          ndk_dir="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+          log_file="${RUNNER_TEMP:-/tmp}/sdkmanager-ndk.log"
+          max_attempts=4
+          for attempt in $(seq 1 "${max_attempts}"); do
+            if [[ -f "${ndk_dir}/source.properties" ]]; then
+              echo "NDK ${NDK_VERSION} is installed."
+              exit 0
+            fi
+            echo "Installing NDK ${NDK_VERSION} (attempt ${attempt}/${max_attempts})"
+            if "${sdkmanager}" --install "ndk;${NDK_VERSION}" > "${log_file}" 2>&1 \
+              && [[ -f "${ndk_dir}/source.properties" ]]; then
+              echo "NDK ${NDK_VERSION} installed."
+              exit 0
+            fi
+            tail -n 20 "${log_file}"
+            # Drop partial installs and temp downloads so the next attempt starts clean.
+            rm -rf "${ndk_dir}" "${ANDROID_HOME}/.temp"
+            if (( attempt < max_attempts )); then
+              echo "::warning::NDK ${NDK_VERSION} install failed; retrying in $(( attempt * 15 ))s."
+              sleep $(( attempt * 15 ))
+            fi
+          done
+          echo "::error::Failed to install NDK ${NDK_VERSION} after ${max_attempts} attempts."
+          exit 1
 
       - name: Build full release APKs
         run: ./gradlew :androidApp:assembleFullRelease -Pnuvio.app.versionName="${RELEASE_VERSION}" --stacktrace
