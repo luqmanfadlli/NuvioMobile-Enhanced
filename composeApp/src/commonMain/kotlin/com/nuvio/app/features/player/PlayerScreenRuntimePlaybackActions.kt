@@ -61,7 +61,7 @@ internal val PlayerScreenRuntime.activePlaybackIdentity: String
 
 internal val PlayerScreenRuntime.shouldTrackWatchProgress: Boolean
     get() = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true) &&
-        !playerSettingsUiState.privateViewingEnabled
+        !playerSettingsUiState.privateViewingEnabled && !playbackSnapshot.discExtraPlaying
 
 internal val PlayerScreenRuntime.activePlaybackKey: PlaybackKey
     get() = PlaybackKey(
@@ -473,7 +473,7 @@ internal fun PlayerScreenRuntime.switchPlaybackEngine() {
     val target = playerController?.playbackEngine?.switchTarget ?: return
     flushWatchProgress()
     if (initialSeekApplied) {
-        activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
+        activeInitialPositionMs = playbackSnapshot.itemPositionMs.coerceAtLeast(0L)
         activeInitialProgressFraction = null
     }
     // Capture the current track selection so it can be restored on the new engine.
@@ -520,7 +520,7 @@ internal fun PlayerScreenRuntime.maybeFailoverPlaybackEngine(
     engineFailoverSourceIdentity = sourceIdentity
     flushWatchProgress()
     if (initialSeekApplied) {
-        activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
+        activeInitialPositionMs = playbackSnapshot.itemPositionMs.coerceAtLeast(0L)
         activeInitialProgressFraction = null
     }
     // Capture the current track selection so it can be restored on the new engine.

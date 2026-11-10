@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="player_disc_titles">Disc titles</string>
+    <string name="player_disc_titles_count">Disc titles (%1$d)</string>
+    <string name="player_disc_title_feature">Feature · %1$s</string>
+    <string name="player_disc_title_extra">Extra · %1$s</string>
+    <string name="player_disc_title_clip">%1$d clip</string>
+    <string name="player_disc_title_clips">%1$d clips</string>
+    <string name="player_disc_title_audio">Audio %1$s</string>
+    <string name="player_disc_title_subtitles">Subtitles %1$s</string>
+    <string name="player_disc_title_failed">This title could not be played</string>
+</resources>
