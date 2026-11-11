@@ -73,7 +73,6 @@ import com.nuvio.app.features.simkl.SimklAuthUiState
 import com.nuvio.app.features.simkl.SimklBrandAsset
 import com.nuvio.app.features.simkl.SimklConnectionMode
 import com.nuvio.app.features.simkl.SimklAuthenticationMethod
-import com.nuvio.app.features.simkl.SIMKL_PIN_VERIFICATION_URL
 import com.nuvio.app.features.simkl.SimklSyncRepository
 import com.nuvio.app.features.simkl.simklBrandPainter
 import com.nuvio.app.features.tracking.TrackingProviderId
@@ -251,7 +250,11 @@ internal fun TrackingProviderCards(
             } else {
                 SimklAuthRepository.pendingDeviceUserCode()
             },
-            verificationUrl = if (isTrakt) TraktAuthRepository.ACTIVATE_URL else SIMKL_PIN_VERIFICATION_URL,
+            verificationUrl = if (isTrakt) {
+                TraktAuthRepository.ACTIVATE_URL
+            } else {
+                SimklAuthRepository.pendingDeviceVerificationUrl()
+            },
             isConnected = if (isTrakt) {
                 traktUiState.mode == TraktConnectionMode.CONNECTED
             } else {
