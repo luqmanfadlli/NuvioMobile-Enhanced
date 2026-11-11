@@ -61,6 +61,9 @@ private const val SEARCH_RESULT_LIMIT = 250
 internal fun GuideChannelPicker(
     channels: List<LiveTvChannel>,
     hasGuide: (LiveTvChannel) -> Boolean,
+    title: String = "Build Your Guide",
+    subtitle: String = "Choose what you actually watch. You can change this anytime.",
+    confirmLabel: String = "View My Guide",
     onDismiss: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -90,14 +93,14 @@ internal fun GuideChannelPicker(
                     modifier = Modifier.size(26.dp).clickable { if (openGroup != null) openGroup = null else onDismiss() },
                 )
                 Text(
-                    openGroup ?: "Build Your Guide",
+                    openGroup ?: title,
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                     color = tokens.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
             }
             if (openGroup == null) {
                 Text(
-                    "Choose what you actually watch. You can change this anytime.",
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium, color = tokens.colors.textMuted,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
                 )
@@ -154,7 +157,7 @@ internal fun GuideChannelPicker(
                         .clickable { GuideChannelStore.setSelected(chosen); onDismiss() }
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 ) {
-                    Text("View My Guide", color = tokens.colors.background, fontWeight = FontWeight.Bold)
+                    Text(confirmLabel, color = tokens.colors.background, fontWeight = FontWeight.Bold)
                 }
             }
         }

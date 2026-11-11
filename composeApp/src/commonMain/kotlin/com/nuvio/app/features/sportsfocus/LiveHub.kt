@@ -173,15 +173,42 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
     var query by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     val myGuide by GuideChannelStore.selected.collectAsStateWithLifecycle()
+    // My Guide is the profile's chosen categories of the curated line-up plus the channels they added by hand,
+    // minus any playlist category they have hidden.
+    var showCategories by rememberSaveable { mutableStateOf(false) }
+    val guideCategoryIds by com.nuvio.app.features.livetv.LiveTvChannelPrefs.guideCategories.collectAsStateWithLifecycle()
+    val hiddenGroups by com.nuvio.app.features.livetv.LiveTvChannelPrefs.hiddenGroups.collectAsStateWithLifecycle()
+    val shownChannels = remember(ui.channels, hiddenGroups) {
+        if (hiddenGroups.isEmpty()) ui.channels
+        else ui.channels.filterNot { com.nuvio.app.features.livetv.LiveTvChannelPrefs.groupKey(it.group) in hiddenGroups }
+    }
+    val guideMatches by androidx.compose.runtime.produceState(
+        initialValue = emptyMap<String, List<LiveTvChannel>>(),
+        shownChannels,
+        ui.epgPrograms,
+    ) {
+        val channels = shownChannels
+        val programs = ui.epgPrograms
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            com.nuvio.app.features.livetv.matchLiveTvGuideCatalog(channels) { !programs[it.id].isNullOrEmpty() }
+        }
+    }
+    val myGuideChannels = remember(guideMatches, guideCategoryIds, shownChannels, myGuide) {
+        com.nuvio.app.features.livetv.liveTvGuideChannels(
+            guideMatches,
+            guideCategoryIds,
+            if (myGuide.isEmpty()) emptyList() else shownChannels.filter { it.id in myGuide },
+        )
+    }
     val windowStart = remember(now / HALF_HOUR_MS) { (now / HALF_HOUR_MS) * HALF_HOUR_MS }
     val windowEnd = windowStart + GUIDE_WINDOW_HOURS * 60 * 60_000L
     val timelineWidth = (GUIDE_WINDOW_HOURS * 60 * GUIDE_DP_PER_MINUTE).dp
     val shared = rememberScrollState()
     // My Guide with nothing chosen yet offers to build it, rather than guessing at favourites.
-    val needsSetup = mineOnly && myGuide.isEmpty()
+    val needsSetup = mineOnly && myGuide.isEmpty() && guideCategoryIds.isEmpty()
 
-    val rows = remember(ui.channels, ui.epgPrograms, myGuide, mineOnly, query, windowStart) {
-        val candidates = if (mineOnly) ui.channels.filter { it.id in myGuide } else ui.channels
+    val rows = remember(shownChannels, ui.epgPrograms, myGuideChannels, mineOnly, query, windowStart) {
+        val candidates = if (mineOnly) myGuideChannels else shownChannels
         val built = candidates.mapNotNull { channel ->
             val programs = ui.epgPrograms[channel.id].orEmpty()
                 .filter { it.endMillis > windowStart && it.startMillis < windowEnd }
@@ -197,12 +224,16 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
         NuvioScreenHeader(title = "Live", includeStatusBarPadding = false, modifier = Modifier.padding(horizontal = NuvioTokens.Space.s8))
         LiveSegmentedControl(segment, onSelect, Modifier.padding(horizontal = NuvioTokens.Space.s16))
         Row(
-            Modifier.padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s8),
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s8),
             horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
             Chip("My Guide", selected = mineOnly, onClick = { mineOnly = true })
             Chip("All Channels", selected = !mineOnly, onClick = { mineOnly = false })
-            if (!needsSetup) Chip(if (myGuide.isEmpty()) "Build My Guide" else "Edit My Guide (${myGuide.size})", selected = false, onClick = { showPicker = true })
+            if (!needsSetup) Chip("Categories", selected = false, onClick = { showCategories = true })
+            if (!needsSetup) Chip(if (myGuide.isEmpty()) "+ Add Channels" else "+ Added (${myGuide.size})", selected = false, onClick = { showPicker = true })
+        }
+        if (showCategories) {
+            com.nuvio.app.features.livetv.LiveTvGuideCategoriesDialog(matches = guideMatches, onDismiss = { showCategories = false })
         }
         if (needsSetup) {
             Column(
@@ -224,10 +255,10 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
                     modifier = Modifier.clickable { mineOnly = false }.padding(NuvioTokens.Space.s8),
                 )
             }
-            if (showPicker) GuideChannelPicker(ui.channels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false }
+            if (showPicker) GuideChannelPicker(shownChannels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false }
             return@Column
         }
-        if (showPicker) GuideChannelPicker(ui.channels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false; mineOnly = true }
+        if (showPicker) GuideChannelPicker(shownChannels, { ui.epgPrograms[it.id].orEmpty().isNotEmpty() }) { showPicker = false; mineOnly = true }
         GuideSearchField(query, { query = it }, Modifier.padding(horizontal = NuvioTokens.Space.s16))
         Spacer(Modifier.height(NuvioTokens.Space.s8))
         if (rows.isEmpty()) {

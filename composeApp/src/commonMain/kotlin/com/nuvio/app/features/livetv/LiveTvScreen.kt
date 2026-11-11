@@ -8,6 +8,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +34,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.SportsSoccer
@@ -80,6 +84,8 @@ import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioPlatformExtraTopPadding
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import com.nuvio.app.features.sportsfocus.GuideChannelPicker
+import com.nuvio.app.features.sportsfocus.GuideChannelStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -174,19 +180,30 @@ fun LiveTvScreen(
     val sportsState by LiveTvSportsRepository.uiState.collectAsStateWithLifecycle()
     val onDemandState by LiveTvOnDemandRepository.uiState.collectAsStateWithLifecycle()
 
+    // Playlist categories the profile has turned off are left out of everything on this screen.
+    val hiddenGroups by LiveTvChannelPrefs.hiddenGroups.collectAsStateWithLifecycle()
+    val shownChannels = remember(uiState.channels, hiddenGroups) {
+        if (hiddenGroups.isEmpty()) uiState.channels
+        else uiState.channels.filterNot { LiveTvChannelPrefs.groupKey(it.group) in hiddenGroups }
+    }
+    var showCategoryManager by rememberSaveable { mutableStateOf(false) }
+    var showGuideCategories by rememberSaveable { mutableStateOf(false) }
+    var showGuideChannelPicker by rememberSaveable { mutableStateOf(false) }
+    var guideFilter by rememberSaveable { mutableStateOf<String?>(null) }
+
     val allChannelsLabel = stringResource(Res.string.live_tv_group_all_channels)
     val favoritesLabel = stringResource(Res.string.live_tv_filter_favorites)
     val uncategorizedLabel = stringResource(Res.string.live_tv_group_uncategorized)
     val chooseCategoryLabel = stringResource(Res.string.live_tv_filter_choose_category)
 
     val categoryOptions = remember(
-        uiState.channels,
+        shownChannels,
         allChannelsLabel,
         favoritesLabel,
         uncategorizedLabel,
     ) {
         buildLiveTvCategoryFilterOptions(
-            channels = uiState.channels,
+            channels = shownChannels,
             allChannelsLabel = allChannelsLabel,
             favoritesLabel = favoritesLabel,
             uncategorizedLabel = uncategorizedLabel,
@@ -194,7 +211,7 @@ fun LiveTvScreen(
     }
 
     val visibleChannels = remember(
-        uiState.channels,
+        shownChannels,
         uiState.favoriteChannelIds,
         uiState.recentChannelIds,
         filterMode,
@@ -203,7 +220,7 @@ fun LiveTvScreen(
         uncategorizedLabel,
     ) {
         filterLiveTvChannels(
-            channels = uiState.channels,
+            channels = shownChannels,
             favoriteChannelIds = uiState.favoriteChannelIds,
             recentChannelIds = uiState.recentChannelIds,
             filterMode = filterMode,
@@ -213,22 +230,22 @@ fun LiveTvScreen(
         )
     }
 
-    val lastWatchedChannel = remember(uiState.channels, uiState.lastWatchedChannelId) {
+    val lastWatchedChannel = remember(shownChannels, uiState.lastWatchedChannelId) {
         uiState.lastWatchedChannelId?.let { channelId ->
-            uiState.channels.firstOrNull { it.id == channelId }
+            shownChannels.firstOrNull { it.id == channelId }
         }
     }
 
-    val hasRecents = remember(uiState.channels, uiState.recentChannelIds) {
+    val hasRecents = remember(shownChannels, uiState.recentChannelIds) {
         val ids = uiState.recentChannelIds.toSet()
-        ids.isNotEmpty() && uiState.channels.any { it.id in ids }
+        ids.isNotEmpty() && shownChannels.any { it.id in ids }
     }
-    val hasFavorites = remember(uiState.channels, uiState.favoriteChannelIds) {
+    val hasFavorites = remember(shownChannels, uiState.favoriteChannelIds) {
         uiState.favoriteChannelIds.isNotEmpty() &&
-            uiState.channels.any { it.id in uiState.favoriteChannelIds }
+            shownChannels.any { it.id in uiState.favoriteChannelIds }
     }
-    val categoryChips = remember(categoryOptions, uiState.channels, uncategorizedLabel) {
-        val hasUncategorized = uiState.channels.any { it.group.isNullOrBlank() }
+    val categoryChips = remember(categoryOptions, shownChannels, uncategorizedLabel) {
+        val hasUncategorized = shownChannels.any { it.group.isNullOrBlank() }
         categoryOptions
             .filter { it.mode == LiveTvChannelFilterMode.Category }
             .filter { hasUncategorized || it.categoryName != uncategorizedLabel }
@@ -245,14 +262,14 @@ fun LiveTvScreen(
     }
 
     val channelChipCounts = remember(
-        uiState.channels,
+        shownChannels,
         uiState.favoriteChannelIds,
         uiState.recentChannelIds,
         searchQuery,
         uncategorizedLabel,
     ) {
         val searched = filterLiveTvChannels(
-            channels = uiState.channels,
+            channels = shownChannels,
             favoriteChannelIds = uiState.favoriteChannelIds,
             recentChannelIds = uiState.recentChannelIds,
             filterMode = LiveTvChannelFilterMode.All,
@@ -289,10 +306,40 @@ fun LiveTvScreen(
     }
 
     // Guide ------------------------------------------------------------------------------------
-    val guideChannels = remember(visibleChannels, uiState.epgPrograms, guideWindowStart, uiState.favoriteChannelIds) {
-        visibleChannels
-            .filter { liveTvGuideHasPrograms(uiState.epgPrograms[it.id], guideWindowStart) }
-            .sortedByDescending { it.id in uiState.favoriteChannelIds }
+    // The guide is the profile's chosen categories of the curated line-up, plus any channel they added by hand.
+    val guideCategoryIds by LiveTvChannelPrefs.guideCategories.collectAsStateWithLifecycle()
+    val addedGuideIds by GuideChannelStore.selected.collectAsStateWithLifecycle()
+    val guideMatches by produceState(
+        initialValue = emptyMap<String, List<LiveTvChannel>>(),
+        shownChannels,
+        uiState.epgPrograms,
+    ) {
+        val channels = shownChannels
+        val programs = uiState.epgPrograms
+        value = withContext(Dispatchers.Default) {
+            matchLiveTvGuideCatalog(channels) { !programs[it.id].isNullOrEmpty() }
+        }
+    }
+    val addedGuideChannels = remember(shownChannels, addedGuideIds) {
+        if (addedGuideIds.isEmpty()) emptyList() else shownChannels.filter { it.id in addedGuideIds }
+    }
+    val guideCategoryChips = remember(guideMatches, guideCategoryIds) {
+        LIVE_TV_GUIDE_CATEGORIES
+            .filter { it.id in guideCategoryIds && !guideMatches[it.id].isNullOrEmpty() }
+            .map { Triple(it.id, it.title, guideMatches[it.id].orEmpty().size) }
+    }
+    LaunchedEffect(guideCategoryChips, addedGuideChannels.isEmpty(), guideFilter) {
+        val filter = guideFilter ?: return@LaunchedEffect
+        val stillThere = if (filter == LIVE_TV_GUIDE_MINE) addedGuideChannels.isNotEmpty() else guideCategoryChips.any { it.first == filter }
+        if (!stillThere && guideMatches.isNotEmpty()) guideFilter = null
+    }
+    val allGuideChannels = remember(guideMatches, guideCategoryIds, addedGuideChannels) {
+        liveTvGuideChannels(guideMatches, guideCategoryIds, addedGuideChannels)
+    }
+    val guideChannels = remember(guideMatches, guideCategoryIds, addedGuideChannels, guideFilter, searchQuery) {
+        val list = liveTvGuideChannels(guideMatches, guideCategoryIds, addedGuideChannels, guideFilter)
+        val query = searchQuery.trim().lowercase()
+        if (query.isEmpty()) list else list.filter { it.name.lowercase().contains(query) }
     }
     LaunchedEffect(section, guideWindowStart, guideChannels.isNotEmpty()) {
         if (section != LiveTvSection.Guide || guideChannels.isEmpty()) return@LaunchedEffect
@@ -506,9 +553,22 @@ fun LiveTvScreen(
                             },
                         )
                     }
-                    if (showChannelControls &&
-                        (section == LiveTvSection.Channels || section == LiveTvSection.Guide)
-                    ) {
+                    if (showChannelControls && section == LiveTvSection.Guide) {
+                        LiveTvGuideControls(
+                            searchVisible = isSearchVisible,
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            allLabel = allChannelsLabel,
+                            allCount = allGuideChannels.size,
+                            categories = guideCategoryChips,
+                            addedCount = addedGuideChannels.size,
+                            selected = guideFilter,
+                            onSelected = { guideFilter = it },
+                            onAddChannel = { showGuideChannelPicker = true },
+                            onCustomize = { showGuideCategories = true },
+                        )
+                    }
+                    if (showChannelControls && section == LiveTvSection.Channels) {
                         LiveTvChannelControls(
                             searchVisible = isSearchVisible,
                             searchQuery = searchQuery,
@@ -538,6 +598,7 @@ fun LiveTvScreen(
                                 filterMode = LiveTvChannelFilterMode.Category
                                 selectedCategoryName = category
                             },
+                            onCustomize = { showCategoryManager = true },
                         )
                     }
                     if (section == LiveTvSection.Guide && guideChannels.isNotEmpty()) {
@@ -601,16 +662,21 @@ fun LiveTvScreen(
                         },
                     )
 
-                    uiState.isEpgLoading -> liveTvLoadingItem()
+                    uiState.isEpgLoading && allGuideChannels.isEmpty() -> liveTvLoadingItem()
+
+                    allGuideChannels.isNotEmpty() -> item {
+                        HomeEmptyStateCard(
+                            title = stringResource(Res.string.live_tv_no_matching_channels_title),
+                            message = "Nothing in your guide matches. Use + to add a channel that isn't in it.",
+                        )
+                    }
 
                     else -> item {
                         HomeEmptyStateCard(
-                            title = stringResource(
-                                if (visibleChannels.isEmpty()) Res.string.live_tv_no_matching_channels_title else Res.string.live_tv_guide_empty_title,
-                            ),
-                            message = stringResource(
-                                if (visibleChannels.isEmpty()) Res.string.live_tv_no_matching_channels_message else Res.string.live_tv_guide_empty_message,
-                            ),
+                            title = "Your guide is empty",
+                            message = "Choose the categories you want to see, or use + to add channels one by one.",
+                            actionLabel = "Choose Categories",
+                            onActionClick = { showGuideCategories = true },
                         )
                     }
                 }
@@ -774,6 +840,27 @@ fun LiveTvScreen(
                     }
                 }
             }
+        }
+
+        if (showCategoryManager) {
+            LiveTvCategoryManagerDialog(
+                channels = uiState.channels,
+                uncategorizedLabel = uncategorizedLabel,
+                onDismiss = { showCategoryManager = false },
+            )
+        }
+        if (showGuideCategories) {
+            LiveTvGuideCategoriesDialog(matches = guideMatches, onDismiss = { showGuideCategories = false })
+        }
+        if (showGuideChannelPicker) {
+            GuideChannelPicker(
+                channels = shownChannels,
+                hasGuide = { !uiState.epgPrograms[it.id].isNullOrEmpty() },
+                title = "Add Channels",
+                subtitle = "Pick any channel to add it to your guide, next to your categories.",
+                confirmLabel = "Done",
+                onDismiss = { showGuideChannelPicker = false },
+            )
         }
 
         val guideChannel = guideChannelId?.let { channelId -> uiState.channels.firstOrNull { it.id == channelId } }
@@ -999,6 +1086,7 @@ private fun LiveTvChannelControls(
     onClearRecents: () -> Unit,
     onFavoritesSelected: () -> Unit,
     onGroupSelected: (String) -> Unit,
+    onCustomize: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     Column(
@@ -1063,6 +1151,80 @@ private fun LiveTvChannelControls(
                     )
                 }
             }
+            LiveTvControlIconButton(Icons.Rounded.Tune, "Customize channels", onCustomize)
+        }
+    }
+}
+
+/** A round button that stays put at the end of a chip row while the chips scroll. */
+@Composable
+private fun LiveTvControlIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    val tokens = MaterialTheme.nuvio
+    Box(
+        modifier = Modifier
+            .padding(start = NuvioTokens.Space.s8)
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(tokens.colors.surface)
+            .border(NuvioTokens.Border.thin, tokens.colors.borderSubtle, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(imageVector = icon, contentDescription = description, tint = tokens.colors.textPrimary, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** The Guide's chips: the profile's categories and the channels they added, then + and Customize. */
+@Composable
+private fun LiveTvGuideControls(
+    searchVisible: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    allLabel: String,
+    allCount: Int,
+    categories: List<Triple<String, String, Int>>,
+    addedCount: Int,
+    selected: String?,
+    onSelected: (String?) -> Unit,
+    onAddChannel: () -> Unit,
+    onCustomize: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
+    ) {
+        AnimatedVisibility(visible = searchVisible) {
+            LiveTvSearchField(query = searchQuery, onQueryChange = onSearchQueryChange)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LiveTvPanelFilterChip(label = "My Guide", selected = selected == null, onClick = { onSelected(null) }, count = allCount)
+                categories.forEach { (id, title, count) ->
+                    LiveTvPanelFilterChip(label = title, selected = selected == id, onClick = { onSelected(id) }, count = count)
+                }
+                if (addedCount > 0) {
+                    LiveTvPanelFilterChip(
+                        label = "Added by Me",
+                        selected = selected == LIVE_TV_GUIDE_MINE,
+                        onClick = { onSelected(LIVE_TV_GUIDE_MINE) },
+                        count = addedCount,
+                    )
+                }
+            }
+            LiveTvControlIconButton(Icons.Rounded.Add, "Add a channel to your guide", onAddChannel)
+            LiveTvControlIconButton(Icons.Rounded.Tune, "Choose guide categories", onCustomize)
         }
     }
 }

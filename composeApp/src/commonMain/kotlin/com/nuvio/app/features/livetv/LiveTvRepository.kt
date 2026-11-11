@@ -505,7 +505,7 @@ object LiveTvRepository {
                     },
                 )
             }
-            val channels = _uiState.value.channels
+            val channels = visibleChannels(_uiState.value.channels)
             val programs = withContext(Dispatchers.Default) { matchEpgToChannels(channels, guides) }
             _uiState.value = _uiState.value.copy(
                 epgPrograms = programs,
@@ -522,6 +522,45 @@ object LiveTvRepository {
                     LiveTvCacheStore.saveEpg(epgSignature, nowMillis, programs)
                 }
             }
+        }
+    }
+
+    private fun visibleChannels(channels: List<LiveTvChannel>): List<LiveTvChannel> {
+        val hidden = LiveTvChannelPrefs.hiddenGroups.value
+        return if (hidden.isEmpty()) channels else channels.filterNot { LiveTvChannelPrefs.groupKey(it.group) in hidden }
+    }
+
+    /**
+     * Called when the hidden playlist categories change. Hiding more only trims the guide already in memory;
+     * showing a category again needs its listings, which were never kept, so the guide is fetched again.
+     */
+    internal fun onHiddenGroupsChanged(previous: Set<String>, next: Set<String>) {
+        if (!hasLoaded) return
+        val state = _uiState.value
+        if (state.channels.isEmpty()) return
+        val revealed = (previous - next).isNotEmpty()
+        if (revealed) {
+            restoredEpg = null
+            epgGuideCache.clear()
+            refreshEpg(force = true)
+            return
+        }
+        if (state.isEpgLoading) {
+            // The running download was started with the old selection; start over with the new one.
+            epgGuideCache.clear()
+            refreshEpg(force = true)
+            return
+        }
+        epgGuideCache.clear()
+        val visibleIds = visibleChannels(state.channels).mapTo(HashSet()) { it.id }
+        val programs = state.epgPrograms.filterKeys { it in visibleIds }
+        _uiState.value = state.copy(epgPrograms = programs)
+        val savedAt = restoredEpg?.savedAtMillis ?: return
+        if (programs.isEmpty()) return
+        val signature = liveTvEpgSignature(state, buildEpgRequests(state))
+        restoredEpg = LiveTvCachedEpg(signature, savedAt, programs)
+        scope.launch {
+            withContext(Dispatchers.Default) { LiveTvCacheStore.saveEpg(signature, savedAt, programs) }
         }
     }
 
@@ -550,9 +589,12 @@ object LiveTvRepository {
                 urls.getOrPut(xtreamEpgUrl(state.xtreamSettings)) { "Xtream" }
             }
         }
+        // With categories hidden, listings for channels nobody will see are dropped as the guide is read.
+        // Built when a guide is actually fetched, off the main thread: it walks every visible channel.
+        val filter = if (LiveTvChannelPrefs.hiddenGroups.value.isEmpty()) null else lazy { XmltvChannelFilter(visibleChannels(state.channels)) }
         return buildList {
             urls.forEach { (url, label) ->
-                add(LiveTvEpgRequest(cacheKey = "xmltv:$url", label = label) { nowMillis -> fetchXmltvGuide(url, nowMillis) })
+                add(LiveTvEpgRequest(cacheKey = "xmltv:$url", label = label) { nowMillis -> fetchXmltvGuide(url, nowMillis, filter?.value) })
             }
             val stalkerSettings = state.stalkerSettings
             if (state.isEpgAutoDetectEnabled && stalkerSettings.isConfigured && stalkerSettings.isEnabled) {
@@ -661,7 +703,12 @@ private const val LIVE_TV_MAX_RECENT_CHANNELS = 30
 private const val LIVE_TV_EPG_CACHE_TTL_MILLIS = 24L * 60L * 60L * 1000L
 
 private fun liveTvEpgSignature(state: LiveTvUiState, requests: List<LiveTvEpgRequest>): String =
-    liveTvChannelSourceSignature(state) + "#" + requests.joinToString("|") { it.cacheKey }.let { "${it.length}:${it.hashCode()}" }
+    liveTvChannelSourceSignature(state) + "#" + requests.joinToString("|") { it.cacheKey }.let { "${it.length}:${it.hashCode()}" } +
+        liveTvHiddenGroupsSignature(LiveTvChannelPrefs.hiddenGroups.value)
+
+/** Empty when nothing is hidden, so guides cached before categories could be hidden stay valid. */
+private fun liveTvHiddenGroupsSignature(hidden: Set<String>): String =
+    if (hidden.isEmpty()) "" else "#h" + hidden.sorted().joinToString("|").let { "${it.length}:${it.hashCode()}" }
 
 internal data class LiveTvCachedEpgGuide(
     val guide: LiveTvEpgGuide,

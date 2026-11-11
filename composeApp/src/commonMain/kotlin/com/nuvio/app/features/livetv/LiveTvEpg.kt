@@ -36,10 +36,11 @@ internal data class LiveTvEpgGuide(
  * Downloads and parses an XMLTV guide without ever holding the whole document: a provider's guide is often
  * hundreds of megabytes, and reading it into one string got the app killed for memory on iPhone.
  */
-internal suspend fun fetchXmltvGuide(url: String, nowMillis: Long): LiveTvEpgGuide {
+internal suspend fun fetchXmltvGuide(url: String, nowMillis: Long, filter: XmltvChannelFilter? = null): LiveTvEpgGuide {
     val parser = XmltvStreamParser(
         windowStartMillis = nowMillis - LIVE_TV_EPG_PAST_WINDOW_MILLIS,
         windowEndMillis = nowMillis + LIVE_TV_EPG_FUTURE_WINDOW_MILLIS,
+        filter = filter,
     )
     val sink = GuideSink(parser)
     if (!liveTvStreamGuideFromDisk(url, epgRequestHeaders, sink::accept)) {
@@ -133,7 +134,10 @@ internal fun parseXmltvGuide(
 internal class XmltvStreamParser(
     private val windowStartMillis: Long,
     private val windowEndMillis: Long,
+    private val filter: XmltvChannelFilter? = null,
 ) {
+    /** Guide channels that were declared and that no visible playlist channel could be matched to. */
+    private val unwanted = HashSet<String>()
     private var buffer = ByteArray(256 * 1024)
     private var start = 0
     private var end = 0
@@ -215,12 +219,20 @@ internal class XmltvStreamParser(
         val openTag = buffer.decodeToString(open, tagEnd)
         val id = readXmlAttribute(openTag, "id")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: return
         val key = liveTvEpgKey(id)
-        if (!selfClosing) {
-            readXmlElementTexts(buffer.decodeToString(tagEnd + 1, close), "display-name").forEach { name ->
-                normalizeEpgChannelName(name).takeIf(String::isNotBlank)?.let { keysByName.getOrPut(it) { key } }
-            }
+        val names = if (selfClosing) {
+            emptyList()
+        } else {
+            readXmlElementTexts(buffer.decodeToString(tagEnd + 1, close), "display-name")
+                .map(::normalizeEpgChannelName)
+                .filter(String::isNotBlank)
         }
-        epgIdNameCandidates(id).forEach { candidate -> idKeysByName.getOrPut(candidate) { key } }
+        val candidates = epgIdNameCandidates(id)
+        if (filter != null && !filter.wants(key, names, candidates)) {
+            unwanted += key
+            return
+        }
+        names.forEach { keysByName.getOrPut(it) { key } }
+        candidates.forEach { candidate -> idKeysByName.getOrPut(candidate) { key } }
     }
 
     private fun readProgramme(open: Int, tagEnd: Int, close: Int) {
@@ -231,7 +243,9 @@ internal class XmltvStreamParser(
         val stopMillis = readXmlAttribute(openTag, "stop")?.let(::parseXmltvTime)
         if (stopMillis != null && stopMillis < windowStartMillis) return
         val channel = readXmlAttribute(openTag, "channel")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: return
-        val list = programs.getOrPut(liveTvEpgKey(channel)) { mutableListOf() }
+        val channelKey = liveTvEpgKey(channel)
+        if (channelKey in unwanted) return
+        val list = programs.getOrPut(channelKey) { mutableListOf() }
         if (list.size >= LIVE_TV_EPG_MAX_PROGRAMS_PER_CHANNEL) return
         val body = buffer.decodeToString(tagEnd + 1, close)
         val title = readXmlElementTexts(body, "title", limit = 1).firstOrNull() ?: return
@@ -283,6 +297,30 @@ internal class XmltvStreamParser(
         val PROGRAMME_OPEN = "<programme".encodeToByteArray()
         val PROGRAMME_CLOSE = "</programme>".encodeToByteArray()
     }
+}
+
+/**
+ * Tells the parser which guide channels can end up on screen, given the playlist channels that are not hidden.
+ * It accepts everything [matchEpgToChannels] could match to one of them, by guide id or by name, so filtering
+ * never loses listings a visible channel would have had.
+ */
+internal class XmltvChannelFilter(visibleChannels: List<LiveTvChannel>) {
+    private val keys = HashSet<String>()
+    private val names = HashSet<String>()
+
+    init {
+        visibleChannels.forEach { channel ->
+            channel.epgId?.trim()?.takeIf(String::isNotBlank)?.let { id ->
+                val key = liveTvEpgKey(id)
+                keys += key
+                names += epgIdNameCandidates(key)
+            }
+            normalizeEpgChannelName(channel.name).takeIf(String::isNotBlank)?.let { names += it }
+        }
+    }
+
+    fun wants(key: String, displayNames: List<String>, idCandidates: List<String>): Boolean =
+        key in keys || displayNames.any { it in names } || idCandidates.any { it in names }
 }
 
 internal fun shortenEpgDescription(value: String): String =
