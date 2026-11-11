@@ -20,6 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.sports.SportsRepository
+import com.nuvio.app.features.sports.ui.SportsSearchTab
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -34,7 +37,7 @@ import com.nuvio.app.features.news.NewsArticle
 import com.nuvio.app.features.podcasts.Podcast
 import com.nuvio.app.features.sports.ui.SportsActions
 
-private enum class BalancedSportsView(val title: String) { Home("Sports"), Following("Following"), Discover("Discover") }
+private enum class BalancedSportsView(val title: String) { Home("Sports"), Following("Following"), Discover("Discover"), Teams("Pick Your Teams") }
 
 /**
  * The Sports tab in Balanced mode: the Sports-focus home page (minus its greeting). Following and Discover,
@@ -64,6 +67,7 @@ fun BalancedSportsTab(
             onOpenLive = onOpenLive,
             modifier = modifier.fillMaxSize(),
             showGreeting = false,
+            teamsHeader = { MyTeamsStrip(onChoose = { viewName = BalancedSportsView.Teams.name }) },
         )
         else -> Column(modifier.fillMaxSize().background(tokens.colors.background)) {
             Row(
@@ -71,12 +75,23 @@ fun BalancedSportsTab(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = tokens.colors.textPrimary)
-                Text("Sports", color = tokens.colors.textPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 12.dp))
+                Text(
+                    if (view == BalancedSportsView.Teams) view.title else "Sports",
+                    color = tokens.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
             }
             // The bar above already clears the status bar, so the page under it must not add that gap again.
             Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) {
                 when (view) {
                     BalancedSportsView.Following -> SportsFocusFollowing(actions, onOpenArticle, Modifier.fillMaxSize())
+                    BalancedSportsView.Teams -> {
+                        // Search for a team or league, or browse by sport; the star follows or unfollows.
+                        val follows by SportsRepository.follows.collectAsStateWithLifecycle()
+                        val known by SportsRepository.known.collectAsStateWithLifecycle()
+                        SportsSearchTab(known, follows, actions)
+                    }
                     else -> DiscoverScreen(
                         onOpenArticle = onOpenArticle,
                         onOpenPodcast = onOpenPodcast,

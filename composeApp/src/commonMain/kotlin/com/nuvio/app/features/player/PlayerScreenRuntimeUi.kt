@@ -548,6 +548,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                 }
             } else null,
             onInteraction = { controlsActivityTick += 1 },
+            onMenuOpenChange = { open -> controlsMenuOpen = open },
             showPlaybackControls = if (controlsFadingOut) shownBeforeExit[0] else controlsVisible,
             onLockToggle = {
                 if (playerControlsLocked) unlockPlayerControls() else lockPlayerControls()

@@ -1105,6 +1105,8 @@ private fun LiveTvChannelControls(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // First in the row, so hiding categories never needs a scroll to the far end of 450 chips.
+            LiveTvControlIconButton(Icons.Rounded.Tune, "Hide or show categories", onCustomize, atStart = true)
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -1151,18 +1153,17 @@ private fun LiveTvChannelControls(
                     )
                 }
             }
-            LiveTvControlIconButton(Icons.Rounded.Tune, "Customize channels", onCustomize)
         }
     }
 }
 
 /** A round button that stays put at the end of a chip row while the chips scroll. */
 @Composable
-private fun LiveTvControlIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+private fun LiveTvControlIconButton(icon: ImageVector, description: String, onClick: () -> Unit, atStart: Boolean = false) {
     val tokens = MaterialTheme.nuvio
     Box(
         modifier = Modifier
-            .padding(start = NuvioTokens.Space.s8)
+            .padding(start = if (atStart) 0.dp else NuvioTokens.Space.s8, end = if (atStart) NuvioTokens.Space.s8 else 0.dp)
             .size(36.dp)
             .clip(CircleShape)
             .background(tokens.colors.surface)

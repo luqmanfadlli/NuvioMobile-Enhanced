@@ -112,6 +112,9 @@ import kotlin.math.roundToLong
 import com.nuvio.app.core.i18n.localizedEpisodeTitle
 import com.nuvio.app.core.ui.glass.isAmbientLiquidGlassActive
 
+/** The player's controls follow Netflix's layout; the earlier layouts remain in this file behind this switch. */
+private const val PLAYER_NETFLIX_LAYOUT = true
+
 @Composable
 internal fun PlayerControlsShell(
     title: String,
@@ -133,6 +136,7 @@ internal fun PlayerControlsShell(
     hideDetails: Boolean = false,
     onNextEpisodeClick: (() -> Unit)? = null,
     onInteraction: () -> Unit = {},
+    onMenuOpenChange: (Boolean) -> Unit = {},
     showPlaybackControls: Boolean = true,
     onLockToggle: () -> Unit,
     onBack: () -> Unit,
@@ -231,6 +235,75 @@ internal fun PlayerControlsShell(
             modifier = modifier,
             titleLogo = titleLogo,
             showTitleLogo = showTitleLogo,
+        )
+        return
+    }
+    if (PLAYER_NETFLIX_LAYOUT) {
+        NetflixPlayerControls(
+            title = title,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            episodeTitle = episodeTitle,
+            playbackSnapshot = playbackSnapshot,
+            displayedPositionMs = displayedPositionMs,
+            metrics = metrics,
+            showPlaybackControls = showPlaybackControls,
+            showRemainingTime = showRemainingTime,
+            onRuntimeClick = onRuntimeClick,
+            parentalWarnings = parentalWarnings,
+            showParentalGuide = showParentalGuide,
+            onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
+            onInteraction = onInteraction,
+            onMenuOpenChange = onMenuOpenChange,
+            onBack = onBack,
+            onLockToggle = onLockToggle,
+            onTogglePlayback = onTogglePlayback,
+            onSeekBack = onSeekBack,
+            onSeekForward = onSeekForward,
+            skipBackwardSeconds = skipBackwardSeconds,
+            skipForwardSeconds = skipForwardSeconds,
+            showSkipButtons = showSkipButtons,
+            onNextEpisodeClick = onNextEpisodeClick,
+            onSpeedClick = onSpeedClick,
+            speedPickerVisible = speedPickerVisible,
+            onSpeedSelected = onSpeedSelected,
+            onSpeedPickerDismiss = onSpeedPickerDismiss,
+            onSubtitleClick = onSubtitleClick,
+            onAudioClick = onAudioClick,
+            onEpisodesClick = onEpisodesClick,
+            onLiveChannelsClick = onLiveChannelsClick,
+            onCastClick = onCastClick,
+            isCasting = isCasting,
+            menuItems = netflixMenuItems(
+                resizeMode = resizeMode,
+                onResizeModeClick = onResizeModeClick,
+                onSourcesClick = onSourcesClick,
+                qualityLabel = qualityLabel,
+                onQualityClick = onQualityClick,
+                onChaptersClick = onChaptersClick,
+                nightModeEnabled = nightModeEnabled,
+                onNightModeClick = onNightModeClick,
+                onRateClick = onRateClick,
+                userRating = userRating,
+                onPartyClick = onPartyClick,
+                partyActive = partyActive,
+                onPictureInPictureClick = onPictureInPictureClick,
+                onOrientationToggleClick = onOrientationToggleClick,
+                isPortraitPlayback = isPortraitPlayback,
+                onOpenInExternalPlayer = onOpenInExternalPlayer,
+                onInfoClick = onInfoClick,
+                onStreamInfoClick = onStreamInfoClick,
+                onVideoSettingsClick = onVideoSettingsClick,
+                onSwitchEngineClick = onSwitchEngineClick,
+                onSubmitIntroClick = onSubmitIntroClick,
+            ),
+            chapters = chapters,
+            onScrubChange = onScrubChange,
+            onScrubFinished = onScrubFinished,
+            seekPreview = seekPreview,
+            onTimelineTouchChange = onTimelineTouchChange,
+            horizontalSafePadding = horizontalSafePadding,
+            modifier = modifier,
         )
         return
     }
@@ -881,7 +954,7 @@ private fun SideControlButton(
 }
 
 @Composable
-private fun SkipStepIcon(seconds: Int, forward: Boolean, size: Dp) {
+internal fun SkipStepIcon(seconds: Int, forward: Boolean, size: Dp) {
     val numbered = when (seconds) {
         5 -> if (forward) Icons.Rounded.Forward5 else Icons.Rounded.Replay5
         10 -> if (forward) Icons.Rounded.Forward10 else Icons.Rounded.Replay10

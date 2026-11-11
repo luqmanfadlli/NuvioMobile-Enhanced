@@ -106,6 +106,8 @@ fun SportsFocusHome(
     modifier: Modifier = Modifier,
     /** The Balanced Sports tab is this same page without the "Good evening" line. */
     showGreeting: Boolean = true,
+    /** Shown right under the greeting: the Balanced Sports tab puts "My Teams" here. */
+    teamsHeader: (@Composable () -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     val repo = SportsRepository
@@ -172,6 +174,7 @@ fun SportsFocusHome(
     ) {
         // Without the greeting, keep the same clearance for the status bar and the corner profile icon.
         item { if (showGreeting) HomeGreeting() else Spacer(Modifier.statusBarsPadding().height(56.dp)) }
+        teamsHeader?.let { header -> item(key = "my-teams") { header() } }
         if (loading && all.isEmpty()) {
             item {
                 Column(Modifier.padding(horizontal = NuvioTokens.Space.s16), verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12)) {

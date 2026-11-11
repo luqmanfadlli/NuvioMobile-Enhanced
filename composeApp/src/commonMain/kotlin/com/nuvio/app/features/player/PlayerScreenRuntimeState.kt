@@ -207,6 +207,8 @@ internal class PlayerScreenRuntime(
     var showSourcesPanel by mutableStateOf(false)
     var showQualityPanel by mutableStateOf(false)
     var showSpeedPanel by mutableStateOf(false)
+    /** The ⋮ menu or the audio / subtitles menu on the player controls is open: the controls stay up. */
+    var controlsMenuOpen by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
     var showChaptersPanel by mutableStateOf(false)
     var showLiveChannelsPanel by mutableStateOf(false)

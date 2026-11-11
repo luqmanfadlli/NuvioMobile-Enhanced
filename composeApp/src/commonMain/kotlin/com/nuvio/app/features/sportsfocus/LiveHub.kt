@@ -193,6 +193,12 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
             com.nuvio.app.features.livetv.matchLiveTvGuideCatalog(channels) { !programs[it.id].isNullOrEmpty() }
         }
     }
+    // The channels you added by hand show before the categories have been matched; when the categories arrive above
+    // them the list would otherwise stay anchored on those and open scrolled down.
+    val guideListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.runtime.LaunchedEffect(guideMatches.isNotEmpty(), mineOnly) {
+        if (guideMatches.isNotEmpty()) guideListState.scrollToItem(0)
+    }
     val myGuideChannels = remember(guideMatches, guideCategoryIds, shownChannels, myGuide) {
         com.nuvio.app.features.livetv.liveTvGuideChannels(
             guideMatches,
@@ -296,7 +302,7 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
                     }
                 }
             }
-            LazyColumn(contentPadding = PaddingValues(bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16))) {
+            LazyColumn(state = guideListState, contentPadding = PaddingValues(bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16))) {
                 items(rows, key = { it.channel.id }) { row ->
                     Row(Modifier.fillMaxWidth().height(GUIDE_ROW_HEIGHT)) {
                         GuideChannelCell(

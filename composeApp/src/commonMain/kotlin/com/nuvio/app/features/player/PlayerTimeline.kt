@@ -135,6 +135,8 @@ internal fun PlayerTimeline(
     onTouchChange: (Boolean) -> Unit = {},
     /** Each chapter after the first gets a mark where it starts. */
     chapters: List<PlayerChapter> = emptyList(),
+    /** Netflix's bar: thin, solid red, with a round red thumb. */
+    netflixStyle: Boolean = false,
 ) {
     val durationMs = snapshot.durationMs.coerceAtLeast(0L)
     val rangeEnd = durationMs.coerceAtLeast(1L).toFloat()
@@ -151,7 +153,11 @@ internal fun PlayerTimeline(
     val isInteracting = enabled && durationMs > 0L && (isPressed || isDragged)
     ReportTimelineTouch(isInteracting, onTouchChange)
     val trackThickness by animateDpAsState(
-        targetValue = if (isInteracting) 10.dp else 6.dp,
+        targetValue = when {
+            netflixStyle -> if (isInteracting) 6.dp else 4.dp
+            isInteracting -> 10.dp
+            else -> 6.dp
+        },
         animationSpec = tween(durationMillis = if (isInteracting) 140 else 180),
         label = "playerTimelineThickness",
     )
@@ -184,30 +190,51 @@ internal fun PlayerTimeline(
                                 val trackHeight = trackThickness.toPx()
                                 val trackOrigin = Offset(0f, 35.dp.toPx() - trackHeight / 2)
                                 val radius = CornerRadius(trackHeight / 2)
+                                val progressFraction = (state.value / rangeEnd).coerceIn(0f, 1f)
                                 drawRoundRect(
-                                    color = PlayerBaseTrackColor,
+                                    color = if (netflixStyle) Color.White.copy(alpha = 0.3f) else PlayerBaseTrackColor,
                                     topLeft = trackOrigin,
                                     size = Size(size.width, trackHeight),
                                     cornerRadius = radius,
                                 )
                                 drawRoundRect(
-                                    color = PlayerBufferedTrackColor,
+                                    color = if (netflixStyle) Color.White.copy(alpha = 0.45f) else PlayerBufferedTrackColor,
                                     topLeft = trackOrigin,
                                     size = Size(size.width * bufferedFraction, trackHeight),
                                     cornerRadius = radius,
                                 )
-                                drawRoundRect(
-                                    brush = accentBrush,
-                                    topLeft = trackOrigin,
-                                    size = Size(size.width * (state.value / rangeEnd).coerceIn(0f, 1f), trackHeight),
-                                    cornerRadius = radius,
-                                )
+                                if (netflixStyle) {
+                                    drawRoundRect(
+                                        color = NetflixRed,
+                                        topLeft = trackOrigin,
+                                        size = Size(size.width * progressFraction, trackHeight),
+                                        cornerRadius = radius,
+                                    )
+                                } else {
+                                    drawRoundRect(
+                                        brush = accentBrush,
+                                        topLeft = trackOrigin,
+                                        size = Size(size.width * progressFraction, trackHeight),
+                                        cornerRadius = radius,
+                                    )
+                                }
                                 val markWidth = PlayerChapterMarkWidth.toPx()
                                 chapterMarks.forEach { fraction ->
                                     drawRect(
                                         color = PlayerChapterMarkColor,
                                         topLeft = Offset(size.width * fraction - markWidth / 2f, trackOrigin.y),
                                         size = Size(markWidth, trackHeight),
+                                    )
+                                }
+                                if (netflixStyle && durationMs > 0L) {
+                                    val thumbRadius = (if (isInteracting) 9.dp else 7.dp).toPx()
+                                    drawCircle(
+                                        color = NetflixRed,
+                                        radius = thumbRadius,
+                                        center = Offset(
+                                            (size.width * progressFraction).coerceIn(thumbRadius, size.width - thumbRadius),
+                                            trackOrigin.y + trackHeight / 2f,
+                                        ),
                                     )
                                 }
                             },
