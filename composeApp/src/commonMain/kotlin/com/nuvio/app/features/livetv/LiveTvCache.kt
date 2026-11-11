@@ -160,6 +160,7 @@ internal object LiveTvCacheStore {
 }
 
 internal fun liveTvChannelSourceSignature(state: LiveTvUiState): String = buildString {
+    append("v2;")
     state.playlists.filter { it.isEnabled }.forEach { playlist ->
         append(playlist.id).append('|').append(playlist.type.name).append('|')
         append(playlist.source.length).append(':').append(playlist.source.hashCode()).append(';')

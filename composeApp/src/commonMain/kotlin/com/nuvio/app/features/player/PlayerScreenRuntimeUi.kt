@@ -172,7 +172,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
         val resolvingTorrentInfoHash = activeTorrentInfoHash
 
         selectedPlayerQualityId = null
-        val shouldInspectHls = activeTorrentInfoHash == null &&
+        val shouldInspectHls = !isLiveTvPlayback &&
+            activeTorrentInfoHash == null &&
             activeSourceAudioUrl == null &&
             activeSourceUrl.contains(".m3u8", ignoreCase = true)
         activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
@@ -335,6 +336,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                     playbackEngine = playbackEngineOverride ?: resolvedAutoEngine,
                     animeContent = animeContentState.value,
                     discPlaybackEnabled = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true),
+                    liveStream = isLiveTvPlayback,
                     onInitialPositionHandled = { key, handled ->
                         if (active.value && playbackKey == activePlaybackKey && key == currentInitialPositionRequestKey()) {
                             initialSeekApplied = handled
