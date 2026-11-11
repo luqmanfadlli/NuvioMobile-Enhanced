@@ -185,6 +185,14 @@ internal fun LazyListScope.homescreenSettingsContent(
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
+                    title = "Show details on the Home carousel",
+                    description = "Adds the type, year, runtime, ratings and synopsis under each featured title. Off keeps the carousel to the artwork, genres and buttons.",
+                    checked = homeSettings.showHeroMetadata,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setShowHeroMetadata,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
                     title = stringResource(Res.string.layout_hide_unreleased),
                     description = stringResource(Res.string.layout_hide_unreleased_sub),
                     checked = hideUnreleasedContent,

@@ -1,5 +1,13 @@
 package com.nuvio.app.features.library
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import com.nuvio.app.core.ui.NativeNavigationTab
+import com.nuvio.app.core.ui.canOpenNativeTab
+import com.nuvio.app.core.ui.openNativeModeSwitcher
+import com.nuvio.app.core.ui.openNativeTab
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,7 +50,18 @@ internal fun LibraryProfileHeader(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ActiveProfileMiniAvatar(profile = profile, avatars = avatars, selected = false, size = 64)
+        // On iOS this avatar stands in for the corner profile button: a tap opens Settings, holding it picks a mode.
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .combinedClickable(
+                    enabled = canOpenNativeTab,
+                    onLongClick = { openNativeModeSwitcher() },
+                    onClick = { openNativeTab(NativeNavigationTab.Settings) },
+                ),
+        ) {
+            ActiveProfileMiniAvatar(profile = profile, avatars = avatars, selected = false, size = 64)
+        }
         Text(
             text = profile?.name?.takeIf { it.isNotBlank() } ?: "My Library",
             style = MaterialTheme.typography.titleLarge,

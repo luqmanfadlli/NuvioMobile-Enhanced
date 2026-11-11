@@ -1058,6 +1058,15 @@ final class AppNavigationCoordinator: ObservableObject {
             self.coordinator(for: tab).popToRoot()
             self.selectedTab = tab
         }
+        NativeTabBridgeKt.observeNativeOpenTab { [weak self] tabName in
+            DispatchQueue.main.async { self?.activateTab(named: tabName) }
+        }
+        NativeTabBridgeKt.observeNativeOpenModeSwitcher { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.isAppReady else { return }
+                self.isProfileSwitcherPresented = true
+            }
+        }
         NativeTabBridgeKt.observeNativeTabBarVisible { [weak self] visible in
             guard let self else { return }
             self.setTabBarVisible(visible.boolValue, animated: self.tabBarBehavior == .morphed)
@@ -2163,7 +2172,13 @@ struct NativeNavContentView: View {
                appCoordinator.selectedTab != .settings,
                appCoordinator.isSelectedTabAtRoot,
                appCoordinator.isProfileButtonEnabled {
+                // Library shows the profile as its own large avatar, so the corner button is invisible there. It
+                // stays mounted because the mode picker is anchored to it.
+                let onLibrary = appCoordinator.selectedTab == .library
                 ProfileCornerButton(appCoordinator: appCoordinator, iconStore: iconStore)
+                    .opacity(onLibrary ? 0 : 1)
+                    .allowsHitTesting(!onLibrary)
+                    .accessibilityHidden(onLibrary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(.top, 6)
                     .padding(.trailing, 14)

@@ -101,6 +101,7 @@ import com.nuvio.app.features.details.selectHeroTrailer
 import com.nuvio.app.features.details.youtubePlaybackUrl
 import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.HomeHeroStyle
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.player.MiniPlayerController
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
@@ -883,25 +884,44 @@ private fun HeroContentBlock(
         }
         val synopsis = (item.description ?: details?.description)?.trim()?.takeIf { it.isNotBlank() }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        HomeHeroMetaRows(
-            item = metaItem,
-            isTablet = layout.isTablet,
-            showImdbRating = showImdbRating,
-            showMdbListRatings = showMdbListRatings,
-        )
-
-        if (synopsis != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = synopsis,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
-                textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        val showMetadata = HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle().value.showHeroMetadata
+        if (showMetadata) {
+            Spacer(modifier = Modifier.height(12.dp))
+            HomeHeroMetaRows(
+                item = metaItem,
+                isTablet = layout.isTablet,
+                showImdbRating = showImdbRating,
+                showMdbListRatings = showMdbListRatings,
             )
+
+            if (synopsis != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = synopsis,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                    textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            // Netflix keeps the hero to artwork plus one line of genres.
+            val genres = metaItem.genres.take(3)
+            if (genres.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = genres.joinToString("  \u2022  "),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                    fontWeight = FontWeight.Medium,
+                    textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         if (onPlayClick != null) {

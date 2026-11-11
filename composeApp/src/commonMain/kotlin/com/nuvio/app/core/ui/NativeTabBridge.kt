@@ -250,6 +250,31 @@ fun observeNativePopToRoot(listener: (String) -> Unit) {
     swiftPopToRootListener = listener
 }
 
+private var swiftOpenTabListener: ((String) -> Unit)? = null
+
+/** iOS registers this so a Compose screen can switch the native tab, e.g. the Library avatar opening Settings. */
+fun observeNativeOpenTab(listener: (String) -> Unit) {
+    swiftOpenTabListener = listener
+}
+
+/** True where the native shell owns the tabs and can be asked to switch them. */
+internal val canOpenNativeTab: Boolean get() = swiftOpenTabListener != null
+
+internal fun openNativeTab(tab: NativeNavigationTab) {
+    swiftOpenTabListener?.invoke(tab.name)
+}
+
+private var swiftOpenModeSwitcherListener: (() -> Unit)? = null
+
+/** iOS registers this so the Library avatar can open the mode picker, as holding the corner profile button does. */
+fun observeNativeOpenModeSwitcher(listener: () -> Unit) {
+    swiftOpenModeSwitcherListener = listener
+}
+
+internal fun openNativeModeSwitcher() {
+    swiftOpenModeSwitcherListener?.invoke()
+}
+
 fun nativeTabSelect(tabName: String) {
     NativeTabBridge.requestTab(tabName)
 }

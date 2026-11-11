@@ -53,6 +53,7 @@ data class HomeTrendingState(
  */
 object HomeTrendingRepository {
     private const val MAX_AGE_MS = 3L * 60 * 60 * 1000
+    private const val EMPTY_RETRY_MS = 60L * 1000
     private val TALK_AND_NEWS = setOf(10767, 10763)
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -66,7 +67,9 @@ object HomeTrendingRepository {
     fun ensureLoaded() {
         if (job?.isActive == true) return
         val s = _state.value
-        if (s.loadedOnce && s.topMovies.isNotEmpty() && LiveTvClock.nowMs() - loadedAtMs < MAX_AGE_MS) return
+        // An empty result (offline, or TMDB had nothing) is retried soon, but not on every visit to Home.
+        val maxAge = if (s.topMovies.isNotEmpty()) MAX_AGE_MS else EMPTY_RETRY_MS
+        if (s.loadedOnce && LiveTvClock.nowMs() - loadedAtMs < maxAge) return
         job = scope.launch {
             runCatching { load() }
             _state.value = _state.value.copy(loadedOnce = true)

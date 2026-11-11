@@ -1,5 +1,7 @@
 package com.nuvio.app.features.home.components
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -87,7 +89,16 @@ private fun Top10Card(
     )
     Row(verticalAlignment = Alignment.Bottom) {
         Box(
-            modifier = Modifier.layout { measurable, constraints ->
+            // The rank is part of the card: tapping or holding it does what the poster does.
+            modifier = Modifier
+                .combinedClickable(
+                    enabled = onClick != null || onLongClick != null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onClick?.invoke() },
+                    onLongClick = onLongClick,
+                )
+                .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
                 val shrink = overlap.roundToPx()
                 // Text leaves room under the digits; shift down so they stand on the poster's bottom edge.

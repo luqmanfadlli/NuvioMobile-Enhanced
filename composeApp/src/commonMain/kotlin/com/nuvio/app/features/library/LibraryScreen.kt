@@ -534,6 +534,8 @@ fun LibraryScreen(
                 autoHidesNativeTabBar = true,
             ) {
 
+            // The profile avatar leads every Library view; on iOS it replaces the corner profile button here.
+            item(key = "library-profile-header") { LibraryProfileHeader() }
             if (sourceMode == LibraryViewMode.Cloud) {
                 cloudLibraryContent(
                     uiState = cloudUiState,
@@ -582,7 +584,6 @@ fun LibraryScreen(
                 )
             } else {
                 // Downloads and the release calendar lead the page, as large cards rather than small header icons.
-                item(key = "library-profile-header") { LibraryProfileHeader() }
                 item(key = "library-quick-access") {
                     LibraryQuickAccess(
                         onDownloadsClick = onDownloadsClick,

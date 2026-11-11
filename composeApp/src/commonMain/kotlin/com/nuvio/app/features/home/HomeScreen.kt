@@ -1240,7 +1240,7 @@ fun HomeScreen(
                         }
 
                         becauseYouWatched.take(1).forEach { picks ->
-                            item(key = "home_because_${picks.title}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                            item(key = "home_because_0_${picks.title}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 NuvioShelfSection(
                                     title = "Because you watched ${picks.title}",
                                     entries = picks.items,
@@ -1298,9 +1298,11 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                            if (rowIndex == 3) {
-                                becauseYouWatched.drop(1).forEach { picks ->
-                                    item(key = "home_because_${picks.title}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                            // After the fourth row, or after the last one when fewer than four ended up loading.
+                            val afterLastOfFew = trending.loadedOnce && trending.rows.size < 4 && rowIndex == trending.rows.lastIndex
+                            if (rowIndex == 3 || afterLastOfFew) {
+                                becauseYouWatched.drop(1).forEachIndexed { becauseIndex, picks ->
+                                    item(key = "home_because_${becauseIndex + 1}_${picks.title}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
                                         NuvioShelfSection(
                                             title = "Because you watched ${picks.title}",
                                             entries = picks.items,

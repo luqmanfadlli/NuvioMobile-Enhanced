@@ -1,18 +1,30 @@
 package com.nuvio.app.features.livetv
 
-import com.nuvio.app.features.addons.httpGetTextWithHeaders
-import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.core.network.createApiHttpClient
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.header
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.utils.io.readAvailable
 
 internal const val LIVE_TV_EPG_PAST_WINDOW_MILLIS = 3L * 60L * 60L * 1000L
-internal const val LIVE_TV_EPG_FUTURE_WINDOW_MILLIS = 48L * 60L * 60L * 1000L
+// The guide screens show 6-12 hours; a day ahead keeps the in-memory guide about half the size of two days.
+internal const val LIVE_TV_EPG_FUTURE_WINDOW_MILLIS = 24L * 60L * 60L * 1000L
 private const val LIVE_TV_EPG_DEFAULT_DURATION_MILLIS = 60L * 60L * 1000L
 private const val LIVE_TV_EPG_MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
 private const val LIVE_TV_EPG_MAX_XML_BYTES = 160 * 1024 * 1024
+/** Uncompressed guides are parsed as they download, so only the read is bounded, not memory. */
+private const val LIVE_TV_EPG_MAX_STREAM_BYTES = 1024L * 1024L * 1024L
+private const val LIVE_TV_EPG_MAX_DESCRIPTION_CHARS = 160
+private const val LIVE_TV_EPG_MAX_PROGRAMS_PER_CHANNEL = 300
+private const val LIVE_TV_EPG_MAX_ELEMENT_BYTES = 1024 * 1024
 
 private val epgRequestHeaders = mapOf(
     "Accept" to "application/xml, text/xml, application/gzip, application/octet-stream, */*",
     "User-Agent" to "Nuvio/1.0",
 )
+
+private val epgHttpClient by lazy { createApiHttpClient().config { followRedirects = true } }
 
 internal data class LiveTvEpgGuide(
     val programsByEpgKey: Map<String, List<LiveTvEpgProgram>> = emptyMap(),
@@ -20,33 +32,82 @@ internal data class LiveTvEpgGuide(
     val programsByChannelId: Map<String, List<LiveTvEpgProgram>> = emptyMap(),
 )
 
+/**
+ * Downloads and parses an XMLTV guide without ever holding the whole document: a provider's guide is often
+ * hundreds of megabytes, and reading it into one string got the app killed for memory on iPhone.
+ */
 internal suspend fun fetchXmltvGuide(url: String, nowMillis: Long): LiveTvEpgGuide {
-    val xml = downloadXmltv(url)
-    return parseXmltvGuide(
-        xml = xml,
+    val parser = XmltvStreamParser(
         windowStartMillis = nowMillis - LIVE_TV_EPG_PAST_WINDOW_MILLIS,
         windowEndMillis = nowMillis + LIVE_TV_EPG_FUTURE_WINDOW_MILLIS,
     )
+    val sink = GuideSink(parser)
+    if (!liveTvStreamGuideFromDisk(url, epgRequestHeaders, sink::accept)) {
+        epgHttpClient.prepareGet(url) {
+            epgRequestHeaders.forEach { (name, value) -> header(name, value) }
+            timeout {
+                requestTimeoutMillis = 10L * 60L * 1000L
+                socketTimeoutMillis = 60L * 1000L
+            }
+        }.execute { response ->
+            require(response.status.value in 200..299) { "Guide request failed with HTTP ${response.status.value}" }
+            val channel = response.bodyAsChannel()
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = channel.readAvailable(buffer, 0, buffer.size)
+                if (count == -1) break
+                if (count == 0) continue
+                if (!sink.accept(buffer, count)) break
+            }
+        }
+    }
+    sink.finish()
+    return parser.finish()
 }
 
-private suspend fun downloadXmltv(url: String): String {
-    val path = url.substringBefore('#').substringBefore('?')
-    if (!path.endsWith(".gz", ignoreCase = true)) {
-        val text = httpGetTextWithHeaders(url, epgRequestHeaders)
-        if (!text.startsWith('\u001F')) return text
+/**
+ * Takes the guide's bytes as they arrive. Plain XML goes straight to the parser; a gzipped guide is collected
+ * (it is small) and unpacked at the end.
+ */
+private class GuideSink(private val parser: XmltvStreamParser) {
+    private var gzipChunks: MutableList<ByteArray>? = null
+    private var sniffed = false
+    private var total = 0L
+
+    /** Returns false once enough has been read. */
+    fun accept(bytes: ByteArray, count: Int): Boolean {
+        total += count
+        if (!sniffed) {
+            sniffed = true
+            if (count >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()) gzipChunks = mutableListOf()
+        }
+        val compressed = gzipChunks
+        if (compressed != null) {
+            require(total <= LIVE_TV_EPG_MAX_DOWNLOAD_BYTES) { "Guide is too large to load." }
+            compressed += bytes.copyOf(count)
+            return true
+        }
+        parser.feed(bytes, 0, count)
+        return total < LIVE_TV_EPG_MAX_STREAM_BYTES
     }
-    val response = httpRequestRaw(
-        method = "GET",
-        url = url,
-        headers = epgRequestHeaders,
-        body = "",
-        maxResponseBodyBytes = LIVE_TV_EPG_MAX_DOWNLOAD_BYTES,
-    )
-    require(response.status in 200..299) { "Guide request failed with HTTP ${response.status}" }
-    val bytes = response.bodyBytes
-    val isGzip = bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()
-    val xmlBytes = if (isGzip) liveTvGunzip(bytes, LIVE_TV_EPG_MAX_XML_BYTES) else bytes
-    return xmlBytes.decodeToString()
+
+    fun finish() {
+        val compressed = gzipChunks ?: return
+        val joined = ByteArray(total.toInt())
+        var offset = 0
+        compressed.forEach { chunk ->
+            chunk.copyInto(joined, offset)
+            offset += chunk.size
+        }
+        compressed.clear()
+        val xml = liveTvGunzip(joined, LIVE_TV_EPG_MAX_XML_BYTES)
+        var position = 0
+        while (position < xml.size) {
+            val length = minOf(64 * 1024, xml.size - position)
+            parser.feed(xml, position, length)
+            position += length
+        }
+    }
 }
 
 internal fun parseXmltvGuide(
@@ -54,73 +115,179 @@ internal fun parseXmltvGuide(
     windowStartMillis: Long,
     windowEndMillis: Long,
 ): LiveTvEpgGuide {
-    val keysByName = HashMap<String, String>()
-    val idKeysByName = HashMap<String, String>()
-    var index = 0
-    while (true) {
-        val start = xml.indexOf("<channel", index)
-        if (start < 0) break
-        if (!isXmlTagBoundary(xml.getOrNull(start + 8))) {
-            index = start + 8
-            continue
+    val parser = XmltvStreamParser(windowStartMillis, windowEndMillis)
+    val bytes = xml.encodeToByteArray()
+    var position = 0
+    while (position < bytes.size) {
+        val length = minOf(64 * 1024, bytes.size - position)
+        parser.feed(bytes, position, length)
+        position += length
+    }
+    return parser.finish()
+}
+
+/**
+ * Incremental XMLTV reader. Bytes are fed in as they arrive; each complete `<channel>` or `<programme>` element
+ * is decoded on its own and everything else is dropped, so memory stays at one network chunk plus the kept guide.
+ */
+internal class XmltvStreamParser(
+    private val windowStartMillis: Long,
+    private val windowEndMillis: Long,
+) {
+    private var buffer = ByteArray(256 * 1024)
+    private var start = 0
+    private var end = 0
+    private val keysByName = HashMap<String, String>()
+    private val idKeysByName = HashMap<String, String>()
+    private val programs = HashMap<String, MutableList<LiveTvEpgProgram>>()
+
+    fun feed(bytes: ByteArray, offset: Int, length: Int) {
+        if (length <= 0) return
+        if (buffer.size - end < length) {
+            val pending = end - start
+            val target = if (pending + length > buffer.size) ByteArray(maxOf(buffer.size * 2, pending + length)) else buffer
+            buffer.copyInto(target, 0, start, end)
+            buffer = target
+            start = 0
+            end = pending
         }
-        val tagEnd = xml.indexOf('>', start)
-        if (tagEnd < 0) break
-        val openTag = xml.substring(start, tagEnd)
-        val selfClosing = openTag.endsWith('/')
-        val close = if (selfClosing) tagEnd else xml.indexOf("</channel>", tagEnd).takeIf { it >= 0 } ?: break
-        index = close + 1
-        val id = readXmlAttribute(openTag, "id")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: continue
+        bytes.copyInto(buffer, end, offset, offset + length)
+        end += length
+        drain()
+    }
+
+    fun finish(): LiveTvEpgGuide {
+        val finalized = programs
+            .mapValues { (_, list) -> finalizeEpgPrograms(list, windowStartMillis) }
+            .filterValues { it.isNotEmpty() }
+        idKeysByName.forEach { (name, key) -> keysByName.getOrPut(name) { key } }
+        return LiveTvEpgGuide(
+            programsByEpgKey = finalized,
+            epgKeysByName = keysByName.filterValues { it in finalized },
+        )
+    }
+
+    private fun drain() {
+        var position = start
+        while (true) {
+            val open = indexOfByte(LESS_THAN, position)
+            if (open < 0) {
+                start = end
+                return
+            }
+            // Not enough bytes yet to tell which element this is.
+            if (end - open < PROGRAMME_OPEN.size + 1) {
+                start = open
+                return
+            }
+            val isChannel = matchesTag(open, CHANNEL_OPEN)
+            val isProgramme = !isChannel && matchesTag(open, PROGRAMME_OPEN)
+            if (!isChannel && !isProgramme) {
+                position = open + 1
+                continue
+            }
+            val tagEnd = indexOfByte(GREATER_THAN, open)
+            if (tagEnd < 0) {
+                if (!waitFor(open)) position = open + 1 else return
+                continue
+            }
+            val selfClosing = buffer[tagEnd - 1] == SLASH
+            val closeTag = if (isChannel) CHANNEL_CLOSE else PROGRAMME_CLOSE
+            val close = if (selfClosing) tagEnd else indexOfBytes(closeTag, tagEnd)
+            if (close < 0) {
+                if (!waitFor(open)) position = open + 1 else return
+                continue
+            }
+            if (isChannel) readChannel(open, tagEnd, close, selfClosing) else if (!selfClosing) readProgramme(open, tagEnd, close)
+            position = if (selfClosing) tagEnd + 1 else close + closeTag.size
+            start = position
+        }
+    }
+
+    /** Keeps an unfinished element for the next chunk; gives up on one that is implausibly large. */
+    private fun waitFor(open: Int): Boolean {
+        if (end - open > LIVE_TV_EPG_MAX_ELEMENT_BYTES) return false
+        start = open
+        return true
+    }
+
+    private fun readChannel(open: Int, tagEnd: Int, close: Int, selfClosing: Boolean) {
+        val openTag = buffer.decodeToString(open, tagEnd)
+        val id = readXmlAttribute(openTag, "id")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: return
         val key = liveTvEpgKey(id)
         if (!selfClosing) {
-            readXmlElementTexts(xml.substring(tagEnd + 1, close), "display-name").forEach { name ->
+            readXmlElementTexts(buffer.decodeToString(tagEnd + 1, close), "display-name").forEach { name ->
                 normalizeEpgChannelName(name).takeIf(String::isNotBlank)?.let { keysByName.getOrPut(it) { key } }
             }
         }
         epgIdNameCandidates(id).forEach { candidate -> idKeysByName.getOrPut(candidate) { key } }
     }
 
-    val programs = HashMap<String, MutableList<LiveTvEpgProgram>>()
-    index = 0
-    while (true) {
-        val start = xml.indexOf("<programme", index)
-        if (start < 0) break
-        if (!isXmlTagBoundary(xml.getOrNull(start + 10))) {
-            index = start + 10
-            continue
-        }
-        val tagEnd = xml.indexOf('>', start)
-        if (tagEnd < 0) break
-        val openTag = xml.substring(start, tagEnd)
-        val selfClosing = openTag.endsWith('/')
-        val close = if (selfClosing) tagEnd else xml.indexOf("</programme>", tagEnd).takeIf { it >= 0 } ?: break
-        index = close + 1
-        if (selfClosing) continue
-        val channel = readXmlAttribute(openTag, "channel")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: continue
-        val startMillis = readXmlAttribute(openTag, "start")?.let(::parseXmltvTime) ?: continue
+    private fun readProgramme(open: Int, tagEnd: Int, close: Int) {
+        // Decide from the open tag alone, so programmes outside the window never have their text decoded.
+        val openTag = buffer.decodeToString(open, tagEnd)
+        val startMillis = readXmlAttribute(openTag, "start")?.let(::parseXmltvTime) ?: return
+        if (startMillis > windowEndMillis) return
         val stopMillis = readXmlAttribute(openTag, "stop")?.let(::parseXmltvTime)
-        if (startMillis > windowEndMillis) continue
-        if (stopMillis != null && stopMillis < windowStartMillis) continue
-        val body = xml.substring(tagEnd + 1, close)
-        val title = readXmlElementTexts(body, "title", limit = 1).firstOrNull() ?: continue
-        programs.getOrPut(liveTvEpgKey(channel)) { mutableListOf() } += LiveTvEpgProgram(
+        if (stopMillis != null && stopMillis < windowStartMillis) return
+        val channel = readXmlAttribute(openTag, "channel")?.let(::decodeXmlEntities)?.trim()?.takeIf(String::isNotBlank) ?: return
+        val list = programs.getOrPut(liveTvEpgKey(channel)) { mutableListOf() }
+        if (list.size >= LIVE_TV_EPG_MAX_PROGRAMS_PER_CHANNEL) return
+        val body = buffer.decodeToString(tagEnd + 1, close)
+        val title = readXmlElementTexts(body, "title", limit = 1).firstOrNull() ?: return
+        list += LiveTvEpgProgram(
             title = title,
             startMillis = startMillis,
             endMillis = stopMillis ?: -1L,
-            description = readXmlElementTexts(body, "desc", limit = 1).firstOrNull(),
+            description = readXmlElementTexts(body, "desc", limit = 1).firstOrNull()?.let(::shortenEpgDescription),
             category = readXmlElementTexts(body, "category", limit = 1).firstOrNull(),
         )
     }
 
-    val finalized = programs
-        .mapValues { (_, list) -> finalizeEpgPrograms(list, windowStartMillis) }
-        .filterValues { it.isNotEmpty() }
-    idKeysByName.forEach { (name, key) -> keysByName.getOrPut(name) { key } }
-    return LiveTvEpgGuide(
-        programsByEpgKey = finalized,
-        epgKeysByName = keysByName.filterValues { it in finalized },
-    )
+    private fun matchesTag(at: Int, tag: ByteArray): Boolean {
+        if (end - at < tag.size + 1) return false
+        for (i in tag.indices) if (buffer[at + i] != tag[i]) return false
+        val next = buffer[at + tag.size]
+        return next == GREATER_THAN || next == SLASH || next == SPACE || next == TAB || next == NEW_LINE || next == CARRIAGE_RETURN
+    }
+
+    private fun indexOfByte(value: Byte, from: Int): Int {
+        for (i in from until end) if (buffer[i] == value) return i
+        return -1
+    }
+
+    private fun indexOfBytes(pattern: ByteArray, from: Int): Int {
+        val last = end - pattern.size
+        var i = from
+        while (i <= last) {
+            if (buffer[i] == pattern[0]) {
+                var j = 1
+                while (j < pattern.size && buffer[i + j] == pattern[j]) j++
+                if (j == pattern.size) return i
+            }
+            i++
+        }
+        return -1
+    }
+
+    private companion object {
+        const val LESS_THAN: Byte = 0x3C
+        const val GREATER_THAN: Byte = 0x3E
+        const val SLASH: Byte = 0x2F
+        const val SPACE: Byte = 0x20
+        const val TAB: Byte = 0x09
+        const val NEW_LINE: Byte = 0x0A
+        const val CARRIAGE_RETURN: Byte = 0x0D
+        val CHANNEL_OPEN = "<channel".encodeToByteArray()
+        val CHANNEL_CLOSE = "</channel>".encodeToByteArray()
+        val PROGRAMME_OPEN = "<programme".encodeToByteArray()
+        val PROGRAMME_CLOSE = "</programme>".encodeToByteArray()
+    }
 }
+
+internal fun shortenEpgDescription(value: String): String =
+    if (value.length <= LIVE_TV_EPG_MAX_DESCRIPTION_CHARS) value
+    else value.take(LIVE_TV_EPG_MAX_DESCRIPTION_CHARS - 1).trimEnd() + "\u2026"
 
 internal fun finalizeEpgPrograms(
     programs: List<LiveTvEpgProgram>,
