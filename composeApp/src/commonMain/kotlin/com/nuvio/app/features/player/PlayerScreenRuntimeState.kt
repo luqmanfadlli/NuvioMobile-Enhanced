@@ -117,8 +117,10 @@ internal class PlayerScreenRuntime(
     var controlsVisible by mutableStateOf(false)
     var showRemainingTime by mutableStateOf(false)
     var playerControlsLocked by mutableStateOf(false)
+    // Live TV plays an HLS master as it is, so ExoPlayer can switch quality with the connection.
     private val shouldResolveInitialPlayerQuality: Boolean
-        get() = torrentInfoHash == null &&
+        get() = !isLiveTvPlayback &&
+            torrentInfoHash == null &&
             sourceAudioUrl == null &&
             sourceUrl.contains(".m3u8", ignoreCase = true)
 

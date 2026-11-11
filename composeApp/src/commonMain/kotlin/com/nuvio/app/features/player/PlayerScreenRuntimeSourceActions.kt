@@ -367,7 +367,8 @@ private fun PlayerScreenRuntime.switchToPreparedLiveChannel(channel: LiveTvChann
     }
     stopActiveP2pStream()
     activeSourceUrl = channel.streamUrl
-    activePlaybackSourceUrl = if (channel.streamUrl.contains(".m3u8", ignoreCase = true)) null else channel.streamUrl
+    // Live channels are never inspected for HLS variants (see PlayerScreenRuntimeUi).
+    activePlaybackSourceUrl = channel.streamUrl
     activeSourceAudioUrl = null
     activeSourceHeaders = sanitizePlaybackHeaders(channel.headers)
     activeSourceResponseHeaders = emptyMap()

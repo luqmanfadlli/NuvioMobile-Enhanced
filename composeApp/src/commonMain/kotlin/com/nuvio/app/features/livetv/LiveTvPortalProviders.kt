@@ -2,6 +2,7 @@ package com.nuvio.app.features.livetv
 
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import io.ktor.http.encodeURLParameter
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -15,7 +16,9 @@ private const val XTREAM_PLAYLIST_ID = "provider:xtream"
 
 private val portalJson = Json { ignoreUnknownKeys = true; isLenient = true }
 private val playlistRequestHeaders = mapOf("Accept" to "application/json, text/plain, */*", "User-Agent" to "Nuvio/1.0")
-private val streamRequestHeaders = mapOf("User-Agent" to "Mozilla/5.0", "Accept" to "*/*")
+// IPTV panels are made for IPTV players and often refuse or stall a browser's user agent, so
+// channels are opened as VLC opens them, as Nuvio TV does.
+private val streamRequestHeaders = mapOf("User-Agent" to LIVE_TV_STREAM_USER_AGENT, "Accept" to "*/*")
 
 internal suspend fun fetchXtreamChannels(settings: LiveTvXtreamSettings): List<LiveTvChannel> {
     val normalized = settings.normalized()
@@ -24,16 +27,18 @@ internal suspend fun fetchXtreamChannels(settings: LiveTvXtreamSettings): List<L
         val id = item.string("category_id") ?: item.string("id") ?: return@mapNotNull null
         id to (item.string("category_name") ?: item.string("name") ?: id)
     }.toMap()
+    val extension = xtreamLiveExtension(normalized)
     return xtreamRequest(normalized, "get_live_streams").arrayOrEmpty().mapIndexedNotNull { index, element ->
         val item = element as? JsonObject ?: return@mapIndexedNotNull null
         val name = item.string("name") ?: return@mapIndexedNotNull null
         val streamId = item.string("stream_id") ?: item.string("id") ?: return@mapIndexedNotNull null
-        val extension = item.string("container_extension")?.trim()?.trimStart('.')?.ifBlank { null } ?: "ts"
-        val directSource = item.string("direct_source")?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
         LiveTvChannel(
             id = "xtream:$streamId",
             name = name,
-            streamUrl = directSource ?: normalized.liveStreamUrl(streamId, extension),
+            // Always the panel's own link, as IPTV players use: "direct_source" is often the panel's
+            // upstream origin, which refuses or stalls clients, and the panel redirects to it when
+            // it is meant to be used.
+            streamUrl = normalized.liveStreamUrl(streamId, extension),
             logoUrl = item.string("stream_icon") ?: item.string("logo"),
             group = item.string("category_id")?.let(categories::get),
             playlistId = XTREAM_PLAYLIST_ID,
@@ -43,6 +48,26 @@ internal suspend fun fetchXtreamChannels(settings: LiveTvXtreamSettings): List<L
             epgId = item.string("epg_channel_id"),
         )
     }.distinctBy { it.streamUrl }
+}
+
+/**
+ * The live format the account may play: MPEG-TS unless the panel only allows HLS. A panel serves
+ * a format the account is not allowed as an error or an endless wait, whatever the stream's own
+ * `container_extension` says.
+ */
+private suspend fun xtreamLiveExtension(settings: LiveTvXtreamSettings): String {
+    val formats = try {
+        val url = "${settings.serverUrl}/player_api.php?username=${settings.username.encodeURLParameter()}&password=${settings.password.encodeURLParameter()}"
+        val login = portalJson.parseToJsonElement(httpGetTextWithHeaders(url, playlistRequestHeaders)) as? JsonObject
+        ((login?.get("user_info") as? JsonObject)?.get("allowed_output_formats") as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.lowercase() }
+            .orEmpty()
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (_: Exception) {
+        emptyList()
+    }
+    return if (formats.isEmpty() || "ts" in formats || "m3u8" !in formats) "ts" else "m3u8"
 }
 
 internal fun xtreamEpgUrl(settings: LiveTvXtreamSettings): String {
