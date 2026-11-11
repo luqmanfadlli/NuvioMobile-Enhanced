@@ -151,6 +151,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         showSourcesPanel = false
         showEpisodesPanel = false
         showChaptersPanel = false
+        showDiscTitlesPanel = false
         chapters = emptyList()
         chaptersLoadedForSourceUrl = null
         clearChapterSkipState()
@@ -728,7 +729,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         lastManualSkipSeekPositions,
     ) {
         recomputeChapterSkipIntervalsIfNeeded()
-        if (skipIntervals.isEmpty()) {
+        if (skipIntervals.isEmpty() || playbackSnapshot.discExtraPlaying) {
             activeSkipInterval = null
             return@LaunchedEffect
         }
@@ -890,7 +891,8 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         playerSettingsUiState.streamAutoPlayNextEpisodeEnabled,
         nextEpisodeCardDismissed,
     ) {
-        val shouldShow = nextEpisodeInfo != null && !nextEpisodeCardDismissed && isAtNextEpisodeThreshold()
+        val shouldShow = nextEpisodeInfo != null && !nextEpisodeCardDismissed && !playbackSnapshot.discExtraPlaying &&
+            isAtNextEpisodeThreshold()
         if (nextEpisodeAutoPlayAutomatic &&
             (!shouldShow || !playerSettingsUiState.streamAutoPlayNextEpisodeEnabled)
         ) {

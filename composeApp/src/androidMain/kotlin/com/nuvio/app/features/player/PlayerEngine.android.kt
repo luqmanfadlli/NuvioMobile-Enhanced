@@ -16,6 +16,7 @@ import android.os.Handler
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.widget.Toast
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +94,7 @@ import com.nuvio.app.features.player.aiostreams.AiostreamsAss
 import com.nuvio.app.features.player.aiostreams.AiostreamsAssEngine
 import com.nuvio.app.features.player.anime.AnimeShaderStatusTracker
 import com.nuvio.app.features.player.anime.AnimeShaders
+import com.nuvio.app.features.player.bluray.BlurayPlaybackSession
 import com.nuvio.app.features.player.swdecoder.SoftwareVideoRenderer
 import com.nuvio.app.features.autosync.rememberLibmpvAutoSyncCoordinator
 import com.nuvio.app.R
@@ -156,6 +158,7 @@ actual fun PlatformPlayerSurface(
     playbackEngine: AndroidPlaybackEngine?,
     animeContent: Boolean,
     useNativeController: Boolean,
+    discPlaybackEnabled: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -229,6 +232,7 @@ actual fun PlatformPlayerSurface(
             resizeMode = resizeMode,
             useNativeController = useNativeController,
             animeContent = animeContent,
+            discPlaybackEnabled = discPlaybackEnabled,
             onInitialPositionHandled = onInitialPositionHandled,
             onControllerReady = surfaceOnControllerReady,
             onSnapshot = surfaceOnSnapshot,
@@ -295,6 +299,7 @@ private fun ExoPlayerSurface(
     resizeMode: PlayerResizeMode,
     useNativeController: Boolean,
     animeContent: Boolean,
+    discPlaybackEnabled: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -461,6 +466,24 @@ private fun ExoPlayerSurface(
             },
         ).countingNetworkBytes(networkBytesRead)
     }
+    val bluraySession = remember(playerSourceKey, discPlaybackEnabled) {
+        val adaptive = normalizedStreamType in setOf("hls", "m3u8", "dash", "mpd", "smoothstreaming", "ss")
+        if (!discPlaybackEnabled || !sourceAudioUrl.isNullOrBlank() || useYoutubeChunkedPlayback || adaptive) {
+            null
+        } else {
+            BlurayPlaybackSession(
+                sourceUrl = sourceUrl,
+                metadataFactory = PlatformPlaybackDataSourceFactory.create(
+                    context = context,
+                    defaultRequestHeaders = sanitizedSourceHeaders,
+                    defaultResponseHeaders = sanitizedSourceResponseHeaders,
+                    useYoutubeChunkedPlayback = false,
+                    useLongReadTimeout = isLoopbackPlaybackSource(sourceUrl),
+                ),
+            )
+        }
+    }
+    var discSnapshotVersion by remember(playerSourceKey) { mutableStateOf(0) }
 
     LaunchedEffect(playerSourceKey) {
         InAppLogger.info(
@@ -473,7 +496,15 @@ private fun ExoPlayerSurface(
     }
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
-        if (!sourceAudioUrl.isNullOrBlank()) {
+        val discSource = bluraySession?.mediaSource(dataSourceFactory, videoMediaItem)
+        if (discSource != null) {
+            val delayedSource = AudioDelayMediaSource(discSource, audioDelayUs::get)
+            if (startPositionMs != null) {
+                setMediaSource(delayedSource, startPositionMs.coerceAtLeast(0L))
+            } else {
+                setMediaSource(delayedSource)
+            }
+        } else if (!sourceAudioUrl.isNullOrBlank()) {
             // AIOStreams ASS scripts keep their own parser; otherwise reuse the libass factory so
             // addon ASS subtitles render the same way as sources the player builds itself.
             val mediaSourceFactory = aiostreamsAss?.let { ass ->
@@ -728,6 +759,21 @@ private fun ExoPlayerSurface(
             playerChapters,
             exoMediaInfoCache,
         ).copy(animeEnhancement = animeEnhancementStatus)
+            .let { base ->
+                val session = bluraySession
+                if (session == null || !session.hasTitles) {
+                    base
+                } else {
+                    val extra = session.isExtraPlaying
+                    base.copy(
+                        isEnded = base.isEnded && !extra,
+                        discTitles = session.titles(),
+                        activeDiscTitleIndex = session.activeIndex,
+                        discExtraPlaying = extra,
+                        discFeaturePositionMs = session.featurePositionMs,
+                    )
+                }
+            }
         latestOnSnapshot.value(snapshot)
         nowPlayingController.syncPlayback(snapshot)
     }
@@ -789,6 +835,15 @@ private fun ExoPlayerSurface(
                 "mime=${mediaItem.localConfiguration?.mimeType ?: "unknown"} startPositionMs=${fallbackStartPositionMs ?: 0L}",
         )
         val requestedStartPositionMs = stallSession.prepareStartPositionMs(fallbackStartPositionMs)
+        val mediaMimeType = mediaItem.localConfiguration?.mimeType
+        if (bluraySession != null && mediaMimeType != MimeTypes.APPLICATION_M3U8 &&
+            mediaMimeType != MimeTypes.APPLICATION_MPD && mediaMimeType != MimeTypes.APPLICATION_SS
+        ) {
+            if (bluraySession.resolveBeforePlayback() != null) {
+                InAppLogger.info("ExoPlayer/Android", "Blu-ray source detected url=${InAppLogger.redactUrl(sourceUrl)}")
+                discSnapshotVersion += 1
+            }
+        }
         playbackDiagnostics.attempt += 1
         playbackDiagnostics.prepareStartedAtMs = SystemClock.elapsedRealtime()
         Log.i(
@@ -855,8 +910,28 @@ private fun ExoPlayerSurface(
         Log.d(TAG, "$reason: preserving audio track index=${selection.index} id=${selection.id}")
     }
 
-    LaunchedEffect(exoPlayer, animeEnhancementStatus) {
+    LaunchedEffect(exoPlayer, animeEnhancementStatus, discSnapshotVersion) {
         dispatchExoPlayerSnapshot()
+    }
+
+    fun playDiscTitle(startPositionMs: Long, reason: String) {
+        val mediaItem = attachedAddonSubtitleConfig?.let { config ->
+            resolvedMediaItem.buildUpon().setSubtitleConfigurations(listOf(config)).build()
+        } ?: resolvedMediaItem
+        InAppLogger.info(
+            "ExoPlayer/Android",
+            "Blu-ray $reason title=${bluraySession?.activeIndex} startPositionMs=$startPositionMs",
+        )
+        exoPlayer.setPlaybackMediaItem(mediaItem, startPositionMs)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
+        discSnapshotVersion += 1
+    }
+
+    fun returnToDiscFeature(reason: String): Boolean {
+        val resumeMs = bluraySession?.returnToFeature() ?: return false
+        playDiscTitle(resumeMs, reason)
+        return true
     }
 
     val liveSettings by rememberAnimeToggles()
@@ -951,6 +1026,22 @@ private fun ExoPlayerSurface(
                     error,
                 )
 
+                if (bluraySession?.isExtraPlaying == true) {
+                    InAppLogger.warn(
+                        "ExoPlayer/Android",
+                        "Blu-ray extra failed code=${error.errorCodeName}; returning to the feature",
+                    )
+                    if (returnToDiscFeature("extra failed")) {
+                        latestOnError.value(null)
+                        Toast.makeText(
+                            context,
+                            runBlocking { getString(Res.string.player_disc_title_failed) },
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        return
+                    }
+                }
+
                 val positionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
                 val durationMs = exoPlayer.duration.coerceAtLeast(0L)
                 if (
@@ -976,6 +1067,32 @@ private fun ExoPlayerSurface(
                         error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
                         error.cause?.toString()?.contains("UnrecognizedInputFormatException") == true
 
+                val discSession = bluraySession
+                val isContainerError = error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                    error.cause?.toString()?.contains("UnrecognizedInputFormatException") == true
+                if (discSession != null && discSession.canProbeAfterFailure && isContainerError && exoPlayer.duration == C.TIME_UNSET) {
+                    val resumeMs = stallSession.prepareStartPositionMs(fallbackStartPositionMs) ?: positionMs
+                    coroutineScope.launch {
+                        if (discSession.probeAfterFailure() != null) {
+                            InAppLogger.warn(
+                                "ExoPlayer/Android",
+                                "Source error recovered by Blu-ray probe url=${InAppLogger.redactUrl(sourceUrl)}",
+                            )
+                            latestOnError.value(null)
+                            playDiscTitle(resumeMs, "probe")
+                            return@launch
+                        }
+                        handleSourceError(error, isSourceError)
+                    }
+                    return
+                }
+
+                handleSourceError(error, isSourceError)
+            }
+
+            private fun handleSourceError(error: PlaybackException, isSourceError: Boolean) {
                 if (isSourceError && !stallSession.probeAttempted) {
                     stallSession.markMimeProbe()
                     coroutineScope.launch {
@@ -1022,6 +1139,12 @@ private fun ExoPlayerSurface(
                         "playWhenReady=${exoPlayer.playWhenReady} " +
                         "terminalError=${exoPlayer.playerError?.errorCodeName ?: "none"}",
                 )
+                if (playbackState == Player.STATE_ENDED && bluraySession?.isExtraPlaying == true &&
+                    returnToDiscFeature("extra ended")
+                ) {
+                    syncPlayerViewKeepScreenOn()
+                    return
+                }
                 if (playbackState == Player.STATE_READY) {
                     fallbackStartPositionMs = null
                     stallSession.onReady()
@@ -1384,6 +1507,20 @@ private fun ExoPlayerSurface(
 
                 override fun getAudioTracks(): List<AudioTrack> =
                     audioTrackCache.tracks(exoPlayer, context)
+
+                override fun selectDiscTitle(index: Int) {
+                    val session = bluraySession ?: return
+                    val startMs = session.select(index, exoPlayer.currentPosition) ?: return
+                    playDiscTitle(startMs, "select")
+                }
+
+                override fun loadDiscTitleDetails() {
+                    val session = bluraySession ?: return
+                    if (!session.hasTitles) return
+                    coroutineScope.launch {
+                        session.loadLanguages { discSnapshotVersion += 1 }
+                    }
+                }
 
                 override suspend fun getMediaInfo(): PlayerMediaInfo {
                     val video = exoPlayer.videoFormat

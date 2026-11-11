@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="player_disc_titles">Judul disk</string>
+    <string name="player_disc_titles_count">Judul disk (%1$d)</string>
+    <string name="player_disc_title_feature">Film utama · %1$s</string>
+    <string name="player_disc_title_extra">Ekstra · %1$s</string>
+    <string name="player_disc_title_clip">%1$d klip</string>
+    <string name="player_disc_title_clips">%1$d klip</string>
+    <string name="player_disc_title_audio">Audio %1$s</string>
+    <string name="player_disc_title_subtitles">Subtitle %1$s</string>
+    <string name="player_disc_title_failed">Judul ini tidak dapat diputar</string>
+</resources>

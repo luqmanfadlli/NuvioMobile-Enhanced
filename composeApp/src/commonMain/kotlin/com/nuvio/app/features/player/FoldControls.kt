@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Lock
@@ -114,6 +115,7 @@ internal fun FoldControls(
     onLockToggle: () -> Unit,
     onPartyClick: (() -> Unit)?,
     partyActive: Boolean,
+    onDiscTitlesClick: (() -> Unit)? = null,
     onNextEpisodeClick: (() -> Unit)?,
     onTogglePlayback: () -> Unit,
     onSeekBack: () -> Unit,
@@ -218,6 +220,13 @@ internal fun FoldControls(
                 onNextEpisodeClick = onNextEpisodeClick?.let(interact),
                 modifier = Modifier.weight(1f),
             )
+            if (onDiscTitlesClick != null) {
+                IconTile(
+                    icon = Icons.Rounded.Album,
+                    description = stringResource(Res.string.player_disc_titles),
+                    onClick = interact(onDiscTitlesClick),
+                )
+            }
             IconTile(
                 icon = Icons.Rounded.Lock,
                 description = stringResource(Res.string.compose_player_lock_controls),

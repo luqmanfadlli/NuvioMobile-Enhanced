@@ -334,6 +334,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                     resizeMode = if (partyPanelInset > 0.dp) PlayerResizeMode.Fit else resizeMode,
                     playbackEngine = playbackEngineOverride ?: resolvedAutoEngine,
                     animeContent = animeContentState.value,
+                    discPlaybackEnabled = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true),
                     onInitialPositionHandled = { key, handled ->
                         if (active.value && playbackKey == activePlaybackKey && key == currentInitialPositionRequestKey()) {
                             initialSeekApplied = handled
@@ -670,6 +671,11 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                     openChaptersPanel()
                 }
             } else null,
+            onDiscTitlesClick = if (!isLiveTvPlayback && playbackSnapshot.discTitles.size > 1) {
+                {
+                    openDiscTitlesPanel()
+                }
+            } else null,
             onLiveChannelsClick = if (isLiveTvPlayback) {
                 {
                     showLiveChannelsPanel = true
@@ -980,6 +986,16 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
         onChapterSelected = { selectChapter(it) },
         onDismiss = {
             showChaptersPanel = false
+            controlsVisible = true
+        },
+    )
+    PlayerDiscTitlesPanel(
+        visible = showDiscTitlesPanel && playbackSnapshot.discTitles.size > 1,
+        titles = playbackSnapshot.discTitles,
+        activeIndex = playbackSnapshot.activeDiscTitleIndex,
+        onTitleSelected = { selectDiscTitle(it) },
+        onDismiss = {
+            showDiscTitlesPanel = false
             controlsVisible = true
         },
     )

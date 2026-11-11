@@ -305,6 +305,22 @@ data class PlayerPlaybackSnapshot(
     val castAvailable: Boolean = false,
     val castDeviceName: String? = null,
     val animeEnhancement: AnimeEnhancementStatus? = null,
+    val discTitles: List<PlayerDiscTitle> = emptyList(),
+    val activeDiscTitleIndex: Int = -1,
+    val discExtraPlaying: Boolean = false,
+    val discFeaturePositionMs: Long = 0L,
+) {
+    val itemPositionMs: Long
+        get() = if (discExtraPlaying) discFeaturePositionMs else positionMs
+}
+
+data class PlayerDiscTitle(
+    val name: String,
+    val durationMs: Long,
+    val clipCount: Int,
+    val isFeature: Boolean,
+    val audioLanguages: List<String> = emptyList(),
+    val subtitleLanguages: List<String> = emptyList(),
 )
 
 data class AnimeEnhancementStatus(
