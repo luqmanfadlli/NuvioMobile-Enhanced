@@ -111,6 +111,13 @@ internal object SubtitleDevicePreferencesRepository {
         )
     }
 
+    fun load(profileId: Int): SubtitleStyleState? =
+        decodeSubtitleDevicePreferences(SubtitleDevicePreferencesStorage.load(profileId))
+
+    fun removeProfile(profileId: Int) {
+        SubtitleDevicePreferencesStorage.remove(profileId)
+    }
+
     fun save(profileId: Int, style: SubtitleStyleState) {
         SubtitleDevicePreferencesStorage.save(profileId, encodeSubtitleDevicePreferences(style.normalizedForDevice()))
     }

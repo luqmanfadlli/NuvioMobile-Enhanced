@@ -24,6 +24,7 @@ import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.SubtitleDevicePreferencesRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.search.SearchHistoryRepository
 import com.nuvio.app.features.search.SearchRepository
@@ -320,6 +321,7 @@ object ProfileRepository {
                 log.w { "Profile $profileIndex was deleted, but local profile-lock cleanup could not be confirmed" }
             }
             ServerRepository.removeProfile(profileIndex)
+            SubtitleDevicePreferencesRepository.removeProfile(profileIndex)
             _state.value = _state.value.copy(
                 profiles = remaining,
                 activeProfile = if (_state.value.activeProfile?.profileIndex == profileIndex) {
@@ -341,6 +343,7 @@ object ProfileRepository {
             }
             SupabaseProvider.client.postgrest.rpc("sync_delete_profile_data", params)
             ServerRepository.removeProfile(profileIndex)
+            SubtitleDevicePreferencesRepository.removeProfile(profileIndex)
             // Remote deletion succeeded; remove device-local authentication artifacts even if
             // the subsequent profile refresh is interrupted or unavailable.
             val localLockCleanupSucceeded = withContext(Dispatchers.IO) {
