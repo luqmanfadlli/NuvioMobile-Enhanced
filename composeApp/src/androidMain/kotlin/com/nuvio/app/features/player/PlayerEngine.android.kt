@@ -159,6 +159,7 @@ actual fun PlatformPlayerSurface(
     animeContent: Boolean,
     useNativeController: Boolean,
     discPlaybackEnabled: Boolean,
+    liveStream: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -233,6 +234,7 @@ actual fun PlatformPlayerSurface(
             useNativeController = useNativeController,
             animeContent = animeContent,
             discPlaybackEnabled = discPlaybackEnabled,
+            liveStream = liveStream,
             onInitialPositionHandled = onInitialPositionHandled,
             onControllerReady = surfaceOnControllerReady,
             onSnapshot = surfaceOnSnapshot,
@@ -300,6 +302,7 @@ private fun ExoPlayerSurface(
     useNativeController: Boolean,
     animeContent: Boolean,
     discPlaybackEnabled: Boolean,
+    liveStream: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -422,9 +425,11 @@ private fun ExoPlayerSurface(
         resolvedMediaItem.isLocalFileSource()
     }
 
-    val extractorsFactory = remember(sourceUrl) {
+    val extractorsFactory = remember(sourceUrl, liveStream) {
         DefaultExtractorsFactory()
-            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
+            .setTsExtractorFlags(
+                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS or liveTsExtractorFlags(liveStream),
+            )
             .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
             .let { factory -> // AutoSync hook: no observation while disabled.
                 AutoSyncPreferencesRepository.ensureLoaded()
@@ -443,6 +448,7 @@ private fun ExoPlayerSurface(
         sanitizedSourceResponseHeaders,
         useYoutubeChunkedPlayback,
         externalSubtitles,
+        liveStream,
     ) {
         val loopbackSource = isLoopbackPlaybackSource(sourceUrl)
         PlatformPlaybackDataSourceFactory.create(
@@ -455,7 +461,9 @@ private fun ExoPlayerSurface(
         ).withPlaybackBuffering(
             context = context,
             settings = playerSettings,
-            bufferedUrls = if (useYoutubeChunkedPlayback || isLoopbackPlaybackSource(sourceUrl)) {
+            // A live channel never ends and never repeats: the VOD disk cache would replay an old
+            // session's bytes and then ask the server for a byte range, and read-ahead only adds delay.
+            bufferedUrls = if (liveStream || useYoutubeChunkedPlayback || isLoopbackPlaybackSource(sourceUrl)) {
                 emptySet()
             } else {
                 listOfNotNull(sourceUrl, sourceAudioUrl?.takeIf { it.isNotBlank() })
@@ -520,6 +528,13 @@ private fun ExoPlayerSurface(
             } else {
                 setMediaSource(mergedSource)
             }
+        } else if (liveStream) {
+            setMediaSource(
+                AudioDelayMediaSource(
+                    createLiveMediaSource(dataSourceFactory, extractorsFactory, videoMediaItem),
+                    audioDelayUs::get,
+                ),
+            )
         } else if (startPositionMs != null) {
             setMediaItem(videoMediaItem, startPositionMs.coerceAtLeast(0L))
         } else {
@@ -538,6 +553,7 @@ private fun ExoPlayerSurface(
         initialPositionRequestKey,
         videoEffectsNeeded,
         animeRebuildGeneration,
+        liveStream,
     ) {
         aiostreamsAss?.reset(
             PlatformPlaybackDataSourceFactory.create(
@@ -622,6 +638,7 @@ private fun ExoPlayerSurface(
         }
 
         val loadControl = playerSettings.buildPlaybackLoadControl(localFileSource = isLocalFileSource)
+            .let { control -> if (liveStream) LiveStartLoadControl(control) else control }
 
         val liveAnimeSettings = PlayerSettingsRepository.uiState.value
         val animeUpscaleEnabled = latestAnimeContent.value && liveAnimeSettings.androidAnimeUpscaleEnabled
@@ -751,6 +768,7 @@ private fun ExoPlayerSurface(
     }
 
     val exoMediaInfoCache = remember(exoPlayer) { ExoMediaInfoCache() }
+    val liveEdgeRejoin = remember(exoPlayer) { if (liveStream) LiveEdgeRejoin() else null }
 
     fun dispatchExoPlayerSnapshot() {
         val snapshot = exoPlayer.snapshot(
@@ -1026,6 +1044,12 @@ private fun ExoPlayerSurface(
                     error,
                 )
 
+                if (liveEdgeRejoin?.tryRejoin(error, exoPlayer) == true) {
+                    InAppLogger.warn("ExoPlayer/Android", "Live stream fell behind its window; rejoining the live edge")
+                    latestOnError.value(null)
+                    return
+                }
+
                 if (bluraySession?.isExtraPlaying == true) {
                     InAppLogger.warn(
                         "ExoPlayer/Android",
@@ -1065,7 +1089,9 @@ private fun ExoPlayerSurface(
 
                 val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
                         error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
-                        error.cause?.toString()?.contains("UnrecognizedInputFormatException") == true
+                        error.cause?.toString()?.contains("UnrecognizedInputFormatException") == true ||
+                        // A channel link often names no format (or the wrong one): the probe reads what the server sends.
+                        (liveStream && error.errorCode in LIVE_PROBE_ERROR_CODES)
 
                 val discSession = bluraySession
                 val isContainerError = error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
@@ -1099,7 +1125,7 @@ private fun ExoPlayerSurface(
                         val probedMime = withContext(Dispatchers.IO) {
                             probeMimeType(sourceUrl, sanitizedSourceHeaders)
                         }
-                        if (probedMime != null) {
+                        if (probedMime != null && probedMime != resolvedMediaItem.localConfiguration?.mimeType) {
                             Log.d(TAG, "Playback failed with source error. Probed MIME type: $probedMime. Retrying...")
                             InAppLogger.warn(
                                 "ExoPlayer/Android",
@@ -3710,6 +3736,13 @@ private fun ExoPlayer.restoreTrackSelection(selection: TrackSelectionSnapshot): 
 
     return selectTrackByIndex(selection.trackType, selection.index)
 }
+
+private val LIVE_PROBE_ERROR_CODES = setOf(
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+)
 
 private fun PlaybackException.isDecoderFailure(): Boolean =
     errorCode in setOf(

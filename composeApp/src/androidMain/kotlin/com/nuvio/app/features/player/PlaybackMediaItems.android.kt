@@ -181,6 +181,10 @@ internal fun normalizeMimeType(contentType: String?): String? {
 
         "application/vnd.ms-sstr+xml" -> MimeTypes.APPLICATION_SS
 
+        "video/mp2t",
+        "video/mpeg2-ts",
+        "video/x-mpegts" -> MimeTypes.VIDEO_MP2T
+
         "video/mp4",
         "application/mp4",
         "video/x-m4v" -> MimeTypes.VIDEO_MP4
@@ -299,11 +303,25 @@ internal fun probeMimeType(url: String, headers: Map<String, String>): String? {
                 .apply { headers.forEach { (key, value) -> header(key, value) } }
                 .build()
             mimeProbeHttpClient.newCall(request).execute().use { response ->
-                if (response.code in 200..299) normalizeMimeType(response.header("Content-Type")) else null
+                if (response.code !in 200..299) return@use null
+                normalizeMimeType(response.header("Content-Type"))
+                    ?: if (method == "GET") response.body.byteStream().use { mimeTypeFromRemoteHeader(it.readHeaderBytes()) } else null
             }
         }.getOrNull()?.let { return it }
     }
     return null
+}
+
+private fun mimeTypeFromRemoteHeader(header: ByteArray): String? {
+    if (header.isEmpty()) return null
+    val text = header.decodeToString().trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+    return when {
+        text.startsWith("#EXTM3U", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+        text.contains("<MPD", ignoreCase = true) -> MimeTypes.APPLICATION_MPD
+        text.contains("<SmoothStreamingMedia", ignoreCase = true) -> MimeTypes.APPLICATION_SS
+        header[0] == MPEG_TS_SYNC_BYTE -> MimeTypes.VIDEO_MP2T
+        else -> mimeTypeFromHeader(header)
+    }
 }
 
 private val mimeProbeHttpClient by lazy {
