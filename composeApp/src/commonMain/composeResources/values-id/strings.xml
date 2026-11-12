@@ -1528,6 +1528,8 @@
     <string name="settings_playback_tunneled_playback_description">Sinkronisasi audio/video tingkat hardware. Dapat meningkatkan pemutaran di beberapa perangkat Android TV</string>
     <string name="settings_playback_exo_chapters">Tampilkan Chapter</string>
     <string name="settings_playback_exo_chapters_description">Tandai chapter di progress bar dan tampilkan daftarnya di player. Dengan ExoPlayer, ini membuat beberapa request kecil tambahan setelah pemutaran dimulai untuk membaca chapter MKV dan MP4.</string>
+    <string name="settings_playback_chapter_title">Tampilkan Judul Chapter</string>
+    <string name="settings_playback_chapter_title_description">Tampilkan nama chapter yang sedang diputar di atas progress bar.</string>
     <string name="settings_playback_remember_audio_delay">Ingat Jeda Audio per Perangkat</string>
     <string name="settings_playback_remember_audio_delay_description">Pulihkan jeda audio yang diatur di player setiap kali output yang sama diputar lagi, seperti speaker ponsel, headphone kabel, atau tiap perangkat Bluetooth</string>
     <string name="settings_playback_downmix_section">Downmix</string>
@@ -2084,6 +2086,13 @@
     <string name="notifications_test_sent_for">Notifikasi uji coba terkirim untuk %1$s.</string>
     <string name="player_unable_to_play_stream">Tidak dapat memutar stream ini.</string>
     <string name="player_engine_unavailable_rebuild">Mesin player MPV tidak tersedia. Silakan build ulang aplikasi.</string>
+    <string name="player_error_stream_expired">Tautan stream telah kedaluwarsa. Coba sumber lain.</string>
+    <string name="player_error_stream_removed">Tautan stream telah kedaluwarsa atau dihapus. Coba sumber lain.</string>
+    <string name="player_error_stream_rate_limited">Terlalu banyak permintaan ke sumber stream. Tunggu sebentar dan coba lagi.</string>
+    <string name="player_error_stream_unavailable">Server stream saat ini tidak tersedia. Coba sumber lain.</string>
+    <string name="player_error_stream_blocked">Sumber stream diblokir atau dibatasi. Coba sumber lain.</string>
+    <string name="player_error_source_invalid_content">Error sumber: Sumber stream menghasilkan konten tidak valid atau tidak dapat diputar. Tautan mungkin telah kedaluwarsa atau server menghasilkan halaman error, bukan video.\n\nCoba sumber lain. [%1$s]</string>
+    <string name="player_error_unsupported_format">Stream ini menggunakan format yang mungkin tidak didukung perangkat Anda. Coba sumber lain. [%1$s]</string>
     <string name="profile_pin_changed_requires_refresh">PIN profil ini berubah. Hubungkan sekali untuk menyegarkan kunci di perangkat ini.</string>
     <string name="profile_pin_clear_failed">Tidak dapat menghapus kunci PIN. Coba lagi.</string>
     <string name="profile_pin_clear_requires_internet">Hubungkan ke internet untuk menghapus kunci PIN.</string>

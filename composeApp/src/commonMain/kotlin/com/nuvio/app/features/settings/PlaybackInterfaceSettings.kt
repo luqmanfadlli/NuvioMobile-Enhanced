@@ -112,6 +112,15 @@ internal fun PlaybackInterfaceSettings(
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_chapter_title),
+                    description = stringResource(Res.string.settings_playback_chapter_title_description),
+                    checked = settings.chapterTitleEnabled,
+                    enabled = settings.androidExoChaptersEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setChapterTitleEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
                     title = stringResource(Res.string.playback_show_loading_status),
                     description = stringResource(Res.string.playback_show_loading_status_sub),
                     checked = settings.showPlayerLoadingStatus,

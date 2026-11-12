@@ -704,6 +704,8 @@ internal fun settingsSearchEntries(
                 stringResource(Res.string.settings_playback_movie_recommendations_description),
             ),
             PlaybackSearchRow("hold-speed", stringResource(Res.string.settings_playback_hold_speed)),
+            PlaybackSearchRow("exo-chapters", stringResource(Res.string.settings_playback_exo_chapters), stringResource(Res.string.settings_playback_exo_chapters_description)),
+            PlaybackSearchRow("chapter-title", stringResource(Res.string.settings_playback_chapter_title), stringResource(Res.string.settings_playback_chapter_title_description)),
         ),
     )
     addPlaybackRows(

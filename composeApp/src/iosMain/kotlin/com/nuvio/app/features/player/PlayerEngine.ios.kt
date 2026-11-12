@@ -292,6 +292,9 @@ actual fun PlatformPlayerSurface(
             override suspend fun getMediaInfo(): PlayerMediaInfo =
                 mpvMediaInfo { name -> bridge.getProperty(name).ifBlank { null } }
 
+            override suspend fun getChapters(): List<PlayerChapter> =
+                mpvChapters { name -> bridge.getProperty(name).ifBlank { null } }
+
             override fun selectSubtitleTrack(index: Int) {
                 InAppLogger.info("Player/iOS", "select subtitle track index=$index")
                 if (index < 0) {
@@ -504,7 +507,7 @@ actual fun PlatformPlayerSurface(
             val durationMs = bridge.getDurationMs()
             if (durationMs > 0L && durationMs != chaptersDurationMs) {
                 chaptersDurationMs = durationMs
-                chapters = mpvChapters { name -> bridge.getProperty(name).ifBlank { null } }
+                chapters = PlayerChapters.normalize(mpvChapters { name -> bridge.getProperty(name).ifBlank { null } })
             }
             val snapshot = PlayerPlaybackSnapshot(
                 isLoading = bridge.getIsLoading(),
