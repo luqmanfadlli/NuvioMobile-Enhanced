@@ -25,6 +25,7 @@ import com.nuvio.app.features.library.LibraryDisplaySettingsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.PlayerSettingsStorage
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.player.SubtitleRepository
@@ -131,6 +132,8 @@ internal object LocalAccountDataCleaner {
     }
 
     internal fun wipePlatformStorage(wipeStorage: () -> Unit = PlatformLocalAccountDataCleaner::wipe) {
+        PlayerSettingsRepository.ensureLoaded()
+        PlayerSettingsStorage.migrateLegacySubtitlePreferencesToDeviceStore()
         try {
             wipeStorage()
         } finally {
