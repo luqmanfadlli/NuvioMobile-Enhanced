@@ -97,6 +97,7 @@ import com.nuvio.app.features.livetv.LiveTvScreen
 import com.nuvio.app.features.livetv.LiveTvVodPlayback
 import com.nuvio.app.features.sports.ui.SportsActions
 import com.nuvio.app.features.sports.ui.SportsScreen
+import com.nuvio.app.core.ui.LocalIsTv
 import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
@@ -537,7 +538,7 @@ internal fun TabletFloatingTopBar(
                         AppScreenTab.Settings -> Unit
                     }
                 }
-                Surface(
+                if (LocalIsTv.current) Surface(
                     color = if (selectedTab == AppScreenTab.Settings) {
                         tokens.colors.overlaySelected
                     } else {

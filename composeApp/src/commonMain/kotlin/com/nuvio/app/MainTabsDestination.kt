@@ -3,6 +3,23 @@ package com.nuvio.app
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.nuvio.app.core.ui.LocalIsTv
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nuvio.app.core.ui.ComposeProfileHost
+import com.nuvio.app.features.experience.ModeSwitcherPopup
+import com.nuvio.app.features.profiles.ActiveProfileMiniAvatar
+import com.nuvio.app.features.profiles.AvatarRepository
+import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.core.ui.TvSideRail
 import nuvio.composeapp.generated.resources.compose_nav_music
 import androidx.compose.material.icons.rounded.MusicNote
@@ -205,6 +222,14 @@ internal fun MainTabsDestination(
                     )
                 }
 
+                if (tabsRouteActive && !isTv && !useNativeNavigation) {
+                    ProfileCornerButton(
+                        visible = highlightedTab != AppScreenTab.Library && highlightedTab != AppScreenTab.Settings,
+                        onOpenSettings = { onTabSelected(AppScreenTab.Settings) },
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    )
+                }
+
                 if (floatingBarVisible) {
                     when (navBarStyleSetting) {
                         NavBarStyle.EXPANDED -> navBarScrollState.expand()
@@ -350,7 +375,8 @@ internal fun mainFloatingNavigationItems(
             AppScreenTab.Settings -> Unit
         }
     }
-    add(
+    // Phones and tablets get the profile as a button in the top corner; only the TV rail keeps it as an item.
+    if (LocalIsTv.current) add(
         FloatingNavigationItem(
             selected = highlightedTab == AppScreenTab.Settings,
             onClick = { onTabSelected(AppScreenTab.Settings) },
@@ -431,7 +457,7 @@ internal fun MainClassicNavigationBar(
                 AppScreenTab.Settings -> Unit
             }
         }
-        NavItem(
+        if (LocalIsTv.current) NavItem(
             selected = highlightedTab == AppScreenTab.Settings,
             onClick = { onTabSelected(AppScreenTab.Settings) },
         ) {
@@ -531,6 +557,67 @@ internal fun BoxScope.SettingsRouteNavigationBar(
                 liquidGlassSelectionEffects = liquidGlassSelectionEffects,
                 defaultIconColorOverride = defaultIconColorOverride,
             )
+        }
+    }
+}
+
+/**
+ * The profile as a round button in the top-right corner (like the iPhone's): a tap opens Settings, holding it picks a
+ * mode. On Library, which shows the profile as its own large avatar, it is kept in place but invisible, because the
+ * avatar opens the same Settings and the mode picker from here.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ProfileCornerButton(
+    visible: Boolean,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
+    val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
+    var modesOpen by remember { mutableStateOf(false) }
+    val latestOpenSettings by rememberUpdatedState(onOpenSettings)
+    DisposableEffect(Unit) {
+        ComposeProfileHost.openSettings = { latestOpenSettings() }
+        ComposeProfileHost.openModeSwitcher = { modesOpen = true }
+        onDispose {
+            ComposeProfileHost.openSettings = null
+            ComposeProfileHost.openModeSwitcher = null
+        }
+    }
+    val shape = CircleShape
+    Box(
+        modifier = modifier
+            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 6.dp, end = 14.dp)
+            .alpha(if (visible) 1f else 0f)
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.35f))
+            .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
+            .then(
+                if (visible) {
+                    Modifier.combinedClickable(
+                        onClick = onOpenSettings,
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            modesOpen = true
+                        },
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .padding(3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        ActiveProfileMiniAvatar(
+            profile = profileState.activeProfile,
+            avatars = avatars,
+            selected = false,
+            size = 34,
+        )
+        if (modesOpen) {
+            ModeSwitcherPopup(onDismissRequest = { modesOpen = false }, popupBelowAnchor = true)
         }
     }
 }

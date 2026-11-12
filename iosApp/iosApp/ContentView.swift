@@ -993,7 +993,7 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
 @MainActor
 final class AppNavigationCoordinator: ObservableObject {
     private static let nativeTabBarVisibleKey = "NuvioNativeTabBarVisible"
-    private static let liveTvTabVisibleKey = "NuvioLiveTvNavigationVisible"
+    fileprivate static let liveTvTabVisibleKey = "NuvioLiveTvNavigationVisible"
 
     @Published var selectedTab: NuvioAppTab = .home {
         didSet {
@@ -1025,7 +1025,7 @@ final class AppNavigationCoordinator: ObservableObject {
     }
     @Published private(set) var tabBarBehavior: NuvioTabBarBehavior = NuvioTabBarBehavior.current()
     @Published private(set) var isSelectedTabAtRoot = true
-    @Published private(set) var isLiveTvTabVisible = true
+    @Published private(set) var isLiveTvTabVisible = UserDefaults.standard.bool(forKey: AppNavigationCoordinator.liveTvTabVisibleKey)
     @Published private(set) var experienceMode: BannerExperienceMode = BannerExperienceMode.current()
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published private(set) var localizedSwitchProfileTitle = ""
@@ -1190,8 +1190,8 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     func reloadLiveTvTabVisibility() {
-        // Live TV and Sports are always available; the old navigation toggle no longer hides them.
-        let visible = true
+        // Live TV and Sports appear once the profile has put in an IPTV login or playlist; Kotlin publishes this.
+        let visible = UserDefaults.standard.bool(forKey: Self.liveTvTabVisibleKey)
         guard isLiveTvTabVisible != visible else { return }
         if !visible && (selectedTab == .liveTv || selectedTab == .sports) {
             selectedTab = .home

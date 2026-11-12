@@ -92,6 +92,7 @@ data class LiveTvUiState(
         get() = playlists.isNotEmpty() || playlistUrl.isNotBlank() ||
             stalkerSettings.isConfigured || xtreamSettings.isConfigured
 
+    /** Live TV and Sports have tabs only once the profile has put in an IPTV login or playlist. */
     val showInNavigation: Boolean
-        get() = hasPlaylist && isNavigationEnabled
+        get() = hasPlaylist
 }

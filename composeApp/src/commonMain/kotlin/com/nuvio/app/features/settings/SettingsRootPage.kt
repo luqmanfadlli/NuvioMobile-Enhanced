@@ -84,6 +84,20 @@ internal fun LazyListScope.settingsRootContent(
                     isTablet = isTablet,
                     onClick = { onPageClick(SettingsPage.Experience) },
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                // The Live TV and Sports tabs stay hidden until this has a login, so it is one tap from Settings.
+                val liveTv by LiveTvRepository.uiState.collectAsStateWithLifecycle()
+                SettingsNavigationRow(
+                    title = "Live TV",
+                    description = if (liveTv.hasPlaylist) {
+                        "Connected \u00B7 Live TV and Sports are on"
+                    } else {
+                        "Add your IPTV login to turn on Live TV and Sports"
+                    },
+                    icon = SettingsPage.LiveTv.icon,
+                    isTablet = isTablet,
+                    onClick = { onPageClick(SettingsPage.LiveTv) },
+                )
             }
         }
     }

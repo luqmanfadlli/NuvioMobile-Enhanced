@@ -145,6 +145,7 @@ import com.nuvio.app.features.podcasts.PodcastNowPlayingHost
 import com.nuvio.app.features.podcasts.PodcastShowScreen
 import com.nuvio.app.features.sports.ui.SportsLeagueScreen
 import com.nuvio.app.features.sports.ui.SportsScreen
+import com.nuvio.app.core.ui.LocalIsTv
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.livetv.LiveTvVodPlayback
 import com.nuvio.app.features.membership.MemberAccessRepository
@@ -341,8 +342,8 @@ internal fun MainAppContent(
             LiveTvRepository.ensureLoaded()
             LiveTvRepository.uiState
         }.collectAsStateWithLifecycle()
-        // Live TV and Sports are part of the app's tabs in every mode that lists them, not a user toggle.
-        val showLiveTvInNavigation = true
+        // Live TV and Sports get their tabs once a login or playlist has been added (Settings > Live TV).
+        val showLiveTvInNavigation = liveTvUiState.showInNavigation
         val authState by AuthRepository.state.collectAsStateWithLifecycle()
         val openPosterActions: (PosterActionTarget) -> Unit = { target ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1748,7 +1749,7 @@ internal fun MainAppContent(
                     LocalNuvioBottomNavigationOverlayPadding provides settingsRouteBottomOverlay,
                     LocalPosterClickAnchor provides if (posterNavigationEnabled) posterNavigation::prepare else null,
                     LocalUseNativeNavigation provides useNativeNavigation,
-                    LocalReserveProfileButton provides nativeTabBarOwnsChrome,
+                    LocalReserveProfileButton provides (nativeTabBarOwnsChrome || (!useNativeNavigation && !LocalIsTv.current)),
                     LocalNativeNavigationBarHidden provides (currentRoute?.hidesNavigationBar == true),
                     LocalVerticalBarPadding provides if (drawsUnderVerticalBar) verticalBarPadding else PaddingValues(),
                 ) {

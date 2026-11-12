@@ -66,6 +66,7 @@ import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvChannelPrefs
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.experience.ExperienceFeatures
 import com.nuvio.app.features.music.data.YtMusicRepository
@@ -349,10 +350,11 @@ private fun UniversalSearchScreen(
     val shows = remember(q, catalog, model.podcasts) {
         if (!active) emptyList() else (PodcastRepository.searchCatalog(q) + model.podcasts).distinctBy { it.id }.take(14)
     }
-    val channels = remember(q, liveTv.channels) {
+    val hiddenLiveGroups by LiveTvChannelPrefs.hiddenGroups.collectAsStateWithLifecycle()
+    val channels = remember(q, liveTv.channels, hiddenLiveGroups) {
         if (!active) emptyList() else {
             val words = q.lowercase().split(' ').filter { it.isNotBlank() }
-            liveTv.channels.filter { c -> val hay = (c.name + " " + c.group.orEmpty()).lowercase(); words.all { it in hay } }.distinctBy { it.id }.take(40)
+            LiveTvChannelPrefs.visibleChannels(liveTv.channels).filter { c -> val hay = (c.name + " " + c.group.orEmpty()).lowercase(); words.all { it in hay } }.distinctBy { it.id }.take(40)
         }
     }
     val songs: List<Song> = remember(model.music) { model.music.mapNotNull { (it as? SearchResult.Track)?.song ?: (it as? SearchResult.TopTrack)?.song } }

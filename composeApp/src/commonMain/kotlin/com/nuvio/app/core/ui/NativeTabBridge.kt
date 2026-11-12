@@ -257,11 +257,22 @@ fun observeNativeOpenTab(listener: (String) -> Unit) {
     swiftOpenTabListener = listener
 }
 
-/** True where the native shell owns the tabs and can be asked to switch them. */
-internal val canOpenNativeTab: Boolean get() = swiftOpenTabListener != null
+/**
+ * Where Compose draws the profile button itself (Android), it registers these so a screen can ask for Settings or
+ * the mode picker the way it asks the native iOS shell.
+ */
+internal object ComposeProfileHost {
+    var openSettings: (() -> Unit)? = null
+    var openModeSwitcher: (() -> Unit)? = null
+}
+
+/** True where something can switch to another tab on a screen's behalf: the native iOS shell or the Compose profile button. */
+internal val canOpenNativeTab: Boolean get() = swiftOpenTabListener != null || ComposeProfileHost.openSettings != null
 
 internal fun openNativeTab(tab: NativeNavigationTab) {
-    swiftOpenTabListener?.invoke(tab.name)
+    val swift = swiftOpenTabListener
+    if (swift != null) swift(tab.name)
+    else if (tab == NativeNavigationTab.Settings) ComposeProfileHost.openSettings?.invoke()
 }
 
 private var swiftOpenModeSwitcherListener: (() -> Unit)? = null
@@ -272,7 +283,8 @@ fun observeNativeOpenModeSwitcher(listener: () -> Unit) {
 }
 
 internal fun openNativeModeSwitcher() {
-    swiftOpenModeSwitcherListener?.invoke()
+    val swift = swiftOpenModeSwitcherListener
+    if (swift != null) swift() else ComposeProfileHost.openModeSwitcher?.invoke()
 }
 
 fun nativeTabSelect(tabName: String) {

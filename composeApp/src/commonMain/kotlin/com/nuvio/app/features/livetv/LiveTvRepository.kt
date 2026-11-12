@@ -52,6 +52,25 @@ object LiveTvRepository {
         publishNavigationVisibility()
     }
 
+    /**
+     * Each profile has its own playlists, login, favourites and guide. When the active profile changes, what was
+     * loaded for the previous one is dropped and this profile's saved settings are read; channels and the guide are
+     * fetched again the next time Live TV is opened.
+     */
+    fun onProfileChanged() {
+        if (!hasLoaded) return
+        refreshJob?.cancel()
+        epgJob?.cancel()
+        hasLoaded = false
+        channelsRequested = false
+        channelsSignature = null
+        restoredEpg = null
+        detectedEpgUrls = emptyList()
+        epgGuideCache.clear()
+        _uiState.value = LiveTvUiState()
+        ensureLoaded()
+    }
+
     fun ensureChannelsLoaded() {
         ensureLoaded()
         if (channelsRequested) return

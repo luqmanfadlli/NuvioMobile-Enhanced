@@ -56,6 +56,12 @@ object LiveTvChannelPrefs {
     /** The key a channel's playlist category is stored under; blank for channels without one. */
     fun groupKey(group: String?): String = group?.trim()?.lowercase().orEmpty()
 
+    /** [channels] without the ones in categories this profile has hidden. */
+    fun visibleChannels(channels: List<LiveTvChannel>): List<LiveTvChannel> {
+        val hidden = _hiddenGroups.value
+        return if (hidden.isEmpty()) channels else channels.filterNot { groupKey(it.group) in hidden }
+    }
+
     fun isHidden(channel: LiveTvChannel): Boolean {
         val hidden = _hiddenGroups.value
         return hidden.isNotEmpty() && groupKey(channel.group) in hidden

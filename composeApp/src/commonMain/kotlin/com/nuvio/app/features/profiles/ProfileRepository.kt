@@ -175,6 +175,7 @@ object ProfileRepository {
             hasEverSelectedProfile = selectedProfile != null || _state.value.hasEverSelectedProfile,
         )
         persist()
+        com.nuvio.app.features.livetv.LiveTvRepository.onProfileChanged()
         WatchedRepository.onProfileChanged(profileIndex)
         TrackingSettingsRepository.onProfileChanged()
         ensureTrackingProvidersRegistered()

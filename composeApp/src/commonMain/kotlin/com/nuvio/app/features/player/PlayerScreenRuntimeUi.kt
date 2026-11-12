@@ -57,6 +57,7 @@ import com.nuvio.app.features.ratings.rememberCanRate
 import com.nuvio.app.features.ratings.rememberUserRating
 import com.nuvio.app.features.ratings.toUserRatingTarget
 import com.nuvio.app.features.tracking.TrackingRatingTarget
+import com.nuvio.app.features.livetv.LiveTvChannelPrefs
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.livetv.currentProgram
 import com.nuvio.app.features.livetv.rememberLiveTvEpgNowMillis
@@ -1128,7 +1129,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
             controlsVisible = true
         },
         showLiveChannelsPanel = showLiveChannelsPanel,
-        liveTvChannels = liveTvUiState.channels,
+        liveTvChannels = LiveTvChannelPrefs.visibleChannels(liveTvUiState.channels),
         activeLiveChannelId = activeVideoId,
         onLiveChannelSelected = { channel -> switchToLiveChannel(channel) },
         onLiveChannelsPanelDismissed = {
