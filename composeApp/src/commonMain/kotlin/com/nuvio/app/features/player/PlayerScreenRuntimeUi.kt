@@ -172,17 +172,13 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
         val resolvingTorrentInfoHash = activeTorrentInfoHash
 
         selectedPlayerQualityId = null
-        // A live channel plays its master playlist as it is, as Nuvio TV plays it: a single pinned
-        // variant (the highest by default) cannot drop quality when the connection is slower, so it
-        // buffers without end, and only the player resolves variant links against the playlist's
-        // address after a redirect.
         val shouldInspectHls = activeTorrentInfoHash == null &&
             activeSourceAudioUrl == null &&
-            !isLiveTvPlayback &&
             activeSourceUrl.contains(".m3u8", ignoreCase = true)
-        activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
+        val waitForQuality = shouldInspectHls && !isLiveTvPlayback
+        activePlaybackSourceUrl = if (waitForQuality) null else activeSourceUrl
         playerQualityState = PlayerQualitySelectionState(
-            isLoading = shouldInspectHls,
+            isLoading = waitForQuality,
             sourceUrl = activeSourceUrl,
         )
         InAppLogger.debug(
@@ -221,8 +217,13 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                 return@LaunchedEffect
             }
 
-            playerQualityState = resolved
-            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
+            if (isLiveTvPlayback) {
+                playerQualityState = resolved.copy(recommendedVariantId = null)
+                if (selectedPlayerQualityId == null) activePlaybackSourceUrl = resolvingSourceUrl
+            } else {
+                playerQualityState = resolved
+                activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
+            }
             InAppLogger.info(
                 "Player/Quality",
                 "quality state ready variants=${resolved.variants.size} " +
@@ -954,6 +955,9 @@ private fun PlayerScreenRuntime.openQualityPanel() {
 private fun PlayerScreenRuntime.playerQualityControlLabel(): String {
     if (playerQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
     val label = playerQualityState.labelFor(selectedPlayerQualityId, forButton = true)
+    if (label.isNullOrBlank() && selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
+        return playbackResolutionLabel(forButton = true)?.let { "Auto $it" } ?: "Auto"
+    }
     if (!label.isNullOrBlank()) {
         return if (selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
             "Auto $label"
