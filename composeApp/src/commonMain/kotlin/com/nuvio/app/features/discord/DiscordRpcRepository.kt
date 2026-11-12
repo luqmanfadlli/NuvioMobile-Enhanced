@@ -94,7 +94,7 @@ internal data class DiscordRpcSettings(
     @SerialName("hide_on_pause")
     val hideOnPause: Boolean = false,
     @SerialName("show_imdb_button")
-    val showImdbButton: Boolean = false,
+    val showImdbButton: Boolean = true,
     @SerialName("application_id")
     val applicationId: String = "",
 )
