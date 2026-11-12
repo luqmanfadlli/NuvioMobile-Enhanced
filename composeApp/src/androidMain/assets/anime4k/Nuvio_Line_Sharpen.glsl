@@ -1,7 +1,8 @@
 //!DESC Nuvio-Line-Sharpen
 //!HOOK MAIN
 //!BIND HOOKED
-#define NUVIO_SHARPEN_STRENGTH 4.0
+#define NUVIO_SHARPEN_STRENGTH 10.0
+#define NUVIO_SHARPEN_OVERSHOOT 0.45
 float nuvio_luma(vec3 rgb) { return dot(rgb, vec3(0.2126, 0.7152, 0.0722)); }
 float nuvio_tap(float x, float y) { return nuvio_luma(HOOKED_texOff(vec2(x, y)).rgb); }
 vec4 hook() {
@@ -22,6 +23,7 @@ vec4 hook() {
     float blur = (36.0 * c + 24.0 * (n + s + w + e) + 16.0 * (nw + ne + sw + se) + 6.0 * (n2 + s2 + w2 + e2)) / 220.0;
     float lo = min(c, min(min(min(n, s), min(w, e)), min(min(nw, ne), min(sw, se))));
     float hi = max(c, max(max(max(n, s), max(w, e)), max(max(nw, ne), max(sw, se))));
-    float sharpened = clamp(c + NUVIO_SHARPEN_STRENGTH * (c - blur), lo, hi);
+    float range = hi - lo;
+    float sharpened = clamp(c + NUVIO_SHARPEN_STRENGTH * (c - blur), lo - NUVIO_SHARPEN_OVERSHOOT * range, hi + NUVIO_SHARPEN_OVERSHOOT * range);
     return vec4(clamp(center.rgb + (sharpened - c), 0.0, 1.0), center.a);
 }
