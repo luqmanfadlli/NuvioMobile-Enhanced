@@ -226,6 +226,7 @@ internal fun MainTabsDestination(
                     ProfileCornerButton(
                         visible = highlightedTab != AppScreenTab.Library && highlightedTab != AppScreenTab.Settings,
                         onOpenSettings = { onTabSelected(AppScreenTab.Settings) },
+                        onOpenTab = { onTabSelected(it.toAppScreenTab()) },
                         modifier = Modifier.align(Alignment.TopEnd),
                     )
                 }
@@ -571,6 +572,7 @@ internal fun BoxScope.SettingsRouteNavigationBar(
 internal fun ProfileCornerButton(
     visible: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenTab: (com.nuvio.app.core.ui.NativeNavigationTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -578,12 +580,15 @@ internal fun ProfileCornerButton(
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
     var modesOpen by remember { mutableStateOf(false) }
     val latestOpenSettings by rememberUpdatedState(onOpenSettings)
+    val latestOpenTab by rememberUpdatedState(onOpenTab)
     DisposableEffect(Unit) {
         ComposeProfileHost.openSettings = { latestOpenSettings() }
         ComposeProfileHost.openModeSwitcher = { modesOpen = true }
+        ComposeProfileHost.openTab = { tab -> latestOpenTab(tab) }
         onDispose {
             ComposeProfileHost.openSettings = null
             ComposeProfileHost.openModeSwitcher = null
+            ComposeProfileHost.openTab = null
         }
     }
     val shape = CircleShape

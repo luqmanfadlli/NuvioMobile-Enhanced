@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +49,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.Chip
+import com.nuvio.app.core.ui.NativeNavigationTab
+import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.openNativeTab
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
@@ -160,6 +164,8 @@ internal object UniversalSearchData {
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 }
 
+internal enum class IdleTab(val label: String) { ForYou("For You"), Movies("Movies"), Series("Series"), Sports("Sports") }
+
 internal enum class UniversalScope(val label: String) {
     All("All"), Media("Movies & Shows"), People("People"), Sports("Sports"), Music("Music"), Podcasts("Podcasts"), Channels("Live TV"),
 }
@@ -171,6 +177,10 @@ internal enum class UniversalScope(val label: String) {
 internal class UniversalSearchModel {
     var query by mutableStateOf("")
     var scope by mutableStateOf(UniversalScope.All)
+    /** Which start page is showing while the box is empty. */
+    var idleTab by mutableStateOf(IdleTab.ForYou)
+    /** Pages opened from the start page (Genres, a collection ...), newest last; back pops one. */
+    val pages = mutableStateListOf<SearchPage>()
     var people by mutableStateOf<List<PersonHit>>(emptyList())
     var sports by mutableStateOf(RemoteSearch())
     var music by mutableStateOf<List<SearchResult>>(emptyList())
@@ -376,7 +386,20 @@ private fun UniversalSearchScreen(
         val limit = { all: Int, one: Int -> if (scope == UniversalScope.All) all else one }
         val seeAll = { s: UniversalScope -> if (scope == UniversalScope.All) ({ model.scope = s }) else null }
 
-        Column(Modifier.fillMaxSize()) {
+        PlatformBackHandler(enabled = model.pages.isNotEmpty() && q.isBlank()) { model.pages.removeLastOrNull() }
+        val openPage = model.pages.lastOrNull()?.takeIf { q.isBlank() }
+        if (openPage != null) {
+            SearchBrowsePage(
+                page = openPage,
+                onBack = { model.pages.removeLastOrNull() },
+                onOpen = { model.pages.add(it) },
+                watchedKeys = watchedUiState.watchedKeys,
+                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                onPosterClick = onPosterClick,
+                onPosterLongClick = onPosterLongClick,
+                onPersonClick = onPersonClick,
+            )
+        } else Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().appBackgroundCover(MaterialTheme.colorScheme.background)) {
                 Column(Modifier.fillMaxWidth()) {
                     NuvioScreenHeader(title = "Search", modifier = Modifier.padding(horizontal = 16.dp))
@@ -406,13 +429,28 @@ private fun UniversalSearchScreen(
                         }
                         Spacer(Modifier.height(10.dp))
                     } else {
-                        DiscoverFilterRow(
-                            state = discoverUiState,
-                            modifier = Modifier.padding(horizontal = 16.dp).padding(top = 2.dp, bottom = 14.dp),
-                            onTypeSelected = SearchRepository::selectDiscoverType,
-                            onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                            onGenreSelected = SearchRepository::selectDiscoverGenre,
-                        )
+                        LazyRow(contentPadding = PaddingValues(horizontal = NuvioTokens.Space.s16), horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                            items(IdleTab.entries, key = { it.name }) { tab ->
+                                Chip(tab.label, selected = model.idleTab == tab, onClick = {
+                                    model.idleTab = tab
+                                    when (tab) {
+                                        IdleTab.Movies -> SearchRepository.selectDiscoverType("movie")
+                                        IdleTab.Series -> SearchRepository.selectDiscoverType("series")
+                                        else -> Unit
+                                    }
+                                })
+                            }
+                        }
+                        if (model.idleTab == IdleTab.Movies || model.idleTab == IdleTab.Series) {
+                            DiscoverFilterRow(
+                                state = discoverUiState,
+                                modifier = Modifier.padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 4.dp),
+                                onTypeSelected = SearchRepository::selectDiscoverType,
+                                onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                                onGenreSelected = SearchRepository::selectDiscoverGenre,
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
                     }
                 }
             }
@@ -432,20 +470,35 @@ private fun UniversalSearchScreen(
                             }
                         }
                     }
-                    discoverContent(
-                        state = discoverUiState,
-                        isSourceLoading = addonManifestsLoading,
-                        columns = discoverColumns,
-                        networkCondition = networkStatus.condition,
-                        onTypeSelected = SearchRepository::selectDiscoverType,
-                        onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                        onGenreSelected = SearchRepository::selectDiscoverGenre,
-                        onRetry = { NetworkStatusRepository.requestRefresh(force = true); SearchRepository.refreshDiscover(addonsUiState.addons, forceRefresh = true) },
-                        watchedKeys = watchedUiState.watchedKeys,
-                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                        onPosterClick = onPosterClick,
-                        onPosterLongClick = onPosterLongClick,
-                    )
+                    when (model.idleTab) {
+                        IdleTab.ForYou -> searchHomeSections(
+                            onOpen = { model.pages.add(it) },
+                            showLiveTv = liveTv.showInNavigation,
+                            onOpenLiveTv = { openNativeTab(NativeNavigationTab.LiveTv) },
+                            watchedKeys = watchedUiState.watchedKeys,
+                            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                            onPosterClick = onPosterClick,
+                            onPosterLongClick = onPosterLongClick,
+                        )
+                        IdleTab.Movies, IdleTab.Series -> discoverContent(
+                            state = discoverUiState,
+                            isSourceLoading = addonManifestsLoading,
+                            columns = discoverColumns,
+                            networkCondition = networkStatus.condition,
+                            onTypeSelected = SearchRepository::selectDiscoverType,
+                            onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                            onGenreSelected = SearchRepository::selectDiscoverGenre,
+                            onRetry = { NetworkStatusRepository.requestRefresh(force = true); SearchRepository.refreshDiscover(addonsUiState.addons, forceRefresh = true) },
+                            watchedKeys = watchedUiState.watchedKeys,
+                            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                            onPosterClick = onPosterClick,
+                            onPosterLongClick = onPosterLongClick,
+                        )
+                        IdleTab.Sports -> {
+                            item(key = "idle-sports-h") { UniversalHeading("Leagues") }
+                            items(SportsCatalog.all.take(30), key = { "idle-lg-" + it.id }) { l -> LeagueRow(l) { sportsActions.onOpenLeague(l) } }
+                        }
+                    }
                     return@NuvioScreen
                 }
 

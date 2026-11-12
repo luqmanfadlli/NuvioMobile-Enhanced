@@ -264,6 +264,7 @@ fun observeNativeOpenTab(listener: (String) -> Unit) {
 internal object ComposeProfileHost {
     var openSettings: (() -> Unit)? = null
     var openModeSwitcher: (() -> Unit)? = null
+    var openTab: ((NativeNavigationTab) -> Unit)? = null
 }
 
 /** True where something can switch to another tab on a screen's behalf: the native iOS shell or the Compose profile button. */
@@ -272,7 +273,7 @@ internal val canOpenNativeTab: Boolean get() = swiftOpenTabListener != null || C
 internal fun openNativeTab(tab: NativeNavigationTab) {
     val swift = swiftOpenTabListener
     if (swift != null) swift(tab.name)
-    else if (tab == NativeNavigationTab.Settings) ComposeProfileHost.openSettings?.invoke()
+    else ComposeProfileHost.openTab?.invoke(tab) ?: if (tab == NativeNavigationTab.Settings) ComposeProfileHost.openSettings?.invoke() else Unit
 }
 
 private var swiftOpenModeSwitcherListener: (() -> Unit)? = null
