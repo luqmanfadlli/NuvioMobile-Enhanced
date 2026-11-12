@@ -67,7 +67,11 @@ private fun PlayerScreenRuntime.buildDiscordPlaybackInfo(subtitle: String?): Dis
     val imdbId = if (isLiveTvPlayback) {
         null
     } else {
-        imdbIdPattern.find(parentMetaId)?.value ?: activeVideoId?.let { imdbIdPattern.find(it)?.value }
+        imdbIdPattern.find(parentMetaId)?.value
+            ?: activeVideoId?.let { imdbIdPattern.find(it)?.value }
+            ?: listOfNotNull(metaUiState.meta, playerMeta)
+                .filter { it.id == parentMetaId }
+                .firstNotNullOfOrNull { meta -> meta.imdbId?.let { imdbIdPattern.find(it)?.value } }
     }
     val artworkCandidates = if (isLiveTvPlayback) {
         listOf(activeLogo, poster, background)
