@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.6.12",
+          "buildVersion": "155",
+          "date": "2026-11-13T01:28:27Z",
+          "localizedDescription": "- fix(subtitles): config export/import and profile removal for device subtitle prefs @luqmanfadlli\r\n- feat(player): restore HLS quality chooser for Live TV @luqmanfadlli\r\n- Significantly increase anime line sharpener strength (#375) @chrisk325\r\n- fix imdb button not appearing on discord rpc (#373) @chrisk325\r\n- feat(player): isolate subtitle preferences per device (#369) @3l-franco\r\n- fix live tv buffering endlessly and black screen on some streams (#366) @chrisk325\r\n- raw bluray files compatibility for exoplayer (#362) @chrisk325\r\n- migrate simkl oauth v1 to v2 (#359) @chrisk325\r\n- feat(player): chapters setting for every engine, chapters on iOS and a chapter title toggle (#2609) @skoruppa\r\n- fix(collections): respect \"Show catalog type\" in folders (#2608) @skoruppa\r\n- fix(player): show the real cause of playback errors, like NuvioTV (#2607) @skoruppa\r\n- fix(player): use the audio clock when mpv video time drops to 0 (#2605) @skoruppa\r\n- fix(player): add an SPS/PPS init segment to HLS streams that lack them (#2606) @skoruppa\r\n- fix(player): decode DASH MIME query hints before detection (#2600) @retrocodes12\r\n- i18n(vi): update latest Vietnamese strings (#2601) @blueocean2308\r\n- fix(streams): keep tokenized links for reuse and refresh expired saved links (#2598) @skoruppa\r\n- i18n: add French string for signed-out notice (#2593) @SK-Gits\r\n- Update Dutch (nl) strings and reorder Dutch in Settings (#2592) @mronion212",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.12-beta/nuvio-0.6.12-enhanced-release.ipa",
+          "size": 75542331,
+          "sha256": "174609f8dd7ace88851755a1a37f48f1fd151620de9af462de01139db63a9cf9",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.11",
           "buildVersion": "154",
           "date": "2026-11-10T08:54:47Z",
