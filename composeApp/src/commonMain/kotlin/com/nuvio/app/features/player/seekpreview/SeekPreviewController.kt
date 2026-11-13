@@ -53,6 +53,7 @@ private const val PrefetchMinStepMs = 30_000L
 private const val PrefetchDelayMs = 3_000L
 private const val PrefetchGapMs = 250L
 private const val PrefetchStepTimeoutMs = 20_000L
+private const val PrefetchBufferingPollMs = 500L
 
 private const val LogTag = "Player/SeekPreview"
 
@@ -97,6 +98,9 @@ internal class SeekPreviewController(
     private var prefetchJob: Job? = null
     private var disposed = false
 
+    @Volatile
+    var playbackBuffering = false
+
     var frame by mutableStateOf<SeekPreviewFrame?>(null)
         private set
 
@@ -126,6 +130,11 @@ internal class SeekPreviewController(
         }
         requests.value = bucket
         if (worker == null) worker = scope.launch { decodeRequests() }
+    }
+
+    fun warmUpFeed(positionMs: Long, durationMs: Long) {
+        if (isUnavailable || durationMs <= 0L || scrubbing) return
+        if (openFeed() != null) warmUp(positionMs, durationMs)
     }
 
     fun warmUp(positionMs: Long, durationMs: Long) {
@@ -289,6 +298,7 @@ internal class SeekPreviewController(
         prefetchJob = scope.launch {
             delay(PrefetchDelayMs)
             for (target in prefetchTargets(anchorMs, durationMs, stepMs)) {
+                while (playbackBuffering && !scrubbing && feed != null) delay(PrefetchBufferingPollMs)
                 if (scrubbing || feed == null) return@launch
                 val near = nearestFeed(target)
                 if (near != null && abs(near.positionMs - target) < stepMs / 2) continue
