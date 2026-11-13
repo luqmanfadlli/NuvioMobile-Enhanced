@@ -175,10 +175,9 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
         val shouldInspectHls = activeTorrentInfoHash == null &&
             activeSourceAudioUrl == null &&
             activeSourceUrl.contains(".m3u8", ignoreCase = true)
-        val waitForQuality = shouldInspectHls && !isLiveTvPlayback
-        activePlaybackSourceUrl = if (waitForQuality) null else activeSourceUrl
+        activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
         playerQualityState = PlayerQualitySelectionState(
-            isLoading = waitForQuality,
+            isLoading = shouldInspectHls,
             sourceUrl = activeSourceUrl,
         )
         InAppLogger.debug(
@@ -217,13 +216,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                 return@LaunchedEffect
             }
 
-            if (isLiveTvPlayback) {
-                playerQualityState = resolved.copy(recommendedVariantId = null)
-                if (selectedPlayerQualityId == null) activePlaybackSourceUrl = resolvingSourceUrl
-            } else {
-                playerQualityState = resolved
-                activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
-            }
+            playerQualityState = resolved
+            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
             InAppLogger.info(
                 "Player/Quality",
                 "quality state ready variants=${resolved.variants.size} " +
@@ -341,7 +335,6 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                     playbackEngine = playbackEngineOverride ?: resolvedAutoEngine,
                     animeContent = animeContentState.value,
                     discPlaybackEnabled = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true),
-                    liveStream = isLiveTvPlayback,
                     onInitialPositionHandled = { key, handled ->
                         if (active.value && playbackKey == activePlaybackKey && key == currentInitialPositionRequestKey()) {
                             initialSeekApplied = handled
@@ -365,7 +358,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                     },
                     onError = { message ->
                         if (!active.value || playbackKey != activePlaybackKey) return@PlatformPlayerSurface
-                        if (message != null && tryRefreshExpiredLinkAfterError(message)) {
+                        if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
                             return@PlatformPlayerSurface
                         }
                         // Engine failover is decided here, driven by its own player setting;
@@ -488,6 +481,10 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
         },
         headers = activeSourceHeaders,
     )
+    val seekPreviewHasDuration by remember(seekPreview) { derivedStateOf { playbackSnapshot.durationMs > 0L } }
+    LaunchedEffect(seekPreview, seekPreviewHasDuration) {
+        if (seekPreviewHasDuration) seekPreview?.warmUp(playbackSnapshot.positionMs, playbackSnapshot.durationMs)
+    }
     val userRatingTarget = currentUserRatingTarget()
     val canRate = rememberCanRate(userRatingTarget)
     val userRating = rememberUserRating(userRatingTarget.takeIf { canRate })
@@ -955,9 +952,6 @@ private fun PlayerScreenRuntime.openQualityPanel() {
 private fun PlayerScreenRuntime.playerQualityControlLabel(): String {
     if (playerQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
     val label = playerQualityState.labelFor(selectedPlayerQualityId, forButton = true)
-    if (label.isNullOrBlank() && selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
-        return playbackResolutionLabel(forButton = true)?.let { "Auto $it" } ?: "Auto"
-    }
     if (!label.isNullOrBlank()) {
         return if (selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
             "Auto $label"
@@ -1315,4 +1309,3 @@ internal val PlayerScreenRuntime.movieRecommendationCandidates: List<MetaPreview
             .take(MOVIE_RECOMMENDATION_LIMIT)
             .toList()
     }
-
