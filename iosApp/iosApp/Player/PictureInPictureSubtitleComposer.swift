@@ -44,21 +44,46 @@ final class PictureInPictureSubtitleComposer {
         }
         let extent = CGRect(x: 0, y: 0, width: width, height: height)
         let composed = overlay.composited(over: base).cropped(to: extent)
-        if let output = render(composed, extent: extent, like: buffer, bgra: renderAsBGRA) {
+        let hdrColorSpace = Self.hdrColorSpace(of: buffer)
+        if hdrColorSpace != nil || !renderAsBGRA,
+           let output = render(composed, extent: extent, like: buffer, bgra: false, hdrColorSpace: hdrColorSpace) {
             return output
         }
-        guard !renderAsBGRA else { return nil }
+        guard hdrColorSpace == nil else { return nil }
         renderAsBGRA = true
-        return render(composed, extent: extent, like: buffer, bgra: true)
+        return render(composed, extent: extent, like: buffer, bgra: true, hdrColorSpace: nil)
     }
 
-    private func render(_ image: CIImage, extent: CGRect, like source: CVPixelBuffer, bgra: Bool) -> CVPixelBuffer? {
+    private static func hdrColorSpace(of buffer: CVPixelBuffer) -> CGColorSpace? {
+        guard let transfer = CVBufferCopyAttachment(buffer, kCVImageBufferTransferFunctionKey, nil) else {
+            return nil
+        }
+        if CFEqual(transfer, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ) {
+            return CGColorSpace(name: CGColorSpace.itur_2100_PQ)
+        }
+        if CFEqual(transfer, kCVImageBufferTransferFunction_ITU_R_2100_HLG) {
+            return CGColorSpace(name: CGColorSpace.itur_2100_HLG)
+        }
+        return nil
+    }
+
+    private func render(
+        _ image: CIImage,
+        extent: CGRect,
+        like source: CVPixelBuffer,
+        bgra: Bool,
+        hdrColorSpace: CGColorSpace?
+    ) -> CVPixelBuffer? {
         let format = bgra ? kCVPixelFormatType_32BGRA : CVPixelBufferGetPixelFormatType(source)
         guard let output = makeBuffer(format: format, width: Int(extent.width), height: Int(extent.height)) else {
             return nil
         }
+        if !bgra { CVBufferPropagateAttachments(source, output) }
         let destination = CIRenderDestination(pixelBuffer: output)
-        if let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB) {
+        if let colorSpace = hdrColorSpace
+            ?? (bgra ? CGColorSpace(name: CGColorSpace.sRGB) : nil)
+            ?? image.colorSpace
+            ?? CGColorSpace(name: CGColorSpace.sRGB) {
             destination.colorSpace = colorSpace
         }
         do {
@@ -66,7 +91,10 @@ final class PictureInPictureSubtitleComposer {
         } catch {
             return nil
         }
-        CVBufferPropagateAttachments(source, output)
+        if bgra {
+            CVBufferSetAttachment(output, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, .shouldPropagate)
+            CVBufferSetAttachment(output, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, .shouldPropagate)
+        }
         return output
     }
 
