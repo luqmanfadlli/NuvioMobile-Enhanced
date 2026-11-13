@@ -488,6 +488,10 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
         },
         headers = activeSourceHeaders,
     )
+    val seekPreviewHasDuration by remember(seekPreview) { derivedStateOf { playbackSnapshot.durationMs > 0L } }
+    LaunchedEffect(seekPreview, seekPreviewHasDuration) {
+        if (seekPreviewHasDuration) seekPreview?.warmUp(playbackSnapshot.positionMs, playbackSnapshot.durationMs)
+    }
     val userRatingTarget = currentUserRatingTarget()
     val canRate = rememberCanRate(userRatingTarget)
     val userRating = rememberUserRating(userRatingTarget.takeIf { canRate })
