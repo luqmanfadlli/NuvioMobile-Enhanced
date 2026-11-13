@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import com.nuvio.app.core.logging.InAppLogger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
@@ -41,8 +43,16 @@ private const val WarmUpDelayMs = 1_200L
 private const val IdleReleaseMs = 30_000L
 
 private const val ThumbnailAskMs = 80L
-private const val ThumbnailIndexMs = 5_000L
 private const val ThumbnailFallbackMs = 15_000L
+
+private const val WarmAttempts = 3
+private const val WarmRetryMs = 11_000L
+
+private const val PrefetchCount = 48L
+private const val PrefetchMinStepMs = 30_000L
+private const val PrefetchDelayMs = 3_000L
+private const val PrefetchGapMs = 250L
+private const val PrefetchStepTimeoutMs = 20_000L
 
 private const val LogTag = "Player/SeekPreview"
 
@@ -80,6 +90,11 @@ internal class SeekPreviewController(
     private var feedAskJob: Job? = null
     private var feedDurationMs = 0L
     private var feedFallbackJob: Job? = null
+    private var feedWarming = false
+    private var feedAnchorMs = 0L
+    private val feedCache = LinkedHashMap<Long, ImageBitmap>()
+    private var feedArrived: CompletableDeferred<Unit>? = null
+    private var prefetchJob: Job? = null
     private var disposed = false
 
     var frame by mutableStateOf<SeekPreviewFrame?>(null)
@@ -93,6 +108,8 @@ internal class SeekPreviewController(
         if (openFeed() != null) {
             scrubbing = true
             warmJob?.cancel()
+            prefetchJob?.cancel()
+            feedWarming = false
             feedDurationMs = durationMs
             wantFeed(positionMs.coerceIn(0L, durationMs))
             return
@@ -114,10 +131,20 @@ internal class SeekPreviewController(
     fun warmUp(positionMs: Long, durationMs: Long) {
         if (isUnavailable || durationMs <= 0L || scrubbing) return
         if (openFeed() != null) {
-            if (warmJob?.isActive == true) return
+            val target = positionMs.coerceIn(0L, durationMs)
+            feedDurationMs = durationMs
+            feedAnchorMs = target
+            warmJob?.cancel()
             warmJob = scope.launch {
-                delay(ThumbnailIndexMs)
-                feed?.prepare()
+                if (!hasSucceeded) delay(WarmUpDelayMs)
+                repeat(WarmAttempts) {
+                    if (scrubbing || feed == null) return@launch
+                    feedWarming = true
+                    feed?.want(target, frame?.positionMs)
+                    if (hasSucceeded) return@launch
+                    delay(WarmRetryMs)
+                    if (hasSucceeded) return@launch
+                }
             }
             return
         }
@@ -137,9 +164,11 @@ internal class SeekPreviewController(
     fun endScrub() {
         scrubbing = false
         if (feed != null) {
+            feedWanted?.let { feedAnchorMs = it }
             feedWanted = null
             feedAskJob?.cancel()
             feedAskJob = null
+            if (hasSucceeded) startPrefetch()
             return
         }
         requests.value = null
@@ -162,6 +191,9 @@ internal class SeekPreviewController(
 
     private fun wantFeed(positionMs: Long) {
         feedWanted = positionMs
+        nearestFeed(positionMs)?.let { near ->
+            if (isCloser(near.positionMs, positionMs)) frame = near
+        }
         if (feedAskJob?.isActive == true) return
         val waitMs = feedAskedAt?.let { ThumbnailAskMs - it.elapsedNow().inWholeMilliseconds } ?: 0L
         if (waitMs <= 0L) {
@@ -198,16 +230,86 @@ internal class SeekPreviewController(
             feedAskJob = null
             feedFallbackJob?.cancel()
             warmJob?.cancel()
+            prefetchJob?.cancel()
+            feedArrived = null
+            feedCache.clear()
             val wanted = feedWanted
             feedWanted = null
-            frame = null
-            if (scrubbing && wanted != null) request(wanted, feedDurationMs)
+            if (scrubbing && wanted != null) {
+                request(wanted, feedDurationMs)
+            } else if (feedDurationMs > 0L) {
+                warmUp(feedAnchorMs, feedDurationMs)
+            }
             return
         }
         hasSucceeded = true
         feedFallbackJob?.cancel()
-        if (feedWanted == null) return
-        frame = SeekPreviewFrame(positionMs, bitmap)
+        feedCache.remove(positionMs)
+        feedCache[positionMs] = bitmap
+        while (feedCache.size > MaxCachedFrames) {
+            feedCache.remove(feedCache.keys.first())
+        }
+        feedArrived?.complete(Unit)
+        val wanted = feedWanted
+        if (wanted != null) {
+            if (isCloser(positionMs, wanted)) frame = SeekPreviewFrame(positionMs, bitmap)
+        } else if (feedWarming) {
+            feedWarming = false
+            frame = SeekPreviewFrame(positionMs, bitmap)
+        }
+        if (!scrubbing) startPrefetch()
+    }
+
+    private fun isCloser(positionMs: Long, wantedMs: Long): Boolean {
+        val shown = frame ?: return true
+        return abs(positionMs - wantedMs) <= abs(shown.positionMs - wantedMs)
+    }
+
+    private fun nearestFeed(positionMs: Long): SeekPreviewFrame? {
+        var bestKey: Long? = null
+        var bestDistance = Long.MAX_VALUE
+        for (key in feedCache.keys) {
+            val distance = abs(key - positionMs)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                bestKey = key
+            }
+        }
+        val key = bestKey ?: return null
+        val bitmap = feedCache[key] ?: return null
+        return SeekPreviewFrame(key, bitmap)
+    }
+
+    private fun startPrefetch() {
+        if (disposed || scrubbing || feed == null || feedDurationMs <= 0L) return
+        if (prefetchJob?.isActive == true) return
+        val durationMs = feedDurationMs
+        val anchorMs = feedAnchorMs.coerceIn(0L, durationMs)
+        val stepMs = (durationMs / PrefetchCount).coerceAtLeast(PrefetchMinStepMs)
+        prefetchJob = scope.launch {
+            delay(PrefetchDelayMs)
+            for (target in prefetchTargets(anchorMs, durationMs, stepMs)) {
+                if (scrubbing || feed == null) return@launch
+                val near = nearestFeed(target)
+                if (near != null && abs(near.positionMs - target) < stepMs / 2) continue
+                val arrived = CompletableDeferred<Unit>()
+                feedArrived = arrived
+                feed?.want(target, null)
+                withTimeoutOrNull(PrefetchStepTimeoutMs) { arrived.await() }
+                if (feedArrived === arrived) feedArrived = null
+                delay(PrefetchGapMs)
+            }
+        }
+    }
+
+    private fun prefetchTargets(anchorMs: Long, durationMs: Long, stepMs: Long): Sequence<Long> = sequence {
+        yield(anchorMs)
+        var offset = stepMs
+        while (anchorMs + offset <= durationMs || anchorMs - offset >= 0L) {
+            if (anchorMs + offset <= durationMs) yield(anchorMs + offset)
+            if (anchorMs - offset >= 0L) yield(anchorMs - offset)
+            offset += stepMs
+        }
     }
 
     private fun scheduleRelease() {
