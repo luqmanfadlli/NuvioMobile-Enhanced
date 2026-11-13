@@ -25,7 +25,7 @@ actual object StreamBadgeSettingsStorage {
     private const val pinnedStreamSourcesKey = "pinned_stream_sources"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
 
-    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, showInPlayerKey, playerBadgeSourceKey, streamBadgePlacementKey, streamBackgroundModeKey, pinnedStreamSourcesKey)
+    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, showInPlayerKey, playerBadgeSourceKey, streamBadgePlacementKey, streamBackgroundModeKey)
 
     private var preferences: SharedPreferences? = null
     private var legacyDebridPreferences: SharedPreferences? = null
@@ -133,7 +133,6 @@ actual object StreamBadgeSettingsStorage {
         loadPlayerBadgeSource()?.let { put(playerBadgeSourceKey, encodeSyncString(it)) }
         loadStreamBadgePlacement()?.let { put(streamBadgePlacementKey, encodeSyncString(it)) }
         loadStreamBackgroundMode()?.let { put(streamBackgroundModeKey, encodeSyncString(it)) }
-        loadPinnedStreamSources()?.let { put(pinnedStreamSourcesKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -147,6 +146,5 @@ actual object StreamBadgeSettingsStorage {
         payload.decodeSyncString(playerBadgeSourceKey)?.let(::savePlayerBadgeSource)
         payload.decodeSyncString(streamBadgePlacementKey)?.let(::saveStreamBadgePlacement)
         payload.decodeSyncString(streamBackgroundModeKey)?.let(::saveStreamBackgroundMode)
-        payload.decodeSyncString(pinnedStreamSourcesKey)?.let(::savePinnedStreamSources)
     }
 }

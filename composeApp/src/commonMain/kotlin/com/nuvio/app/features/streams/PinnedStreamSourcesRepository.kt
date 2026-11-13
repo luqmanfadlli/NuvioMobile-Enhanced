@@ -42,8 +42,8 @@ object PinnedStreamSourcesRepository {
             else -> current.filterNot { it == normalized }
         }
         if (updated == current) return
-        _pinnedSourceIds.value = updated
         persist(updated)
+        _pinnedSourceIds.value = updated
     }
 
     fun toggle(sourceKey: String) {
