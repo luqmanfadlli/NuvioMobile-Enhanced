@@ -55,12 +55,14 @@ import com.nuvio.app.core.ui.revealAlpha
 import com.nuvio.app.core.ui.featherArtwork
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
+import com.nuvio.app.core.ui.platformPhysicalTopInset
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.player.MiniPlayerController
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.verticalBarWidth
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 @Composable
 fun DetailHero(
@@ -94,9 +96,13 @@ fun DetailHero(
             label = "detail_hero_trailer_alpha",
         )
         val muteIconSize = if (isTablet) 20.dp else 22.dp
-        val heroChromeTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
-            8.dp +
-            ((40.dp - muteIconSize) / 2)
+        val heroChromeTopPadding = if (LocalUseNativeNavigation.current) {
+            platformPhysicalTopInset() + 8.dp
+        } else {
+            WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
+                8.dp +
+                ((40.dp - muteIconSize) / 2)
+        }
         val bottomGradientColor = heroGradientColor ?: MaterialTheme.colorScheme.background
         var logoLoadError by remember(meta.id, meta.logo) {
             mutableStateOf(false)
