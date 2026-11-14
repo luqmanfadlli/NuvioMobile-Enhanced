@@ -121,14 +121,12 @@ fun TabletDetailBackdrop(
             onHeroTrailerReady = onHeroTrailerReady,
             onHeroTrailerFinished = onHeroTrailerFinished,
         )
-        if (!cinematic) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = scrollProgress() * 0.86f }
-                    .background(backgroundColor),
-            )
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = scrollProgress() * if (cinematic) 0.36f else 0.86f }
+                .background(backgroundColor),
+        )
     }
 }
 

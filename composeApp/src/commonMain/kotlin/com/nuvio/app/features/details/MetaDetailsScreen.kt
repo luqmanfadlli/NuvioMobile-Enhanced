@@ -1252,12 +1252,10 @@ fun MetaDetailsScreen(
                                 } else when (backgroundMode) {
                                     MetaScreenBackgroundMode.Normal -> Unit
                                     MetaScreenBackgroundMode.Cinematic -> if (cinematicBackground) {
-                                        // Upstream's pre-blurred artwork backdrop, with the fork's
-                                        // glass source and its lighter background-tinted scrim.
                                         ArtworkBackdrop(
                                             image = cinematicBackdrop,
                                             modifier = Modifier.nuvioBackdropSource(cinematicArtworkBackdrop),
-                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.48f)),
+                                            scrim = SolidColor(colorScheme.background.copy(alpha = 0.36f)),
                                         )
                                     }
                                     MetaScreenBackgroundMode.DominantColor -> {
@@ -1482,11 +1480,6 @@ fun MetaDetailsScreen(
                                 if (!useTabletLayout && backgroundMode.usesBackdropBackground && heroHeightPx.intValue > 0) {
                                     val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
                                         ?: colorScheme.background
-                                    // The blend band sits under the hero and darkens the backdrop around
-                                    // the hero's bottom edge. It used to start fully opaque exactly at that
-                                    // edge, which left a hard line and a dark box under the feathered
-                                    // artwork. Ramp it in across the artwork's feathered region and ease
-                                    // it back out below, so the artwork melts into the backdrop.
                                     val blendFadeInPx = heroHeightPx.intValue * DETAIL_HERO_BLEND_FADE_IN_FRACTION
                                     val blendFadeOutPx = with(density) { DETAIL_HERO_BLEND_FADE_OUT.toPx() }
                                     val blendBandHeight = with(density) { (blendFadeInPx + blendFadeOutPx).toDp() }
@@ -2735,7 +2728,6 @@ private fun TabbedSectionGroup(
     }
 }
 
-// Matches the region of the hero artwork that featherArtwork() fades out (its bottom 42%).
 private const val DETAIL_HERO_BLEND_FADE_IN_FRACTION = 0.42f
 private val DETAIL_HERO_BLEND_FADE_OUT = 200.dp
 private const val DETAIL_HERO_BLEND_PEAK_ALPHA = 0.96f

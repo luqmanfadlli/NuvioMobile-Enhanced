@@ -76,7 +76,6 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.backdropControlColor
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
-import com.nuvio.app.core.ui.featherArtwork
 import com.nuvio.app.core.ui.rememberArtworkBackdrop
 import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
@@ -476,12 +475,10 @@ private fun MobileStreamsLayout(
     val streamsGlassBackdrop = rememberNuvioBackdrop()
     Box(modifier = modifier.fillMaxSize()) {
         if (cinematic) {
-            // Upstream's pre-blurred artwork backdrop. The fork keeps its glass source and the
-            // darker flat scrim it used with the old 12dp blur.
             ArtworkBackdrop(
                 image = rememberArtworkBackdrop(heroArtwork),
                 modifier = Modifier.nuvioBackdropSource(streamsGlassBackdrop),
-                scrim = SolidColor(Color.Black.copy(alpha = if (isEpisode) 0.46f else 0.36f)),
+                scrim = SolidColor(Color.Black.copy(alpha = if (isEpisode) 0.48f else 0.36f)),
             )
         }
 
@@ -493,7 +490,6 @@ private fun MobileStreamsLayout(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         EpisodeHeaderArtwork(
                             imageUrl = heroArtwork,
-                            cinematic = cinematic,
                             blurred = blurEpisodeThumbnail,
                             modifier = Modifier.matchParentSize(),
                         )
@@ -668,12 +664,10 @@ private fun MovieHeroBlock(
 @Composable
 private fun EpisodeHeaderArtwork(
     imageUrl: String?,
-    cinematic: Boolean,
     blurred: Boolean,
     modifier: Modifier,
 ) {
-    if (cinematic && blurred) return
-    Box(modifier = if (cinematic) modifier.featherArtwork() else modifier) {
+    Box(modifier = modifier) {
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
@@ -688,25 +682,23 @@ private fun EpisodeHeaderArtwork(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (cinematic) 0.34f else 0.1f)),
+                .background(Color.Black.copy(alpha = 0.1f)),
         )
 
-        if (!cinematic) {
-            val background = MaterialTheme.colorScheme.background
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to Color.Transparent,
-                            0.58f to Color.Transparent,
-                            0.8f to Color.Black.copy(alpha = 0.42f),
-                            0.93f to background.copy(alpha = 0.84f),
-                            1.0f to background,
-                        ),
+        val background = MaterialTheme.colorScheme.background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to Color.Transparent,
+                        0.58f to Color.Transparent,
+                        0.8f to Color.Black.copy(alpha = 0.42f),
+                        0.93f to background.copy(alpha = 0.84f),
+                        1.0f to background,
                     ),
-            )
-        }
+                ),
+        )
     }
 }
 
