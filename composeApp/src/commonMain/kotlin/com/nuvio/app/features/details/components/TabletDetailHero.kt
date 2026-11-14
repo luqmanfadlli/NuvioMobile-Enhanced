@@ -106,7 +106,7 @@ fun TabletDetailBackdrop(
         BackdropArtwork(
             meta = meta,
             gradientColor = backgroundColor,
-            cinematic = cinematic,
+            cinematic = false,
             modifier = if (cinematic) {
                 Modifier.graphicsLayer { alpha = 1f - scrollProgress() }
             } else {

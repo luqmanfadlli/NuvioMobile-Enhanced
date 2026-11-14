@@ -52,7 +52,6 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.focusedAlignment
 import com.nuvio.app.core.ui.rememberBackdropFocusState
 import com.nuvio.app.core.ui.revealAlpha
-import com.nuvio.app.core.ui.featherArtwork
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
 import com.nuvio.app.core.ui.platformPhysicalTopInset
@@ -128,7 +127,6 @@ fun DetailHero(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (cinematicBackground) Modifier.featherArtwork() else Modifier),
                 ) {
                     val imageUrl = meta.background ?: meta.poster
                     if (imageUrl != null) {
