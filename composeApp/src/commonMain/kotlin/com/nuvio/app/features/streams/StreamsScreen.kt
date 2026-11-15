@@ -55,6 +55,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -668,7 +672,24 @@ private fun EpisodeHeaderArtwork(
     blurred: Boolean,
     modifier: Modifier,
 ) {
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0.0f to Color.Black,
+                        0.45f to Color.Black,
+                        0.65f to Color.Black.copy(alpha = 0.8f),
+                        0.8f to Color.Black.copy(alpha = 0.45f),
+                        0.92f to Color.Black.copy(alpha = 0.15f),
+                        1.0f to Color.Transparent,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
@@ -686,17 +707,14 @@ private fun EpisodeHeaderArtwork(
                 .background(Color.Black.copy(alpha = 0.1f)),
         )
 
-        val background = MaterialTheme.colorScheme.background
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         0.0f to Color.Transparent,
-                        0.58f to Color.Transparent,
-                        0.8f to Color.Black.copy(alpha = 0.42f),
-                        0.93f to background.copy(alpha = 0.84f),
-                        1.0f to background,
+                        0.5f to Color.Transparent,
+                        1.0f to Color.Black.copy(alpha = 0.42f),
                     ),
                 ),
         )
