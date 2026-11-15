@@ -2229,7 +2229,6 @@
     <string name="downloads_enqueue_replaced">Menggantikan unduhan sebelumnya</string>
     <string name="downloads_enqueue_started">Unduhan dimulai</string>
     <string name="downloads_enqueue_unsupported_format">Format stream tidak didukung untuk unduhan</string>
-    <string name="downloads_enqueue_requires_wifi">Hubungkan ke Wi-Fi untuk mengunduh, atau izinkan data seluler di pengaturan Unduhan</string>
     <string name="downloads_allow_mobile_data_title">Izinkan data seluler</string>
     <string name="downloads_show_download_button_title">Tampilkan tombol unduh</string>
     <string name="downloads_show_download_button_description">Menambahkan tombol unduh di bawah Putar pada halaman detail judul.</string>

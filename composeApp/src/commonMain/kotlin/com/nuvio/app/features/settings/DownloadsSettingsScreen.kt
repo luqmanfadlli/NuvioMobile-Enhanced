@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.features.downloads.DownloadsSettingsRepository
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_root_downloads_title
@@ -15,6 +16,8 @@ fun DownloadsSettingsScreen(
     onBack: () -> Unit,
 ) {
     DownloadsSettingsRepository.ensureLoaded()
+
+    PlatformBackHandler(enabled = true, onBack = onBack)
 
     NuvioScreen(
         modifier = Modifier.fillMaxSize(),

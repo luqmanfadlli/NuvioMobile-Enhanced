@@ -98,12 +98,18 @@ fun pauseDownloadsForAppBackground() = Unit
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual object DownloadsPlatformDownloader {
+    // A running task's bytes live only in its resume data, which carries the task's cellular rule.
+    // So a transfer started under Wi-Fi-only stays Wi-Fi-only until it finishes, even after mobile
+    // data is allowed; restarting it under the new rule would discard its progress.
+    actual val restartKeepsProgress: Boolean = false
+
     actual fun start(
         request: DownloadPlatformRequest,
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
         onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
         onFailure: (message: String) -> Unit,
         onPaused: () -> Unit,
+        onQueued: () -> Unit,
     ): DownloadsTaskHandle {
         prepareDownloadSubtitles(request.item.id, request)
         IosBackgroundDownloadCoordinator.startOrResume(
@@ -121,6 +127,10 @@ internal actual object DownloadsPlatformDownloader {
         } else {
             item
         }
+
+    actual fun pauseRestoredItem(item: DownloadItem) = Unit
+
+    actual fun clearUnfinishedTransfers() = Unit
 
     actual fun removeFile(localFileUri: String?): Boolean {
         if (localFileUri.isNullOrBlank()) return false
@@ -202,6 +212,8 @@ private class ActiveDownload(
     val request: DownloadPlatformRequest,
     val taskIdentifier: ULong,
     var callbacks: DownloadCallbacks?,
+    /** The cellular rule this transfer runs under; resume data keeps it. */
+    val allowsCellular: Boolean,
     val resumedFromData: Boolean = false,
     var retriedWithoutRange: Boolean = false,
     var deliberatelyCancelled: Boolean = false,
@@ -233,7 +245,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
             BACKGROUND_SESSION_IDENTIFIER,
         ).apply {
             timeoutIntervalForResource = DOWNLOAD_RESOURCE_TIMEOUT_SECONDS
-            allowsCellularAccess = true
+            allowsCellularAccess = true // Each request carries the Wi-Fi-only rule; the session is created once.
             sessionSendsLaunchEvents = true
         }
         val created = NSURLSession.sessionWithConfiguration(
@@ -263,14 +275,16 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
         }
 
         if (rangeStart == null) {
-            val resumeData = takeResumeData(request.destinationFileName)
-            if (resumeData != null) {
+            val resumed = takeResumeData(request.destinationFileName)
+            if (resumed != null) {
+                val (resumeData, allowsCellular) = resumed
                 val task = ensureSessionCreated().downloadTaskWithResumeData(resumeData)
                 task.taskDescription = downloadId
                 activeDownloads[downloadId] = ActiveDownload(
                     request = request,
                     taskIdentifier = task.taskIdentifier,
                     callbacks = callbacks,
+                    allowsCellular = allowsCellular,
                     resumedFromData = true,
                 )
                 tasksByDownloadId[downloadId] = task
@@ -278,7 +292,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
                 return
             }
         } else {
-            removePathIfExists(resumeDataPath(request.destinationFileName))
+            removeResumeData(request.destinationFileName)
         }
 
         val base = resolveDownloadsBaseDirectory()
@@ -295,6 +309,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
                 request = request,
                 taskIdentifier = task.taskIdentifier,
                 callbacks = callbacks,
+                allowsCellular = nativeRequest.allowsCellularAccess,
             )
             tasksByDownloadId[downloadId] = task
             callbacks?.onProgress?.invoke(resumeFromBytes, null)
@@ -320,7 +335,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
             dispatch_async(dispatch_get_main_queue()) {
                 if (pendingPauses[downloadId] === pending) pendingPauses.remove(downloadId)
                 if (resumeData != null && !pending.discard) {
-                    writeResumeData(fileName, resumeData)
+                    writeResumeData(fileName, resumeData, active?.allowsCellular ?: mobileDataAllowed())
                 }
                 pending.deferredStart?.invoke()
             }
@@ -331,7 +346,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
         pendingPauses.values
             .filter { it.fileName == fileName }
             .forEach { it.discard = true }
-        removePathIfExists(resumeDataPath(fileName))
+        removeResumeData(fileName)
     }
 
     private fun activeFor(task: NSURLSessionTask): Pair<String, ActiveDownload>? {
@@ -474,7 +489,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
             return
         }
         (didCompleteWithError.userInfo[NSURLSessionDownloadTaskResumeData] as? NSData)?.let { data ->
-            writeResumeData(active.request.destinationFileName, data)
+            writeResumeData(active.request.destinationFileName, data, active.allowsCellular)
         }
         finishWithFailure(downloadId, didCompleteWithError.localizedDescription)
     }
@@ -531,6 +546,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
         if (rangeStart != null && rangeStart > 0L) {
             nativeRequest.setValue("bytes=$rangeStart-", forHTTPHeaderField = "Range")
         }
+        nativeRequest.setAllowsCellularAccess(mobileDataAllowed())
         return nativeRequest
     }
 }
@@ -645,18 +661,35 @@ private fun resumeDataDirectoryPath(): String {
     return path
 }
 
-private fun resumeDataPath(fileName: String): String =
-    "${resumeDataDirectoryPath()}/$fileName.resumedata"
+private fun mobileDataAllowed(): Boolean {
+    DownloadsSettingsRepository.ensureLoaded()
+    return DownloadsSettingsRepository.allowMobileDataDownloads.value
+}
 
-@OptIn(ExperimentalForeignApi::class)
-private fun writeResumeData(fileName: String, data: NSData) {
-    data.writeToFile(resumeDataPath(fileName), atomically = true)
+// Resume data keeps the request it was created with, including its cellular rule, so it is
+// filed by that rule. Wi-Fi-only data is always safe to reuse; cellular data only while allowed.
+private fun resumeDataPath(fileName: String, cellular: Boolean): String =
+    "${resumeDataDirectoryPath()}/$fileName${if (cellular) "" else ".wifi"}.resumedata"
+
+private fun removeResumeData(fileName: String) {
+    removePathIfExists(resumeDataPath(fileName, cellular = true))
+    removePathIfExists(resumeDataPath(fileName, cellular = false))
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun takeResumeData(fileName: String): NSData? {
-    val path = resumeDataPath(fileName)
-    val data = NSData.dataWithContentsOfFile(path)
-    removePathIfExists(path)
-    return data?.takeIf { it.length > 0uL }
+private fun writeResumeData(fileName: String, data: NSData, cellular: Boolean) {
+    removeResumeData(fileName)
+    data.writeToFile(resumeDataPath(fileName, cellular), atomically = true)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun takeResumeData(fileName: String): Pair<NSData, Boolean>? {
+    val candidates = if (mobileDataAllowed()) listOf(true, false) else listOf(false)
+    val taken = candidates.firstNotNullOfOrNull { cellular ->
+        NSData.dataWithContentsOfFile(resumeDataPath(fileName, cellular))
+            ?.takeIf { it.length > 0uL }
+            ?.let { it to cellular }
+    }
+    removeResumeData(fileName)
+    return taken
 }

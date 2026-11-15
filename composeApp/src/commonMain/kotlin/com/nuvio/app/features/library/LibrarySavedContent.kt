@@ -4,6 +4,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -114,6 +115,8 @@ internal fun LazyListScope.libraryVerticalContent(
     posterPattern: String,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
+    activeDownloadItemFor: ((LibraryItem) -> ActiveDownloadCard?)? = null,
+    onActiveDownloadTogglePause: ((ActiveDownloadCard) -> Unit)? = null,
 ) {
     items(
         items = projection.entries.chunked(columns),
@@ -123,26 +126,39 @@ internal fun LazyListScope.libraryVerticalContent(
         },
         contentType = { "library_poster_row" },
     ) { rowEntries ->
+        // Not remembered: whether a row has an active download changes as downloads progress,
+        // while the row's entries stay the same.
+        val activeDownloads = rowEntries.map { activeDownloadItemFor?.invoke(it.item) }
         val resolvedItems = remember(rowEntries, posterPattern, releaseInfoFor) {
             rowEntries.map { entry ->
-                entry.item.toMetaPreview()
-                    .copy(releaseInfo = releaseInfoFor(entry.item))
-                    .let { if (posterPattern.isNotBlank()) it.withCustomPosterUrl(posterPattern) else it }
+                entry.item.toPosterPreview(releaseInfoFor, posterPattern)
             }
         }
         PosterGridRow(
             items = resolvedItems,
             columns = columns,
-            modifier = libraryContentTransitionModifier()
-                .padding(horizontal = 16.dp),
+            modifier = libraryContentTransitionModifier().padding(horizontal = 16.dp),
             watchedKeys = watchedKeys,
             fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
             onPosterClick = onPosterClick?.let { callback ->
                 { preview -> rowEntries.findEntry(preview)?.item?.let(callback) }
             },
             onPosterLongClick = onPosterLongClick?.let { callback ->
-                { preview ->
-                    rowEntries.findEntry(preview)?.let { entry -> callback(entry.item, entry.section) }
+                { preview -> rowEntries.findEntry(preview)?.let { entry -> callback(entry.item, entry.section) } }
+            },
+            cellOverride = { index, cellModifier ->
+                val activeDownload = activeDownloads[index]
+                activeDownload?.let { download ->
+                    @Composable {
+                        ActiveDownloadPosterCard(
+                            item = download,
+                            posterPattern = posterPattern,
+                            onClick = { onPosterClick?.invoke(rowEntries[index].item) },
+                            onTogglePause = onActiveDownloadTogglePause?.let { callback -> { callback(download) } },
+                            modifier = cellModifier,
+                            fillMaxWidth = true,
+                        )
+                    }
                 }
             },
         )
@@ -184,3 +200,11 @@ private fun librarySortOptionLabel(option: LibrarySortOption): String =
 
 private fun List<LibraryVerticalEntry>.findEntry(preview: MetaPreview): LibraryVerticalEntry? =
     firstOrNull { entry -> entry.item.id == preview.id && entry.item.type == preview.type }
+
+/** The poster preview for [this] item, with its release info and the user's custom poster pattern. */
+internal fun LibraryItem.toPosterPreview(
+    releaseInfoFor: (LibraryItem) -> String,
+    posterPattern: String,
+): MetaPreview = toMetaPreview()
+    .copy(releaseInfo = releaseInfoFor(this))
+    .let { if (posterPattern.isNotBlank()) it.withCustomPosterUrl(posterPattern) else it }

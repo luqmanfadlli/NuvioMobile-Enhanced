@@ -13,15 +13,23 @@ internal interface DownloadsTaskHandle {
 }
 
 internal expect object DownloadsPlatformDownloader {
+    /** Whether cancelling and restarting a running transfer keeps its downloaded bytes. */
+    val restartKeepsProgress: Boolean
+
     fun start(
         request: DownloadPlatformRequest,
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
         onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
         onFailure: (message: String) -> Unit,
         onPaused: () -> Unit,
+        onQueued: () -> Unit,
     ): DownloadsTaskHandle
 
     fun restoreItem(item: DownloadItem): DownloadItem
+
+    fun pauseRestoredItem(item: DownloadItem)
+
+    fun clearUnfinishedTransfers()
 
     fun removeFile(localFileUri: String?): Boolean
 

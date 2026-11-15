@@ -2194,7 +2194,6 @@
     <string name="downloads_enqueue_replaced">Download anterior substituído</string>
     <string name="downloads_enqueue_started">Download iniciado</string>
     <string name="downloads_enqueue_unsupported_format">Formato de stream não suportado para downloads</string>
-    <string name="downloads_enqueue_requires_wifi">Conecte-se ao Wi-Fi para baixar ou permita o uso de dados móveis nas configurações de downloads.</string>
     <string name="downloads_allow_mobile_data_title">Permitir dados móveis</string>
     <string name="downloads_show_download_button_title">Mostrar botão de download</string>
     <string name="downloads_show_download_button_description">Adiciona um botão de download abaixo de reproduzir na página de detalhes de um título.</string>

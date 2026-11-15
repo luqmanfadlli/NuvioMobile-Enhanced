@@ -88,7 +88,7 @@ internal fun ProviderFilterRow(
     val chip: @Composable (AddonStreamGroup?, Boolean, () -> Unit) -> Unit =
         filterChip ?: { group, isSelected, onClick ->
             FilterChip(
-                label = group?.addonName ?: stringResource(Res.string.collections_tab_all),
+                label = group?.displayName() ?: stringResource(Res.string.collections_tab_all),
                 isSelected = isSelected,
                 isPinned = group != null && group.soleSourcePin()?.key in pinnedSourceIds,
                 onClick = onClick,
@@ -131,7 +131,7 @@ internal fun rememberPinnedStreamSourceIds(): State<List<String>> {
 }
 
 internal fun AddonStreamGroup.soleSourcePin(): PinTarget? {
-    if (addonId.startsWith("debrid:")) return null
+    if (addonId.startsWith("debrid:") || addonId == DOWNLOADED_ADDON_ID) return null
     val playableStreams = streams.filterNot { it.isAddonDebridCandidate && it.isDirectDebridStream }
     val sourceNames = playableStreams
         .map { it.sourceName?.trim()?.takeIf(String::isNotEmpty) }
