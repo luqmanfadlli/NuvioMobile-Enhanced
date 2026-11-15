@@ -698,7 +698,7 @@ internal fun MainAppContent(
             NetworkCondition.ServersUnreachable,
             -> {
                 if (!watchSourceReconnectPending) {
-                    InAppLogger.warn("Network/Status", "watch source reconnect pending condition=${networkStatusUiState.condition.name}")
+                    InAppLogger.warn("Network/Status", "watch source reconnect pending condition=${networkCondition.name}")
                 }
                 watchSourceReconnectPending = true
             }
