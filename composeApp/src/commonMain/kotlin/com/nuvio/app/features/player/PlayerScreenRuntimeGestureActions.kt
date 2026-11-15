@@ -166,6 +166,14 @@ internal fun PlayerScreenRuntime.showVolumeFeedback(level: PlayerAudioLevel) {
     )
 }
 
+internal const val PlayerKeyVolumeStep = 1f / 15f
+
+internal fun PlayerScreenRuntime.changeVolumeBy(delta: Float) {
+    val controller = gestureController ?: return
+    val current = controller.currentVolume()?.fraction ?: return
+    controller.setVolume(current + delta)?.let(::showVolumeFeedback)
+}
+
 internal fun PlayerScreenRuntime.togglePlayback() {
     if (isPartyControlLocked) {
         toggleOwnPlayback()
@@ -239,6 +247,8 @@ internal fun PlayerScreenRuntime.handleKeyboardShortcut(shortcut: PlayerKeyboard
         PlayerKeyboardShortcut.TogglePlayback -> togglePlayback()
         PlayerKeyboardShortcut.SeekBackward -> seekBy(-skipStepMs(PlayerSeekDirection.Backward))
         PlayerKeyboardShortcut.SeekForward -> seekBy(skipStepMs(PlayerSeekDirection.Forward))
+        PlayerKeyboardShortcut.VolumeUp -> changeVolumeBy(PlayerKeyVolumeStep)
+        PlayerKeyboardShortcut.VolumeDown -> changeVolumeBy(-PlayerKeyVolumeStep)
         PlayerKeyboardShortcut.Exit -> {
             flushWatchProgress()
             args.onBack()

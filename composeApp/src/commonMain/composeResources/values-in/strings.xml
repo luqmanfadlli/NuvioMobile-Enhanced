@@ -3060,4 +3060,19 @@
     <string name="settings_glass_ui_style_dark">Gelap</string>
     <string name="settings_glass_ui_style_balanced">Seimbang</string>
     <string name="settings_glass_ui_style_vivid">Cerah</string>
+    <string name="settings_continue_watching_click_action_title">Saat Dipilih</string>
+    <string name="settings_continue_watching_click_action_description">Yang dibuka saat Anda memilih item Lanjutkan Menonton</string>
+    <string name="settings_continue_watching_click_action_stream">Buka Stream</string>
+    <string name="settings_continue_watching_click_action_stream_desc">Pilih sumber atau lanjutkan pemutaran</string>
+    <string name="settings_continue_watching_click_action_details">Buka Detail</string>
+    <string name="settings_continue_watching_click_action_details_desc">Buka halaman detail judul</string>
+    <string name="settings_continue_watching_click_action_details_upcoming">Detail Hanya untuk Episode Mendatang</string>
+    <string name="settings_continue_watching_click_action_details_upcoming_desc">Buka detail untuk episode yang belum tayang, stream untuk lainnya</string>
+    <string name="settings_playback_auto_switch_engine_blocked_by_fallback">Matikan beralih ke sumber cocok berikutnya untuk menggunakan ini.</string>
+    <string name="settings_playback_fallback_next_source">Beralih ke sumber cocok berikutnya saat gagal</string>
+    <string name="settings_playback_fallback_next_source_description">Jika sumber yang dipilih otomatis gagal atau tidak mulai tepat waktu, coba sumber cocok berikutnya secara diam-diam.</string>
+    <string name="settings_playback_fallback_max_sources">Jumlah sumber yang dicoba saat gagal</string>
+    <string name="settings_playback_fallback_startup_timeout">Batas waktu sumber untuk mulai</string>
+    <string name="settings_playback_fallback_next_source_blocked_by_engine_switch">Matikan ganti engine otomatis saat error pemutaran untuk menggunakan ini.</string>
+    <string name="player_error_source_startup_timeout">Sumber tidak mulai dalam %1$d detik.</string>
 </resources>

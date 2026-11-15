@@ -242,6 +242,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
 
     // State - refreshes position from mpv on each call (polled from Kotlin every 250ms)
     func getIsLoading() -> Bool { playerVC?.refreshPlaybackState(); return playerVC?.isPlayerLoading ?? true }
+    func getIsOpening() -> Bool { !(playerVC?.isFileLoaded ?? false) }
     func getIsPlaying() -> Bool { return playerVC?.isPlayerPlaying ?? false }
     func getIsEnded() -> Bool { return playerVC?.isPlayerEnded ?? false }
     func getDurationMs() -> Int64 { return playerVC?.durationMs ?? 0 }
@@ -347,7 +348,7 @@ final class MPVPlayerViewController: UIViewController {
     /// mpv's sub-add needs a loaded file. An add-on subtitle selected before that (Nuvio restores
     /// the remembered one as soon as add-ons answer, often while the stream still opens) waits here.
     private var pendingSubtitleUrl: String?
-    private var isFileLoaded = false
+    private(set) var isFileLoaded = false
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
     var mpv: OpaquePointer?
     private var cachedNowPlayingMetadata: CachedNowPlayingMetadata?
@@ -2911,6 +2912,8 @@ final class MPVPlayerViewController: UIViewController {
         case togglePlayback = "toggle_playback"
         case seekBackward = "seek_backward"
         case seekForward = "seek_forward"
+        case volumeUp = "volume_up"
+        case volumeDown = "volume_down"
         case exit
 
         init?(key: UIKey) {
@@ -2918,6 +2921,8 @@ final class MPVPlayerViewController: UIViewController {
             case UIKeyCommand.inputEscape: self = .exit
             case UIKeyCommand.inputLeftArrow: self = .seekBackward
             case UIKeyCommand.inputRightArrow: self = .seekForward
+            case UIKeyCommand.inputUpArrow: self = .volumeUp
+            case UIKeyCommand.inputDownArrow: self = .volumeDown
             case " ": self = .togglePlayback
             default: return nil
             }
