@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.6.13",
+          "buildVersion": "156",
+          "date": "2026-11-15T02:58:11Z",
+          "localizedDescription": "- fix(app): log the mapped network condition after the upstream merge @luqmanfadlli \r\n- fix(details): apply the Simkl More Like This source @luqmanfadlli\r\n- feat(grid): show 6 posters per row in landscape, 7 on tablets @luqmanfadlli\r\n- fix(ios): keep the folder header below the landscape native bar @luqmanfadlli\r\n- feat(ios): apply Dolby Vision RPU reshaping in Picture in Picture @luqmanfadlli\r\n- fix(ios): extend toolbar fade to screen edges in landscape @luqmanfadlli\r\n- fix(ios): collapse collection header under the native bar @luqmanfadlli\r\n- fix(collection): keep folder cover visible under glass header @luqmanfadlli\r\n- feat(streams): static glass shows the streams artwork backdrop @luqmanfadlli\r\n- fix(ios): show the back button in iPad settings sub-pages (#381) @luqmanfadlli\r\n- fix(ios): keep the mpv drawable at native resolution (#383) @luqmanfadlli\r\n- fix(ios): convert Dolby Vision Profile 5 frames for Picture in Picture @luqmanfadlli\r\n- fix(ios): fix the hero trailer in the cinematic details background (#364) @luqmanfadlli\r\n- fix(hero): place the trailer mute button in the top-right corner (#353) @luqmanfadlli\r\n- fix(sync): push stream badge changes before the next pull (#367) @luqmanfadlli\r\n- fix(ios): keep HDR colours when drawing subtitles in Picture in Picture (#372) @luqmanfadlli\r\n- fix(player): pause seek preview prefetch while buffering and no early warm-up on iOS @luqmanfadlli\r\n- fix seekbar thumbnails taking a lot pf time to load (#380) @chrisk325\r\n- i18n: add French strings and align birth and death wording (#2664) @SK-Gits\r\n- i18n(vi): update latest Vietnamese strings (#2622) @blueocean2308\r\n- perf: smoother cold start and home on Android (#2652) @skoruppa\r\n- fix(home): show hero only after its source catalogs load (#2651) @skoruppa\r\n- feat(player): basic keyboard support (#2633) @skoruppa\r\n- fix(cw): dismiss a next up show by its content id, as on TV (#2632) @skoruppa\r\n- feat(cw): choose what selecting a Continue Watching item opens (#2630) @skoruppa\r\n- Translation improvements and adjustments for Slovak language (#2625) @mmsw91\r\n- i18n: add French strings for chapter title setting (#2621) @SK-Gits\r\n- feat(player): fall back to the next matching source on failure (#2612) @skoruppa\r\n- fix(player): show each start-up step on the loading screen, like NuvioTV (#2611) @skoruppa",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.13-beta/nuvio-0.6.13-enhanced-release.ipa",
+          "size": 75644478,
+          "sha256": "179323e4975ba7d95ff704ec64d44b8cfba0f69de306f5b5e93d4514ae0c28d8",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.12",
           "buildVersion": "155",
           "date": "2026-11-13T01:28:27Z",
