@@ -144,7 +144,7 @@ final class RootComposeViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         enforceContainingTabBarVisibility()
-        removeTopBarBlur()
+        removeBarBlur()
         guard view.bounds.size != foldBoundsSize else { return }
         foldBoundsSize = view.bounds.size
         updateFold()
@@ -229,7 +229,7 @@ final class RootComposeViewController: UIViewController {
         refreshImmersiveSystemUI()
         setInteractiveContentPopGestureEnabled(false)
         setNavigationBarPassthroughEnabled(true)
-        removeTopBarBlur()
+        removeBarBlur()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -237,7 +237,7 @@ final class RootComposeViewController: UIViewController {
         refreshContainingTabBarVisibility()
         refreshImmersiveSystemUI()
         setInteractiveContentPopGestureEnabled(false)
-        removeTopBarBlur()
+        removeBarBlur()
         if let tabBarController {
             onTabBarControllerAvailable?(tabBarController)
         }
@@ -298,10 +298,12 @@ final class RootComposeViewController: UIViewController {
         NuvioNavigationBarPassthrough.setEnabled(enabled, on: navigationController)
     }
 
-    // Fork: no frosted strip across the top of any page. Clears the navigation bar's
+    // No frosted strips at the top or bottom of any page. Clears the navigation bar's
     // background on the bar and on this page's navigation item (SwiftUI's own setting
-    // alone did not reach it), and on iOS 26+ hides the blur iOS draws along the top
-    // edge of scrolling content. The back button and titles are untouched.
+    // alone did not reach it), clears the tab bar's background so only the floating tab
+    // pill is left (the "Static" and "Auto-hide" tab bars showed a full-width blurred band
+    // behind the pill), and on iOS 26+ hides the blur iOS draws along the top and bottom
+    // edges of scrolling content. Buttons, titles and the tab pill itself are untouched.
     private static let transparentBarAppearance: UINavigationBarAppearance = {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
@@ -311,40 +313,76 @@ final class RootComposeViewController: UIViewController {
         return appearance
     }()
 
-    private func removeTopBarBlur() {
-        guard let navigationController else { return }
-        let appearance = Self.transparentBarAppearance
-        let bar = navigationController.navigationBar
-        if bar.standardAppearance !== appearance {
-            bar.standardAppearance = appearance
-            bar.compactAppearance = appearance
-            bar.scrollEdgeAppearance = appearance
-            bar.compactScrollEdgeAppearance = appearance
+    private static let transparentTabBarAppearance: UITabBarAppearance = {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = nil
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
+        return appearance
+    }()
+
+    private func removeBarBlur() {
+        var page: UIViewController = self
+
+        if let navigationController {
+            let appearance = Self.transparentBarAppearance
+            let bar = navigationController.navigationBar
+            if bar.standardAppearance !== appearance {
+                bar.standardAppearance = appearance
+                bar.compactAppearance = appearance
+                bar.scrollEdgeAppearance = appearance
+                bar.compactScrollEdgeAppearance = appearance
+            }
+
+            while let parent = page.parent, parent !== navigationController {
+                page = parent
+            }
+            for item in [navigationItem, page.navigationItem] where item.standardAppearance !== appearance {
+                item.standardAppearance = appearance
+                item.compactAppearance = appearance
+                item.scrollEdgeAppearance = appearance
+                item.compactScrollEdgeAppearance = appearance
+            }
         }
 
-        var page: UIViewController = self
-        while let parent = page.parent, parent !== navigationController {
-            page = parent
-        }
-        for item in [navigationItem, page.navigationItem] where item.standardAppearance !== appearance {
-            item.standardAppearance = appearance
-            item.compactAppearance = appearance
-            item.scrollEdgeAppearance = appearance
-            item.compactScrollEdgeAppearance = appearance
+        if let tabBarController {
+            let appearance = Self.transparentTabBarAppearance
+            let tabBar = tabBarController.tabBar
+            if tabBar.standardAppearance !== appearance {
+                tabBar.standardAppearance = appearance
+                tabBar.scrollEdgeAppearance = appearance
+            }
+
+            // The tab's own item overrides the bar, so clear it on the tab's root controller too.
+            var tabPage: UIViewController = self
+            while let parent = tabPage.parent, parent !== tabBarController {
+                tabPage = parent
+            }
+            let item = tabPage.tabBarItem
+            if let item, item.standardAppearance !== appearance {
+                item.standardAppearance = appearance
+                item.scrollEdgeAppearance = appearance
+            }
         }
 
         if #available(iOS 26.0, *) {
-            Self.hideTopEdgeEffects(in: page.view)
+            Self.hideEdgeEffects(in: page.view)
         }
     }
 
     @available(iOS 26.0, *)
-    private static func hideTopEdgeEffects(in view: UIView) {
-        if let scrollView = view as? UIScrollView, !scrollView.topEdgeEffect.isHidden {
-            scrollView.topEdgeEffect.isHidden = true
+    private static func hideEdgeEffects(in view: UIView) {
+        if let scrollView = view as? UIScrollView {
+            if !scrollView.topEdgeEffect.isHidden {
+                scrollView.topEdgeEffect.isHidden = true
+            }
+            if !scrollView.bottomEdgeEffect.isHidden {
+                scrollView.bottomEdgeEffect.isHidden = true
+            }
         }
         for subview in view.subviews {
-            hideTopEdgeEffects(in: subview)
+            hideEdgeEffects(in: subview)
         }
     }
 
@@ -1540,7 +1578,7 @@ private struct DetailDestinationView: View {
             wrapper.route.hidesNavigationBar ? Visibility.hidden : Visibility.visible,
             for: .navigationBar
         )
-        // Fork: no frosted strip across the top of any page. The bar keeps its buttons
+        // No frosted strip across the top of any page. The bar keeps its buttons
         // (back, title) but loses its blurred background and the blur iOS adds along the
         // top edge, so the page shows right up to the top of the screen.
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -1559,6 +1597,17 @@ private struct DetailDestinationView: View {
 }
 
 private extension View {
+    // Only the floating tab pill: no full-width blurred band behind it.
+    @ViewBuilder
+    func hidesTabBarBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            toolbarBackground(.hidden, for: .tabBar)
+                .scrollEdgeEffectHidden(true, for: .bottom)
+        } else {
+            toolbarBackground(.hidden, for: .tabBar)
+        }
+    }
+
     @ViewBuilder
     func hidesTopEdgeBlur() -> some View {
         if #available(iOS 26.0, *) {
@@ -1928,6 +1977,7 @@ struct NativeNavContentView: View {
                             coordinator: appCoordinator.coordinator(for: tab),
                             appCoordinator: appCoordinator
                         )
+                        .hidesTabBarBackground()
                     } label: {
                         Label {
                             Text(appCoordinator.title(for: tab))
@@ -1965,6 +2015,7 @@ struct NativeNavContentView: View {
                             coordinator: appCoordinator.coordinator(for: tab),
                             appCoordinator: appCoordinator
                         )
+                        .hidesTabBarBackground()
                     } label: {
                         Label {
                             Text(appCoordinator.title(for: tab))
