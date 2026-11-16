@@ -1509,7 +1509,6 @@
     <string name="settings_playback_vod_disk_cache_auto_size_description">Define o tamanho do cache com base no espaço livre em disco. Desative para escolher um tamanho.</string>
     <string name="settings_playback_vod_disk_cache_size">Tamanho do cache</string>
     <string name="settings_playback_vod_disk_cache_note">A gravação em disco continua enquanto um stream em cache é reproduzido. O novo tamanho será aplicado na próxima vez que o aplicativo for iniciado.</string>
-    <string name="settings_playback_tunneled_playback_description">Sincronização de áudio/vídeo em nível de hardware. Pode melhorar a reprodução em alguns dispositivos Android TV</string>
     <string name="settings_tmdb_api_key_label">Chave de API</string>
     <string name="settings_tmdb_api_key_override_description">Use sua própria chave de API do TMDB ou deixe em branco para usar a padrão.</string>
     <string name="settings_tmdb_personal_api_key">Chave de API pessoal</string>
@@ -2698,7 +2697,6 @@
         <item quantity="one">%d título</item>
         <item quantity="other">%d títulos</item>
     </plurals>
-    <string name="settings_playback_auto_skip_segments">Pular trechos automaticamente</string>
     <string name="settings_playback_auto_switch_engine_on_error">Trocar de motor automaticamente em erro de reprodução</string>
     <string name="settings_playback_auto_switch_engine_on_error_description">Troca para o outro motor de reprodução quando a reprodução falha, independentemente do motor selecionado.</string>
     <string name="settings_playback_auto_switch_engine_blocked_by_fallback">Desative a alternativa para a próxima fonte correspondente para usar esta opção.</string>
