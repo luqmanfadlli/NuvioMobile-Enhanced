@@ -54,9 +54,18 @@ Everything below is added on top of upstream Nuvio Mobile. Features that upstrea
 | **Trailer start with sound** — start the hero trailer unmuted instead of muted. You can still mute it with the speaker button. Appears once trailer playback is on. | Settings → Layout → Home Layout → **Start with sound** | Off |
 | **Trailer start delay** — how long the artwork holds before the trailer starts, `Instant` to 10 s. Appears once trailer playback is on. | Settings → Layout → Home Layout → **Trailer Start Delay** | Instant |
 | **Hero style** — `Full-bleed` (artwork spans the screen) or `Card` (rounded, inset). | Settings → Layout → Home Layout → **Hero Style** | Full-bleed |
-| **Dynamic background** — tints the home screen with a gradient pulled from the featured artwork's colours. | Settings → Layout → **Dynamic background color** | Off |
-| **Catalog accent underline** — accent rule under each catalog row heading. | Settings → Layout → **Catalog accent underline** | Off |
+| **Dynamic background** — tints the home screen with a gradient pulled from the featured artwork's colours. | Settings → Layout → Home → **Dynamic background color** | Off |
+| **Catalog accent underline** — accent rule under each catalog row heading. | Settings → Layout → Home → **Catalog accent underline** | Off |
+| **Smart hero framing** — when a wide backdrop is cropped to fit the hero, the visible part is chosen to keep the subject in frame instead of always cutting to the centre. | — | Always on |
 | **Accent gradient on more surfaces** — the theme's accent gradient also colours settings and Profile Insight icons, Taste DNA bars and chips, the catalog accent underline, primary buttons, and the tinted iOS tab bar in every tab bar mode. | Settings → Layout → **Theme** | Follows the selected theme |
+
+### Appearance
+
+| Feature | Where | Default |
+|---|---|---|
+| **App background** — set a photo from your gallery or any image URL (JPG, PNG, GIF or WebP) as the background behind every screen. | Settings → Appearance → **Background** | Default |
+| **Glass UI** *(experimental)* — cards, sheets, dialogs and headers become frosted glass over the app background, with `Dark`, `Balanced` and `Vivid` styles. | Settings → Appearance → **Glass UI** | Off |
+| **More posters in landscape** — Discover and collection folders show 6 posters per row in landscape on phones and 7 on tablets. | — | Always on |
 
 ### Player
 
@@ -69,9 +78,11 @@ Everything below is added on top of upstream Nuvio Mobile. Features that upstrea
 | **Picture in Picture button** — enter PiP straight from the player overlay, in both the legacy and the new control layout. | Player screen overlay | — |
 | **Gesture readouts** — swiping shows the seek target and delta, and the volume/brightness percentage, in the new control layout as well. | — | Always on |
 | **Swipe to Seek toggle** — an option to turn it off to prevent accidental seeking while keeping the up/down brightness and volume swipes. | Settings → Playback → **Swipe to Seek** (under Touch Gestures) | On |
-| **Hardware keyboard shortcuts** — <kbd>Space</kbd> play/pause, <kbd>←</kbd> / <kbd>→</kbd> seek 10 s, <kbd>Esc</kbd> leave the player. Inert while a panel is open or the controls are locked. | — | Always on |
+| **Hardware keyboard shortcuts** — <kbd>Space</kbd> play/pause, <kbd>←</kbd> / <kbd>→</kbd> seek, <kbd>↑</kbd> / <kbd>↓</kbd> volume, <kbd>Esc</kbd> leave the player. Inert while a panel is open or the controls are locked. | — | Always on |
 | **Adjustable subtitle transparency** | Settings → Playback → Subtitle Rendering → **Background Color** | — |
 | **Subtitle shadow** — a soft shadow behind subtitle text, with adjustable strength, to keep it readable on bright scenes. | Settings → Playback → Subtitle Rendering → **Shadow** | Off |
+| **Outline blur** — softens only the subtitle outline while the text stays sharp. | Settings → Playback → Subtitle Rendering → **Outline blur** | Off |
+| **Subtitle style per device** — subtitle size, colours, outline and position are kept per device, so a phone and a tablet on the same profile can look different. | — | Always on |
 | **Custom subtitle fonts** — import a `.ttf` or `.otf` file and use it for subtitles. Fonts stay on the device; subtitles in non-Latin scripts keep a font that supports them. | Settings → Playback → Subtitle Rendering → **Font** → **Import Font** | Default |
 | **Hebrew subtitle punctuation fix** *(iOS)* — external Hebrew subtitles authored for left-to-right renderers get their punctuation moved back to the end of the sentence. Correctly authored files are left untouched. | — | Always on |
 | **Sync subtitles by ear** — tap **Heard** when you hear a line and **Saw** when its subtitle appears, in either order, and the offset is set for you. | Player → Subtitles panel → **Sync by ear** | — |
@@ -79,7 +90,13 @@ Everything below is added on top of upstream Nuvio Mobile. Features that upstrea
 | **Seek bar thumbnails** — a preview frame floats above the seek bar while you drag it, so you can see where you will land. Frames are grabbed from the stream itself (stream headers and extension-less HLS included) only around scrubbing: the connection opens shortly after the controls appear and is released after a short idle. | Settings → Playback → **Seek Bar Thumbnails** | On |
 | **Player buttons** — choose and order the player buttons. In the new layout, pick which buttons stay on the bar and which sit behind the arrow. In the legacy layout, reorder or hide the top and bottom bar buttons; hidden buttons are not shown at all. | Settings → Playback → **Player buttons** (new layout) / **Top bar buttons** and **Bottom bar buttons** (legacy layout) | All buttons in the usual order |
 | **Keeps playing behind Notification Center** *(iOS)* — pulling down Notification Center no longer pauses the video: audio keeps going and the picture picks up right where it is when you come back. If you stay away for more than 10 seconds, playback pauses as before. | — | Always on |
-| **Movie recommendations** — in the last four minutes of a movie, a small card suggests More Like This titles you haven't watched. Dismissing it snoozes it for a minute. | Settings → Playback → **Movie Recommendations** | On |
+| **Movie recommendations** — in the last four minutes of a movie, a small card suggests More Like This titles you haven't watched, from your chosen More Like This source (TMDB, Trakt or SIMKL, falling back to TMDB). Dismissing it snoozes it for a minute. | Settings → Playback → **Movie Recommendations** | On |
+| **Night mode** — a player button that evens out loud and quiet scenes for listening at a low volume, on every engine including iOS. | Settings → Playback → Audio → **Night Mode Button** | Button shown, night mode off |
+| **Anime4K** *(Android)* — a 2x upscaler and a line sharpener for anime, on ExoPlayer and libmpv. Only applied to anime. | Settings → Playback → Video → **Anime 2x Upscaler** / **Anime Line Sharpener** | Off |
+| **Plain controls** — hide the glass backgrounds behind player buttons and time pills, and hide the skip back/forward buttons. | Settings → Playback → Player interface → **Glass Backgrounds on Controls** / **Show Skip Buttons** | On |
+| **Title logo in the player** — show the title artwork instead of the title text in the player controls. | Settings → Playback → Player interface → **Show title logo** | Off |
+| **Skip Intro timing** — show the Skip Intro button earlier or later than the intro timestamp. | Settings → Playback → Skip segments → **Skip Intro Timing** | On time |
+| **Download speed while loading** — the loading screen shows how fast the stream is downloading. | — | Always on |
 | **Mini player** *(Android)* — keep watching in a small floating window while you browse. Tap it to return to full screen. With it on, the player's back button still ends playback; use the **PiP** button in the player header (or the system back gesture) to minimize. | Settings → Playback → **Mini Player** | Off |
 | **Private viewing** — play without saving watch progress, Continue Watching or watched status, and without syncing playback to connected trackers. | Settings → Playback → **Private Viewing** | Off |
 
@@ -93,6 +110,8 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | **Xtream** — connect with a server URL, username and password. | Settings → Integrations → Live TV → **Providers** → Xtream | Not configured |
 | **Stalker Portal** — connect with a portal URL and MAC address; login details optional. | Settings → Integrations → Live TV → **Providers** → Stalker Portal | Not configured |
 | **TV guide (EPG)** — now/next programmes in the channel list and the player, plus a full guide per channel. XMLTV guides linked in playlists and from Xtream/Stalker are found automatically; you can also add your own `.xml` or `.xml.gz` URLs. | Settings → Integrations → Live TV → **TV Guide (EPG)** | Auto-detect on |
+| **Quality chooser** — pick a quality on HLS channels that offer several; Auto stays the default. | Player screen overlay | Auto |
+| **Category search** — Live TV search also matches channel categories. | Live TV → search | Always on |
 | **Show Live TV in navigation** — the tab appears once at least one source is configured. | Settings → Integrations → Live TV → **Show Live TV in navigation** | On |
 
 ### Profiles
@@ -169,6 +188,8 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | **Morphed Liquid Glass tab bar** — shrinks to a compact pill, with native drag-across-tabs and the system glass highlight (requires an **iPhone on iOS 26 or newer**). | Settings → Layout → **Liquid Glass tab bar** | Morphed |
 | **Skia graphics engine** — rebuild graphics engine for animated artwork rendering with shared codecs and bounded memory. Fixed crash on large animated collection, support animated avatar and badge | — | — |
 | **Bundle CJK Font** — fixed Chinese subtitle rendering | — | — |
+| **Subtitles in Picture in Picture** — text subtitles keep showing in Picture in Picture and the mini player. | — | Always on |
+| **Dolby Vision in Picture in Picture** — Dolby Vision Profile 5 videos keep their colours in Picture in Picture instead of turning purple and green. | — | Always on |
 
 ### Performance
 
@@ -176,6 +197,9 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 - **Instant home** — the last home screen is saved per profile and shown on the next launch while fresh rows load.
 - **Lighter Live TV** — channels load only when you open Live TV, sources download in parallel, and the guide is cached for up to 6 hours.
 - **Smoother artwork colours** — dynamic background and details-page colours appear without a dark first frame and blend straight from one hero to the next.
+- **Faster details** — movie and show details open sooner.
+- **Smoother scrolling** — home, shelves and grids scroll with fewer dropped frames.
+- **Lower memory on iPhone** — long sessions and 4K HDR / Dolby Vision playback use less memory, so iOS is less likely to close the app.
 - **Libass rendering off the main thread** *(Android, ExoPlayer)* — ASS/SSA subtitles render on their own thread for less stutter with heavy styled subtitles.
 
 ---
