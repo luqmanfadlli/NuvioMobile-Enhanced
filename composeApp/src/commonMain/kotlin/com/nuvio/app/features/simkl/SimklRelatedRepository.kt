@@ -5,7 +5,6 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.details.MetaDetails
-import com.nuvio.app.features.player.skip.SimklIdResolver
 import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import kotlinx.serialization.SerialName
@@ -64,10 +63,17 @@ object SimklRelatedRepository {
         val (source, id) = parseSimklRedirectParam(meta.id)
             ?: meta.imdbId?.takeIf(String::isNotBlank)?.let { "imdb" to it }
             ?: parseSimklRedirectParam(fallbackItemId)
-            ?: return emptyList()
+            ?: run {
+                log.w { "No Simkl lookup id for ${meta.id} fallback=$fallbackItemId" }
+                return emptyList()
+            }
 
         val contentTypeHint = meta.type?.takeIf { it.isNotBlank() } ?: fallbackItemType
-        val resolved = SimklIdResolver.resolveIds(source, id, contentTypeHint) ?: return emptyList()
+        val resolved = resolveSimklItem(source, id, contentTypeHint) ?: run {
+            log.w { "Simkl lookup found nothing for $source=$id type=$contentTypeHint" }
+            InAppLogger.warn("Simkl/Related", "Lookup found nothing for $source=$id type=$contentTypeHint")
+            return emptyList()
+        }
         val cacheKey = "${resolved.type}|${resolved.simklId}"
 
         if (!forceRefresh) {
@@ -94,11 +100,55 @@ object SimklRelatedRepository {
 
         val items = rawItems.mapNotNull(::itemToMetaPreview)
             .distinctBy { "${it.type}:${it.id}" }
+        log.d { "Simkl related ${resolved.type}/${resolved.simklId}: raw=${rawItems.size} shown=${items.size}" }
         cache[cacheKey] = TimedCache(items, currentTimeMs())
         return items
     }
 
     fun clearCache() { cache.clear() }
+
+    private data class SimklItemRef(val type: String, val simklId: Long)
+
+    private suspend fun resolveSimklItem(source: String, id: String, contentTypeHint: String?): SimklItemRef? {
+        val response = try {
+            SimklApi.client.execute(
+                SimklApiRequest(
+                    method = SimklHttpMethod.GET,
+                    path = "/search/id",
+                    query = mapOf(source to id),
+                    requiresAuthentication = SimklAuthRepository.isAuthenticated.value,
+                    retryPolicy = SimklRetryPolicy.TRANSIENT_FAILURES,
+                ),
+            )
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            log.w { "Simkl lookup $source=$id failed: ${e.message}" }
+            return null
+        }
+        if (response.status !in 200..299) {
+            log.w { "Simkl lookup $source=$id failed status=${response.status}" }
+            return null
+        }
+        val results = runCatching { json.decodeFromString<List<SimklRelatedItemDto>>(response.body) }
+            .getOrElse { error ->
+                log.w { "Simkl lookup $source=$id unreadable: ${error.message}" }
+                return null
+            }
+            .filter { it.ids?.simkl != null }
+        if (results.isEmpty()) return null
+        val expectedTypes = when (contentTypeHint?.trim()?.lowercase()) {
+            "movie", "film" -> setOf("movie")
+            "series", "tv", "show", "tvshow" -> setOf("show", "tv", "anime")
+            else -> emptySet()
+        }
+        val match = results.firstOrNull { it.type?.lowercase() in expectedTypes } ?: results.first()
+        val path = when (match.type?.lowercase()) {
+            "movie" -> "movies"
+            "show", "tv" -> "tv"
+            else -> "anime"
+        }
+        return SimklItemRef(type = path, simklId = match.ids?.simkl ?: return null)
+    }
 
     private suspend fun fetchDetail(type: String, simklId: Long): SimklDetailDto? = try {
         val response = SimklApi.client.execute(

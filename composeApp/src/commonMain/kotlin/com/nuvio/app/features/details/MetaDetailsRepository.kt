@@ -660,6 +660,10 @@ object MetaDetailsRepository {
         val isTraktAuthenticated = TraktAuthRepository.uiState.value.mode == TraktConnectionMode.CONNECTED
         val tmdbSettings = TmdbSettingsRepository.snapshot()
 
+        log.d {
+            "More like this source=${trackingSettings.moreLikeThisSource} simkl=${shouldUseSimklMoreLikeThis(trackingSettings.moreLikeThisSource)} " +
+                "type=${meta.type} fallbackType=$fallbackItemType id=${meta.id}"
+        }
         // Simkl source
         if (shouldUseSimklMoreLikeThis(trackingSettings.moreLikeThisSource) &&
             supportsMoreLikeThis(meta, fallbackItemType)
