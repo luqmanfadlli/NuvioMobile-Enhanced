@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "1.0.0",
+          "buildVersion": "157",
+          "date": "2026-11-16T06:50:50Z",
+          "localizedDescription": "# Nuvio Enhanced 1.0.0\r\n\r\nThank you to everyone who has contributed to the project, tested the betas, and supported us along the way.\r\n\r\nThis is the first stable release. It has additional features and fixes from 0.6.13-beta:\r\n- feat(player): use the chosen More Like This source for end-of-movie picks @luqmanfadlli\r\n- fix(details): fall back to TMDB when Simkl has no related titles @luqmanfadlli\r\n- fix(simkl): look up More Like This titles through the Simkl API client @luqmanfadlli\r\n- fix(ios): render mpv at the screen's backing scale (#383) @luqmanfadlli\r\n- fix(streams): blend episode header artwork smoothly into background (#388) @chrisk325\r\n\r\n> **Note**\r\nOn Android, choose Stable in **Settings → About → Update channel** for fewer updates and a more stable build. Choose **Beta** for frequent updates, with possible breaking changes. If you were already on a beta build, you stay on **Beta** until you switch.\r\n",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/1.0.0/nuvio-1.0.0-enhanced-release.ipa",
+          "size": 75657908,
+          "sha256": "0c0c21e5296c824c1b4fbe8e4890778a38ab757e3ddf572c61971f996336f050",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.13",
           "buildVersion": "156",
           "date": "2026-11-15T02:58:11Z",
