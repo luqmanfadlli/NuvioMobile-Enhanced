@@ -17,6 +17,9 @@ jobs:
   full-debug-build:
     name: Build fullDebug APK
     runs-on: ubuntu-latest
+    env:
+      NUVIO_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NUVIO_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
     steps:
       - name: Checkout

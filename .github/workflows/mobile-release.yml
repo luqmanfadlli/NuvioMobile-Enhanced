@@ -64,6 +64,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+      NUVIO_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NUVIO_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       CONTRIBUTIONS_URL: https://api.github.com/repos/luqmanfadlli/NuvioMobile-Enhanced/contributors?per_page=100
 
     steps:
@@ -284,6 +286,8 @@ jobs:
       NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M -XX:+UseG1GC
       NUVIO_IOS_PHASE_PROFILE: ${{ inputs.ios_disable_phases }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+      NUVIO_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NUVIO_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       CONTRIBUTIONS_URL: ${{ secrets.CONTRIBUTIONS_URL }}
 
     steps:

@@ -310,6 +310,10 @@ fun runtimeConfigValue(key: String, fallback: String = ""): String =
         ?: providers.environmentVariable(key).orNull?.trim()?.takeIf { it.isNotBlank() }
         ?: fallback
 
+fun runtimeConfigValueFromEnvironment(key: String): String =
+    providers.environmentVariable(key).orNull?.trim()?.takeIf { it.isNotBlank() }
+        ?: runtimeConfigValue(key)
+
 fun runtimeConfigBoolean(key: String, default: Boolean): Boolean =
     when (runtimeConfigValue(key).lowercase()) {
         "1", "true", "yes", "y", "on" -> true
@@ -322,8 +326,8 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
     localPropertiesFile.set(rootProject.layout.projectDirectory.file("local.properties"))
     appVersionName.set(releaseAppVersionName)
     appVersionCode.set(releaseAppVersionCode)
-    supabaseUrl.set(runtimeConfigValue("NUVIO_SUPABASE_URL"))
-    supabaseAnonKey.set(runtimeConfigValue("NUVIO_SUPABASE_ANON_KEY"))
+    supabaseUrl.set(runtimeConfigValueFromEnvironment("NUVIO_SUPABASE_URL"))
+    supabaseAnonKey.set(runtimeConfigValueFromEnvironment("NUVIO_SUPABASE_ANON_KEY"))
     supabaseFallbackUrl.set(runtimeConfigValue("NUVIO_SUPABASE_FALLBACK_URL"))
     sentryDsn.set(runtimeConfigValue("SENTRY_DSN"))
     tmdbApiKey.set(runtimeConfigValue("TMDB_API_KEY"))

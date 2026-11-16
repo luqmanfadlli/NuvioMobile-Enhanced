@@ -183,6 +183,10 @@ fun ProfileSelectionScreen(
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val backgroundProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
+    val timeOfDay = remember { ProfileTimeOfDay.now() }
+    val activeProfileName = backgroundProfile?.name?.trim()?.takeIf { it.isNotEmpty() }
+    val greeting = activeProfileName?.let { "${timeOfDay.greeting}, $it!" }
+        ?: "${timeOfDay.greeting}!"
 
     BoxWithConstraints(
         modifier = modifier
@@ -191,6 +195,7 @@ fun ProfileSelectionScreen(
         val isTabletLayout = maxWidth >= 768.dp
         ProfileBackgroundBackdrop(
             profile = backgroundProfile,
+            timePalette = timeOfDay.palette,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -242,7 +247,7 @@ fun ProfileSelectionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
               ) {
                 Text(
-                    text = stringResource(Res.string.profile_who_is_watching),
+                    text = greeting,
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontSize = 30.sp,
                         letterSpacing = 0.sp,
