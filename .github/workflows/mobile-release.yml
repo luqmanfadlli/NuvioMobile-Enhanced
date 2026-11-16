@@ -157,6 +157,7 @@ jobs:
           NOTES_FROM: ${{ inputs.notes_from }}
           UPSTREAM_URL: https://github.com/NuvioMedia/NuvioMobile.git
           UPSTREAM_BRANCH: cmp-rewrite
+          UPSTREAM_REPOSITORY: NuvioMedia/NuvioMobile
         run: |
           notes_to="${GITHUB_SHA}"
           notes_from="$(printf '%s' "${NOTES_FROM}" | tr -d '[:space:]')"
@@ -180,11 +181,11 @@ jobs:
             fi
           fi
 
-          exclude_ref_args=()
+          upstream_args=()
           if git fetch --no-tags --quiet "${UPSTREAM_URL}" "${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"; then
-            exclude_ref_args=(--exclude-ref "refs/remotes/upstream/${UPSTREAM_BRANCH}")
+            upstream_args=(--upstream-ref "refs/remotes/upstream/${UPSTREAM_BRANCH}" --upstream-repository "${UPSTREAM_REPOSITORY}")
           else
-            echo "::warning::Could not fetch upstream; release notes may include upstream commits."
+            echo "::warning::Could not fetch upstream; upstream commits will be listed with the fork changes."
           fi
 
           ./scripts/generate-release-notes.sh \
@@ -192,7 +193,7 @@ jobs:
             --to "${notes_to}" \
             --repository "${GITHUB_REPOSITORY}" \
             --exclude "${EXCLUDE_COMMITS}" \
-            "${exclude_ref_args[@]}" \
+            "${upstream_args[@]}" \
             > release-notes.md
 
           if [[ ! -s release-notes.md ]]; then
