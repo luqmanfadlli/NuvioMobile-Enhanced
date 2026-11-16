@@ -18,7 +18,18 @@
       "iconURL": "https://raw.githubusercontent.com/NuvioMedia/NuvioMobile/0.4.11/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
       "tintColor": "#1E88E5",
       "category": "entertainment",
-      "versions": [],
+      "versions": [
+        {
+          "version": "1.1.0-beta.1",
+          "buildVersion": "158",
+          "date": "2026-11-16T12:13:03Z",
+          "localizedDescription": "## Nuvio Enhanced\r\n- fix(ios): import the navigationController extension for the bar anchor @luqmanfadlli\r\n- fix(i18n): drop duplicated Brazilian Portuguese strings from the merge @luqmanfadlli\r\n- fix(mdblist): don't use the show runtime as an episode's length @luqmanfadlli\r\n- fix(details): mirror the hero mute button on the back button (#395) @luqmanfadlli\r\n- i18n(id): update Indonesian locale @luqmanfadlli\r\n- iOS: remove the blurred strip across the top of pushed pages (#392) @lalith14\r\n- feat(downloads): download whole seasons at once and manage storage (#391) @SanpuiRonak\r\n\r\n## Upstream (NuvioMedia/NuvioMobile)\r\n- feat(library): remember list and type, add genre, year and watched filters (#2681) @skoruppa\r\n- fix(player): bottom controls pushed up on Android with gesture navigation (#2680) @skoruppa\r\n- fix(debrid): match TorBox alternative-hash cache answers (#2679) @WhiteGiso\r\n- i18n: use a regular space before the seconds unit (#2674) @SK-Gits\r\n- feat(subtitles): add outline width and match the styled overlay to native renderers (#2669) @skoruppa\r\n- i18n: add complete high-fidelity Brazilian Portuguese localization (#2668) @jhojhocraazy\r\n- feat(l10n): add Ukrainian localization (#2665) @insabon\r\n- feat(addons): support Stremio player and library tracking addons (#2660) @skoruppa\r\n- fix(player): fall back from the next episode's auto-selected source (#2653) @skoruppa\r\n- fix(ios): keep downloads out of iCloud and computer backups (#2650) @vgyy4\r\n- i18n(he): update latest Hebrew strings (#2631) @haveAnIssue\r\n- fix(ui): correct mixed RTL/LTR text in Search and Watch Party (#2563) @i7xre\r\n- Add Simplified Chinese (zh) localization (#2499) @JadeDouble\r\n- i18n(ur): translate new episode-shuffle resources (#2090) @muzii9",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/1.1.0-beta.1/nuvio-1.1.0-beta.1-enhanced-release.ipa",
+          "size": 76637661,
+          "sha256": "5969ac9925914a1ee861c6cb7e9e46a0bc8b4d764638bfdb2c1e03a55d784490",
+          "minOSVersion": "16.1"
+        }
+      ],
       "appPermissions": {
         "entitlements": [],
         "privacy": {
