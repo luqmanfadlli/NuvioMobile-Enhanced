@@ -677,11 +677,15 @@ object MetaDetailsRepository {
             }.onFailure { error ->
                 log.w { "Failed to load Simkl related titles for ${meta.id}: ${error.message}" }
             }.getOrDefault(emptyList())
+            InAppLogger.info("Metadata/Simkl", "Related titles id=${meta.id} count=${items.size}")
 
-            return meta.copy(
-                moreLikeThis = items,
-                moreLikeThisSource = MoreLikeThisSource.SIMKL.takeIf { items.isNotEmpty() },
-            )
+            if (items.isNotEmpty()) {
+                return meta.copy(
+                    moreLikeThis = items,
+                    moreLikeThisSource = MoreLikeThisSource.SIMKL,
+                    moreLikeThisHasMore = false,
+                )
+            }
         }
 
         // Trakt source
