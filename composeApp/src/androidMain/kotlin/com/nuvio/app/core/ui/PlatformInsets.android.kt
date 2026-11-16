@@ -21,6 +21,9 @@ internal actual val nuvioBottomNavigationExtraVerticalPadding: Dp = 6.dp
 internal actual fun nuvioBottomNavigationBarInsets(): WindowInsets = WindowInsets.navigationBars
 
 @Composable
+internal actual fun platformNativeBarButtonAnchor(): NativeBarButtonAnchor? = null
+
+@Composable
 internal actual fun platformPhysicalTopInset(): Dp =
     WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
