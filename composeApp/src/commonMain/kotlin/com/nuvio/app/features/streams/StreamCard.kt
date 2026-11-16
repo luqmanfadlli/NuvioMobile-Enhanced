@@ -186,7 +186,7 @@ internal fun StreamCard(
                 if (!stream.addonLogo.isNullOrBlank()) {
                     AsyncImage(
                         model = stream.addonLogo,
-                        contentDescription = stream.addonName,
+                        contentDescription = stream.displayAddonName(),
                         modifier = Modifier
                             .size(28.dp)
                             .clip(RoundedCornerShape(6.dp)),
@@ -195,7 +195,7 @@ internal fun StreamCard(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = stream.addonName,
+                    text = stream.displayAddonName(),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, shadow = streamGlassTextShadow()),
                     color = Color.White,
                     maxLines = 1,

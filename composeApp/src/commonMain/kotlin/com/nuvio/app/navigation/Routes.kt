@@ -94,6 +94,9 @@ data class DownloadsRoute(override val title: String = "") : AppRoute {
 }
 
 @Serializable
+data class DownloadsSettingsRoute(override val title: String = "") : SettingsDestinationRoute
+
+@Serializable
 data class DownloadShowRoute(
     val showId: String,
     override val title: String,

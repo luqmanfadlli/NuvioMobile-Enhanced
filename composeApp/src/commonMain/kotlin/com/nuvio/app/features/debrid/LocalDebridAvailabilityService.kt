@@ -96,6 +96,14 @@ object LocalDebridAvailabilityService {
     fun cacheCheckConfiguration(): String =
         cacheCheckAccount()?.let { account -> "${account.provider.id}:${account.apiKey.hashCode()}" } ?: "none"
 
+    suspend fun checkCachedAvailability(
+        group: AddonStreamGroup,
+        eligibleGroupIds: Set<String>,
+    ): AddonStreamGroup {
+        if (!hasPendingCacheCheck(listOf(group), eligibleGroupIds)) return group
+        return annotateCachedAvailability(listOf(group), eligibleGroupIds).firstOrNull() ?: group
+    }
+
     suspend fun isCached(hash: String): Boolean? {
         val account = cacheCheckAccount() ?: return null
         return LocalDebridService.isCached(account, hash)

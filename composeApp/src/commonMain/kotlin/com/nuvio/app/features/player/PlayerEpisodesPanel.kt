@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.details.seasonLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -227,11 +228,7 @@ private fun EpisodesListPanelContent(
             ) {
                 items(availableSeasons, key = { it }) { season ->
                     EpisodeSeasonChip(
-                        label = if (season == 0) {
-                            stringResource(Res.string.episodes_specials)
-                        } else {
-                            stringResource(Res.string.episodes_season, season)
-                        },
+                        label = seasonLabel(season),
                         isSelected = selectedSeason == season,
                         onClick = {
                             selectedSeason = season

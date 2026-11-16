@@ -55,6 +55,7 @@ import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.shimmer
 import com.nuvio.app.features.streams.ProviderFilterRow
+import com.nuvio.app.features.streams.displayName
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.streams.rememberRefreshRotation
 import nuvio.composeapp.generated.resources.Res
@@ -235,7 +236,7 @@ internal fun PlayerProviderFilterRow(
         },
     ) { group, isSelected, onClick ->
         AddonFilterChip(
-            label = group?.addonName ?: stringResource(Res.string.collections_tab_all),
+            label = group?.displayName() ?: stringResource(Res.string.collections_tab_all),
             isSelected = isSelected,
             isLoading = group?.isLoading == true,
             hasError = group?.error != null,

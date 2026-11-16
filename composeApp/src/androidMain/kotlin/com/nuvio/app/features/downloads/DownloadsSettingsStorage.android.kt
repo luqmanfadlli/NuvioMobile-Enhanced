@@ -45,4 +45,24 @@ actual object DownloadsSettingsStorage {
             ?.putBoolean(showDownloadButtonKey, enabled)
             ?.apply()
     }
+
+    actual fun loadString(key: String): String? =
+        preferences?.getString(key, null)
+
+    actual fun saveString(key: String, value: String) {
+        preferences
+            ?.edit()
+            ?.putString(key, value)
+            ?.apply()
+    }
+
+    actual fun loadInt(key: String): Int? =
+        preferences?.takeIf { it.contains(key) }?.getInt(key, 0)
+
+    actual fun saveInt(key: String, value: Int) {
+        preferences
+            ?.edit()
+            ?.putInt(key, value)
+            ?.apply()
+    }
 }

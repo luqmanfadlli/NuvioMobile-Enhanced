@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.nuvio.app.features.details.EpisodeRatingsVisibility
 import com.nuvio.app.features.details.MetaDetails
+import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.details.groupedEpisodesForDisplay
 import com.nuvio.app.features.details.seasonSortKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
@@ -54,6 +55,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -121,7 +124,13 @@ internal class EpisodeNavigatorState {
 
 @Composable
 internal fun rememberEpisodeNavigatorState(metaId: String): EpisodeNavigatorState =
-    remember(metaId) { EpisodeNavigatorState() }
+    rememberSaveable(metaId, saver = episodeNavigatorStateSaver) { EpisodeNavigatorState() }
+
+/** Keeps the selected season across configuration changes; the rest is transient UI state. */
+private val episodeNavigatorStateSaver = Saver<EpisodeNavigatorState, List<Int?>>(
+    save = { listOf(it.selectedSeason) },
+    restore = { saved -> EpisodeNavigatorState().apply { selectedSeason = saved.firstOrNull() } },
+)
 
 internal fun MetaVideo.navigatorKey(): String = "$season:$episode:$id"
 
@@ -552,6 +561,7 @@ internal fun LazyListScope.detailEpisodeListItems(
     onEpisodeClick: (MetaVideo) -> Unit,
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
+    episodeDownloadFor: (MetaVideo) -> DownloadItem?,
 ): Int {
     val grouped = navigator.grouped(meta.videos) { meta.groupedEpisodesForDisplay() }
     if (grouped.isEmpty()) return 0
@@ -618,6 +628,7 @@ internal fun LazyListScope.detailEpisodeListItems(
                     progressByVideoId = progressByVideoId,
                     watchedKeys = watchedKeys,
                     episodeRatings = emptyMap(),
+                    episodeDownloadFor = episodeDownloadFor,
                     episodeRatingsVisibility = episodeRatingsVisibility,
                     blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                     onEpisodeClick = onEpisodeClick,

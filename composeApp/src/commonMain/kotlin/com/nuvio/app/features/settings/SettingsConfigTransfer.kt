@@ -35,6 +35,8 @@ import com.nuvio.app.features.discord.DiscordRpcActivityType
 import com.nuvio.app.features.discord.DiscordRpcRepository
 import com.nuvio.app.features.discord.DiscordRpcSettings
 import com.nuvio.app.features.discord.DiscordRpcStatus
+import com.nuvio.app.features.downloads.DownloadConcurrencyLimit
+import com.nuvio.app.features.downloads.DownloadPreferredResolution
 import com.nuvio.app.features.downloads.DownloadsSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsSyncService
@@ -107,6 +109,7 @@ import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 
 internal object SettingsConfigTransfer {
+    private const val PREFERRED_DOWNLOAD_RESOLUTION_KEY = "preferred_download_resolution"
     private const val FORMAT = "nuvio_settings_config"
     private const val VERSION = 1
     private const val KEY_SETTINGS = "settings"
@@ -457,6 +460,10 @@ internal object SettingsConfigTransfer {
         put("episode_release_alerts_enabled", EpisodeReleaseNotificationsRepository.uiState.value.isEnabled)
         put("allow_mobile_data_downloads", DownloadsSettingsRepository.allowMobileDataDownloads.value)
         put("show_download_button", DownloadsSettingsRepository.showDownloadButton.value)
+        put(PREFERRED_DOWNLOAD_RESOLUTION_KEY, DownloadsSettingsRepository.preferredResolution.value.name)
+        DownloadConcurrencyLimit.entries.forEach { limit ->
+            put(limit.storageKey, DownloadsSettingsRepository.concurrencyLimit(limit))
+        }
         put("search_history_enabled", SearchHistoryRepository.enabled.value)
         if (DnsSettingsRepository.isSupported) {
             put("dns_provider", DnsSettingsRepository.provider.value.storageId)
@@ -470,6 +477,12 @@ internal object SettingsConfigTransfer {
         payload.boolean("episode_release_alerts_enabled")?.let(EpisodeReleaseNotificationsRepository::applyFromSyncEnabled)
         payload.boolean("allow_mobile_data_downloads")?.let(DownloadsSettingsRepository::setAllowMobileDataDownloads)
         payload.boolean("show_download_button")?.let(DownloadsSettingsRepository::setShowDownloadButton)
+        payload.string(PREFERRED_DOWNLOAD_RESOLUTION_KEY)?.let {
+            DownloadsSettingsRepository.setPreferredResolution(DownloadPreferredResolution.fromStorage(it))
+        }
+        DownloadConcurrencyLimit.entries.forEach { limit ->
+            payload.int(limit.storageKey)?.let { DownloadsSettingsRepository.setConcurrencyLimit(limit, it) }
+        }
         payload.boolean("search_history_enabled")?.let(SearchHistoryRepository::setEnabled)
         if (DnsSettingsRepository.isSupported) {
             payload.string("dns_provider")?.let { DnsSettingsRepository.setProvider(DnsProvider.fromStorage(it)) }
