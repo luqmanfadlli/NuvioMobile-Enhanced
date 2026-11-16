@@ -36,9 +36,19 @@ https://github.com/luqmanfadlli/NuvioMobile-Enhanced/raw/refs/heads/enhanced/sto
 ```
 or grab the IPA from [the latest release](https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/latest).
 
+#### Beta builds
+
+Pre-release builds have their own source. Add it instead of the stable one if you want to try new features early:
+
+```
+https://github.com/luqmanfadlli/NuvioMobile-Enhanced/raw/refs/heads/enhanced/store-beta.json
+```
+
+Both sources install the same app, so use only one of them on a device. Beta IPAs are also attached to the [pre-releases](https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases).
+
 ### Android
 
-Grab the APK from [the latest release](https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/latest).
+Grab the APK from [the latest release](https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/latest). Beta APKs are on the [pre-releases](https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases).
 
 ---
 
