@@ -14,6 +14,14 @@ on:
           - draft
           - publish
         default: dry-run
+      channel:
+        description: Stable release, or beta published as a pre-release
+        required: true
+        type: choice
+        options:
+          - stable
+          - beta
+        default: stable
       target:
         description: Choose which platform to build
         required: true
@@ -74,6 +82,8 @@ jobs:
 
       - name: Read release metadata
         id: release
+        env:
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: ./scripts/release-metadata.sh "${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
 
       - name: Validate release state
@@ -112,7 +122,7 @@ jobs:
 
             unexpected_changes="$(
               git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
-                | grep -Ev '^(\.github/workflows/(mobile-release|update-store-source)\.yml|store\.json|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh|scripts/update-store-source\.py)$' \
+                | grep -Ev '^(\.github/workflows/(mobile-release|update-store-source)\.yml|store(-beta)?\.json|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh|scripts/update-store-source\.py)$' \
                 || true
             )"
             if [[ -n "${unexpected_changes}" ]]; then
@@ -381,6 +391,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_MODE: ${{ inputs.mode }}
+      RELEASE_CHANNEL: ${{ inputs.channel }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.tag }}
       RELEASE_BRANCH: ${{ github.ref_name }}
@@ -417,6 +428,9 @@ jobs:
           if [[ "${RELEASE_MODE}" == "draft" ]]; then
             release_args+=(--draft)
           fi
+          if [[ "${RELEASE_CHANNEL}" == "beta" ]]; then
+            release_args+=(--prerelease)
+          fi
           gh release create "${release_args[@]}" "${release_files[@]}"
 
   # Attaches the IPA to the release created above once iOS finishes.
@@ -439,6 +453,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_MODE: ${{ inputs.mode }}
+      RELEASE_CHANNEL: ${{ inputs.channel }}
       RELEASE_TARGET: ${{ inputs.target }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.tag }}
@@ -477,6 +492,9 @@ jobs:
             if [[ "${RELEASE_MODE}" == "draft" ]]; then
               release_args+=(--draft)
             fi
+            if [[ "${RELEASE_CHANNEL}" == "beta" ]]; then
+              release_args+=(--prerelease)
+            fi
             gh release create "${release_args[@]}" "${ipa_files[@]}"
           else
             gh release upload "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --clobber "${ipa_files[@]}"
@@ -494,3 +512,4 @@ jobs:
     with:
       tag: ${{ needs.prepare.outputs.tag }}
       version: ${{ needs.prepare.outputs.version }}
+      prerelease: ${{ inputs.channel == 'beta' }}

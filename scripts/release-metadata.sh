@@ -47,7 +47,11 @@ if [[ ! "$current_version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
 fi
 
 printf 'version=%s\n' "$current_version"
-printf 'tag=%s\n' "${current_version}"
+if [[ "${RELEASE_CHANNEL:-stable}" == "beta" && "$current_version" != *-* ]]; then
+    printf 'tag=%s-beta\n' "$current_version"
+else
+    printf 'tag=%s\n' "$current_version"
+fi
 printf 'release_commit=%s\n' "$(git rev-parse "${target_ref}^{commit}")"
 printf 'current_bump=%s\n' "$current_bump"
 printf 'previous_version=%s\n' "$previous_version"
