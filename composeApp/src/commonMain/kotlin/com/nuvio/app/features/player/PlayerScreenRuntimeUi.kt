@@ -1319,7 +1319,7 @@ private const val MOVIE_RECOMMENDATION_LIMIT = 10
 internal val PlayerScreenRuntime.movieRecommendationCandidates: List<MetaPreview>
     get() {
         val watchedKeys = watchedUiState.watchedKeys
-        return playerMeta?.moreLikeThis.orEmpty()
+        return (playerMoreLikeThis ?: playerMeta?.moreLikeThis).orEmpty()
             .asSequence()
             .filterNot { it.id == parentMetaId }
             .filterNot { WatchingState.isPosterWatched(watchedKeys = watchedKeys, item = it) }

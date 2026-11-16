@@ -216,6 +216,23 @@ object MetaDetailsRepository {
         return cachedMeta.withUnreleasedFilter()
     }
 
+    suspend fun withPreferredMoreLikeThis(
+        meta: MetaDetails,
+        fallbackItemId: String,
+        fallbackItemType: String,
+    ): MetaDetails {
+        if (meta.moreLikeThisSource == MoreLikeThisSource.SIMKL || meta.moreLikeThisSource == MoreLikeThisSource.TRAKT) {
+            return meta
+        }
+        return withContext(Dispatchers.Default) {
+            applyMoreLikeThisSource(
+                meta = meta,
+                fallbackItemId = fallbackItemId,
+                fallbackItemType = fallbackItemType,
+            )
+        }.withUnreleasedFilter()
+    }
+
     fun clearCachedMetadata() {
         cachedMetaByRequestKey.clear()
     }

@@ -920,11 +920,28 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
     }
 
+    LaunchedEffect(isMoviePlayback, playerSettingsUiState.movieRecommendationsEnabled, playerMeta?.id, playerMeta?.moreLikeThisSource) {
+        val meta = playerMeta
+        if (!isMoviePlayback || !playerSettingsUiState.movieRecommendationsEnabled || meta == null || meta.id != parentMetaId) {
+            playerMoreLikeThis = null
+            return@LaunchedEffect
+        }
+        playerMoreLikeThis = runCatching {
+            MetaDetailsRepository.withPreferredMoreLikeThis(
+                meta = meta,
+                fallbackItemId = parentMetaId,
+                fallbackItemType = parentMetaType,
+            ).moreLikeThis
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+            .getOrNull()
+    }
+
     LaunchedEffect(
         playbackSnapshot.positionMs,
         playbackSnapshot.durationMs,
         playbackSnapshot.isEnded,
         playerMeta?.moreLikeThis,
+        playerMoreLikeThis,
         watchedUiState.watchedKeys,
         movieRecommendationDismissedStage,
         playerSettingsUiState.movieRecommendationsEnabled,
