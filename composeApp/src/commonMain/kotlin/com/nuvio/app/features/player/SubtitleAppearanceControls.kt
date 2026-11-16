@@ -97,6 +97,9 @@ internal fun SubtitleAppearanceControls(
                 onStyleChanged(style.copy(outlineColor = it))
             }
             SubtitleValueControl(
+                stringResource(Res.string.subtitle_outline_width), style.outlineWidth, subtitleOutlineWidthRange, 1,
+            ) { onStyleChanged(style.copy(outlineWidth = it)) }
+            SubtitleValueControl(
                 stringResource(Res.string.subtitle_outline_blur),
                 style.appearance.outlineBlur,
                 SUBTITLE_OUTLINE_BLUR_MIN..SUBTITLE_OUTLINE_BLUR_MAX,

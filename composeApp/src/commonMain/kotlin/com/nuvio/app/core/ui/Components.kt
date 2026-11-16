@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -411,6 +412,7 @@ fun NuvioInputField(
     placeholder: String,
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.nuvio.shapes.compactCard,
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     trailingContent: (@Composable (() -> Unit))? = null,
     containerColor: Color = MaterialTheme.nuvio.colors.surfaceCard,
 ) {
@@ -428,7 +430,7 @@ fun NuvioInputField(
                 style = MaterialTheme.typography.bodyLarge,
             )
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
+        textStyle = textStyle.copy(color = tokens.colors.textPrimary),
         trailingIcon = trailingContent,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = tokens.colors.borderFocus,

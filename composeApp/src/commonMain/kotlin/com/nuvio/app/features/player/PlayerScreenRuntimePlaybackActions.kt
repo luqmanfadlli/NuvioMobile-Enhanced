@@ -3,6 +3,9 @@ package com.nuvio.app.features.player
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
+import com.nuvio.app.features.addons.AddonEventDispatcher
+import com.nuvio.app.features.addons.AddonPlayerAction
+import com.nuvio.app.features.addons.AddonPlayerEventTarget
 import com.nuvio.app.features.servers.ServerItemRef
 import com.nuvio.app.features.servers.ServerStreams
 import com.nuvio.app.features.tmdb.TmdbService
@@ -385,6 +388,36 @@ internal suspend fun PlayerScreenRuntime.resolveParentalGuideImdbId(): String? {
     )
 }
 
+internal fun PlayerScreenRuntime.emitAddonPlayerEvent(action: AddonPlayerAction) {
+    val durationMs = playbackSnapshot.durationMs
+    if (isShortPlaceholderDuration(durationMs)) return
+    val positionMs = playbackSnapshot.positionMs
+    val active = activeAddonPlayerEventTarget
+    if (action == AddonPlayerAction.STOP) {
+        if (active == null) return
+        activeAddonPlayerEventTarget = null
+        lastAddonPlayerAction = null
+        AddonEventDispatcher.player(active, AddonPlayerAction.STOP, positionMs, durationMs)
+        return
+    }
+    val session = playbackSession
+    val target = AddonPlayerEventTarget(type = session.contentType, videoId = session.videoId)
+    if (active != null && active != target) {
+        AddonEventDispatcher.player(active, AddonPlayerAction.STOP, positionMs, durationMs)
+        activeAddonPlayerEventTarget = null
+        lastAddonPlayerAction = null
+    }
+    if (action == AddonPlayerAction.PAUSE && activeAddonPlayerEventTarget == null) return
+    activeAddonPlayerEventTarget = target
+    lastAddonPlayerAction = action
+    AddonEventDispatcher.player(target, action, positionMs, durationMs)
+}
+
+internal fun PlayerScreenRuntime.resendAddonPlayerStateAfterSeek() {
+    val action = lastAddonPlayerAction ?: return
+    emitAddonPlayerEvent(action)
+}
+
 internal fun PlayerScreenRuntime.flushWatchProgress(
     scrobbleAction: TrackingScrobbleAction = TrackingScrobbleAction.STOP,
 ) {
@@ -392,6 +425,11 @@ internal fun PlayerScreenRuntime.flushWatchProgress(
     when (scrobbleAction) {
         TrackingScrobbleAction.PAUSE -> emitTrackingScrobblePause()
         TrackingScrobbleAction.STOP -> emitStopScrobbleForCurrentProgress()
+        TrackingScrobbleAction.START -> Unit
+    }
+    when (scrobbleAction) {
+        TrackingScrobbleAction.PAUSE -> emitAddonPlayerEvent(AddonPlayerAction.PAUSE)
+        TrackingScrobbleAction.STOP -> emitAddonPlayerEvent(AddonPlayerAction.STOP)
         TrackingScrobbleAction.START -> Unit
     }
     WatchProgressRepository.flushPlaybackProgress(
@@ -411,6 +449,7 @@ internal fun PlayerScreenRuntime.scheduleProgressSyncAfterSeek() {
             session = playbackSession,
             snapshot = playbackSnapshot,
         )
+        resendAddonPlayerStateAfterSeek()
 
         val progressPercent = currentPlaybackProgressPercent()
         if (

@@ -286,8 +286,12 @@ fun LibraryScreen(
     var selectedCloudItemKey by rememberSaveable { mutableStateOf<String?>(null) }
     var showTorboxConnectDialog by rememberSaveable { mutableStateOf(false) }
     val torboxConnected = cloudSettings.apiKeyFor(DebridProviders.TORBOX_ID).isNotBlank()
-    var selectedLibrarySectionKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedLibraryType by rememberSaveable { mutableStateOf<String?>(null) }
+    var libraryGenre by rememberSaveable { mutableStateOf<String?>(null) }
+    var libraryYear by rememberSaveable { mutableStateOf<String?>(null) }
+    var libraryWatchedFilterName by rememberSaveable { mutableStateOf(LibraryWatchedFilter.ALL.name) }
+    val libraryWatchedFilter = remember(libraryWatchedFilterName) {
+        runCatching { LibraryWatchedFilter.valueOf(libraryWatchedFilterName) }.getOrDefault(LibraryWatchedFilter.ALL)
+    }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     ScreenActivityEffect(listState) { screenActive ->
@@ -312,7 +316,7 @@ fun LibraryScreen(
     }
     val orderListKeys = if (!sourceMode.showsLibrarySections) emptyList() else {
         if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) currentModeSections.map { it.type }
-        else listOfNotNull(currentModeSections.firstOrNull { it.type == selectedLibrarySectionKey }?.type
+        else listOfNotNull(currentModeSections.firstOrNull { it.type == displaySettings.selectedSectionKey }?.type
             ?: currentModeSections.firstOrNull()?.type)
     }
     val providerOrders = rememberLibraryProviderOrders(uiState.sourceMode, orderListKeys, effectiveSortOption)
@@ -332,8 +336,11 @@ fun LibraryScreen(
     val verticalProjection = remember(
         currentModeSections,
         uiState.sourceMode,
-        selectedLibrarySectionKey,
-        selectedLibraryType,
+        libraryGenre,
+        libraryYear,
+        libraryWatchedFilter,
+        watchedUiState.watchedKeys,
+        fullyWatchedSeriesKeys,
         displaySettings,
         sourceMode,
         providerOrders,
@@ -342,10 +349,20 @@ fun LibraryScreen(
             buildLibraryVerticalProjection(
                 sections = currentModeSections,
                 sourceMode = uiState.sourceMode,
-                selectedSectionKey = selectedLibrarySectionKey,
-                selectedType = selectedLibraryType,
+                selectedSectionKey = displaySettings.selectedSectionKey,
+                selectedType = displaySettings.selectedType,
                 sortOption = visibleSortOption,
                 providerOrders = providerOrders.ranks,
+                selectedGenre = libraryGenre,
+                selectedYear = libraryYear,
+                watchedFilter = libraryWatchedFilter,
+                isWatched = { item ->
+                    WatchingState.isPosterWatched(
+                        watchedKeys = watchedUiState.watchedKeys,
+                        item = item.toMetaPreview(),
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                    )
+                },
             )
         } else {
             LibraryVerticalProjection(
@@ -794,11 +811,12 @@ fun LibraryScreen(
                                     sourceMode = uiState.sourceMode,
                                     sortOption = effectiveSortOption,
                                     verticalProjection = verticalProjection,
-                                    onSectionSelected = { sectionKey ->
-                                        selectedLibrarySectionKey = sectionKey
-                                        selectedLibraryType = null
-                                    },
-                                    onTypeSelected = { type -> selectedLibraryType = type },
+                                    watchedFilter = libraryWatchedFilter,
+                                    onSectionSelected = LibraryDisplaySettingsRepository::setSelectedSection,
+                                    onTypeSelected = LibraryDisplaySettingsRepository::setSelectedType,
+                                    onGenreSelected = { genre -> libraryGenre = genre },
+                                    onYearSelected = { year -> libraryYear = year },
+                                    onWatchedFilterSelected = { filter -> libraryWatchedFilterName = filter.name },
                                     onSortSelected = LibraryDisplaySettingsRepository::setSortOption,
                                     modifier = libraryContentTransitionModifier()
                                         .padding(horizontal = 16.dp)

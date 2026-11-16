@@ -3161,4 +3161,27 @@
     <string name="downloads_episodes_out_of_downloaded">%1$d dari %2$d episode diunduh</string>
     <string name="batch_download_failed_single">%1$d episode tidak bisa dimasukkan ke antrean</string>
     <string name="batch_download_failed_multiple">%1$d episode tidak bisa dimasukkan ke antrean</string>
+    <string name="addons_tracking_consent_body">%1$s adalah addon pelacak. Nuvio akan mengirimkan aktivitas Anda ke addon ini: apa yang Anda putar, jeda, dan hentikan beserta posisi pemutarannya, apa yang Anda tambahkan ke atau hapus dari library, dan apa yang Anda tandai sudah atau belum ditonton. Data ini keluar dari Nuvio dan dikelola oleh pengembang addon serta layanan yang terhubung dengannya.</string>
+    <string name="addons_tracking_consent_checkbox">Saya setuju membagikan aktivitas tontonan dan library saya dengan addon ini</string>
+    <string name="addons_tracking_consent_title">Addon pelacak</string>
+    <string name="auth_notice_signed_out">Anda telah keluar dari Nuvio. Silakan masuk lagi.</string>
+    <string name="library_filter_genre">Genre</string>
+    <string name="library_filter_watched">Ditonton</string>
+    <string name="library_filter_year">Tahun</string>
+    <string name="library_type_all">Semua</string>
+    <string name="library_watched_filter_all">Semua</string>
+    <string name="library_watched_filter_unwatched">Belum ditonton</string>
+    <string name="library_watched_filter_watched">Sudah ditonton</string>
+    <string name="player_anime4k_badge_sharpen">Tajamkan</string>
+    <string name="player_anime4k_badge_upscale">%1$dp → %2$dp</string>
+    <string name="player_anime4k_status_active">Aktif: %1$s</string>
+    <string name="player_anime4k_status_inactive">Diaktifkan, tetapi tidak aktif untuk video ini</string>
+    <string name="player_anime4k_status_off">Mati</string>
+    <string name="player_anime4k_title">Anime4K</string>
+    <string name="settings_playback_anime_line_sharpen">Penajam Garis Anime</string>
+    <string name="settings_playback_anime_line_sharpen_description">Pulihkan dan tajamkan garis gambar anime dengan Anime4K. Hanya dipakai untuk anime. ExoPlayer melewatinya saat tunneled playback aktif.</string>
+    <string name="settings_playback_anime_upscale">Upscaler Anime 2x</string>
+    <string name="settings_playback_anime_upscale_description">Tingkatkan resolusi anime dengan Anime4K hingga minimal 1440p, atau ke resolusi layar bila lebih tinggi. Hanya dipakai untuk anime. ExoPlayer melewatinya saat tunneled playback aktif.</string>
+    <string name="settings_playback_section_anime_enhancement">PENINGKATAN ANIME</string>
+    <string name="subtitle_outline_width">Lebar outline</string>
 </resources>

@@ -104,7 +104,10 @@ internal fun decodeSubtitleAppearance(value: String?): SubtitleAppearance =
 internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encodeToString(normalized())
 
 internal val SubtitleStyleState.requiresComposeStyledOverlay: Boolean
-    get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled
+    get() = appearance.fontId != "default" ||
+        backgroundColor.alpha > 0f ||
+        appearance.shadowEnabled ||
+        (outlineEnabled && outlineWidth != SUBTITLE_OUTLINE_WIDTH_DEFAULT)
 
 internal val SubtitleStyleState.usesStyledOverlay: Boolean
     get() = requiresComposeStyledOverlay ||
