@@ -144,6 +144,7 @@ final class RootComposeViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         enforceContainingTabBarVisibility()
+        removeTopBarBlur()
         guard view.bounds.size != foldBoundsSize else { return }
         foldBoundsSize = view.bounds.size
         updateFold()
@@ -228,6 +229,7 @@ final class RootComposeViewController: UIViewController {
         refreshImmersiveSystemUI()
         setInteractiveContentPopGestureEnabled(false)
         setNavigationBarPassthroughEnabled(true)
+        removeTopBarBlur()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -235,6 +237,7 @@ final class RootComposeViewController: UIViewController {
         refreshContainingTabBarVisibility()
         refreshImmersiveSystemUI()
         setInteractiveContentPopGestureEnabled(false)
+        removeTopBarBlur()
         if let tabBarController {
             onTabBarControllerAvailable?(tabBarController)
         }
@@ -293,6 +296,56 @@ final class RootComposeViewController: UIViewController {
     private func setNavigationBarPassthroughEnabled(_ enabled: Bool) {
         guard passesThroughEmptyNavigationBarAreas else { return }
         NuvioNavigationBarPassthrough.setEnabled(enabled, on: navigationController)
+    }
+
+    // Fork: no frosted strip across the top of any page. Clears the navigation bar's
+    // background on the bar and on this page's navigation item (SwiftUI's own setting
+    // alone did not reach it), and on iOS 26+ hides the blur iOS draws along the top
+    // edge of scrolling content. The back button and titles are untouched.
+    private static let transparentBarAppearance: UINavigationBarAppearance = {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = nil
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
+        return appearance
+    }()
+
+    private func removeTopBarBlur() {
+        guard let navigationController else { return }
+        let appearance = Self.transparentBarAppearance
+        let bar = navigationController.navigationBar
+        if bar.standardAppearance !== appearance {
+            bar.standardAppearance = appearance
+            bar.compactAppearance = appearance
+            bar.scrollEdgeAppearance = appearance
+            bar.compactScrollEdgeAppearance = appearance
+        }
+
+        var page: UIViewController = self
+        while let parent = page.parent, parent !== navigationController {
+            page = parent
+        }
+        for item in [navigationItem, page.navigationItem] where item.standardAppearance !== appearance {
+            item.standardAppearance = appearance
+            item.compactAppearance = appearance
+            item.scrollEdgeAppearance = appearance
+            item.compactScrollEdgeAppearance = appearance
+        }
+
+        if #available(iOS 26.0, *) {
+            Self.hideTopEdgeEffects(in: page.view)
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private static func hideTopEdgeEffects(in view: UIView) {
+        if let scrollView = view as? UIScrollView, !scrollView.topEdgeEffect.isHidden {
+            scrollView.topEdgeEffect.isHidden = true
+        }
+        for subview in view.subviews {
+            hideTopEdgeEffects(in: subview)
+        }
     }
 
     private func immersiveController(in controller: UIViewController?) -> UIViewController? {
@@ -1487,6 +1540,11 @@ private struct DetailDestinationView: View {
             wrapper.route.hidesNavigationBar ? Visibility.hidden : Visibility.visible,
             for: .navigationBar
         )
+        // Fork: no frosted strip across the top of any page. The bar keeps its buttons
+        // (back, title) but loses its blurred background and the blur iOS adds along the
+        // top edge, so the page shows right up to the top of the screen.
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .hidesTopEdgeBlur()
         .verticalBarDisabled(wrapper.route is PlayerRoute)
     }
 
@@ -1501,6 +1559,15 @@ private struct DetailDestinationView: View {
 }
 
 private extension View {
+    @ViewBuilder
+    func hidesTopEdgeBlur() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectHidden(true, for: .top)
+        } else {
+            self
+        }
+    }
+
     @ViewBuilder
     func verticalBarDisabled(_ disabled: Bool) -> some View {
         if #available(iOS 27.1, *), disabled {
