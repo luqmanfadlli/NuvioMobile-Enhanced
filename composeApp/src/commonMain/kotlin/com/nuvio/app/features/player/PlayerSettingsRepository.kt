@@ -113,7 +113,7 @@ data class PlayerSettingsUiState(
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
     val deadLinkTimeoutEnabled: Boolean = true,
-    val deadLinkTimeoutSeconds: Int = 10,
+    val deadLinkTimeoutSeconds: Int = 20,
     val skipIntroEnabled: Boolean = true,
     val skipIntroOffsetSeconds: Int = 0,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
@@ -254,7 +254,7 @@ object PlayerSettingsRepository {
     private var streamAutoPlayRegex = ""
     private var streamAutoPlayTimeoutSeconds = 3
     private var deadLinkTimeoutEnabled = true
-    private var deadLinkTimeoutSeconds = 10
+    private var deadLinkTimeoutSeconds = 20
     private var skipIntroEnabled = true
     private var skipIntroOffsetSeconds = 0
     private var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
@@ -382,7 +382,7 @@ object PlayerSettingsRepository {
         streamAutoPlayRegex = ""
         streamAutoPlayTimeoutSeconds = 3
         deadLinkTimeoutEnabled = true
-        deadLinkTimeoutSeconds = 10
+        deadLinkTimeoutSeconds = 20
         skipIntroEnabled = true
         skipIntroOffsetSeconds = 0
         autoSkipSegmentTypes = emptySet()
