@@ -46,8 +46,8 @@ internal actual fun rememberSettingsConfigFileLauncher(
                 }
                 val fileUrl = NSURL.fileURLWithPath(path)
                 val picker = UIDocumentPickerViewController(
-                    forExportingURLs = listOf(fileUrl),
-                    asCopy = true,
+                    uRL = fileUrl,
+                    inMode = UIDocumentPickerMode.UIDocumentPickerModeExportToService,
                 )
                 val delegate = SettingsConfigDocumentPickerDelegate(
                     onPicked = {
