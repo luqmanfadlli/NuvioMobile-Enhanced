@@ -136,6 +136,8 @@ object StreamAutoPlaySelector {
         }
         val matchingStreams = when (mode) {
             StreamAutoPlayMode.MANUAL -> emptyList()
+            // Legacy persisted values must not trigger automatic stream selection.
+            StreamAutoPlayMode.SEMI_AUTOMATIC -> emptyList()
             StreamAutoPlayMode.FIRST_STREAM -> candidateStreams
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
