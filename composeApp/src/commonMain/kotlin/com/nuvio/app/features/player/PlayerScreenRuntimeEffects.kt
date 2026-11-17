@@ -91,8 +91,9 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
             scope = deadLinkScope,
             timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
             timeoutEnabled = {
+                val party = PartyRepository.state.value.party
                 val guestFollowingSharedStream =
-                    partyState.party?.isHost == false && sharedPartyStream != null
+                    party?.isHost == false && PartyRepository.sharedStream.value != null
                 PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled && !guestFollowingSharedStream
             },
             candidateStreams = {
