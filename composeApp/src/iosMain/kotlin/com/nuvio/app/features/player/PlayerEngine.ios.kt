@@ -81,7 +81,8 @@ actual fun PlatformPlayerSurface(
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
     val experimentalSinglePrimaryPictureInPictureEnabled =
         IosExperimentalPictureInPictureSettingsStorage.loadSinglePrimaryRendererEnabled()
-    var subtitleText by remember(sourceUrl) { mutableStateOf("") }
+    var subtitleText by remember { mutableStateOf("") }
+    LaunchedEffect(sourceUrl) { subtitleText = "" }
     var subtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
 
     LaunchedEffect(Unit) { trimImageMemoryForPlayback() }
