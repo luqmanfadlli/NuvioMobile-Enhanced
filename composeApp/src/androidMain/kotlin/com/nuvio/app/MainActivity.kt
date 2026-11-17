@@ -87,6 +87,7 @@ import com.nuvio.app.features.simkl.SimklSyncStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
 import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
 import com.nuvio.app.features.watched.WatchedStorage
+import com.nuvio.app.features.streams.SmartStreamSettingsStorage
 import com.nuvio.app.features.streams.StreamLinkCacheStorage
 import com.nuvio.app.features.streams.StreamBadgeSettingsStorage
 import com.nuvio.app.features.streams.BingeGroupCacheStorage
@@ -180,6 +181,7 @@ open class MainActivity : AppCompatActivity() {
         EpisodeReleaseNotificationsStorage.initialize(applicationContext)
         WatchProgressStorage.initialize(applicationContext)
         StreamLinkCacheStorage.initialize(applicationContext)
+        SmartStreamSettingsStorage.initialize(applicationContext)
         StreamBadgeSettingsStorage.initialize(applicationContext)
         BingeGroupCacheStorage.initialize(applicationContext)
         ProfileTitleFactsStorage.initialize(applicationContext)
