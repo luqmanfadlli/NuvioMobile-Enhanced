@@ -18,7 +18,10 @@ import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.servers.ServerStreamSource
 import com.nuvio.app.features.servers.ServerStreams
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -284,32 +287,32 @@ internal object StreamSourceLoader {
 
         val results = Channel<Pair<Int, AddonStreamGroup>>(Channel.UNLIMITED)
         val arrivedByIndex = mutableMapOf<Int, AddonStreamGroup>()
+        val loadScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
-            supervisorScope {
-                sources.forEachIndexed { index, source ->
-                    launch {
-                        val group = try {
-                            present(source.load())
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            failedGroup(source.addonName, source.addonId, e)
-                        }
-                        results.send(index to group)
+            sources.forEachIndexed { index, source ->
+                loadScope.launch {
+                    val group = try {
+                        present(source.load())
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        failedGroup(source.addonName, source.addonId, e)
                     }
+                    results.send(index to group)
                 }
-                withTimeoutOrNull(timeoutMs) {
-                    repeat(sources.size) {
-                        val (index, group) = results.receive()
-                        arrivedByIndex[index] = group
-                    }
+            }
+            withTimeoutOrNull(timeoutMs) {
+                repeat(sources.size) {
+                    val (index, group) = results.receive()
+                    arrivedByIndex[index] = group
                 }
-                coroutineContext[Job]?.children?.forEach { it.cancel() }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             log.w(e) { "Stream loading error: ${e.message}" }
+        } finally {
+            loadScope.cancel()
         }
 
         val arrivedGroups = sources.indices.mapNotNull { arrivedByIndex[it] }
