@@ -19,6 +19,7 @@ import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamBadgePresentation
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamLoadCompletion
+import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamSearchSessions
 import com.nuvio.app.features.streams.StreamSearchTargets
 import com.nuvio.app.features.streams.withoutPendingGroups
@@ -49,6 +50,7 @@ object PlayerStreamsRepository {
     // source panel
     private val _sourceState = MutableStateFlow(StreamsUiState())
     val sourceState: StateFlow<StreamsUiState> = _sourceState.asStateFlow()
+    private val deadSourceIdentityKeys = MutableStateFlow<Set<String>>(emptySet())
     private var sourceJob: Job? = null
     private var sourceRequestKey: String? = null
 
@@ -100,16 +102,50 @@ object PlayerStreamsRepository {
         )
     }
 
-    fun stopSourcesLoading() {
-        PluginRepository.setLocalPluginSearchPaused(true)
-        cancelSourceJob()
-    }
+    // The dead-link watchdog may continue discovery after the source picker closes.
+    fun stopSourcesLoading() = Unit
 
     fun pauseSearchForPlayback() {
-        PluginRepository.setLocalPluginSearchPaused(true)
-        cancelSourceJob()
         cancelEpisodeStreamsJob()
     }
+
+    fun currentSourceCandidates(): List<StreamItem> =
+        _sourceState.value.groups.flatMap { it.streams }
+
+    fun pruneDeadSource(stream: StreamItem, identityKeyOverride: String? = null) {
+        val identityKey = identityKeyOverride ?: stream.playerSourceIdentityKey() ?: return
+        deadSourceIdentityKeys.update { it + identityKey }
+        _sourceState.update { current ->
+            val groups = current.groups.map { group ->
+                group.copy(streams = group.streams.filterNot { it.playerSourceIdentityKey() == identityKey })
+            }
+            val anyLoading = groups.any { it.isLoading }
+            current.copy(
+                groups = groups,
+                isAnyLoading = anyLoading,
+                emptyStateReason = groups.toEmptyStateReason(anyLoading),
+            )
+        }
+    }
+
+    private fun filterDeadSources(stateFlow: MutableStateFlow<StreamsUiState>, streams: List<StreamItem>): List<StreamItem> {
+        if (stateFlow !== _sourceState) return streams
+        val deadKeys = deadSourceIdentityKeys.value
+        if (deadKeys.isEmpty()) return streams
+        return streams.filterNot { stream -> stream.playerSourceIdentityKey()?.let(deadKeys::contains) == true }
+    }
+
+    suspend fun discoverSourceCandidates(
+        type: String,
+        videoId: String,
+        season: Int? = null,
+        episode: Int? = null,
+    ): List<StreamItem> {
+        loadSources(type = type, videoId = videoId, season = season, episode = episode)
+        return currentSourceCandidates().distinctBy { it.playerSourceIdentityKey() }
+    }
+
+    fun isSourceDiscoveryLoading(): Boolean = _sourceState.value.isAnyLoading
 
     private fun cancelSourceJob() {
         val job = sourceJob ?: return
@@ -166,6 +202,7 @@ object PlayerStreamsRepository {
         PluginRepository.setLocalPluginSearchPaused(true)
         sourceJob?.cancel()
         sourceRequestKey = null
+        deadSourceIdentityKeys.value = emptySet()
         _sourceState.value = StreamsUiState()
         clearEpisodeStreams()
     }
@@ -338,9 +375,10 @@ object PlayerStreamsRepository {
 
             fun publishStreamGroup(group: AddonStreamGroup) {
                 stateFlow.update { current ->
+                    val visibleGroup = group.copy(streams = filterDeadSources(stateFlow, group.streams))
                     val updated = StreamAutoPlaySelector.orderAddonStreams(
                         groups = current.groups.map { currentGroup ->
-                            if (currentGroup.addonId == group.addonId) group else currentGroup
+                            if (currentGroup.addonId == visibleGroup.addonId) visibleGroup else currentGroup
                         },
                         installedOrder = installedAddonOrder,
                         preferredGroupIds = preferredGroupIds,
@@ -390,7 +428,7 @@ object PlayerStreamsRepository {
                                             null
                                         }
                                         group.copy(
-                                            streams = mergedStreams,
+                                            streams = filterDeadSources(stateFlow, mergedStreams),
                                             isLoading = stillLoading,
                                             error = finalError,
                                         )
