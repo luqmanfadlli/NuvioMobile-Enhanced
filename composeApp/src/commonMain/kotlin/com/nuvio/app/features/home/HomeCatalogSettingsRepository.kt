@@ -665,7 +665,7 @@ object HomeCatalogSettingsRepository {
             val remoteKeys = remotePreferences.keys
             val knownKeys = knownPreferenceKeys()
             val preservedPreferences = preferences.filterKeys { key ->
-                key !in remoteKeys && (key in knownKeys || key.requiresExplicitSyncKey())
+                key !in remoteKeys && (knownKeys.isEmpty() || key in knownKeys || key.requiresExplicitSyncKey())
             }
             preferences = preservedPreferences + remotePreferences
             normalizePreferences()
