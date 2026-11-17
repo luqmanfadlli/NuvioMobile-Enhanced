@@ -3220,4 +3220,7 @@
     <string name="downloads_episodes_out_of_downloaded">Episode %1$d out of %2$d downloaded</string>
     <string name="batch_download_failed_single">%1$d episode could not be queued</string>
     <string name="batch_download_failed_multiple">%1$d episodes could not be queued</string>
+    <string name="settings_playback_dead_link_timeout">Dead Link Timeout</string>
+    <string name="settings_playback_dead_link_timeout_description">Try another source if playback has not started within this time.</string>
+    <string name="settings_playback_seconds">%1$d seconds</string>
 </resources>
