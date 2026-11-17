@@ -54,8 +54,11 @@ body:
     attributes:
       label: Install method
       options:
-        - GitHub Release / App Store / Play Store
-        - TestFlight
+        - GitHub Release (Android APK)
+        - AltStore / SideStore
+        - LiveContainer
+        - FlareStore
+        - Other sideloading tool (Feather, ESign, Sideloadly, …)
         - CI build / Nightly
         - Built from source
         - Other (please describe below)
@@ -188,6 +191,18 @@ body:
         - Not sure
         - Yes, it used to work
         - No, it never worked
+    validations:
+      required: true
+
+  - type: dropdown
+    id: official_nuvio
+    attributes:
+      label: Does the official Nuvio app have the same bug?
+      description: Try the same steps in the official Nuvio app if you can. This tells whether the bug comes from this fork or from Nuvio itself.
+      options:
+        - Not tested
+        - Yes, the official app has the same bug
+        - No, it only happens in Nuvio Enhanced
     validations:
       required: true
 
