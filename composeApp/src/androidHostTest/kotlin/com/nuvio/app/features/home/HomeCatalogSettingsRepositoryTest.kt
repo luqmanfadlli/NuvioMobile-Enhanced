@@ -80,6 +80,36 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
+    fun hiddenRowsCanBeReorderedWithoutChangingVisibleRowsOrVisibility() {
+        HomeCatalogSettingsRepository.syncCatalogs(
+            listOf(addon(listOf("popular", "latest", "trending"))),
+        )
+        val initialKeys = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        val firstHiddenKey = initialKeys[0]
+        val secondHiddenKey = initialKeys[1]
+        HomeCatalogSettingsRepository.setEnabled(firstHiddenKey, false)
+        HomeCatalogSettingsRepository.setEnabled(secondHiddenKey, false)
+
+        val visibleBefore = HomeCatalogSettingsRepository.uiState.value.items
+            .filter { it.enabled }
+            .map { it.key }
+        val hiddenBefore = HomeCatalogSettingsRepository.uiState.value.items
+            .filterNot { it.enabled }
+            .map { it.key }
+
+        HomeCatalogSettingsRepository.moveByVisibilityIndex(
+            fromIndex = 0,
+            toIndex = 1,
+            visible = false,
+        )
+
+        val after = HomeCatalogSettingsRepository.uiState.value.items
+        assertEquals(visibleBefore, after.filter { it.enabled }.map { it.key })
+        assertEquals(hiddenBefore.reversed(), after.filterNot { it.enabled }.map { it.key })
+        assertTrue(after.filter { it.key == firstHiddenKey || it.key == secondHiddenKey }.all { !it.enabled })
+    }
+
+    @Test
     fun rowPlacementIsIncludedInProfileSyncPayload() {
         HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
         HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_BOTTOM)
