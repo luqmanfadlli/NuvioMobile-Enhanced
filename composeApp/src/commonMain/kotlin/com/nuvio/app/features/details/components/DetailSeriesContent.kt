@@ -980,7 +980,8 @@ private fun EpisodeHorizontalCard(
     val hasAnyRating = tmdbRatingLabel != null || imdbRatingLabel != null || userRating != null
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
-    val imageUrl = video.thumbnail ?: fallbackImage
+    val episodeImage = rememberEpisodeImageState(video.thumbnail, fallbackImage)
+    val imageUrl = episodeImage.url
     val visibleProgressEntry = progressEntry?.takeIf { it.progressFraction > 0f && !it.isEffectivelyCompleted }
     val progressBarHeight = 3.dp
     val progressBarContentSpacing = 6.dp
@@ -1022,6 +1023,7 @@ private fun EpisodeHorizontalCard(
                     .fillMaxSize()
                     .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
+                onError = { episodeImage.onError() },
             )
         }
 
@@ -1578,7 +1580,8 @@ private fun EpisodeListCard(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = cornerRadius, bottomStart = cornerRadius)),
             ) {
-                val imageUrl = video.thumbnail ?: fallbackImage
+                val episodeImage = rememberEpisodeImageState(video.thumbnail, fallbackImage)
+                val imageUrl = episodeImage.url
                 val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(
@@ -1588,6 +1591,7 @@ private fun EpisodeListCard(
                             .fillMaxSize()
                             .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                         contentScale = ContentScale.Crop,
+                        onError = { episodeImage.onError() },
                     )
                 } else {
                     Box(
@@ -1892,4 +1896,20 @@ private fun formatEpisodeRating(rating: Double): String {
     val whole = roundedTenths / 10
     val tenth = (roundedTenths % 10).absoluteValue
     return "$whole.$tenth"
+}
+
+private class EpisodeImageState(
+    val url: String?,
+    val onError: () -> Unit,
+)
+
+@Composable
+private fun rememberEpisodeImageState(thumbnail: String?, fallbackImage: String?): EpisodeImageState {
+    val primary = thumbnail?.takeIf { it.isNotBlank() }
+    val fallback = fallbackImage?.takeIf { it.isNotBlank() }
+    var primaryFailed by remember(primary, fallback) { mutableStateOf(false) }
+    val url = if (primary != null && !primaryFailed) primary else fallback
+    return EpisodeImageState(url) {
+        if (primary != null && url == primary && fallback != null && fallback != primary) primaryFailed = true
+    }
 }
