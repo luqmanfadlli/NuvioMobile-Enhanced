@@ -178,11 +178,16 @@ internal fun LibrarySavedControls(
         }
     }
 
+    val chipCount = (if (sourceMode.isRemoteTrackingSource) 1 else 0) + 2 +
+        (if (verticalProjection.availableGenres.isNotEmpty()) 1 else 0) +
+        (if (verticalProjection.availableYears.isNotEmpty()) 1 else 0) + 1
+    val singleRow = layoutMode == LibraryLayoutMode.VERTICAL && (compact || chipCount <= SingleRowMaxChips)
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (layoutMode == LibraryLayoutMode.VERTICAL && compact) {
+        if (singleRow) {
             LibraryFilterRow(modifier = Modifier.widthIn(max = CompactFilterRowMaxWidth), shrinkToFit = true) {
                 leadingChips(true)
                 facetChips(true)
@@ -196,7 +201,7 @@ internal fun LibrarySavedControls(
             }
         }
 
-        if (layoutMode == LibraryLayoutMode.VERTICAL && !compact) {
+        if (layoutMode == LibraryLayoutMode.VERTICAL && !singleRow) {
             LibraryFilterRow {
                 facetChips(true)
             }
@@ -206,6 +211,7 @@ internal fun LibrarySavedControls(
 
 private val CompactFilterRowMaxWidth = 960.dp
 private val CompactFilterMinChipWidth = 112.dp
+private const val SingleRowMaxChips = 3
 
 @Composable
 private fun FacetSlot(fillWidth: Boolean, content: @Composable () -> Unit) {
