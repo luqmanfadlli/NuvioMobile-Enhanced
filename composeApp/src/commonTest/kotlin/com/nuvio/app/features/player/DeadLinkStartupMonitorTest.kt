@@ -1,7 +1,5 @@
 package com.nuvio.app.features.player
 
-import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
-import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
@@ -803,12 +801,7 @@ class DeadLinkStartupMonitorTest {
             scope = backgroundScope,
             timeoutSeconds = { 5 },
             candidates = {
-                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
-                    streams = discovered,
-                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
-                    debridEnabled = true,
-                    p2pEnabled = true,
-                )
+                discovered.filter { it.streamLabel.contains("1080", ignoreCase = true) }
             },
             onFallback = fallbacks::add,
             sourceDiscoveryLoading = { true },
@@ -840,12 +833,7 @@ class DeadLinkStartupMonitorTest {
             scope = backgroundScope,
             timeoutSeconds = { 5 },
             candidates = {
-                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
-                    streams = listOf(selected, lower720),
-                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
-                    debridEnabled = true,
-                    p2pEnabled = true,
-                )
+                listOf(selected, lower720)
             },
             onFallback = fallbacks::add,
             sourceDiscoveryLoading = { loading },
