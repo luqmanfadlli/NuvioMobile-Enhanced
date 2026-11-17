@@ -61,6 +61,8 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.backdropControlColor
+import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 import com.nuvio.app.core.ui.nuvio
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -129,7 +131,14 @@ internal fun SmartStreamControls(
                     .fillMaxWidth()
                     .heightIn(min = 60.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(colors.accent)
+                    .ambientLiquidGlass(
+                        shape = RoundedCornerShape(16.dp),
+                        tint = colors.accent,
+                        fallback = colors.accent,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        staticFromBackdrop = true,
+                    )
                     .combinedClickable(
                         onClick = { onPlay(best.stream) },
                         onLongClick = { showBest = true },
@@ -228,7 +237,14 @@ internal fun SmartStreamControls(
                             modifier = Modifier
                                 .height(32.dp)
                                 .clip(CircleShape)
-                                .background(colors.accent.copy(alpha = 0.14f))
+                                .ambientLiquidGlass(
+                                    shape = CircleShape,
+                                    tint = StreamGlassTint,
+                                    fallback = backdropControlColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                                    blurRadius = 14.dp,
+                                    refractionHeight = 8.dp,
+                                    staticFromBackdrop = true,
+                                )
                                 .border(1.dp, colors.accent.copy(alpha = 0.55f), CircleShape)
                                 .clickable(onClick = chip.remove)
                                 .padding(start = 12.dp, end = 8.dp),
@@ -301,13 +317,20 @@ private fun SmartBarButton(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.nuvio.colors
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = modifier
             .height(44.dp)
             .clip(shape)
-            .background(if (highlighted) colors.accent.copy(alpha = 0.14f) else colors.surfaceCard)
-            .border(1.dp, if (highlighted) colors.accent.copy(alpha = 0.55f) else colors.borderDefault, shape)
+            .ambientLiquidGlass(
+                shape = shape,
+                tint = StreamGlassTint,
+                fallback = backdropControlColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                blurRadius = 14.dp,
+                refractionHeight = 8.dp,
+                staticFromBackdrop = true,
+            )
+            .then(if (highlighted) Modifier.border(1.dp, colors.accent.copy(alpha = 0.55f), shape) else Modifier)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
