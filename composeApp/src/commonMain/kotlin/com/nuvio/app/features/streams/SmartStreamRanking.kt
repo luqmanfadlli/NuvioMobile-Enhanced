@@ -63,12 +63,10 @@ internal object SmartStreamRanking {
 
     internal fun target(device: SmartDeviceProfile, settings: SmartStreamSettings): SmartTarget {
         val saveData = !device.onWifi && settings.mobileData == SmartMobileData.SAVE_DATA
-        val screenLines = device.videoLines
         val lines = when (settings.resolutionLimit) {
             SmartResolutionLimit.AUTO -> {
-                val comfortable = min(screenLines, device.maxComfortableLines)
-                val memoryAware = if (device.memoryTier == SmartMemoryTier.AMPLE) comfortable else min(comfortable, 1080)
-                if (saveData) min(memoryAware, 1080) else memoryAware
+                val capable = if (device.memoryTier == SmartMemoryTier.AMPLE) device.maxComfortableLines else 1080
+                if (saveData) min(capable, 1080) else capable
             }
             SmartResolutionLimit.P1080 -> 1080
             SmartResolutionLimit.P4K -> 2160
