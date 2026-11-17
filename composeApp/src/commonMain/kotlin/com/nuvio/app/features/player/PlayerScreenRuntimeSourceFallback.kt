@@ -1,5 +1,8 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.streams.SmartStreamRanking
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
+import com.nuvio.app.features.streams.currentSmartDeviceProfile
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -104,6 +107,7 @@ internal fun PlayerScreenRuntime.tryFallbackToNextSourceAfterError(message: Stri
                     triedKeys = sourceFallbackTriedKeys,
                     failedAddonId = failedAddonId,
                     failedInfoHash = failedInfoHash,
+                    isEpisode = season != null,
                 )
                 if (next == null) {
                     val searchDone = state.emptyStateReason != null || (!state.isAnyLoading && state.groups.isNotEmpty())
@@ -154,12 +158,23 @@ internal fun nextSourceFallbackCandidate(
     installedAddonNames: Set<String> = AddonRepository.uiState.value.addons.enabledAddons().map { it.displayTitle }.toSet(),
     debridEnabled: Boolean = DebridSettingsRepository.snapshot().canResolvePlayableLinks,
     activeResolverProviderId: String? = DebridSettingsRepository.snapshot().activeResolverProviderId,
+    isEpisode: Boolean = false,
 ): StreamItem? {
     val untried = streams.filterNot { stream ->
         val key = stream.playerSourceIdentityKey()
         (key != null && key in triedKeys) ||
             (failedInfoHash != null && stream.addonId == failedAddonId &&
                 stream.p2pInfoHash.equals(failedInfoHash, ignoreCase = true))
+    }
+    val smartSettings = SmartStreamSettingsRepository.state.value
+    if (smartSettings.autoPlay) {
+        return SmartStreamRanking.rankForAutoPlay(
+            streams = untried,
+            settings = smartSettings,
+            device = currentSmartDeviceProfile(),
+            debridEnabled = debridEnabled,
+            isEpisode = isEpisode,
+        ).ranked.firstOrNull()?.stream
     }
     return StreamAutoPlaySelector.evaluateAutoPlayStream(
         streams = untried,

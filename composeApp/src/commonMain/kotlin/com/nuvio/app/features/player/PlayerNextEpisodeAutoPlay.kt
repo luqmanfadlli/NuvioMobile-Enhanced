@@ -348,6 +348,7 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
                         triedKeys = triedKeys,
                         failedAddonId = failed.addonId,
                         failedInfoHash = failed.p2pInfoHash,
+                        isEpisode = true,
                     )
                 },
             )

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.player.skip.AutoSkipSegmentType
 import com.nuvio.app.features.player.skip.NextEpisodeThresholdMode
@@ -164,7 +165,8 @@ const val SOURCE_STARTUP_TIMEOUT_SECONDS_STEP = 5
  */
 val PlayerSettingsUiState.streamAutoPlayFallbackActive: Boolean
     get() = streamAutoPlayFallbackOnFailure &&
-        streamAutoPlayMode != StreamAutoPlayMode.MANUAL &&
+        (streamAutoPlayMode != StreamAutoPlayMode.MANUAL ||
+            SmartStreamSettingsRepository.state.value.autoPlay) &&
         !externalPlayerEnabled
 
 object PlayerSettingsRepository {
