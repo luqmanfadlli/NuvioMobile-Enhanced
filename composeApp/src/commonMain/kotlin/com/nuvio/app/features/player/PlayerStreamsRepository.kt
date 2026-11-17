@@ -51,6 +51,7 @@ object PlayerStreamsRepository {
     private val _sourceState = MutableStateFlow(StreamsUiState())
     val sourceState: StateFlow<StreamsUiState> = _sourceState.asStateFlow()
     private val deadSourceIdentityKeys = MutableStateFlow<Set<String>>(emptySet())
+    private var deadSourceContentKey: String? = null
     private var sourceJob: Job? = null
     private var sourceRequestKey: String? = null
 
@@ -67,6 +68,11 @@ object PlayerStreamsRepository {
         episode: Int? = null,
         forceRefresh: Boolean = false,
     ) {
+        val contentKey = "$type::$videoId::$season::$episode"
+        if (deadSourceContentKey != contentKey) {
+            deadSourceContentKey = contentKey
+            deadSourceIdentityKeys.value = emptySet()
+        }
         fetchStreams(
             type = type,
             videoId = videoId,
