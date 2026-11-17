@@ -1,16 +1,14 @@
 package com.nuvio.app.features.streams
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.UIKit.UIDevice
 import platform.UIKit.UIScreen
 import platform.UIKit.UIUserInterfaceIdiomPad
-import platform.posix.uname
-import platform.posix.utsname
+import platform.VideoToolbox.VTIsHardwareDecodeSupported
+
+private const val CODEC_HEVC: UInt = 0x68766331u
+private const val CODEC_AV1: UInt = 0x61763031u
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun readSmartScreenInfo(): SmartScreenInfo {
@@ -18,28 +16,19 @@ internal actual fun readSmartScreenInfo(): SmartScreenInfo {
     val size = screen.nativeBounds.useContents { size.width to size.height }
     val longSide = maxOf(size.first, size.second).toInt()
     val shortSide = minOf(size.first, size.second).toInt()
-    val hdr = screen.potentialEDRHeadroom > 1.0
-    val model = memScoped {
-        val info = alloc<utsname>()
-        uname(info.ptr)
-        info.machine.toKString()
-    }
+    val hevcHardware = hardwareDecodes(CODEC_HEVC)
+    val hdrScreen = screen.potentialEDRHeadroom > 1.0
     return SmartScreenInfo(
         longSidePx = longSide,
         shortSidePx = shortSide,
-        hdr = hdr,
-        av1Hardware = modelDecodesAv1(model),
+        hdrFormats = if (hdrScreen && hevcHardware) SmartHdr.entries.toSet() else emptySet(),
+        hevcHardware = hevcHardware,
+        av1Hardware = hardwareDecodes(CODEC_AV1),
+        decodes4k = hevcHardware,
         externalDisplay = UIScreen.screens.size > 1,
         isTablet = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad,
     )
 }
 
-internal fun modelDecodesAv1(model: String): Boolean {
-    val family = when {
-        model.startsWith("iPhone") -> "iPhone"
-        model.startsWith("iPad") -> "iPad"
-        else -> return false
-    }
-    val major = model.removePrefix(family).substringBefore(',').toIntOrNull() ?: return false
-    return major >= 16
-}
+@OptIn(ExperimentalForeignApi::class)
+private fun hardwareDecodes(codec: UInt): Boolean = runCatching { VTIsHardwareDecodeSupported(codec) }.getOrDefault(false)

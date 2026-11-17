@@ -751,6 +751,8 @@ private fun SmartBestSheet(
                 GroupDivider()
                 InfoRow("Smooth video", device.videoLabel)
                 GroupDivider()
+                InfoRow("Memory", device.memoryLabel)
+                GroupDivider()
                 InfoRow("Connection", device.connectionLabel)
             }
         }

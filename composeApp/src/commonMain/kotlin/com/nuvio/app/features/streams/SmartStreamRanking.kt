@@ -36,6 +36,7 @@ internal data class SmartTarget(
 )
 
 internal object SmartStreamRanking {
+    private const val HEAVY_4K_MBPS = 40.0
 
     val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
 
@@ -45,7 +46,11 @@ internal object SmartStreamRanking {
         val saveData = !device.onWifi && settings.mobileData == SmartMobileData.SAVE_DATA
         val screenLines = device.videoLines
         val lines = when (settings.resolutionLimit) {
-            SmartResolutionLimit.AUTO -> if (saveData) min(screenLines, 1080) else screenLines
+            SmartResolutionLimit.AUTO -> {
+                val comfortable = min(screenLines, device.maxComfortableLines)
+                val memoryAware = if (device.memoryTier == SmartMemoryTier.AMPLE) comfortable else min(comfortable, 1080)
+                if (saveData) min(memoryAware, 1080) else memoryAware
+            }
             SmartResolutionLimit.P1080 -> 1080
             SmartResolutionLimit.P4K -> 2160
         }
@@ -86,6 +91,7 @@ internal object SmartStreamRanking {
             30.0 * min(lines, target.lines).toDouble() / target.lines
         }
         if (target.explicitLimit != null && lines != null && lines > target.explicitLimit) score -= 25.0
+        if (lines != null && lines > device.maxComfortableLines) score -= 60.0
 
         val mbps = info.sizeBytes?.let { it * 8.0 / runtimeSeconds / 1_000_000.0 }
         score += when {
@@ -104,15 +110,26 @@ internal object SmartStreamRanking {
                 lines != null && lines >= 2160 -> -50.0
                 else -> -30.0
             }
-            SmartCodec.HEVC -> 6.0
+            SmartCodec.HEVC -> if (device.screen.hevcHardware) 6.0 else -30.0
             SmartCodec.H264 -> 4.0
             SmartCodec.OTHER -> -5.0
             null -> 0.0
         }
 
         if (info.hdr != null && device.screen.hdr) {
-            val bonus = 10.0 + 4.0 * info.hdr.rank
-            score += if (target.saveData) bonus / 2 else bonus
+            if (info.hdr in device.screen.hdrFormats) {
+                val bonus = 10.0 + 4.0 * info.hdr.rank
+                score += if (target.saveData) bonus / 2 else bonus
+            } else if (info.hdr == SmartHdr.DOLBY_VISION) {
+                score -= 10.0
+            } else {
+                score += 4.0
+            }
+        }
+
+        if (device.memoryTier != SmartMemoryTier.AMPLE && lines != null && lines >= 2160) {
+            val heavy = info.source == SmartSource.REMUX || (mbps != null && mbps > HEAVY_4K_MBPS)
+            if (heavy) score -= 20.0
         }
 
         score += when (info.source) {
@@ -190,11 +207,18 @@ internal object SmartStreamRanking {
             }
         }
         when (info.codec) {
-            SmartCodec.HEVC, SmartCodec.H264 -> add("${info.codec?.label}, played smoothly by the chip")
+            SmartCodec.HEVC -> if (device.screen.hevcHardware) add("HEVC, decoded by your chip")
+            SmartCodec.H264 -> add("H.264, played smoothly by the chip")
             SmartCodec.AV1 -> if (device.screen.av1Hardware) add("AV1, decoded by your chip")
             else -> Unit
         }
-        if (info.hdr != null && device.screen.hdr) add("${info.hdr.label}, and your screen shows HDR")
+        if (info.hdr != null && info.hdr in device.screen.hdrFormats) add("${info.hdr.label}, and your screen shows it")
+        if (info.resolution != null && info.resolution.lines >= 2160 && device.memoryTier == SmartMemoryTier.AMPLE) {
+            add("${device.memoryLabel} memory, enough for 4K")
+        }
+        if (device.maxComfortableLines < 2160 || device.memoryTier != SmartMemoryTier.AMPLE) {
+            if (info.resolution != null && info.resolution.lines <= 1080) add("Kept to 1080p to play smoothly on this device")
+        }
         info.sizeBytes?.let { size ->
             add("${formatSmartSize(size)}, sensible for ${if (device.onWifi) "Wi-Fi" else "mobile data"}")
         }
