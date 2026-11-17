@@ -822,7 +822,7 @@ private fun BoxScope.RenderPlaybackOverlays(
         val snapshotIsLoading by remember(runtime) { derivedStateOf { playbackSnapshot.isLoading } }
         val snapshotDurationMs by remember(runtime) { derivedStateOf { playbackSnapshot.durationMs } }
         val displayedPositionMs = scrubbingPositionMs ?: overlaySnapshot.positionMs
-        val openingOverlayVisible = playerSettingsUiState.showLoadingOverlay && !initialLoadCompleted && errorMessage == null
+        val openingOverlayVisible = (playerSettingsUiState.showLoadingOverlay && !initialLoadCompleted || deadLinkStatusMessage != null) && errorMessage == null
         val showNetworkSpeed = openingOverlayVisible &&
             playerSettingsUiState.showPlayerLoadingStatus &&
             p2pInitialLoadingMessage == null
@@ -855,7 +855,7 @@ private fun BoxScope.RenderPlaybackOverlays(
             flushWatchProgress()
             args.onBack()
         },
-        openingLoadingMessage = if (playerSettingsUiState.showPlayerLoadingStatus) {
+        openingLoadingMessage = deadLinkStatusMessage ?: if (playerSettingsUiState.showPlayerLoadingStatus) {
             p2pInitialLoadingMessage ?: playerLoadingStatusMessage(
                 showStatus = true,
                 controllerReady = playerController != null,
