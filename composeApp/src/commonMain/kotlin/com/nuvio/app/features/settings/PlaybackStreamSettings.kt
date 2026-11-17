@@ -458,4 +458,6 @@ internal val StreamAutoPlayMode.labelRes: StringResource
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
+        // Legacy persisted values must remain readable, but semi-automatic mode is no longer exposed.
+        StreamAutoPlayMode.SEMI_AUTOMATIC -> Res.string.settings_playback_stream_selection_mode_manual
     }
