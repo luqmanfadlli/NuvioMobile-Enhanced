@@ -65,6 +65,8 @@ import com.nuvio.app.core.ui.backdropControlColor
 import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 import com.nuvio.app.core.ui.nuvio
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.withContext
 
 internal data class SmartStreamsState(
@@ -158,7 +160,7 @@ internal fun SmartStreamControls(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Play best for this device",
+                        text = stringResource(Res.string.smart_streams_play_best),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = colors.onAccent,
                         maxLines = 1,
@@ -178,7 +180,7 @@ internal fun SmartStreamControls(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SmartBarButton(
                 icon = { Icon(Icons.Rounded.SwapVert, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                label = state.settings.sortMode.label,
+                label = smartSortTitle(state.settings.sortMode),
                 highlighted = false,
                 trailing = {
                     Icon(
@@ -193,7 +195,7 @@ internal fun SmartStreamControls(
             )
             SmartBarButton(
                 icon = { Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                label = "Filters",
+                label = stringResource(Res.string.smart_streams_filters),
                 highlighted = filters.activeCount > 0,
                 trailing = if (filters.activeCount > 0) {
                     {
@@ -220,7 +222,7 @@ internal fun SmartStreamControls(
             )
         }
 
-        val chips = activeFilterChips(filters)
+        val chips = activeFilterChips(filters, rememberSmartLabels())
         if (chips.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -259,7 +261,7 @@ internal fun SmartStreamControls(
                             )
                             Icon(
                                 Icons.Rounded.Close,
-                                contentDescription = "Remove ${chip.label} filter",
+                                contentDescription = stringResource(Res.string.smart_streams_remove_filter, chip.label),
                                 tint = colors.textPrimary,
                                 modifier = Modifier.size(14.dp),
                             )
@@ -267,7 +269,7 @@ internal fun SmartStreamControls(
                     }
                 }
                 Text(
-                    text = "Clear all",
+                    text = stringResource(Res.string.smart_streams_clear_all),
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = colors.textSecondary,
                     modifier = Modifier
@@ -280,14 +282,14 @@ internal fun SmartStreamControls(
 
         if (result != null && result.totalCount > 0) {
             val order = when (state.settings.sortMode) {
-                SmartSortMode.BEST_MATCH -> "BEST MATCH FIRST"
-                SmartSortMode.HIGHEST_QUALITY -> "HIGHEST QUALITY FIRST"
-                SmartSortMode.SMALLEST_FILE -> "SMALLEST FIRST"
-                SmartSortMode.LARGEST_FILE -> "LARGEST FIRST"
-                SmartSortMode.ADDON_ORDER -> "BY ADDON"
+                SmartSortMode.BEST_MATCH -> stringResource(Res.string.smart_streams_order_best)
+                SmartSortMode.HIGHEST_QUALITY -> stringResource(Res.string.smart_streams_order_quality)
+                SmartSortMode.SMALLEST_FILE -> stringResource(Res.string.smart_streams_order_smallest)
+                SmartSortMode.LARGEST_FILE -> stringResource(Res.string.smart_streams_order_largest)
+                SmartSortMode.ADDON_ORDER -> stringResource(Res.string.smart_streams_order_addon)
             }
             Text(
-                text = "${result.shownCount} OF ${result.totalCount} STREAMS · $order",
+                text = stringResource(Res.string.smart_streams_count, result.shownCount, result.totalCount, order),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp),
                 color = colors.textMuted,
                 modifier = Modifier.padding(top = 2.dp),
@@ -354,7 +356,7 @@ private fun SmartBarButton(
 
 private data class SmartFilterChip(val label: String, val remove: () -> Unit)
 
-private fun activeFilterChips(filters: SmartStreamFilters): List<SmartFilterChip> = buildList {
+private fun activeFilterChips(filters: SmartStreamFilters, labels: SmartLabels): List<SmartFilterChip> = buildList {
     SmartResolution.entries.reversed().filter { it in filters.resolutions }.forEach { value ->
         add(SmartFilterChip(value.label) { updateFilters { it.copy(resolutions = it.resolutions - value) } })
     }
@@ -362,20 +364,20 @@ private fun activeFilterChips(filters: SmartStreamFilters): List<SmartFilterChip
         add(SmartFilterChip(value.label) { updateFilters { it.copy(hdr = it.hdr - value) } })
     }
     SmartCodec.entries.filter { it in filters.codecs }.forEach { value ->
-        add(SmartFilterChip(value.label) { updateFilters { it.copy(codecs = it.codecs - value) } })
+        add(SmartFilterChip(labels.codec(value)) { updateFilters { it.copy(codecs = it.codecs - value) } })
     }
     SmartAudio.entries.filter { it in filters.audio }.forEach { value ->
-        add(SmartFilterChip(value.label) { updateFilters { it.copy(audio = it.audio - value) } })
+        add(SmartFilterChip(labels.audio(value)) { updateFilters { it.copy(audio = it.audio - value) } })
     }
     SmartSource.entries.reversed().filter { it in filters.sources }.forEach { value ->
         add(SmartFilterChip(value.label) { updateFilters { it.copy(sources = it.sources - value) } })
     }
     filters.maxSizeGb?.let { gb ->
-        add(SmartFilterChip("Under $gb GB") { updateFilters { it.copy(maxSizeGb = null) } })
+        add(SmartFilterChip(labels.underSize(gb)) { updateFilters { it.copy(maxSizeGb = null) } })
     }
-    if (filters.instantOnly) add(SmartFilterChip("Instant only") { updateFilters { it.copy(instantOnly = false) } })
+    if (filters.instantOnly) add(SmartFilterChip(labels.instantOnly) { updateFilters { it.copy(instantOnly = false) } })
     if (!filters.hideLowQuality) {
-        add(SmartFilterChip("Showing low quality") { updateFilters { it.copy(hideLowQuality = true) } })
+        add(SmartFilterChip(labels.showingLowQuality) { updateFilters { it.copy(hideLowQuality = true) } })
     }
 }
 
@@ -622,7 +624,7 @@ private fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifie
 private fun SmartSortSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
     val colors = MaterialTheme.nuvio.colors
     SmartSheet(onDismiss = onDismiss) { close ->
-        SheetTitle("Sort streams")
+        SheetTitle(stringResource(Res.string.smart_streams_sort_title))
         GroupCard {
             SmartSortMode.entries.forEachIndexed { index, mode ->
                 if (index > 0) GroupDivider()
@@ -642,11 +644,11 @@ private fun SmartSortSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
-                            text = mode.label,
+                            text = smartSortTitle(mode),
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                             color = colors.textPrimary,
                         )
-                        Text(text = mode.description, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                        Text(text = smartSortDescription(mode), style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
                     }
                     Box(
                         modifier = Modifier
@@ -664,8 +666,8 @@ private fun SmartSortSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
         }
         GroupCard {
             SwitchRow(
-                title = "Use for every title",
-                subtitle = "Remember this sort and your filters next time",
+                title = stringResource(Res.string.smart_streams_remember),
+                subtitle = stringResource(Res.string.smart_streams_remember_description),
                 checked = state.settings.rememberChoices,
                 onCheckedChange = { checked -> SmartStreamSettingsRepository.update { it.copy(rememberChoices = checked) } },
             )
@@ -675,77 +677,78 @@ private fun SmartSortSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
 
 @Composable
 private fun SmartFiltersSheet(state: SmartStreamsState, onDismiss: () -> Unit) {
+    val labels = rememberSmartLabels()
     val filters = state.settings.filters
     SmartSheet(onDismiss = onDismiss) { close ->
-        SheetTitle("Filters")
+        SheetTitle(stringResource(Res.string.smart_streams_filters))
         ChipSection(
-            title = "RESOLUTION",
+            title = stringResource(Res.string.smart_streams_section_resolution),
             options = SmartResolution.entries.reversed(),
             selected = filters.resolutions,
             label = { it.label },
             onToggle = { value -> updateFilters { it.copy(resolutions = it.resolutions.toggle(value)) } },
         )
         ChipSection(
-            title = "HDR",
+            title = stringResource(Res.string.smart_streams_section_hdr),
             options = SmartHdrFilter.entries,
             selected = filters.hdr,
             label = { it.label },
             onToggle = { value -> updateFilters { it.copy(hdr = it.hdr.toggle(value)) } },
         )
         ChipSection(
-            title = "VIDEO",
+            title = stringResource(Res.string.smart_streams_section_video),
             options = listOf(SmartCodec.HEVC, SmartCodec.H264, SmartCodec.AV1),
             selected = filters.codecs,
-            label = { it.label },
+            label = { labels.codec(it) },
             onToggle = { value -> updateFilters { it.copy(codecs = it.codecs.toggle(value)) } },
         )
         ChipSection(
-            title = "AUDIO",
+            title = stringResource(Res.string.smart_streams_section_audio),
             options = SmartAudio.entries,
             selected = filters.audio,
-            label = { it.label },
+            label = { labels.audio(it) },
             onToggle = { value -> updateFilters { it.copy(audio = it.audio.toggle(value)) } },
         )
         ChipSection(
-            title = "SOURCE",
+            title = stringResource(Res.string.smart_streams_section_source),
             options = listOf(SmartSource.REMUX, SmartSource.BLURAY, SmartSource.WEBDL, SmartSource.WEBRIP),
             selected = filters.sources,
             label = { it.label },
             onToggle = { value -> updateFilters { it.copy(sources = it.sources.toggle(value)) } },
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel("FILE SIZE")
+            SectionLabel(stringResource(Res.string.smart_streams_section_file_size))
             Segmented(
                 options = listOf<Int?>(null, 5, 10, 20, 30),
                 selected = filters.maxSizeGb,
-                label = { gb -> if (gb == null) "Any" else "< $gb GB" },
+                label = { gb -> if (gb == null) labels.sizeAny else labels.sizeUnder(gb) },
                 onSelect = { gb -> updateFilters { it.copy(maxSizeGb = gb) } },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         GroupCard {
             SwitchRow(
-                title = "Instant only",
-                subtitle = "Streams that start with no waiting",
+                title = stringResource(Res.string.smart_streams_instant_only),
+                subtitle = stringResource(Res.string.smart_streams_instant_only_description),
                 checked = filters.instantOnly,
                 onCheckedChange = { checked -> updateFilters { it.copy(instantOnly = checked) } },
             )
             GroupDivider()
             SwitchRow(
-                title = "Hide low quality",
-                subtitle = "CAM, telesync and screener copies",
+                title = stringResource(Res.string.smart_streams_hide_low_quality),
+                subtitle = stringResource(Res.string.smart_streams_hide_low_quality_description),
                 checked = filters.hideLowQuality,
                 onCheckedChange = { checked -> updateFilters { it.copy(hideLowQuality = checked) } },
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SecondaryButton(
-                text = "Reset",
+                text = stringResource(Res.string.smart_streams_reset),
                 onClick = { updateFilters { SmartStreamFilters() } },
                 modifier = Modifier.weight(1f),
             )
             PrimaryButton(
-                text = "Show ${state.result?.shownCount ?: 0} streams",
+                text = stringResource(Res.string.smart_streams_show_count, state.result?.shownCount ?: 0),
                 onClick = close,
                 modifier = Modifier.weight(2f),
             )
@@ -762,27 +765,28 @@ private fun SmartBestSheet(
 ) {
     val colors = MaterialTheme.nuvio.colors
     val device = state.device
+    val labels = rememberSmartLabels()
     SmartSheet(onDismiss = onDismiss) { close ->
         val streamName = listOfNotNull(best.stream.addonName, best.stream.streamLabel.takeIf { it.isNotBlank() })
             .joinToString(" · ")
-        SheetTitle("Best for this device", streamName)
+        SheetTitle(stringResource(Res.string.smart_streams_best_title), streamName)
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel("THIS DEVICE")
+            SectionLabel(stringResource(Res.string.smart_streams_this_device))
             GroupCard {
-                InfoRow("Screen", device.screenLabel)
+                InfoRow(stringResource(Res.string.smart_streams_screen), smartScreenLabel(device))
                 GroupDivider()
-                InfoRow("Smooth video", device.videoLabel)
+                InfoRow(stringResource(Res.string.smart_streams_smooth_video), smartVideoLabel(device))
                 GroupDivider()
-                InfoRow("Memory", device.memoryLabel)
+                InfoRow(stringResource(Res.string.smart_streams_memory), device.memoryLabel)
                 GroupDivider()
-                InfoRow("Connection", device.connectionLabel)
+                InfoRow(stringResource(Res.string.smart_streams_connection), smartConnectionLabel(device.onWifi))
             }
         }
 
         if (best.reasons.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("WHY THIS STREAM")
+                SectionLabel(stringResource(Res.string.smart_streams_why))
                 GroupCard {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         best.reasons.forEach { reason ->
@@ -797,7 +801,7 @@ private fun SmartBestSheet(
                                     tint = colors.accent,
                                     modifier = Modifier.size(18.dp),
                                 )
-                                Text(text = reason, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                                Text(text = smartReasonText(reason), style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
                             }
                         }
                     }
@@ -806,21 +810,21 @@ private fun SmartBestSheet(
         }
 
         GroupCard {
-            SettingSegmentRow(title = "Highest resolution") {
+            SettingSegmentRow(title = stringResource(Res.string.smart_streams_highest_resolution)) {
                 Segmented(
                     options = SmartResolutionLimit.entries,
                     selected = state.settings.resolutionLimit,
-                    label = { it.label },
+                    label = { labels.limit(it) },
                     onSelect = { value -> SmartStreamSettingsRepository.update { it.copy(resolutionLimit = value) } },
                     modifier = Modifier.width(180.dp),
                 )
             }
             GroupDivider()
-            SettingSegmentRow(title = "On mobile data") {
+            SettingSegmentRow(title = stringResource(Res.string.smart_streams_on_mobile_data)) {
                 Segmented(
                     options = SmartMobileData.entries,
                     selected = state.settings.mobileData,
-                    label = { it.label },
+                    label = { labels.mobile(it) },
                     onSelect = { value -> SmartStreamSettingsRepository.update { it.copy(mobileData = value) } },
                     modifier = Modifier.width(180.dp),
                 )
@@ -828,7 +832,7 @@ private fun SmartBestSheet(
         }
 
         PrimaryButton(
-            text = "Play this stream",
+            text = stringResource(Res.string.smart_streams_play_this),
             icon = true,
             onClick = {
                 close()
@@ -890,17 +894,17 @@ internal fun SmartFiltersEmptyBlock(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "No streams match your filters",
+            text = stringResource(Res.string.smart_streams_empty_title),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = colors.textPrimary,
         )
         Text(
-            text = "Some addons don't say the quality in the stream name, so those can't be filtered.",
+            text = stringResource(Res.string.smart_streams_empty_message),
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textMuted,
         )
         SecondaryButton(
-            text = "Clear filters",
+            text = stringResource(Res.string.smart_streams_clear_filters),
             onClick = { updateFilters { SmartStreamFilters() } },
             modifier = Modifier.width(200.dp),
         )
@@ -940,7 +944,7 @@ internal fun LazyListScope.smartSortedStreamSection(
             showAddonLogo = showAddonLogo,
             badgePlacement = badgePlacement,
             isCurrent = stream == bestStream,
-            currentLabel = if (stream == bestStream) "Best match" else null,
+            currentLabel = if (stream == bestStream) stringResource(Res.string.smart_streams_best_match) else null,
             onClick = {
                 if (isSelectable) {
                     onStreamSelected(stream, resumePositionMs, resumeProgressFraction)

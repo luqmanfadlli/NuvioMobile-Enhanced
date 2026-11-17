@@ -4,23 +4,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal enum class SmartSortMode(val label: String, val description: String) {
-    BEST_MATCH("Best match", "Best for this device first · recommended"),
-    HIGHEST_QUALITY("Highest quality", "4K first, then HDR, then 1080p"),
-    SMALLEST_FILE("Smallest file", "Starts faster and uses less data"),
-    LARGEST_FILE("Largest file", "Usually the highest bitrate"),
-    ADDON_ORDER("Addon order", "Grouped by addon, like before"),
+internal enum class SmartSortMode {
+    BEST_MATCH,
+    HIGHEST_QUALITY,
+    SMALLEST_FILE,
+    LARGEST_FILE,
+    ADDON_ORDER,
 }
 
-internal enum class SmartResolutionLimit(val label: String) {
-    AUTO("Auto"),
-    P1080("1080p"),
-    P4K("4K"),
+internal enum class SmartResolutionLimit {
+    AUTO,
+    P1080,
+    P4K,
 }
 
-internal enum class SmartMobileData(val label: String) {
-    SAVE_DATA("Save data"),
-    BEST_QUALITY("Best quality"),
+internal enum class SmartMobileData {
+    SAVE_DATA,
+    BEST_QUALITY,
 }
 
 internal enum class SmartHdrFilter(val label: String) {

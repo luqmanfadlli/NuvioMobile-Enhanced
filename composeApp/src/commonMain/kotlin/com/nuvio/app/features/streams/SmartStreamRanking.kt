@@ -12,10 +12,23 @@ internal data class SmartRankedStream(
     val index: Int,
 )
 
+internal sealed interface SmartReason {
+    data object Instant : SmartReason
+    data object NotInstant : SmartReason
+    data class SharpestForScreen(val resolution: String, val lines: Int) : SmartReason
+    data class SharpestWithinLimit(val resolution: String) : SmartReason
+    data class DecodedByChip(val codec: String) : SmartReason
+    data object H264Smooth : SmartReason
+    data class HdrShown(val format: String) : SmartReason
+    data class EnoughMemory(val memory: String) : SmartReason
+    data object KeptTo1080 : SmartReason
+    data class SensibleSize(val size: String, val onWifi: Boolean) : SmartReason
+}
+
 internal data class SmartPick(
     val stream: StreamItem,
     val info: SmartStreamInfo,
-    val reasons: List<String>,
+    val reasons: List<SmartReason>,
 )
 
 internal data class SmartStreamsResult(
@@ -193,34 +206,34 @@ internal object SmartStreamRanking {
         )
     }
 
-    private fun reasons(info: SmartStreamInfo, device: SmartDeviceProfile, target: SmartTarget): List<String> = buildList {
+    private fun reasons(info: SmartStreamInfo, device: SmartDeviceProfile, target: SmartTarget): List<SmartReason> = buildList {
         when (info.instant) {
-            SmartInstant.YES -> add("Instant, starts with no waiting")
-            SmartInstant.NO -> add("Needs to load first (no instant stream found)")
+            SmartInstant.YES -> add(SmartReason.Instant)
+            SmartInstant.NO -> add(SmartReason.NotInstant)
             SmartInstant.UNKNOWN -> Unit
         }
         info.resolution?.let { resolution ->
             if (resolution.lines > target.lines) {
-                add("${resolution.label}, sharpest for this screen (about ${device.videoLines} lines)")
+                add(SmartReason.SharpestForScreen(resolution.label, device.videoLines))
             } else {
-                add("${resolution.label}, the sharpest within your limit")
+                add(SmartReason.SharpestWithinLimit(resolution.label))
             }
         }
         when (info.codec) {
-            SmartCodec.HEVC -> if (device.screen.hevcHardware) add("HEVC, decoded by your chip")
-            SmartCodec.H264 -> add("H.264, played smoothly by the chip")
-            SmartCodec.AV1 -> if (device.screen.av1Hardware) add("AV1, decoded by your chip")
+            SmartCodec.HEVC -> if (device.screen.hevcHardware) add(SmartReason.DecodedByChip("HEVC"))
+            SmartCodec.H264 -> add(SmartReason.H264Smooth)
+            SmartCodec.AV1 -> if (device.screen.av1Hardware) add(SmartReason.DecodedByChip("AV1"))
             else -> Unit
         }
-        if (info.hdr != null && info.hdr in device.screen.hdrFormats) add("${info.hdr.label}, and your screen shows it")
+        if (info.hdr != null && info.hdr in device.screen.hdrFormats) add(SmartReason.HdrShown(info.hdr.label))
         if (info.resolution != null && info.resolution.lines >= 2160 && device.memoryTier == SmartMemoryTier.AMPLE) {
-            add("${device.memoryLabel} memory, enough for 4K")
+            add(SmartReason.EnoughMemory(device.memoryLabel))
         }
         if (device.maxComfortableLines < 2160 || device.memoryTier != SmartMemoryTier.AMPLE) {
-            if (info.resolution != null && info.resolution.lines <= 1080) add("Kept to 1080p to play smoothly on this device")
+            if (info.resolution != null && info.resolution.lines <= 1080) add(SmartReason.KeptTo1080)
         }
         info.sizeBytes?.let { size ->
-            add("${formatSmartSize(size)}, sensible for ${if (device.onWifi) "Wi-Fi" else "mobile data"}")
+            add(SmartReason.SensibleSize(formatSmartSize(size), device.onWifi))
         }
     }
 

@@ -45,31 +45,11 @@ internal data class SmartDeviceProfile(
             minOf(screen.shortSidePx, screen.longSidePx * 9 / 16).coerceAtLeast(480)
         }
 
-    val screenLabel: String
-        get() = buildString {
-            if (screen.hdr) {
-                append(SmartHdr.entries.filter { it in screen.hdrFormats }.joinToString(", ") { it.label })
-                append(" · ")
-            }
-            append("${screen.longSidePx} × ${screen.shortSidePx}")
-            if (screen.externalDisplay) append(" · TV connected")
-        }
-
-    val videoLabel: String
-        get() = buildList {
-            add(if (screen.hevcHardware) "HEVC" else "HEVC (software)")
-            add("H.264")
-            if (screen.av1Hardware) add("AV1")
-        }.joinToString(", ") + if (screen.decodes4k) " · up to 4K" else " · up to 1080p"
-
     val memoryLabel: String
         get() {
             val tenths = (memoryMb * 10 + 512) / 1024
             return "${tenths / 10}.${tenths % 10} GB"
         }
-
-    val connectionLabel: String
-        get() = if (onWifi) "Wi-Fi" else "Mobile data"
 
     companion object {
         const val LOW_MEMORY_MB = 3000
