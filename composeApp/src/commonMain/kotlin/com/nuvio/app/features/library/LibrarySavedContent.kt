@@ -62,7 +62,6 @@ internal fun LibrarySavedControls(
     onWatchedFilterSelected: (LibraryWatchedFilter) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val sortOptions = availableLibrarySortOptions(sourceMode)
     val allTypesLabel = stringResource(Res.string.library_filter_all_types)
@@ -181,29 +180,32 @@ internal fun LibrarySavedControls(
     val chipCount = (if (sourceMode.isRemoteTrackingSource) 1 else 0) + 2 +
         (if (verticalProjection.availableGenres.isNotEmpty()) 1 else 0) +
         (if (verticalProjection.availableYears.isNotEmpty()) 1 else 0) + 1
-    val singleRow = layoutMode == LibraryLayoutMode.VERTICAL && (compact || chipCount <= SingleRowMaxChips)
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (singleRow) {
-            LibraryFilterRow(modifier = Modifier.widthIn(max = CompactFilterRowMaxWidth), shrinkToFit = true) {
-                leadingChips(true)
-                facetChips(true)
+    BoxWithConstraints(modifier = modifier) {
+        val available = minOf(maxWidth, CompactFilterRowMaxWidth)
+        val singleRow = layoutMode == LibraryLayoutMode.VERTICAL &&
+            CompactFilterMinChipWidth * chipCount + FilterChipSpacing * (chipCount - 1) <= available
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (singleRow) {
+                LibraryFilterRow(modifier = Modifier.widthIn(max = CompactFilterRowMaxWidth), shrinkToFit = true) {
+                    leadingChips(true)
+                    facetChips(true)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    leadingChips(false)
+                }
             }
-        } else {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                leadingChips(false)
-            }
-        }
 
-        if (layoutMode == LibraryLayoutMode.VERTICAL && !singleRow) {
-            LibraryFilterRow {
-                facetChips(true)
+            if (layoutMode == LibraryLayoutMode.VERTICAL && !singleRow) {
+                LibraryFilterRow {
+                    facetChips(true)
+                }
             }
         }
     }
@@ -211,7 +213,7 @@ internal fun LibrarySavedControls(
 
 private val CompactFilterRowMaxWidth = 960.dp
 private val CompactFilterMinChipWidth = 112.dp
-private const val SingleRowMaxChips = 3
+private val FilterChipSpacing = 8.dp
 
 @Composable
 private fun FacetSlot(fillWidth: Boolean, content: @Composable () -> Unit) {
