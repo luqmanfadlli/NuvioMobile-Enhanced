@@ -103,6 +103,12 @@ jobs:
           } >> "${gradle_user_home}/gradle.properties"
           cat "${gradle_user_home}/gradle.properties"
 
+      - name: Mark the version as a test build
+        run: |
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          version_file=iosApp/Configuration/Version.xcconfig
+          sed -i '' -E "s/^(MARKETING_VERSION=.*)$/\1-test.${short_sha}/" "${version_file}"
+          cat "${version_file}"
       - name: Prepare iOS dependencies
         run: ./scripts/prepare-ios-dependencies.sh
 
