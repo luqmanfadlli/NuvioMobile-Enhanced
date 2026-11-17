@@ -83,12 +83,18 @@ private fun rememberNetworkCondition(): NetworkCondition {
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     val networkCondition = rememberNetworkCondition()
+    val partyState by PartyRepository.state.collectAsStateWithLifecycle()
+    val sharedPartyStream by PartyRepository.sharedStream.collectAsStateWithLifecycle()
     val deadLinkScope = rememberCoroutineScope()
     val deadLinkMonitor = remember(deadLinkScope) {
         DeadLinkStartupMonitor(
             scope = deadLinkScope,
             timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
-            timeoutEnabled = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled },
+            timeoutEnabled = {
+                val guestFollowingSharedStream =
+                    partyState.party?.isHost == false && sharedPartyStream != null
+                PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled && !guestFollowingSharedStream
+            },
             candidateStreams = {
                 val videoId = activeVideoId
                 if (videoId.isNullOrBlank()) {
@@ -125,6 +131,18 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     }
     DisposableEffect(deadLinkMonitor) {
         onDispose { deadLinkMonitor.close() }
+    }
+
+    val deadLinkSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(
+        deadLinkSettings.deadLinkTimeoutEnabled,
+        deadLinkSettings.deadLinkTimeoutSeconds,
+        partyState.party?.id,
+        partyState.party?.memberId,
+        partyState.party?.isHost,
+        sharedPartyStream,
+    ) {
+        deadLinkMonitor.settingsChanged()
     }
 
     LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber) {
