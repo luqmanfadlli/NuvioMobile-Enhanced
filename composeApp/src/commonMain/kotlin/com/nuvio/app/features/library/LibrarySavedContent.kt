@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -61,22 +62,62 @@ internal fun LibrarySavedControls(
     onWatchedFilterSelected: (LibraryWatchedFilter) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val sortOptions = availableLibrarySortOptions(sourceMode)
     val allTypesLabel = stringResource(Res.string.library_filter_all_types)
     val allLabel = stringResource(Res.string.library_type_all)
+    val facetChips: @Composable (Boolean) -> Unit = { fillWidth ->
+        if (verticalProjection.availableGenres.isNotEmpty()) {
+            val genreTitle = stringResource(Res.string.library_filter_genre)
+            FacetSlot(fillWidth) {
+                NuvioDropdownChip(
+                    title = genreTitle,
+                    label = "$genreTitle: ${verticalProjection.selectedGenre ?: allLabel}",
+                    selectedKey = verticalProjection.selectedGenre.orEmpty(),
+                    options = libraryFacetOptions(allLabel, verticalProjection.availableGenres),
+                    onSelected = { option -> onGenreSelected(option.key.ifBlank { null }) },
+                    fillWidth = fillWidth,
+                )
+            }
+        }
+        if (verticalProjection.availableYears.isNotEmpty()) {
+            val yearTitle = stringResource(Res.string.library_filter_year)
+            FacetSlot(fillWidth) {
+                NuvioDropdownChip(
+                    title = yearTitle,
+                    label = "$yearTitle: ${verticalProjection.selectedYear ?: allLabel}",
+                    selectedKey = verticalProjection.selectedYear.orEmpty(),
+                    options = libraryFacetOptions(allLabel, verticalProjection.availableYears),
+                    onSelected = { option -> onYearSelected(option.key.ifBlank { null }) },
+                    fillWidth = fillWidth,
+                )
+            }
+        }
+        val watchedTitle = stringResource(Res.string.library_filter_watched)
+        FacetSlot(fillWidth) {
+            NuvioDropdownChip(
+                title = watchedTitle,
+                label = "$watchedTitle: ${libraryWatchedFilterLabel(watchedFilter)}",
+                selectedKey = watchedFilter.name,
+                options = LibraryWatchedFilter.entries.map { filter ->
+                    NuvioDropdownOption(key = filter.name, label = libraryWatchedFilterLabel(filter))
+                },
+                onSelected = { option ->
+                    LibraryWatchedFilter.entries
+                        .firstOrNull { it.name == option.key }
+                        ?.let(onWatchedFilterSelected)
+                },
+                fillWidth = fillWidth,
+            )
+        }
+    }
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode.isRemoteTrackingSource) {
-                val selectedSection = verticalProjection.availableSections
-                    .firstOrNull { section -> section.type == verticalProjection.selectedSectionKey }
+    val leadingChips: @Composable (Boolean) -> Unit = { fillWidth ->
+        if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode.isRemoteTrackingSource) {
+            val selectedSection = verticalProjection.availableSections
+                .firstOrNull { section -> section.type == verticalProjection.selectedSectionKey }
+            FacetSlot(fillWidth) {
                 NuvioDropdownChip(
                     title = stringResource(Res.string.library_filter_list),
                     label = selectedSection?.let { section -> localizedLibrarySectionTitle(section.type, section.displayTitle) }.orEmpty(),
@@ -86,21 +127,24 @@ internal fun LibrarySavedControls(
                     },
                     enabled = verticalProjection.availableSections.size > 1,
                     onSelected = { option -> onSectionSelected(option.key) },
+                    fillWidth = fillWidth,
                 )
             }
+        }
 
-            if (layoutMode == LibraryLayoutMode.VERTICAL) {
-                val typeOptions = buildList {
-                    add(NuvioDropdownOption(key = "", label = "$allTypesLabel (${verticalProjection.allTypesCount})"))
-                    addAll(
-                        verticalProjection.availableTypes.map { type ->
-                            NuvioDropdownOption(
-                                key = type,
-                                label = "${localizedMediaTypeLabel(type)} (${verticalProjection.typeCounts[type] ?: 0})",
-                            )
-                        },
-                    )
-                }
+        if (layoutMode == LibraryLayoutMode.VERTICAL) {
+            val typeOptions = buildList {
+                add(NuvioDropdownOption(key = "", label = "$allTypesLabel (${verticalProjection.allTypesCount})"))
+                addAll(
+                    verticalProjection.availableTypes.map { type ->
+                        NuvioDropdownOption(
+                            key = type,
+                            label = "${localizedMediaTypeLabel(type)} (${verticalProjection.typeCounts[type] ?: 0})",
+                        )
+                    },
+                )
+            }
+            FacetSlot(fillWidth) {
                 NuvioDropdownChip(
                     title = stringResource(Res.string.library_filter_type),
                     label = verticalProjection.selectedType
@@ -110,9 +154,12 @@ internal fun LibrarySavedControls(
                     options = typeOptions,
                     enabled = typeOptions.size > 1,
                     onSelected = { option -> onTypeSelected(option.key.ifBlank { null }) },
+                    fillWidth = fillWidth,
                 )
             }
+        }
 
+        FacetSlot(fillWidth) {
             NuvioDropdownChip(
                 title = stringResource(Res.string.library_filter_sort),
                 label = librarySortOptionLabel(sortOption),
@@ -126,56 +173,46 @@ internal fun LibrarySavedControls(
                         .firstOrNull { it.name == option.key }
                         ?.let(onSortSelected)
                 },
+                fillWidth = fillWidth,
             )
         }
+    }
 
-        if (layoutMode == LibraryLayoutMode.VERTICAL) {
-            LibraryFilterRow {
-                if (verticalProjection.availableGenres.isNotEmpty()) {
-                    val genreTitle = stringResource(Res.string.library_filter_genre)
-                    Box(propagateMinConstraints = true) {
-                        NuvioDropdownChip(
-                            title = genreTitle,
-                            label = "$genreTitle: ${verticalProjection.selectedGenre ?: allLabel}",
-                            selectedKey = verticalProjection.selectedGenre.orEmpty(),
-                            options = libraryFacetOptions(allLabel, verticalProjection.availableGenres),
-                            onSelected = { option -> onGenreSelected(option.key.ifBlank { null }) },
-                            fillWidth = true,
-                        )
-                    }
-                }
-                if (verticalProjection.availableYears.isNotEmpty()) {
-                    val yearTitle = stringResource(Res.string.library_filter_year)
-                    Box(propagateMinConstraints = true) {
-                        NuvioDropdownChip(
-                            title = yearTitle,
-                            label = "$yearTitle: ${verticalProjection.selectedYear ?: allLabel}",
-                            selectedKey = verticalProjection.selectedYear.orEmpty(),
-                            options = libraryFacetOptions(allLabel, verticalProjection.availableYears),
-                            onSelected = { option -> onYearSelected(option.key.ifBlank { null }) },
-                            fillWidth = true,
-                        )
-                    }
-                }
-                val watchedTitle = stringResource(Res.string.library_filter_watched)
-                Box(propagateMinConstraints = true) {
-                    NuvioDropdownChip(
-                        title = watchedTitle,
-                        label = "$watchedTitle: ${libraryWatchedFilterLabel(watchedFilter)}",
-                        selectedKey = watchedFilter.name,
-                        options = LibraryWatchedFilter.entries.map { filter ->
-                            NuvioDropdownOption(key = filter.name, label = libraryWatchedFilterLabel(filter))
-                        },
-                        onSelected = { option ->
-                            LibraryWatchedFilter.entries
-                                .firstOrNull { it.name == option.key }
-                                ?.let(onWatchedFilterSelected)
-                        },
-                        fillWidth = true,
-                    )
-                }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (layoutMode == LibraryLayoutMode.VERTICAL && compact) {
+            LibraryFilterRow(modifier = Modifier.widthIn(max = CompactFilterRowMaxWidth), shrinkToFit = true) {
+                leadingChips(true)
+                facetChips(true)
+            }
+        } else {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                leadingChips(false)
             }
         }
+
+        if (layoutMode == LibraryLayoutMode.VERTICAL && !compact) {
+            LibraryFilterRow {
+                facetChips(true)
+            }
+        }
+    }
+}
+
+private val CompactFilterRowMaxWidth = 960.dp
+private val CompactFilterMinChipWidth = 112.dp
+
+@Composable
+private fun FacetSlot(fillWidth: Boolean, content: @Composable () -> Unit) {
+    if (fillWidth) {
+        Box(propagateMinConstraints = true) { content() }
+    } else {
+        content()
     }
 }
 
@@ -281,6 +318,7 @@ private fun libraryFacetOptions(
 @Composable
 private fun LibraryFilterRow(
     modifier: Modifier = Modifier,
+    shrinkToFit: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -295,6 +333,8 @@ private fun LibraryFilterRow(
             val naturalWidths = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
             val naturalTotal = naturalWidths.sum() + totalSpacing
             val equalShare = if (count > 0) (viewportWidth - totalSpacing) / count else 0
+            val minChip = CompactFilterMinChipWidth.roundToPx()
+            val available = viewportWidth - totalSpacing
             val widths = when {
                 count == 0 -> emptyList()
                 naturalWidths.all { it <= equalShare } -> List(count) { index ->
@@ -304,6 +344,23 @@ private fun LibraryFilterRow(
                     val extra = (viewportWidth - naturalTotal) / count
                     naturalWidths.mapIndexed { index, width ->
                         width + extra + if (index == count - 1) (viewportWidth - naturalTotal) - extra * count else 0
+                    }
+                }
+                shrinkToFit && minChip * count <= available -> {
+                    val shrunk = naturalWidths.map { width ->
+                        (width.toLong() * available / (naturalTotal - totalSpacing)).toInt().coerceAtLeast(minChip)
+                    }
+                    val overflow = shrunk.sum() - available
+                    if (overflow <= 0) {
+                        shrunk.mapIndexed { index, width -> if (index == count - 1) width - overflow else width }
+                    } else {
+                        val shrinkable = shrunk.sumOf { (it - minChip).coerceAtLeast(0) }.coerceAtLeast(1)
+                        val adjusted = shrunk.map { width ->
+                            width - ((width - minChip).coerceAtLeast(0).toLong() * overflow / shrinkable).toInt()
+                        }
+                        adjusted.mapIndexed { index, width ->
+                            if (index == count - 1) width + (available - adjusted.sum()) else width
+                        }
                     }
                 }
                 else -> naturalWidths

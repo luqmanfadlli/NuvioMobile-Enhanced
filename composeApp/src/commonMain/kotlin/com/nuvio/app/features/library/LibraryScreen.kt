@@ -818,6 +818,7 @@ fun LibraryScreen(
                                     onYearSelected = { year -> libraryYear = year },
                                     onWatchedFilterSelected = { filter -> libraryWatchedFilterName = filter.name },
                                     onSortSelected = LibraryDisplaySettingsRepository::setSortOption,
+                                    compact = isLandscape,
                                     modifier = libraryContentTransitionModifier()
                                         .padding(horizontal = 16.dp)
                                         .padding(top = 8.dp, bottom = 14.dp),
