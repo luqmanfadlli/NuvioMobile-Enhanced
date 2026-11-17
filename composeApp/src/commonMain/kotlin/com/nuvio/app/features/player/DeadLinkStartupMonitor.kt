@@ -2,7 +2,6 @@ package com.nuvio.app.features.player
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.debrid.DebridSettingsRepository
-import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.isSelectableForPlayback
 import kotlinx.coroutines.CancellationException
@@ -79,7 +78,7 @@ internal class DeadLinkStartupMonitor(
             // The user's explicit semi-auto selection is authoritative even when
             // the selected stream's filename/title does not expose its resolution.
             fallbackQualityHeight = requestedQualityHeight()
-                ?: QualityFirstAutoPlayPolicy.detectQualityHeight(stream)
+                ?: deadLinkQualityHeight(stream)
         }
         if (!timeoutEnabled()) {
             cancelTimer()
@@ -316,7 +315,7 @@ internal class DeadLinkStartupMonitor(
                 // Do not auto-open an external app: it has no in-player startup
                 // signal, so the watchdog cannot know whether it succeeded.
                 .filter { !it.shouldOpenExternally && it.isSelectableForPlayback(debridEnabled) }
-                .distinctBy { it.playerPlaybackDeduplicationKey() }
+                .distinctBy(::deadLinkCandidateIdentityKey)
                 .filter { candidate ->
                     val candidateKey = candidate.playerSourceIdentityKey()
                     candidateKey != null && candidateKey !in attemptedKeys
@@ -329,12 +328,12 @@ internal class DeadLinkStartupMonitor(
             val currentTierHeight = fallbackQualityHeight
             val next = if (semiAuto && currentTierHeight != null) {
                 eligibleCandidates.firstOrNull {
-                    QualityFirstAutoPlayPolicy.detectQualityHeight(it) == currentTierHeight
+                    deadLinkQualityHeight(it) == currentTierHeight
                 } ?: if (sourceDiscoveryLoading()) {
                     null
                 } else {
                     eligibleCandidates.firstOrNull {
-                        QualityFirstAutoPlayPolicy.detectQualityHeight(it)?.let { height ->
+                        deadLinkQualityHeight(it)?.let { height ->
                             height < currentTierHeight
                         } == true
                     }
@@ -356,7 +355,7 @@ internal class DeadLinkStartupMonitor(
                 currentKey = nextKey
                 currentStream = next
                 if (semiAuto) {
-                    QualityFirstAutoPlayPolicy.detectQualityHeight(next)?.let { fallbackQualityHeight = it }
+                    deadLinkQualityHeight(next)?.let { fallbackQualityHeight = it }
                 }
                 generation++
                 playbackStarted = false
@@ -401,5 +400,41 @@ internal class DeadLinkStartupMonitor(
     private companion object {
         const val CANDIDATE_POLL_INTERVAL_MS = 300L
         const val STABILITY_WINDOW_MS = 25_000L
+    }
+}
+
+
+/** Stable identity for candidate de-duplication without depending on the enhanced-only autoplay API. */
+private fun deadLinkCandidateIdentityKey(stream: StreamItem): String {
+    stream.playableDirectUrl?.takeIf { it.isNotBlank() }?.let { url ->
+        val requestHeaders = stream.behaviorHints.proxyHeaders?.request
+            .orEmpty()
+            .entries
+            .sortedBy { it.key.lowercase() }
+            .joinToString("&") { (name, value) -> "$name=$value" }
+        return if (requestHeaders.isBlank()) "url:$url" else "url:$url|headers:$requestHeaders"
+    }
+    return stream.playerSourceIdentityKey()
+        ?: "stream:${stream.addonId}:${stream.streamLabel}:${stream.behaviorHints.filename.orEmpty()}"
+}
+
+/** Extract a conservative resolution tier from the selected stream's own metadata. */
+private fun deadLinkQualityHeight(stream: StreamItem): Int? {
+    val metadataCandidates = listOfNotNull(
+        stream.behaviorHints.filename,
+        stream.streamLabel,
+        stream.streamSubtitle,
+    )
+    val markers = listOf(
+        Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
+        Regex("""(?i)(?:\b2160p?\b|\b4k\b|\buhd\b)""") to 2160,
+        Regex("""(?i)(?:\b1440p?\b|\b2k\b|\bqhd\b)""") to 1440,
+        Regex("""(?i)(?:\b1080p?\b|\bfhd\b|\bfull\s*hd\b)""") to 1080,
+        Regex("""(?i)\b720p\b""") to 720,
+        Regex("""(?i)\b480p?\b""") to 480,
+        Regex("""(?i)\b360p?\b""") to 360,
+    )
+    return metadataCandidates.firstNotNullOfOrNull { metadata ->
+        markers.firstOrNull { (regex, _) -> regex.containsMatchIn(metadata) }?.second
     }
 }
