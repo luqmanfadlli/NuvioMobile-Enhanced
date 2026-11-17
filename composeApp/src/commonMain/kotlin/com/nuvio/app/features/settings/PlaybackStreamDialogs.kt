@@ -375,7 +375,3 @@ internal fun StreamAutoPlayRegexDialog(
     }
 }
 
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-
-
