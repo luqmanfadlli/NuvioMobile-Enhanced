@@ -3,7 +3,7 @@ package com.nuvio.app.features.player
 import com.nuvio.app.features.streams.StreamItem
 
 internal object DeadLinkTimeoutPolicy {
-    const val DEFAULT_SECONDS = 10
+    const val DEFAULT_SECONDS = 20
     const val MIN_SECONDS = 5
     const val MAX_SECONDS = 60
 
