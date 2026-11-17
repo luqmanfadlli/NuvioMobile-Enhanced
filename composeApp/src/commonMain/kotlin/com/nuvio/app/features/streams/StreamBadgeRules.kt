@@ -196,7 +196,7 @@ object StreamBadgeMatcher {
                 if (!filter.isEnabled || filter.name.isBlank() || filter.pattern.isBlank()) {
                     return@mapNotNull null
                 }
-                val regex = runCatching { Regex(filter.pattern) }.getOrNull() ?: return@mapNotNull null
+                val regex = runCatching { BadgePattern(filter.pattern) }.getOrNull() ?: return@mapNotNull null
                 CompiledStreamBadgeFilter(
                     name = filter.name,
                     badge = StreamBadge(
@@ -310,7 +310,7 @@ object StreamBadgeMatcher {
 data class CompiledStreamBadgeFilter(
     val name: String,
     val badge: StreamBadge,
-    val regex: Regex,
+    val regex: BadgePattern,
     val groupId: String = "",
 )
 
