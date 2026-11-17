@@ -178,6 +178,19 @@ internal fun StreamItem.playerSourceIdentityKey(): String? {
         ?.joinToString(separator = "|", prefix = "meta:")
 }
 
+internal fun StreamItem.playerPlaybackDeduplicationKey(): String? {
+    serverTarget?.let { target ->
+        return "server:${target.item.encode()}:${target.mediaSourceId.orEmpty()}"
+    }
+    p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
+        return "torrent:$hash:${p2pFileIdx ?: -1}"
+    }
+    playableDirectUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
+        return "url:$url"
+    }
+    return playerSourceIdentityKey()
+}
+
 internal fun PlayerScreenRuntime.stopActiveP2pStream() {
     if (activeTorrentInfoHash != null || p2pResolvedSourceUrl != null) {
         InAppLogger.info(
