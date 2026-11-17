@@ -11,6 +11,8 @@ object StreamAutoPlayPolicy {
             StreamAutoPlayMode.MANUAL -> false
             StreamAutoPlayMode.FIRST_STREAM -> true
             StreamAutoPlayMode.REGEX_MATCH -> isRegexSelectionConfigured(settings.streamAutoPlayRegex)
+            // Do not reactivate the removed semi-automatic quality-selection behavior.
+            StreamAutoPlayMode.SEMI_AUTOMATIC -> false
         }
     }
 
