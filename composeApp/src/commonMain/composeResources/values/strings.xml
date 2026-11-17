@@ -3223,4 +3223,6 @@
     <string name="settings_playback_dead_link_timeout">Dead Link Timeout</string>
     <string name="settings_playback_dead_link_timeout_description">Try another source if playback has not started within this time.</string>
     <string name="settings_playback_seconds">%1$d seconds</string>
+    <string name="settings_playback_stream_selection_mode_semi_automatic">Semi-automatic quality selection</string>
+    <string name="settings_playback_stream_selection_mode_semi_automatic_description">Choose a quality tier, then automatically try matching sources and fall back to lower qualities.</string>
 </resources>
