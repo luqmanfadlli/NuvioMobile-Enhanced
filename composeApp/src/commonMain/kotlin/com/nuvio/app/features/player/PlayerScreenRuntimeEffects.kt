@@ -18,6 +18,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.nuvio.app.features.addons.AddonPlayerAction
 import com.nuvio.app.features.details.MetaDetailsRepository
@@ -82,6 +83,94 @@ private fun rememberNetworkCondition(): NetworkCondition {
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     val networkCondition = rememberNetworkCondition()
+    val deadLinkScope = rememberCoroutineScope()
+    val deadLinkMonitor = remember(deadLinkScope) {
+        DeadLinkStartupMonitor(
+            scope = deadLinkScope,
+            timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
+            timeoutEnabled = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled },
+            candidateStreams = {
+                val videoId = activeVideoId
+                if (videoId.isNullOrBlank()) {
+                    emptyList()
+                } else {
+                    val discovered = PlayerStreamsRepository.discoverSourceCandidates(
+                        type = contentType ?: parentMetaType,
+                        videoId = videoId,
+                        season = activeSeasonNumber,
+                        episode = activeEpisodeNumber,
+                    )
+                    if (P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled) {
+                        discovered
+                    } else {
+                        discovered.filterNot { it.p2pInfoHash != null }
+                    }
+                }
+            },
+            onFallback = { next ->
+                errorMessage = null
+                deadLinkStatusMessage = "Trying next source · ${next.addonName} · ${next.streamLabel}"
+                switchToSource(next)
+            },
+            onExhausted = {
+                errorMessage = errorMessage ?: "This source did not start and no alternate sources remain."
+                controlsVisible = !playerControlsLocked
+            },
+            sourceDiscoveryLoading = { PlayerStreamsRepository.isSourceDiscoveryLoading() },
+            onDeadLink = { failed, stableIdentityKey ->
+                PlayerStreamsRepository.pruneDeadSource(failed, stableIdentityKey)
+                deadLinkStatusMessage = "Unavailable · ${failed.addonName} · ${failed.streamLabel}"
+            },
+        )
+    }
+    DisposableEffect(deadLinkMonitor) {
+        onDispose { deadLinkMonitor.close() }
+    }
+
+    LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber) {
+        deadLinkMonitor.resetForContent()
+        deadLinkStatusMessage = null
+        activeStream?.let { deadLinkMonitor.sourceSelected(it, activeSourceIdentityKey) }
+    }
+
+    LaunchedEffect(activeStream, activeSourceUrl, activeSourceIdentityKey, activePlaybackKey) {
+        val stream = activeStream
+        if (stream == null) {
+            deadLinkMonitor.sourceCleared()
+            return@LaunchedEffect
+        }
+        deadLinkMonitor.sourceSelected(stream, activeSourceIdentityKey)
+    }
+
+    LaunchedEffect(
+        activeStream,
+        activeSourceUrl,
+        activeSourceIdentityKey,
+        playbackSnapshot.isPlaying,
+        playbackSnapshot.isLoading,
+        playbackSnapshot.isEnded,
+        playbackSnapshotKey,
+        activePlaybackKey,
+    ) {
+        if (playbackSnapshotKey != activePlaybackKey) return@LaunchedEffect
+        if (playbackSnapshot.isPlaying && !playbackSnapshot.isLoading) {
+            deadLinkStatusMessage = null
+        }
+        deadLinkMonitor.playbackStateChanged(
+            activeStream,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            activeSourceIdentityKey,
+            isEnded = playbackSnapshot.isEnded,
+        )
+    }
+
+    LaunchedEffect(errorMessage, activeStream, activeSourceIdentityKey) {
+        if (errorMessage != null) {
+            deadLinkMonitor.playbackFailed(activeStream, activeSourceIdentityKey)
+        }
+    }
+
     val currentFeedback = liveGestureFeedback ?: gestureFeedback
     LaunchedEffect(currentFeedback) {
         if (currentFeedback != null) {
