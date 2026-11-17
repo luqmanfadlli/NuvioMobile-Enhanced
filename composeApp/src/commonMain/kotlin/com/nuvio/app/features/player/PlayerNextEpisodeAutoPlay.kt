@@ -1,5 +1,8 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.streams.SmartStreamRanking
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
+import com.nuvio.app.features.streams.currentSmartDeviceProfile
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -171,7 +174,8 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
             episode = nextVideo.episode,
         )
 
-        if (effectiveMode == StreamAutoPlayMode.MANUAL) {
+        val smartSettings = SmartStreamSettingsRepository.state.value
+        if (effectiveMode == StreamAutoPlayMode.MANUAL && !smartSettings.autoPlay) {
             onSearchingChanged(false)
             onNextEpisodeCardVisibleChanged(false)
             onManualSelectionRequired(nextVideo)
@@ -208,7 +212,16 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
         }
 
         fun trySelectStream(streams: List<StreamItem>): StreamItem? =
-            StreamAutoPlaySelector.selectAutoPlayStream(
+            if (smartSettings.autoPlay) {
+                SmartStreamRanking.rankForAutoPlay(
+                    streams = streams,
+                    settings = smartSettings,
+                    device = currentSmartDeviceProfile(),
+                    debridEnabled = debridSettings.canResolvePlayableLinks,
+                    isEpisode = true,
+                    preferredBingeGroup = currentStreamBingeGroup,
+                ).ranked.firstOrNull()?.stream
+            } else StreamAutoPlaySelector.selectAutoPlayStream(
                 streams = streams,
                 mode = effectiveMode,
                 regexPattern = effectiveRegex,

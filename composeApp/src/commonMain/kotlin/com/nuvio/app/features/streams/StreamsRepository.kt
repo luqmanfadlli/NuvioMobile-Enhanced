@@ -308,6 +308,7 @@ object StreamsRepository {
                     device = device,
                     debridEnabled = debridSettings.canResolvePlayableLinks,
                     isEpisode = season != null && episode != null,
+                    preferredBingeGroup = persistedBingeGroup,
                 )
             }
 

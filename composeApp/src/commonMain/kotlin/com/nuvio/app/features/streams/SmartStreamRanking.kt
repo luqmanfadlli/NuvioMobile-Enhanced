@@ -54,6 +54,7 @@ internal data class SmartTarget(
 )
 
 internal object SmartStreamRanking {
+    private const val BINGE_GROUP_BONUS = 25.0
     private const val HEAVY_4K_MBPS = 40.0
 
     val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
@@ -248,17 +249,21 @@ internal object SmartStreamRanking {
         device: SmartDeviceProfile,
         debridEnabled: Boolean,
         isEpisode: Boolean,
+        preferredBingeGroup: String? = null,
     ): SmartAutoPlayRanking {
+        val bingeGroup = preferredBingeGroup?.trim()?.takeIf { it.isNotEmpty() }
         val runtime = runtimeSeconds(isEpisode)
         val target = target(device, settings)
         val ranked = streams
             .filter { it.isSelectableForPlayback(debridEnabled) }
             .mapIndexed { index, stream ->
                 val info = SmartStreamQuality.cached(stream)
-                SmartRankedStream(stream, info, score(info, device, target, runtime), index)
+                val bingeBonus = if (bingeGroup != null && stream.behaviorHints.bingeGroup == bingeGroup) BINGE_GROUP_BONUS else 0.0
+                SmartRankedStream(stream, info, score(info, device, target, runtime) + bingeBonus, index)
             }
             .filter { matches(it.info, settings.filters.copy(hideLowQuality = true)) }
             .sortedWith(compareByDescending<SmartRankedStream> { it.score }.thenBy { it.index })
+            .let { all -> all.filter { it.info.instant != SmartInstant.NO }.ifEmpty { all } }
         val best = ranked.firstOrNull()
         val goodEnough = best != null &&
             best.info.instant == SmartInstant.YES &&
