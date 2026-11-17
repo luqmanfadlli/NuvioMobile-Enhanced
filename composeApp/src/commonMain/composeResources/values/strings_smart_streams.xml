@@ -79,4 +79,9 @@
     <string name="smart_streams_settings_section">SMART STREAMS</string>
     <string name="smart_streams_settings_row">Preferences</string>
     <string name="smart_streams_settings_row_description">Sort, filters, highest resolution and mobile data</string>
+    <string name="smart_streams_instant">Instant</string>
+    <string name="smart_streams_autoplay_mode">Smart auto-play</string>
+    <string name="smart_streams_autoplay_mode_description">Picks the best stream for this device using your Smart Streams preferences and plays it</string>
+    <string name="smart_streams_autoplay_searching">Finding the best source… %1$d/%2$d</string>
+    <string name="smart_streams_autoplay_candidate">Best so far: %1$s</string>
 </resources>

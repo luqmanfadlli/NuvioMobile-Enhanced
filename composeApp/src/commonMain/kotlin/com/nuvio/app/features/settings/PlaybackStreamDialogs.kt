@@ -44,6 +44,8 @@ internal fun StreamAutoPlayModeDialog(
     selectedMode: StreamAutoPlayMode,
     onModeSelected: (StreamAutoPlayMode) -> Unit,
     onDismiss: () -> Unit,
+    smartSelected: Boolean = false,
+    onSmartSelected: (() -> Unit)? = null,
 ) {
     val options = listOf(
         Triple(
@@ -72,12 +74,20 @@ internal fun StreamAutoPlayModeDialog(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             options.forEach { (mode, titleRes, descriptionRes) ->
-                val isSelected = mode == selectedMode
+                val isSelected = !smartSelected && mode == selectedMode
                 DialogOption(
                     text = stringResource(titleRes),
                     description = stringResource(descriptionRes),
                     selected = isSelected,
                     onClick = { onModeSelected(mode) },
+                )
+            }
+            if (onSmartSelected != null) {
+                DialogOption(
+                    text = stringResource(Res.string.smart_streams_autoplay_mode),
+                    description = stringResource(Res.string.smart_streams_autoplay_mode_description),
+                    selected = smartSelected,
+                    onClick = onSmartSelected,
                 )
             }
         }

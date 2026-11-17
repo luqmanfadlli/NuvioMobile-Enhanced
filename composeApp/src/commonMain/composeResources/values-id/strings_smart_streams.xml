@@ -79,4 +79,9 @@
     <string name="smart_streams_settings_section">SMART STREAMS</string>
     <string name="smart_streams_settings_row">Preferensi</string>
     <string name="smart_streams_settings_row_description">Urutan, filter, resolusi tertinggi, dan data seluler</string>
+    <string name="smart_streams_instant">Instan</string>
+    <string name="smart_streams_autoplay_mode">Putar otomatis cerdas</string>
+    <string name="smart_streams_autoplay_mode_description">Memilih stream terbaik untuk perangkat ini sesuai preferensi Smart Streams lalu memutarnya</string>
+    <string name="smart_streams_autoplay_searching">Mencari sumber terbaik… %1$d/%2$d</string>
+    <string name="smart_streams_autoplay_candidate">Terbaik sejauh ini: %1$s</string>
 </resources>

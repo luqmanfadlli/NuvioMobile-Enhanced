@@ -165,7 +165,7 @@ internal fun SmartStreamControls(
                         color = colors.onAccent,
                         maxLines = 1,
                     )
-                    val summary = best.info.summary().ifBlank { best.stream.addonName }
+                    val summary = best.info.summary(stringResource(Res.string.smart_streams_instant)).ifBlank { best.stream.addonName }
                     Text(
                         text = summary,
                         style = MaterialTheme.typography.labelMedium,

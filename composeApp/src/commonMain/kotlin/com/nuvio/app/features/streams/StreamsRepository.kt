@@ -114,9 +114,14 @@ object StreamsRepository {
                 "manual=$manualSelection force=$forceRefresh",
         )
         val autoPlayMode = playerSettings.streamAutoPlayMode
-        val isAutoPlayEnabled = !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
-            !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
-                !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
+        val smartSettings = SmartStreamSettingsRepository.state.value
+        val smartAutoPlay = !manualSelection && smartSettings.autoPlay
+        val smartDevice = if (smartAutoPlay) currentSmartDeviceProfile() else null
+        val isAutoPlayEnabled = smartAutoPlay || (
+            !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
+                !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
+                    !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
+            )
 
         // Look up persisted binge group when both settings are enabled
         val persistedBingeGroup = if (
@@ -295,8 +300,26 @@ object StreamsRepository {
             val installedAddonIds = streamAddons.map { it.addonId }.toSet()
             var autoSelectTriggered = false
             var timeoutElapsed = false
+            var smartGraceJob: Job? = null
+            fun smartRanking(): SmartAutoPlayRanking? = smartDevice?.let { device ->
+                SmartStreamRanking.rankForAutoPlay(
+                    streams = _uiState.value.groups.flatMap { it.streams },
+                    settings = smartSettings,
+                    device = device,
+                    debridEnabled = debridSettings.canResolvePlayableLinks,
+                    isEpisode = season != null && episode != null,
+                )
+            }
+
+            fun smartEvaluation(ranking: SmartAutoPlayRanking): StreamAutoPlayEvaluation {
+                val ready = ranking.ranked.map { it.stream }
+                return StreamAutoPlayEvaluation(stream = ready.firstOrNull(), readyStreams = ready)
+            }
+
             fun evaluateAutoPlay(bingeGroupOnly: Boolean = false): StreamAutoPlayEvaluation =
-                StreamAutoPlaySelector.evaluateAutoPlayStream(
+                if (smartAutoPlay && !bingeGroupOnly) {
+                    smartRanking()?.let(::smartEvaluation) ?: StreamAutoPlayEvaluation()
+                } else StreamAutoPlaySelector.evaluateAutoPlayStream(
                     streams = _uiState.value.groups.flatMap { it.streams },
                     mode = autoPlayMode,
                     regexPattern = playerSettings.streamAutoPlayRegex,
@@ -369,6 +392,34 @@ object StreamsRepository {
                     }
                 }
 
+                if (smartAutoPlay) {
+                    val ranking = smartRanking() ?: return
+                    val groups = _uiState.value.groups.filterNot { it.isLocalDownload }
+                    _uiState.update { current ->
+                        current.copy(
+                            smartAutoPlaySearch = SmartAutoPlaySearch(
+                                loadedSources = groups.count { !it.isLoading },
+                                totalSources = groups.size,
+                                candidateSummary = ranking.ranked.firstOrNull()?.info?.summary(instantLabel = null),
+                            ),
+                        )
+                    }
+                    val allLoaded = groups.none { it.isLoading }
+                    when {
+                        allLoaded -> settleAutoPlay(smartEvaluation(ranking))
+                        timeoutElapsed && ranking.ranked.isNotEmpty() -> settleAutoPlay(smartEvaluation(ranking))
+                        ranking.goodEnough && smartGraceJob == null -> {
+                            smartGraceJob = launch {
+                                delay(SMART_AUTOPLAY_GRACE_MS)
+                                if (!autoSelectTriggered) {
+                                    smartRanking()?.let { settleAutoPlay(smartEvaluation(it)) }
+                                }
+                            }
+                        }
+                    }
+                    return
+                }
+
                 val earlyEvaluation = when {
                     timeoutElapsed -> evaluateAutoPlay()
                     persistedBingeGroup != null -> evaluateAutoPlay(bingeGroupOnly = true)
@@ -421,7 +472,19 @@ object StreamsRepository {
 
             updateAutoPlayAfterStreamsChanged()
 
-            val timeoutJob = if (isDirectAutoPlayFlow) {
+            val timeoutJob = if (smartAutoPlay) {
+                val timeoutSeconds = playerSettings.streamAutoPlayTimeoutSeconds
+                val maxWaitMs = when {
+                    timeoutSeconds <= 0 -> 0L
+                    timeoutSeconds == Int.MAX_VALUE -> SMART_AUTOPLAY_UNLIMITED_WAIT_MS
+                    else -> timeoutSeconds * 1_000L
+                }
+                launch {
+                    delay(maxWaitMs)
+                    timeoutElapsed = true
+                    updateAutoPlayAfterStreamsChanged()
+                }
+            } else if (isDirectAutoPlayFlow) {
                 val timeoutSeconds = playerSettings.streamAutoPlayTimeoutSeconds
                 val isUnlimitedTimeout = timeoutSeconds == Int.MAX_VALUE
                 // Timeout semantics:
@@ -673,3 +736,6 @@ object StreamsRepository {
         )
     }
 }
+
+private const val SMART_AUTOPLAY_GRACE_MS = 2_500L
+private const val SMART_AUTOPLAY_UNLIMITED_WAIT_MS = 60_000L

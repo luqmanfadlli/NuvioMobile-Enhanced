@@ -12,6 +12,11 @@ internal data class SmartRankedStream(
     val index: Int,
 )
 
+internal data class SmartAutoPlayRanking(
+    val ranked: List<SmartRankedStream>,
+    val goodEnough: Boolean,
+)
+
 internal sealed interface SmartReason {
     data object Instant : SmartReason
     data object NotInstant : SmartReason
@@ -235,6 +240,30 @@ internal object SmartStreamRanking {
         info.sizeBytes?.let { size ->
             add(SmartReason.SensibleSize(formatSmartSize(size), device.onWifi))
         }
+    }
+
+    fun rankForAutoPlay(
+        streams: List<StreamItem>,
+        settings: SmartStreamSettings,
+        device: SmartDeviceProfile,
+        debridEnabled: Boolean,
+        isEpisode: Boolean,
+    ): SmartAutoPlayRanking {
+        val runtime = runtimeSeconds(isEpisode)
+        val target = target(device, settings)
+        val ranked = streams
+            .filter { it.isSelectableForPlayback(debridEnabled) }
+            .mapIndexed { index, stream ->
+                val info = SmartStreamQuality.cached(stream)
+                SmartRankedStream(stream, info, score(info, device, target, runtime), index)
+            }
+            .filter { matches(it.info, settings.filters.copy(hideLowQuality = true)) }
+            .sortedWith(compareByDescending<SmartRankedStream> { it.score }.thenBy { it.index })
+        val best = ranked.firstOrNull()
+        val goodEnough = best != null &&
+            best.info.instant == SmartInstant.YES &&
+            (best.info.resolution?.lines ?: 0) >= minOf(target.lines, device.maxComfortableLines)
+        return SmartAutoPlayRanking(ranked = ranked, goodEnough = goodEnough)
     }
 
     fun compute(

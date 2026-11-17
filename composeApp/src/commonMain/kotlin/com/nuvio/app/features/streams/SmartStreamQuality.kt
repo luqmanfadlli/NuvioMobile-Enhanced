@@ -1,5 +1,8 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+
 internal enum class SmartResolution(val lines: Int, val label: String) {
     SD(480, "SD"),
     HD720(720, "720p"),
@@ -47,11 +50,11 @@ internal data class SmartStreamInfo(
     val instant: SmartInstant,
     val isLowQuality: Boolean,
 ) {
-    fun summary(): String = listOfNotNull(
+    fun summary(instantLabel: String?): String = listOfNotNull(
         resolution?.label,
         codec?.takeIf { it != SmartCodec.OTHER }?.label,
         hdr?.label,
-        if (instant == SmartInstant.YES) "Instant" else null,
+        instantLabel?.takeIf { instant == SmartInstant.YES },
         sizeBytes?.let(::formatSmartSize),
     ).joinToString(" · ")
 }
@@ -106,12 +109,16 @@ internal object SmartStreamQuality {
     private const val CACHE_LIMIT = 3000
     private val cache = LinkedHashMap<String, SmartStreamInfo>()
 
+    private val cacheLock = SynchronizedObject()
+
     fun cached(stream: StreamItem): SmartStreamInfo {
         val key = cacheKey(stream)
-        cache[key]?.let { return it }
+        synchronized(cacheLock) { cache[key] }?.let { return it }
         val info = read(stream)
-        if (cache.size >= CACHE_LIMIT) cache.remove(cache.keys.first())
-        cache[key] = info
+        synchronized(cacheLock) {
+            if (cache.size >= CACHE_LIMIT) cache.remove(cache.keys.first())
+            cache[key] = info
+        }
         return info
     }
 

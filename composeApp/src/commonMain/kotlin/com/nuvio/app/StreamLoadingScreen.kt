@@ -9,6 +9,8 @@ import com.nuvio.app.features.streams.StreamsUiState
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.debrid_resolving_stream
 import nuvio.composeapp.generated.resources.player_loading_preparing
+import nuvio.composeapp.generated.resources.smart_streams_autoplay_candidate
+import nuvio.composeapp.generated.resources.smart_streams_autoplay_searching
 import nuvio.composeapp.generated.resources.streams_finding_source
 import nuvio.composeapp.generated.resources.streams_loading_subtitles
 import nuvio.composeapp.generated.resources.youtube_resolving_stream
@@ -31,6 +33,13 @@ internal fun StreamLoadingScreen(
         preparingPlayback -> stringResource(Res.string.player_loading_preparing)
         state.overlayMessage == stringResource(Res.string.streams_loading_subtitles) -> subtitleLoadingStatusMessage()
         state.overlayMessage != null -> state.overlayMessage
+        state.autoPlayStream == null && state.smartAutoPlaySearch != null -> {
+            val search = state.smartAutoPlaySearch
+            val searching = stringResource(Res.string.smart_streams_autoplay_searching, search.loadedSources, search.totalSources)
+            search.candidateSummary?.takeIf { it.isNotBlank() }
+                ?.let { "$searching\n" + stringResource(Res.string.smart_streams_autoplay_candidate, it) }
+                ?: searching
+        }
         state.autoPlayStream != null -> stringResource(Res.string.player_loading_preparing)
         else -> stringResource(Res.string.streams_finding_source)
     }
