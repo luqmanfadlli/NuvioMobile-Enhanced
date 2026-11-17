@@ -300,7 +300,6 @@ object StreamsRepository {
             val installedAddonIds = streamAddons.map { it.addonId }.toSet()
             var autoSelectTriggered = false
             var timeoutElapsed = false
-            var smartGraceJob: Job? = null
             fun smartRanking(): SmartAutoPlayRanking? = smartDevice?.let { device ->
                 SmartStreamRanking.rankForAutoPlay(
                     streams = _uiState.value.groups.flatMap { it.streams },
@@ -409,14 +408,6 @@ object StreamsRepository {
                     when {
                         allLoaded -> settleAutoPlay(smartEvaluation(ranking))
                         timeoutElapsed && ranking.ranked.isNotEmpty() -> settleAutoPlay(smartEvaluation(ranking))
-                        ranking.goodEnough && smartGraceJob == null -> {
-                            smartGraceJob = launch {
-                                delay(SMART_AUTOPLAY_GRACE_MS)
-                                if (!autoSelectTriggered) {
-                                    smartRanking()?.let { settleAutoPlay(smartEvaluation(it)) }
-                                }
-                            }
-                        }
                     }
                     return
                 }
@@ -738,5 +729,4 @@ object StreamsRepository {
     }
 }
 
-private const val SMART_AUTOPLAY_GRACE_MS = 2_500L
 private const val SMART_AUTOPLAY_UNLIMITED_WAIT_MS = 60_000L
