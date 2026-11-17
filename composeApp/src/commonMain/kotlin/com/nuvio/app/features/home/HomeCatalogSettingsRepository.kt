@@ -399,6 +399,46 @@ object HomeCatalogSettingsRepository {
         move(key = key, direction = 1)
     }
 
+    fun moveByVisibilityIndex(fromIndex: Int, toIndex: Int, visible: Boolean) {
+        ensureLoaded()
+        val allItems = _uiState.value.items
+        val groupItems = allItems.filter { it.enabled == visible }
+        if (fromIndex !in groupItems.indices || toIndex !in groupItems.indices || fromIndex == toIndex) return
+        val fromItem = groupItems[fromIndex]
+        val toItem = groupItems[toIndex]
+
+        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            else -> HomeCatalogRowPlacement.NORMAL
+        }
+        val fromSection = pinSection(fromItem)
+        val toSection = pinSection(toItem)
+        if (fromSection != toSection) return
+        val start = minOf(fromIndex, toIndex)
+        val end = maxOf(fromIndex, toIndex)
+        if (groupItems.subList(start, end + 1).any { item ->
+            pinSection(item) != fromSection
+        }) return
+
+        val reorderedGroup = groupItems.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        val otherItems = allItems.filter { it.enabled != visible }
+        val orderedItems = if (visible) reorderedGroup + otherItems else otherItems + reorderedGroup
+        val updatedPreferences = preferences.toMutableMap()
+        orderedItems.forEachIndexed { index, item ->
+            val current = updatedPreferences[item.key] ?: return@forEachIndexed
+            updatedPreferences[item.key] = current.copy(order = index)
+        }
+        preferences = updatedPreferences
+        enforcePinnedCollectionsAtTop()
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+
     fun moveByIndex(fromIndex: Int, toIndex: Int) {
         ensureLoaded()
         val items = _uiState.value.items

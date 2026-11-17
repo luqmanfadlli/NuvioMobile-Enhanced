@@ -3221,4 +3221,10 @@
     <string name="downloads_episodes_out_of_downloaded">Episode %1$d out of %2$d downloaded</string>
     <string name="batch_download_failed_single">%1$d episode could not be queued</string>
     <string name="batch_download_failed_multiple">%1$d episodes could not be queued</string>
+    <string name="settings_homescreen_hidden_rows_title">HIDDEN ROWS &amp; COLLECTIONS</string>
+    <string name="settings_homescreen_show_hidden">Show hidden</string>
+    <string name="settings_homescreen_hide_hidden">Hide hidden</string>
+    <string name="settings_homescreen_hidden_count">%1$d hidden rows and collections</string>
+    <string name="settings_homescreen_no_visible_rows_title">No visible home rows</string>
+    <string name="settings_homescreen_no_visible_rows_message">All catalog rows and collections are hidden. Open the hidden section below to restore them.</string>
 </resources>
