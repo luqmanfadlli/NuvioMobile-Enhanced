@@ -73,4 +73,10 @@
     <string name="smart_streams_reason_memory">%1$s memory, enough for 4K</string>
     <string name="smart_streams_reason_kept_1080">Kept to 1080p to play smoothly on this device</string>
     <string name="smart_streams_reason_size">%1$s, sensible for %2$s</string>
+    <string name="smart_streams_preferences_title">Smart Streams</string>
+    <string name="smart_streams_preferences_description">How streams are sorted, filtered and picked as the best for this device</string>
+    <string name="smart_streams_section_sort">SORT</string>
+    <string name="smart_streams_settings_section">SMART STREAMS</string>
+    <string name="smart_streams_settings_row">Preferences</string>
+    <string name="smart_streams_settings_row_description">Sort, filters, highest resolution and mobile data</string>
 </resources>

@@ -2,6 +2,7 @@ package com.nuvio.app.features.settings
 
 import com.nuvio.app.core.ui.Slider
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.features.streams.SmartStreamPreferencesSheet
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +54,7 @@ internal fun PlaybackStreamSettings(
 ) {
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showSmartStreamPreferences by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -88,6 +90,20 @@ internal fun PlaybackStreamSettings(
                         onClick = { showReuseCacheDurationDialog = true },
                     )
                 }
+            }
+        }
+
+        SettingsSection(
+            title = stringResource(Res.string.smart_streams_settings_section),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.smart_streams_settings_row),
+                    description = stringResource(Res.string.smart_streams_settings_row_description),
+                    isTablet = isTablet,
+                    onClick = { showSmartStreamPreferences = true },
+                )
             }
         }
 
@@ -266,6 +282,10 @@ internal fun PlaybackStreamSettings(
             },
             onDismiss = { showReuseCacheDurationDialog = false },
         )
+    }
+
+    if (showSmartStreamPreferences) {
+        SmartStreamPreferencesSheet(onDismiss = { showSmartStreamPreferences = false })
     }
 
     if (showAutoPlayModeDialog) {

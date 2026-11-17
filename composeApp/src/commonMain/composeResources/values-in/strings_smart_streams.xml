@@ -73,4 +73,10 @@
     <string name="smart_streams_reason_memory">Memori %1$s, cukup untuk 4K</string>
     <string name="smart_streams_reason_kept_1080">Dibatasi 1080p agar lancar di perangkat ini</string>
     <string name="smart_streams_reason_size">%1$s, wajar untuk %2$s</string>
+    <string name="smart_streams_preferences_title">Smart Streams</string>
+    <string name="smart_streams_preferences_description">Cara stream diurutkan, difilter, dan dipilih sebagai yang terbaik untuk perangkat ini</string>
+    <string name="smart_streams_section_sort">URUTAN</string>
+    <string name="smart_streams_settings_section">SMART STREAMS</string>
+    <string name="smart_streams_settings_row">Preferensi</string>
+    <string name="smart_streams_settings_row_description">Urutan, filter, resolusi tertinggi, dan data seluler</string>
 </resources>
