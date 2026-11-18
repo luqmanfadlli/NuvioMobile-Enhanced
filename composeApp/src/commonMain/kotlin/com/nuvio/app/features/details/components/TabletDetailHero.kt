@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.asPaddingValues
+import com.nuvio.app.core.ui.platformNativeBarButtonAnchor
+import com.nuvio.app.core.ui.platformPhysicalTopInset
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -399,15 +403,23 @@ fun TabletDetailHero(
         }
 
         if (heroTrailerSourceUrl != null) {
+            val useNativeNavigation = LocalUseNativeNavigation.current
+            val nativeBarAnchor = if (useNativeNavigation) platformNativeBarButtonAnchor() else null
+            val muteTopPadding = when {
+                nativeBarAnchor != null -> nativeBarAnchor.centerY - 20.dp
+                useNativeNavigation -> platformPhysicalTopInset() + space.s8
+                else -> WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + space.s8
+            }
+            val muteEndPadding = nativeBarAnchor?.let { it.trailingCenterX - 20.dp } ?: horizontalPadding
             Surface(
                 onClick = onHeroTrailerMuteToggle,
                 enabled = heroTrailerReady,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(LocalVerticalBarPadding.current)
+                    .padding(if (nativeBarAnchor != null) PaddingValues() else LocalVerticalBarPadding.current)
                     .padding(
-                        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + space.s8,
-                        end = horizontalPadding,
+                        top = muteTopPadding,
+                        end = muteEndPadding,
                     )
                     .size(40.dp)
                     .graphicsLayer { alpha = trailerAlpha },
