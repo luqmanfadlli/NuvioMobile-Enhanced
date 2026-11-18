@@ -292,8 +292,40 @@ class StreamAutoPlaySelectorTest {
         assertEquals(stream, selected)
     }
 
+    @Test
+    fun `native Telegram stream is selected only when all sources are allowed`() {
+        val telegram = stream(
+            addonName = "Telegram",
+            addonId = "telegram_native",
+            url = "http://127.0.0.1:1234/file/1",
+        )
+
+        val allSources = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(telegram),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = emptySet(),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+        val pluginsOnly = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(telegram),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ENABLED_PLUGINS_ONLY,
+            installedAddonNames = emptySet(),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(telegram, allSources)
+        assertNull(pluginsOnly)
+    }
+
     private fun stream(
         addonName: String,
+        addonId: String = "addon:$addonName",
         url: String? = null,
         externalUrl: String? = null,
         name: String? = null,
@@ -308,7 +340,7 @@ class StreamAutoPlaySelectorTest {
         externalUrl = externalUrl,
         infoHash = infoHash,
         addonName = addonName,
-        addonId = "addon:$addonName",
+        addonId = addonId,
         clientResolve = if (directDebrid) {
             StreamClientResolve(
                 type = "debrid",

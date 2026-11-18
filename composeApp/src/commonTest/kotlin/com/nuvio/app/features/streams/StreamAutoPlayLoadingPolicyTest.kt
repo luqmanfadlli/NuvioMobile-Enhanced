@@ -168,6 +168,27 @@ class StreamAutoPlayLoadingPolicyTest {
     }
 
     @Test
+    fun `enabled plugins do not wait for the native Telegram source`() {
+        val groups = listOf(
+            group(addonId = "telegram_native", isLoading = true),
+            group(addonId = "plugin:comet", isLoading = false),
+        )
+
+        assertTrue(
+            groups.areAutoPlaySourcesLoaded(
+                source = StreamAutoPlaySource.ENABLED_PLUGINS_ONLY,
+                installedAddonIds = emptySet(),
+            ),
+        )
+        assertFalse(
+            groups.areAutoPlaySourcesLoaded(
+                source = StreamAutoPlaySource.ALL_SOURCES,
+                installedAddonIds = emptySet(),
+            ),
+        )
+    }
+
+    @Test
     fun `all sources wait for addons and plugins`() {
         val groups = listOf(
             group(addonId = "addon:torrentio", isLoading = false),
