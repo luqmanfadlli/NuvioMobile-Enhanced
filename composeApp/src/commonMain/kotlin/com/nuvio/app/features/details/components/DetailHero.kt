@@ -169,11 +169,11 @@ fun DetailHero(
                                 .background(MaterialTheme.colorScheme.surface),
                         )
                     }
-                    if (heroTrailerSourceUrl != null) {
+                    if (heroTrailerSourceUrl != null && !MiniPlayerController.isActive) {
                         HeroTrailerPlayerSurface(
                             sourceUrl = heroTrailerSourceUrl,
                             sourceAudioUrl = heroTrailerSourceAudioUrl,
-                            playWhenReady = heroTrailerPlayWhenReady() && !MiniPlayerController.isActive,
+                            playWhenReady = heroTrailerPlayWhenReady(),
                             muted = heroTrailerMuted,
                             modifier = Modifier
                                 .align(Alignment.TopCenter)

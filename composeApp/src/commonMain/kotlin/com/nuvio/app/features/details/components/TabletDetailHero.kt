@@ -202,11 +202,11 @@ private fun BackdropArtwork(
             )
         }
 
-        if (heroTrailerSourceUrl != null) {
+        if (heroTrailerSourceUrl != null && !MiniPlayerController.isActive) {
             HeroTrailerPlayerSurface(
                 sourceUrl = heroTrailerSourceUrl,
                 sourceAudioUrl = heroTrailerSourceAudioUrl,
-                playWhenReady = heroTrailerPlayWhenReady() && !MiniPlayerController.isActive,
+                playWhenReady = heroTrailerPlayWhenReady(),
                 muted = heroTrailerMuted,
                 modifier = artworkModifier.graphicsLayer {
                     alpha = trailerAlpha
