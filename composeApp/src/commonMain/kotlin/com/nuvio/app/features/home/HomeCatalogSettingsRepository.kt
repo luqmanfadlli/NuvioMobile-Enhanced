@@ -691,7 +691,6 @@ object HomeCatalogSettingsRepository {
                     customTitle = pref.customTitle,
                     isCollection = true,
                     collectionId = collectionDefinition?.collectionId ?: pref.key.removePrefix("collection_"),
-                    rowPlacement = pref.rowPlacement,
                     key = pref.key,
                 )
             } else {
@@ -704,7 +703,6 @@ object HomeCatalogSettingsRepository {
                     order = pref.order,
                     customTitle = pref.customTitle,
                     isCollection = false,
-                    rowPlacement = pref.rowPlacement,
                     key = pref.key,
                 )
             }
@@ -730,7 +728,8 @@ object HomeCatalogSettingsRepository {
                     enabled = item.enabled,
                     heroSourceEnabled = existingHeroState[key] ?: true,
                     order = item.order,
-                    rowPlacement = HomeCatalogRowPlacement.fromStorage(item.rowPlacement).storageValue,
+                    rowPlacement = preferences[key]?.rowPlacement
+                        ?: HomeCatalogRowPlacement.NORMAL.storageValue,
                 )
             }
             val remoteKeys = remotePreferences.keys
