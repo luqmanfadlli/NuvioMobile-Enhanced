@@ -85,7 +85,7 @@ internal fun DownloadActionSheet(
                     ),
                     onClick = { dismissAfter(onPlay) },
                 )
-                DownloadStatus.Downloading -> NuvioBottomSheetActionRow(
+                DownloadStatus.Downloading, DownloadStatus.Queued -> NuvioBottomSheetActionRow(
                     icon = Icons.Rounded.Pause,
                     title = stringResource(Res.string.compose_action_pause),
                     onClick = { dismissAfter(onToggleTransfer) },

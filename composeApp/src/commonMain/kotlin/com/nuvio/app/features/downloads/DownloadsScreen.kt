@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -492,9 +493,8 @@ private fun List<DownloadItem>.downloadedEntries(): List<DownloadedEntry> {
 
 private fun DownloadItem.toggleTransfer() {
     when (status) {
-        DownloadStatus.Downloading -> DownloadsRepository.pauseDownload(id)
-        DownloadStatus.Paused -> DownloadsRepository.resumeDownload(id)
-        DownloadStatus.Failed -> DownloadsRepository.retryDownload(id)
+        DownloadStatus.Downloading, DownloadStatus.Queued -> DownloadsRepository.pauseDownload(id)
+        DownloadStatus.Paused, DownloadStatus.Failed -> DownloadsRepository.resumeDownload(id)
         DownloadStatus.Completed -> Unit
     }
 }
