@@ -359,7 +359,7 @@ object HomeCatalogSettingsRepository {
         val current = preferences[key] ?: defaultPreferenceForMissingKey(key) ?: return
         val normalized = if (placement == HomeCatalogRowPlacement.PINNED_POSITION) HomeCatalogRowPlacement.NORMAL else placement
         if (current.rowPlacement == normalized.storageValue) return
-        updatePreference(key) { it.copy(rowPlacement = normalized.storageValue) }
+        updatePreference(key, pushRemote = false) { it.copy(rowPlacement = normalized.storageValue) }
     }
 
     fun setEnabled(key: String, enabled: Boolean) {
@@ -526,17 +526,23 @@ object HomeCatalogSettingsRepository {
         val normalized = current
             .filterKeys { it !in knownKeys }
             .toMutableMap()
-        var enabledHeroSourceCount = 0
+        val hasHeroChoice = current.values.any { it.heroSourceEnabled && !it.key.startsWith("collection_") }
+        val chosenHeroKeys = orderedEntries
+            .filter { entry -> !entry.isCollection && current[entry.key]?.heroSourceEnabled == true }
+            .take(HERO_SOURCE_SELECTION_LIMIT)
+            .mapTo(mutableSetOf()) { it.key }
+        var enabledHeroSourceCount = chosenHeroKeys.size
         orderedEntries.forEach { entry ->
             val stored = current[entry.key]
-            val heroSourceEnabled = if (entry.isCollection) {
-                false
-            } else {
-                (stored?.heroSourceEnabled ?: true) &&
-                    enabledHeroSourceCount < HERO_SOURCE_SELECTION_LIMIT
-            }
-            if (heroSourceEnabled) {
-                enabledHeroSourceCount += 1
+            val heroSourceEnabled = when {
+                entry.isCollection -> false
+                entry.key in chosenHeroKeys -> true
+                stored != null || hasHeroChoice -> false
+                enabledHeroSourceCount < HERO_SOURCE_SELECTION_LIMIT -> {
+                    enabledHeroSourceCount += 1
+                    true
+                }
+                else -> false
             }
             normalized[entry.key] = StoredHomeCatalogPreference(
                 key = entry.key,
@@ -720,13 +726,14 @@ object HomeCatalogSettingsRepository {
         hideUnreleasedContent = payload.hideUnreleasedContent
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
+            val hasHeroChoice = existingHeroState.any { (key, enabled) -> enabled && !key.startsWith("collection_") }
             val remotePreferences = payload.items.associate { item ->
                 val key = item.preferenceKey()
                 key to StoredHomeCatalogPreference(
                     key = key,
                     customTitle = item.customTitle,
                     enabled = item.enabled,
-                    heroSourceEnabled = existingHeroState[key] ?: true,
+                    heroSourceEnabled = existingHeroState[key] ?: !hasHeroChoice,
                     order = item.order,
                     rowPlacement = preferences[key]?.rowPlacement
                         ?: HomeCatalogRowPlacement.NORMAL.storageValue,
