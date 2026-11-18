@@ -20,6 +20,8 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.runner.RunWith
@@ -110,10 +112,39 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
-    fun rowPlacementIsIncludedInProfileSyncPayload() {
+    fun rowPlacementIsExcludedFromProfileSyncPayload() {
         HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
         HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_BOTTOM)
-        assertEquals(HomeCatalogRowPlacement.PINNED_BOTTOM.storageValue, HomeCatalogSettingsRepository.exportToSyncPayload().items.single().rowPlacement)
+
+        val payload = HomeCatalogSettingsRepository.exportToSyncPayload()
+        val serialized = Json.encodeToString(SyncHomeCatalogPayload.serializer(), payload)
+
+        assertTrue("\\"row_placement\\"" !in serialized)
+    }
+
+    @Test
+    fun applyingRemoteSettingsPreservesLocalRowPlacement() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
+        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_BOTTOM)
+
+        HomeCatalogSettingsRepository.applyFromRemote(
+            SyncHomeCatalogPayload(
+                items = listOf(
+                    SyncCatalogItem(
+                        addonId = "test",
+                        type = "movie",
+                        catalogId = "popular",
+                        enabled = false,
+                        order = 0,
+                        key = "test:movie:popular",
+                    ),
+                ),
+            ),
+        )
+
+        val item = HomeCatalogSettingsRepository.uiState.value.items.single()
+        assertEquals(HomeCatalogRowPlacement.PINNED_BOTTOM, item.rowPlacement)
+        assertEquals(false, item.enabled)
     }
 
     @Test
