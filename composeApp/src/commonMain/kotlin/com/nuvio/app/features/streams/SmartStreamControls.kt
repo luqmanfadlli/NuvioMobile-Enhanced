@@ -1,5 +1,6 @@
 package com.nuvio.app.features.streams
 
+import com.nuvio.app.features.downloads.DownloadNetworkGuard
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,7 +84,9 @@ internal fun rememberSmartStreams(
     isEpisode: Boolean,
 ): SmartStreamsState {
     val settings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
-    val device = remember { currentSmartDeviceProfile() }
+    // Re-read the device when the network changes, so the connection shown and used is live.
+    val onWifi by DownloadNetworkGuard.transportState.collectAsStateWithLifecycle()
+    val device = remember(onWifi) { currentSmartDeviceProfile() }
     DisposableEffect(Unit) {
         onDispose { SmartStreamSettingsRepository.onStreamsScreenClosed() }
     }
