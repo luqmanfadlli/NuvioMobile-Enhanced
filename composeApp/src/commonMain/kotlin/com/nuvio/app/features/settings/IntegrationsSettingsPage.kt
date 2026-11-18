@@ -21,6 +21,8 @@ import nuvio.composeapp.generated.resources.settings_integrations_mdblist_descri
 import nuvio.composeapp.generated.resources.settings_integrations_omdb_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
+import nuvio.composeapp.generated.resources.settings_telegram_description
+import nuvio.composeapp.generated.resources.settings_telegram_title
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.integrationsContent(
