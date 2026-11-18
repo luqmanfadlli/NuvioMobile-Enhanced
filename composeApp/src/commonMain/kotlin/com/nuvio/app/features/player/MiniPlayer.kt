@@ -78,8 +78,11 @@ object MiniPlayerController {
     private val hostedLaunchIds = mutableSetOf<Long>()
     private val placeholderLaunchIds = mutableSetOf<Long>()
 
+    var parkedInPictureInPicture by mutableStateOf(false)
+        internal set
+
     val isActive: Boolean
-        get() = minimized && ownedRoute != null
+        get() = (minimized && ownedRoute != null) || parkedInPictureInPicture
 
     fun hostedRoute(topPlayerRoute: PlayerRoute?, enabled: Boolean): PlayerRoute? {
         val owned = ownedRoute

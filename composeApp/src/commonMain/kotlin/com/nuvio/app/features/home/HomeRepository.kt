@@ -280,7 +280,7 @@ object HomeRepository {
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
 
         val entries = currentDefinitions
-            .sortedBy { definition -> preferences[definition.key]?.order ?: Int.MAX_VALUE }
+            .let { orderHomeCatalogDefinitions(it, snapshot) }
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
                 if (preference?.enabled == false) return@mapNotNull null
