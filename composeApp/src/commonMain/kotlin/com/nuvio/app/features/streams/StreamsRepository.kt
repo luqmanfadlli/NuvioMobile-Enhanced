@@ -17,6 +17,8 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.servers.ServerStreams
+import com.nuvio.app.features.telegram.TelegramIntegrationBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -182,6 +184,7 @@ object StreamsRepository {
 
         val isNativeServerRequest = ServerStreams.isNativeRequest(videoId)
         val serverSources = ServerStreams.sources(type, videoId, season, episode, forceRefresh)
+        val telegramAvailable = !isNativeServerRequest && TelegramIntegrationBridge.isAuthenticated()
         val preferredGroupIds = serverSources.filter { it.preferred }.mapTo(mutableSetOf()) { it.addonId }
         val installedAddons = if (isNativeServerRequest) emptyList() else AddonRepository.uiState.value.addons.enabledAddons()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest) {
@@ -214,7 +217,7 @@ object StreamsRepository {
             }
         }
 
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty() && !telegramAvailable) {
             showOnlyDownloadedOrEmpty(
                 StreamsEmptyStateReason.NoAddonsInstalled,
                 "No stream addons or plugin scrapers installed for type=$type id=$videoId",
@@ -241,7 +244,7 @@ object StreamsRepository {
                 "for type=$type id=$videoId",
         )
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty() && !telegramAvailable) {
             showOnlyDownloadedOrEmpty(
                 StreamsEmptyStateReason.NoCompatibleAddons,
                 "No compatible stream addon/plugin for type=$type id=$videoId",
@@ -274,7 +277,18 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
+        } + serverSources.map { it.loadingGroup() } + if (telegramAvailable) {
+            listOf(
+                AddonStreamGroup(
+                    addonName = "Telegram",
+                    addonId = "telegram_native",
+                    streams = emptyList(),
+                    isLoading = true,
+                ),
+            )
+        } else {
+            emptyList()
+        }, installedAddonOrder, preferredGroupIds)
         val initialGroups = listOfNotNull(downloadedGroup) + placeholderGroups
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
@@ -515,6 +529,57 @@ object StreamsRepository {
                 }
             } else {
                 null
+            }
+
+            if (telegramAvailable) {
+                launch {
+                    val group = try {
+                        val details = MetaDetailsRepository.peek(type, parentMetaId ?: videoId)
+                            ?: MetaDetailsRepository.peek(type, videoId)
+                        val searchTitle = details?.name?.takeIf { it.isNotBlank() }
+                        val year = details?.releaseInfo
+                            ?.let { Regex("\\b(19\\d{2}|20\\d{2})\\b").find(it)?.value?.toIntOrNull() }
+                        val selectedChats = TelegramIntegrationBridge.snapshot.value.selectedChatIds
+                        val resultStreams = if (searchTitle.isNullOrBlank() || selectedChats.isEmpty()) {
+                            emptyList()
+                        } else {
+                            TelegramIntegrationBridge.resolveStreams(
+                                type = type,
+                                videoId = videoId,
+                                title = searchTitle,
+                                year = year,
+                                season = season,
+                                episode = episode,
+                                imdbId = details?.imdbId,
+                            )
+                        }
+                        val noResultReason = when {
+                            searchTitle.isNullOrBlank() -> "Media title is not available for Telegram search."
+                            selectedChats.isEmpty() -> "No Telegram channels or groups are selected. Configure sources in Settings > Integrations > Telegram."
+                            resultStreams.isEmpty() -> "No matching Telegram video was found in the selected sources."
+                            else -> null
+                        }
+                        AddonStreamGroup(
+                            addonName = "Telegram",
+                            addonId = "telegram_native",
+                            streams = resultStreams,
+                            isLoading = false,
+                            error = noResultReason,
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        log.w(error) { "Telegram stream lookup failed for $videoId" }
+                        AddonStreamGroup(
+                            addonName = "Telegram",
+                            addonId = "telegram_native",
+                            streams = emptyList(),
+                            isLoading = false,
+                            error = error.message ?: "Telegram search failed.",
+                        )
+                    }
+                    publishAddonGroup(presentStreamGroup(group))
+                }
             }
 
             StreamSearchSessions.search(
