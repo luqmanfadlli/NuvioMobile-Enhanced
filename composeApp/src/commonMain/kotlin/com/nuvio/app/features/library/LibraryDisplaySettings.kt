@@ -43,6 +43,7 @@ enum class LibraryViewMode {
     Saved,
     Downloaded,
     Cloud,
+    Telegram,
     Servers;
 
     /** Saved and Downloaded both show titles in library sections, with the same layout and sorting. */
