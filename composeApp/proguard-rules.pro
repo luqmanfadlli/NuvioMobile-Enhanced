@@ -67,3 +67,8 @@
 
 -keep class com.nuvio.app.features.player.aiostreams.AssSurface { *; }
 -keep interface com.nuvio.app.features.player.aiostreams.Thumbnails$Listener { *; }
+
+# Full Android Telegram bootstrap is loaded reflectively from NuvioApplication.
+-keep class com.nuvio.app.features.telegram.TelegramAndroidBootstrap {
+    public static void install(android.app.Application);
+}
