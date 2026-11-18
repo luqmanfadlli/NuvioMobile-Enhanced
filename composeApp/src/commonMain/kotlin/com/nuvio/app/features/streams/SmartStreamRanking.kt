@@ -27,6 +27,7 @@ internal sealed interface SmartReason {
     data class HdrShown(val format: String) : SmartReason
     data class EnoughMemory(val memory: String) : SmartReason
     data object KeptTo1080 : SmartReason
+    data class PreferredLanguage(val code: String) : SmartReason
     data class SensibleSize(val size: String, val onWifi: Boolean) : SmartReason
 }
 
@@ -51,6 +52,7 @@ internal data class SmartTarget(
     val sweetLowMbps: Double,
     val sweetHighMbps: Double,
     val saveData: Boolean,
+    val languages: List<String> = emptyList(),
 )
 
 internal object SmartStreamRanking {
@@ -84,7 +86,14 @@ internal object SmartStreamRanking {
             low = min(low, 2.5)
             high = min(high, 6.0)
         }
-        return SmartTarget(lines, explicitLimit, low, high, saveData)
+        return SmartTarget(
+            lines = lines,
+            explicitLimit = explicitLimit,
+            sweetLowMbps = low,
+            sweetHighMbps = high,
+            saveData = saveData,
+            languages = runCatching { SmartLanguageReader.preferredLanguages() }.getOrDefault(emptyList()),
+        )
     }
 
     internal fun score(
@@ -161,6 +170,8 @@ internal object SmartStreamRanking {
             else -> 0.0
         }
 
+        score += languageScore(info.languages, target.languages)
+
         if (info.isLowQuality) score -= 100.0
         return score
     }
@@ -210,7 +221,23 @@ internal object SmartStreamRanking {
         )
     }
 
+    internal fun languageScore(languages: SmartStreamLanguages, preferred: List<String>): Double {
+        val primary = preferred.firstOrNull() ?: return 0.0
+        val secondary = preferred.drop(1).toSet()
+        return when {
+            primary in languages.codes -> 30.0
+            languages.codes.any { it in secondary } -> 20.0
+            languages.multiAudio && languages.codes.isEmpty() -> 8.0
+            languages.codes.isNotEmpty() -> -25.0
+            else -> 0.0
+        }
+    }
+
+    private fun preferredMatch(languages: SmartStreamLanguages, preferred: List<String>): String? =
+        preferred.firstOrNull { it in languages.codes }
+
     private fun reasons(info: SmartStreamInfo, device: SmartDeviceProfile, target: SmartTarget): List<SmartReason> = buildList {
+        preferredMatch(info.languages, target.languages)?.let { add(SmartReason.PreferredLanguage(it)) }
         when (info.instant) {
             SmartInstant.YES -> add(SmartReason.Instant)
             SmartInstant.NO -> add(SmartReason.NotInstant)

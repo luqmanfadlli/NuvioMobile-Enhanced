@@ -49,12 +49,14 @@ internal data class SmartStreamInfo(
     val sizeBytes: Long?,
     val instant: SmartInstant,
     val isLowQuality: Boolean,
+    val languages: SmartStreamLanguages = SmartStreamLanguages(emptySet(), multiAudio = false),
 ) {
     fun summary(instantLabel: String?): String = listOfNotNull(
         resolution?.label,
         codec?.takeIf { it != SmartCodec.OTHER }?.label,
         hdr?.label,
         instantLabel?.takeIf { instant == SmartInstant.YES },
+        languages.codes.takeIf { it.isNotEmpty() }?.joinToString("/") { it.uppercase() },
         sizeBytes?.let(::formatSmartSize),
     ).joinToString(" · ")
 }
@@ -155,6 +157,7 @@ internal object SmartStreamQuality {
             sizeBytes = stream.behaviorHints.videoSize?.takeIf { it > 0 } ?: readSize(raw),
             instant = readInstant(stream, raw),
             isLowQuality = lowQuality.containsMatchIn(text) && !webdl.containsMatchIn(text) && !bluray.containsMatchIn(text),
+            languages = SmartLanguageReader.read(raw, text, parsed?.languages.orEmpty()),
         )
     }
 

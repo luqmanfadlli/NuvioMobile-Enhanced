@@ -1,6 +1,7 @@
 package com.nuvio.app.features.streams
 
 import androidx.compose.runtime.Composable
+import com.nuvio.app.features.player.languageLabelResForCode
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -117,6 +118,10 @@ internal fun smartReasonText(reason: SmartReason): String = when (reason) {
     is SmartReason.HdrShown -> stringResource(Res.string.smart_streams_reason_hdr, reason.format)
     is SmartReason.EnoughMemory -> stringResource(Res.string.smart_streams_reason_memory, reason.memory)
     SmartReason.KeptTo1080 -> stringResource(Res.string.smart_streams_reason_kept_1080)
+    is SmartReason.PreferredLanguage -> stringResource(
+        Res.string.smart_streams_reason_language,
+        languageLabelResForCode(reason.code)?.let { stringResource(it) } ?: reason.code.uppercase(),
+    )
     is SmartReason.SensibleSize -> stringResource(
         Res.string.smart_streams_reason_size,
         reason.size,
