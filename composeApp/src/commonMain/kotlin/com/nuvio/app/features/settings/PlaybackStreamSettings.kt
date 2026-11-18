@@ -2,6 +2,8 @@ package com.nuvio.app.features.settings
 
 import com.nuvio.app.core.ui.Slider
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.features.streams.SmartStreamPreferencesSheet
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +55,9 @@ internal fun PlaybackStreamSettings(
 ) {
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showSmartStreamPreferences by remember { mutableStateOf(false) }
+    val smartStreamSettings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
+    val smartAutoPlay = smartStreamSettings.autoPlay
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -92,17 +97,35 @@ internal fun PlaybackStreamSettings(
         }
 
         SettingsSection(
+            title = stringResource(Res.string.smart_streams_settings_section),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.smart_streams_settings_row),
+                    description = stringResource(Res.string.smart_streams_settings_row_description),
+                    isTablet = isTablet,
+                    onClick = { showSmartStreamPreferences = true },
+                )
+            }
+        }
+
+        SettingsSection(
             title = stringResource(Res.string.settings_playback_section_stream_auto_play),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = stringResource(settings.streamAutoPlayMode.labelRes),
+                    description = if (smartAutoPlay) {
+                        stringResource(Res.string.smart_streams_autoplay_mode)
+                    } else {
+                        stringResource(settings.streamAutoPlayMode.labelRes)
+                    },
                     isTablet = isTablet,
                     onClick = { showAutoPlayModeDialog = true },
                 )
-                if (settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
+                if (!smartAutoPlay && settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
                     SettingsNavigationRow(
@@ -112,7 +135,7 @@ internal fun PlaybackStreamSettings(
                         onClick = { showAutoPlayRegexDialog = true },
                     )
                 }
-                if (settings.streamAutoPlayMode != StreamAutoPlayMode.MANUAL) {
+                if (smartAutoPlay || settings.streamAutoPlayMode != StreamAutoPlayMode.MANUAL) {
                     // Excludes the engine switch on error (Android only): both react to the same failure.
                     // Only the switch that is off is locked, so both stay reachable if both ended up on.
                     val blockedByEngineSwitch = !isIos && settings.autoSwitchPlaybackEngineOnError &&
@@ -268,11 +291,21 @@ internal fun PlaybackStreamSettings(
         )
     }
 
+    if (showSmartStreamPreferences) {
+        SmartStreamPreferencesSheet(onDismiss = { showSmartStreamPreferences = false })
+    }
+
     if (showAutoPlayModeDialog) {
         StreamAutoPlayModeDialog(
             selectedMode = settings.streamAutoPlayMode,
+            smartSelected = smartAutoPlay,
             onModeSelected = {
+                SmartStreamSettingsRepository.update { current -> current.copy(autoPlay = false) }
                 PlayerSettingsRepository.setStreamAutoPlayMode(it)
+                showAutoPlayModeDialog = false
+            },
+            onSmartSelected = {
+                SmartStreamSettingsRepository.update { current -> current.copy(autoPlay = true) }
                 showAutoPlayModeDialog = false
             },
             onDismiss = { showAutoPlayModeDialog = false },

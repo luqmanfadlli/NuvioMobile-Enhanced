@@ -683,14 +683,11 @@
     <string name="detail_tab_trailer">Trailer</string>
     <string name="detail_trailer_category_count">%1$s (%2$d)</string>
     <string name="detail_trailers_title">Trailer</string>
-    <string name="downloads_empty_episodes">Tidak ada episode yang selesai diunduh</string>
     <string name="downloads_empty_title">Belum ada unduhan</string>
-    <string name="downloads_episode_count">%1$d episode diunduh</string>
     <string name="downloads_open_directory">Buka folder unduhan</string>
     <string name="downloads_open_directory_failed">Tidak dapat membuka folder unduhan</string>
     <string name="downloads_section_active">Aktif</string>
     <string name="downloads_section_movies">Film</string>
-    <string name="downloads_section_shows">Serial</string>
     <string name="downloads_show_downloads">Tampilkan Unduhan</string>
     <string name="downloads_status_completed">Selesai • %1$s</string>
     <string name="downloads_status_downloading">Mengunduh • %1$s</string>
@@ -3184,4 +3181,21 @@
     <string name="settings_playback_anime_upscale_description">Tingkatkan resolusi anime dengan Anime4K hingga minimal 1440p, atau ke resolusi layar bila lebih tinggi. Hanya dipakai untuk anime. ExoPlayer melewatinya saat tunneled playback aktif.</string>
     <string name="settings_playback_section_anime_enhancement">PENINGKATAN ANIME</string>
     <string name="subtitle_outline_width">Lebar outline</string>
+    <string name="downloads_delete_message">Ini akan mengosongkan %1$s di perangkat ini.</string>
+    <string name="downloads_delete_title">Hapus %1$s?</string>
+    <string name="downloads_downloading_count">%1$d sedang diunduh</string>
+    <string name="downloads_empty_message">Tekan lama sebuah stream lalu pilih Unduh file untuk menontonnya secara offline.</string>
+    <string name="downloads_pause_all">Jeda semua</string>
+    <string name="downloads_resume_all">Lanjutkan semua</string>
+    <string name="downloads_section_downloaded">Terunduh</string>
+    <string name="downloads_speed">%1$s/d</string>
+    <string name="downloads_watched_count">%1$d ditonton</string>
+    <plurals name="downloads_episodes">
+        <item quantity="one">%1$d episode</item>
+        <item quantity="other">%1$d episode</item>
+    </plurals>
+    <plurals name="downloads_titles">
+        <item quantity="one">%1$d judul</item>
+        <item quantity="other">%1$d judul</item>
+    </plurals>
 </resources>

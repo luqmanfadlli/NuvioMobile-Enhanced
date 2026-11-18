@@ -24,13 +24,11 @@ internal fun DownloadsDestination(
     DownloadsScreen(
         onBack = onBack,
         onOpenDownload = onOpenDownload,
+        onOpenDetails = navController::openDownloadDetails,
         onNavigateToShow = if (useNativeNavigation) {
             { showId, title -> navController.navigate(DownloadShowRoute(showId, title)) }
         } else {
             null
-        },
-        onNavigateToMovie = { type, movieId, title ->
-            navController.navigate(DetailRoute(type = type, id = movieId, title = title))
         },
         onOpenSettings = {
             navController.navigate(DownloadsSettingsRoute(downloadsSettingsTitle))
@@ -48,7 +46,18 @@ internal fun DownloadShowDestination(
     DownloadsScreen(
         onBack = onBack,
         onOpenDownload = onOpenDownload,
+        onOpenDetails = navController::openDownloadDetails,
         initialShowId = route.showId,
         onBackFromShow = onBack,
+    )
+}
+
+private fun NuvioNavigator.openDownloadDetails(item: DownloadItem) {
+    navigate(
+        DetailRoute(
+            type = item.parentMetaType,
+            id = item.parentMetaId,
+            title = item.title,
+        ),
     )
 }

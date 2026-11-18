@@ -350,26 +350,32 @@ object BatchDownloadCoordinator {
             episodesToLoad.map { episode ->
                 launch(Dispatchers.Default) {
                     sourceLoadPermits.withPermit {
-                        val target = plan.meta.batchTargetFor(episode, season)
-                        val streams = runCatchingUnlessCancelled {
-                            StreamSourceLoader.loadStreams(
-                                type = plan.meta.type,
-                                videoId = target.streamVideoId,
-                                season = target.season,
-                                episode = target.episode,
-                                embeddedStreams = plan.meta.findEmbeddedStreams(target.streamVideoId),
-                                timeoutMs = SOURCE_LOAD_TIMEOUT_MS,
-                            )
-                        }.getOrElse { emptyList() }
-                        val selection = StreamSourcePrefillSelector.selectForBatch(streams, preferredResolution)
+                        try {
+                            val target = plan.meta.batchTargetFor(episode, season)
+                            val streams = runCatchingUnlessCancelled {
+                                StreamSourceLoader.loadStreams(
+                                    type = plan.meta.type,
+                                    videoId = target.streamVideoId,
+                                    season = target.season,
+                                    episode = target.episode,
+                                    embeddedStreams = plan.meta.findEmbeddedStreams(target.streamVideoId),
+                                    timeoutMs = SOURCE_LOAD_TIMEOUT_MS,
+                                )
+                            }.getOrElse { emptyList() }
+                            val selection = StreamSourcePrefillSelector.selectForBatch(streams, preferredResolution)
 
-                        updateEpisode(plan.meta.id, season, episode) { item ->
-                            if (item.status == EpisodePlanStatus.AlreadyDownloaded) item
-                            else if (selection == null) {
-                                item.copy(allAvailableStreams = streams, status = EpisodePlanStatus.NoSourceFound)
-                            } else {
-                                item.withSelectedStream(selection.stream, selection.facts, selection.sizeBytes)
-                                    .copy(allAvailableStreams = streams)
+                            updateEpisode(plan.meta.id, season, episode) { item ->
+                                if (item.status == EpisodePlanStatus.AlreadyDownloaded) item
+                                else if (selection == null) {
+                                    item.copy(allAvailableStreams = streams, status = EpisodePlanStatus.NoSourceFound)
+                                } else {
+                                    item.withSelectedStream(selection.stream, selection.facts, selection.sizeBytes)
+                                        .copy(allAvailableStreams = streams)
+                                }
+                            }
+                        } finally {
+                            updateEpisode(plan.meta.id, season, episode) { item ->
+                                if (item.status == EpisodePlanStatus.Loading) item.copy(status = EpisodePlanStatus.NoSourceFound) else item
                             }
                         }
                     }

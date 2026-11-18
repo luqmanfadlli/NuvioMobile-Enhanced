@@ -513,22 +513,16 @@ fun LibraryScreen(
                     title = when (sourceMode) {
                         LibraryViewMode.Saved -> when (uiState.sourceMode) {
                             LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
-                            LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
-                            LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
-                            LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
-                            LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_title)
-                            LibrarySourceMode.WETRAKR -> stringResource(Res.string.library_wetrakr_title)
-                            LibrarySourceMode.PUBLICMETADB -> stringResource(Res.string.library_publicmetadb_title)
+                            LibrarySourceMode.TRAKT -> "Trakt"
+                            LibrarySourceMode.SIMKL -> "Simkl"
+                            LibrarySourceMode.MDBLIST -> "MDBList"
+                            LibrarySourceMode.ANILIST -> "AniList"
+                            LibrarySourceMode.WETRAKR -> "WeTrakr"
+                            LibrarySourceMode.PUBLICMETADB -> "PublicMetaDB"
                         }
                         LibraryViewMode.Downloaded -> stringResource(Res.string.compose_settings_root_downloads_title)
                         else -> stringResource(Res.string.library_title)
                     },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                LibrarySourceSwitch(
-                    selectedMode = sourceMode,
-                    showServers = hasServers,
-                    onModeSelected = LibraryDisplaySettingsRepository::setViewMode,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     if (sourceMode.showsLibrarySections) {
@@ -621,6 +615,12 @@ fun LibraryScreen(
                         LibraryDownloadsButton(onClick = onDownloadsClick)
                     }
                 }
+                LibrarySourceSwitch(
+                    selectedMode = sourceMode,
+                    showServers = hasServers,
+                    onModeSelected = LibraryDisplaySettingsRepository::setViewMode,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
                 Spacer(modifier = Modifier.height(6.dp))
             }
         }

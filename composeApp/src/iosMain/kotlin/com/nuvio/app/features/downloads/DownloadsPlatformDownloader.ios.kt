@@ -1,6 +1,13 @@
 package com.nuvio.app.features.downloads
 
+import com.nuvio.app.core.logging.InAppLogger
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
@@ -449,7 +456,7 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
             }
 
             removePathIfExists(destinationPath)
-            val moved = NSFileManager.defaultManager.moveItemAtPath(tempPath, destinationPath, null)
+            val moved = moveOrCopy(tempPath, destinationPath)
             if (!moved) {
                 finishWithFailure(
                     downloadId,
@@ -555,8 +562,35 @@ private class IosBackgroundDownloadCoordinatorImpl : NSObject(), NSURLSessionDow
 @OptIn(ExperimentalForeignApi::class)
 private fun appendFile(fromPath: String, toPath: String, append: Boolean): Boolean {
     if (!append) {
-        return NSFileManager.defaultManager.moveItemAtPath(fromPath, toPath, null)
+        return moveOrCopy(fromPath, toPath)
     }
+    return copyByAppending(fromPath, toPath)
+}
+
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+private fun moveOrCopy(fromPath: String, toPath: String): Boolean {
+    val manager = NSFileManager.defaultManager
+    val moveError = memScoped {
+        val error = alloc<ObjCObjectVar<NSError?>>()
+        if (manager.moveItemAtPath(fromPath, toPath, error.ptr)) return true
+        error.value
+    }
+    InAppLogger.warn(
+        "Downloads/iOS",
+        "move failed from=$fromPath to=$toPath domain=${moveError?.domain} code=${moveError?.code} ${moveError?.localizedDescription}",
+    )
+    val copyError = memScoped {
+        val error = alloc<ObjCObjectVar<NSError?>>()
+        if (manager.copyItemAtPath(fromPath, toPath, error.ptr)) {
+            manager.removeItemAtPath(fromPath, null)
+            return true
+        }
+        error.value
+    }
+    InAppLogger.warn(
+        "Downloads/iOS",
+        "copy failed from=$fromPath to=$toPath domain=${copyError?.domain} code=${copyError?.code} ${copyError?.localizedDescription}",
+    )
     return copyByAppending(fromPath, toPath)
 }
 
