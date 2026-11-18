@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -185,6 +186,7 @@ fun NuvioScreenHeader(
     includeStatusBarPadding: Boolean = true,
     topPadding: Dp? = null,
     onBack: (() -> Unit)? = null,
+    coverAbove: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
@@ -220,7 +222,7 @@ fun NuvioScreenHeader(
         Row(
             modifier = Modifier
                 .matchParentSize()
-                .appBackgroundCover(tokens.colors.background)
+                .appBackgroundCover(tokens.colors.background, coverAbove = coverAbove)
                 .nuvioConsumePointerEvents(),
         ) {}
         Row(
@@ -338,8 +340,9 @@ fun NuvioBackButton(
     buttonSize: Dp = NuvioTokens.Space.s40,
     iconSize: Dp = NuvioTokens.Icon.md,
     contentDescription: String = stringResource(Res.string.action_back),
+    hiddenUnderNativeNavigation: Boolean = true,
 ) {
-    if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
+    if (hiddenUnderNativeNavigation && LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
 
     Box(
         modifier = modifier
@@ -409,6 +412,7 @@ fun NuvioInputField(
     placeholder: String,
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.nuvio.shapes.compactCard,
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     trailingContent: (@Composable (() -> Unit))? = null,
     containerColor: Color = MaterialTheme.nuvio.colors.surfaceCard,
 ) {
@@ -426,7 +430,7 @@ fun NuvioInputField(
                 style = MaterialTheme.typography.bodyLarge,
             )
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
+        textStyle = textStyle.copy(color = tokens.colors.textPrimary),
         trailingIcon = trailingContent,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = tokens.colors.borderFocus,

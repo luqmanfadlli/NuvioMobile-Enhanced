@@ -22,6 +22,14 @@ class MdbListProgressProjectionTest {
     }
 
     @Test
+    fun episodesIgnoreTheShowRuntime() {
+        val record = mdbListTestEpisode(2, 4).let { it.copy(media = it.media.copy(runtimeMinutes = 6138)) }
+        val seed = MdbListProgressProjection(MdbListSyncSnapshot(42, watched = listOf(record))).nextUpSeeds.single()
+        assertEquals(0L, seed.durationMs)
+        assertEquals(0L, seed.lastPositionMs)
+    }
+
+    @Test
     fun completedEpisodesProvideExactAliasesAndNextUpSeeds() {
         val record = mdbListTestEpisode(2, 4)
         val projection = MdbListProgressProjection(MdbListSyncSnapshot(42, watched = listOf(record)))

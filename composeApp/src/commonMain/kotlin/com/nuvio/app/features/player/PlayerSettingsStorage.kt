@@ -15,6 +15,12 @@ internal expect object PlayerSettingsStorage {
     fun saveShowLoadingOverlay(enabled: Boolean)
     fun loadAutoSwitchPlaybackEngineOnError(): Boolean?
     fun saveAutoSwitchPlaybackEngineOnError(enabled: Boolean)
+    fun loadStreamAutoPlayFallbackOnFailure(): Boolean?
+    fun saveStreamAutoPlayFallbackOnFailure(enabled: Boolean)
+    fun loadStreamAutoPlayFallbackMaxSources(): Int?
+    fun saveStreamAutoPlayFallbackMaxSources(count: Int)
+    fun loadStreamAutoPlayFallbackStartupTimeoutSeconds(): Int?
+    fun saveStreamAutoPlayFallbackStartupTimeoutSeconds(seconds: Int)
     fun loadShowPlayerLoadingStatus(): Boolean?
     fun saveShowPlayerLoadingStatus(enabled: Boolean)
     fun loadPauseOverlayEnabled(): Boolean?
@@ -109,10 +115,12 @@ internal expect object PlayerSettingsStorage {
     fun loadAndroidAnimeUpscaleEnabled(): Boolean?
     fun loadAndroidAnimeLineSharpenEnabled(): Boolean?
     fun loadAndroidExoChaptersEnabled(): Boolean?
+    fun loadChapterTitleEnabled(): Boolean?
     fun saveAndroidLibmpvYuv420pEnabled(enabled: Boolean)
     fun saveAndroidAnimeUpscaleEnabled(enabled: Boolean)
     fun saveAndroidAnimeLineSharpenEnabled(enabled: Boolean)
     fun saveAndroidExoChaptersEnabled(enabled: Boolean)
+    fun saveChapterTitleEnabled(enabled: Boolean)
     fun loadRememberAudioDelayPerDevice(): Boolean?
     fun saveRememberAudioDelayPerDevice(enabled: Boolean)
     fun loadPersistAudioAmplification(): Boolean?
@@ -250,6 +258,7 @@ internal expect object PlayerSettingsStorage {
     fun saveIosSaturation(value: Int)
     fun loadIosGamma(): Int?
     fun saveIosGamma(value: Int)
+    fun migrateLegacySubtitlePreferencesToDeviceStore()
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

@@ -80,7 +80,9 @@ internal fun TabletStreamsLayout(
     onStreamLongPress: (StreamItem) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    backgroundMode: StreamBackgroundMode = StreamBackgroundMode.Cinematic,
 ) {
+    val cinematic = backgroundMode == StreamBackgroundMode.Cinematic
     val streamsPanelBackdrop = rememberNuvioBackdrop()
     val tabletBackdrop = remember(background, poster) {
         background ?: poster
@@ -111,7 +113,7 @@ internal fun TabletStreamsLayout(
                 .fillMaxSize()
                 .nuvioBackdropSource(streamsPanelBackdrop),
         ) {
-            if (tabletBackdrop != null) {
+            if (cinematic && tabletBackdrop != null) {
                 AsyncImage(
                     model = tabletBackdrop,
                     contentDescription = null,
@@ -132,7 +134,7 @@ internal fun TabletStreamsLayout(
                 )
             }
 
-            Box(
+            if (cinematic) Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
@@ -149,7 +151,7 @@ internal fun TabletStreamsLayout(
 
         val verticalBar = LocalVerticalBarPadding.current
         val layoutDirection = LocalLayoutDirection.current
-        CompositionLocalProvider(LocalLiquidGlassBackdrop provides streamsPanelBackdrop) {
+        CompositionLocalProvider(LocalLiquidGlassBackdrop provides if (cinematic) streamsPanelBackdrop else null) {
             Row(modifier = Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
@@ -187,61 +189,89 @@ internal fun TabletStreamsLayout(
                         ),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(24.dp))
-                            .liquidGlassSurface(
-                                backdrop = streamsPanelBackdrop,
-                                shape = RoundedCornerShape(24.dp),
-                                tint = Color.Transparent,
-                                fallback = Color.Transparent,
-                                blurRadius = 56.dp,
-                                refractionHeight = 20.dp,
-                                refractionAmount = 40.dp,
-                            )
-                            .background(Color.Black.copy(alpha = 0.36f)),
+                        modifier = if (cinematic) {
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(24.dp))
+                                .liquidGlassSurface(
+                                    backdrop = streamsPanelBackdrop,
+                                    shape = RoundedCornerShape(24.dp),
+                                    tint = Color.Transparent,
+                                    fallback = Color.Transparent,
+                                    blurRadius = 56.dp,
+                                    refractionHeight = 20.dp,
+                                    refractionAmount = 40.dp,
+                                )
+                                .background(Color.Black.copy(alpha = 0.36f))
+                        } else {
+                            Modifier.fillMaxSize()
+                        },
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(16.dp),
                         ) {
-                            if ((resumePositionMs != null && resumePositionMs > 0L) || (resumeProgressFraction != null && resumeProgressFraction > 0f)) {
-                                ResumeBanner(
-                                    positionMs = resumePositionMs,
-                                    progressFraction = resumeProgressFraction,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                )
-                            }
-
-                            ProviderFilterRow(
-                                groups = uiState.groups,
-                                selectedFilter = uiState.selectedFilter,
-                                onFilterSelected = { addonId -> StreamsRepository.selectFilter(addonId) },
-                                onRefresh = onRefresh,
+                            val smartStreams = rememberSmartStreams(
+                                listState = rememberStreamSearchResult(uiState, searchQuery, showSearchField).uiState,
+                                allState = uiState,
+                                debridEnabled = debridEnabled,
+                                isEpisode = isEpisode,
                             )
+                            val listHeader: @Composable () -> Unit = {
+                                Column {
+                                    if ((resumePositionMs != null && resumePositionMs > 0L) || (resumeProgressFraction != null && resumeProgressFraction > 0f)) {
+                                        ResumeBanner(
+                                            positionMs = resumePositionMs,
+                                            progressFraction = resumeProgressFraction,
+                                            modifier = Modifier.padding(bottom = 8.dp),
+                                        )
+                                    }
 
-                            ActiveScrapersStatusBlock(
-                                groups = uiState.groups,
-                                modifier = Modifier.padding(bottom = 4.dp),
-                            )
+                                    ProviderFilterRow(
+                                        groups = uiState.groups,
+                                        selectedFilter = uiState.selectedFilter,
+                                        onFilterSelected = { addonId -> StreamsRepository.selectFilter(addonId) },
+                                        onRefresh = onRefresh,
+                                    )
 
-                            if (showSearchField) {
-                                StreamSearchField(
-                                    query = searchQuery,
-                                    onQueryChange = onSearchQueryChange,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                )
+                                    ActiveScrapersStatusBlock(
+                                        groups = uiState.groups,
+                                        modifier = Modifier.padding(bottom = 4.dp),
+                                    )
+
+                                    SmartStreamControls(
+                                        state = smartStreams,
+                                        onPlay = { stream -> onStreamSelected(stream, resumePositionMs, resumeProgressFraction) },
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    )
+
+                                    if (showSearchField) {
+                                        StreamSearchField(
+                                            query = searchQuery,
+                                            onQueryChange = onSearchQueryChange,
+                                            modifier = Modifier.padding(bottom = 8.dp),
+                                        )
+                                    }
+                                }
                             }
 
                             val listUiState = rememberStreamSearchResult(uiState, searchQuery, showSearchField)
                             if (listUiState.isEmptyBecauseOfSearch) {
+                                listHeader()
                                 StreamSearchEmptyBlock(modifier = Modifier.weight(1f))
+                                return@Column
+                            }
+                            if (smartStreams.result?.emptyBecauseOfFilters == true) {
+                                listHeader()
+                                SmartFiltersEmptyBlock(modifier = Modifier.weight(1f))
                                 return@Column
                             }
 
                             StreamList(
-                                uiState = listUiState.uiState,
+                                uiState = smartStreams.result?.listState ?: listUiState.uiState,
+                                smartStreams = smartStreams.result?.sortedStreams,
+                                bestStream = smartStreams.result?.best?.stream,
                                 debridEnabled = debridEnabled,
                                 appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                                 onStreamSelected = onStreamSelected,
@@ -249,6 +279,7 @@ internal fun TabletStreamsLayout(
                                 resumePositionMs = resumePositionMs,
                                 resumeProgressFraction = resumeProgressFraction,
                                 modifier = Modifier.weight(1f),
+                                header = listHeader,
                             )
                         }
                     }

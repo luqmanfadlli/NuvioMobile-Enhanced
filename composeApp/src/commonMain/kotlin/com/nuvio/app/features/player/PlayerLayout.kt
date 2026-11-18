@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeContent
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -165,13 +166,12 @@ internal fun playerToolbarTopInsets(metrics: PlayerLayoutMetrics): WindowInsets 
 
 @Composable
 internal fun playerTimelineBottomInsets(metrics: PlayerLayoutMetrics): WindowInsets {
-    val safeInsets = if (isIos) {
-        WindowInsets.safeContent.only(WindowInsetsSides.Bottom)
-    } else {
-        WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Bottom)
-    }
     val contentInsets = WindowInsets(bottom = metrics.sliderBottomOffset / 2)
-    return if (isIos) safeInsets.union(contentInsets) else safeInsets.add(contentInsets)
+    return if (isIos) {
+        WindowInsets.safeContent.only(WindowInsetsSides.Bottom).union(contentInsets)
+    } else {
+        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).add(contentInsets)
+    }
 }
 
 internal fun PlayerResizeMode.next(): PlayerResizeMode =

@@ -23,6 +23,7 @@ import com.nuvio.app.features.debrid.DirectDebridPlayableResult
 import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.streams.isLocalDownload
 import com.nuvio.app.features.p2p.P2pConsentDialog
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerLaunch
@@ -388,6 +389,8 @@ internal fun StreamDestination(
                         bingeGroup = cached.bingeGroup,
                     ),
                 ),
+                sourceFromLinkCache = true,
+                sourceAutoSelected = true,
             )
             if (playerSettings.externalPlayerEnabled) {
                 openExternalPlayback(playerLaunch)
@@ -559,6 +562,7 @@ internal fun StreamDestination(
             contentLanguage = resolveLaunchContentLanguage(),
             sourceFilename = stream.behaviorHints.filename,
             stream = stream,
+            sourceAutoSelected = true,
         )
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
             openExternalPlayback(playerLaunch)
@@ -702,7 +706,7 @@ internal fun StreamDestination(
             return
         }
         val sourceUrl = stream.playableDirectUrl ?: return
-        if (saveForReuse && playerSettings.streamReuseLastLinkEnabled && stream.serverTarget == null) {
+        if (saveForReuse && playerSettings.streamReuseLastLinkEnabled && stream.serverTarget == null && !stream.isLocalDownload) {
             val cacheKey = StreamLinkCacheRepository.contentKey(
                 type = launch.type,
                 videoId = effectiveVideoId,
@@ -825,11 +829,12 @@ internal fun StreamDestination(
                 episodeNumber = launch.episodeNumber,
                 episodeTitle = launch.episodeTitle,
                 episodeThumbnail = launch.episodeThumbnail,
+                // pauseDescription contains the episode overview for this playback launch.
+                episodeOverview = launch.pauseDescription,
                 resumePositionMs = launch.resumePositionMs,
                 resumeProgressFraction = launch.resumeProgressFraction,
                 manualSelection = launch.manualSelection,
                 startFromBeginning = launch.startFromBeginning,
-                downloadMode = launch.downloadMode,
                 onStreamSelected = { stream, resolvedResumePositionMs, resolvedResumeProgressFraction ->
                     openSelectedStream(
                         stream = stream,

@@ -310,7 +310,7 @@ internal fun Modifier.appGlassBackdrop(shape: Shape): Modifier {
 }
 
 @Composable
-fun Modifier.appBackgroundCover(fallback: Color): Modifier {
+fun Modifier.appBackgroundCover(fallback: Color, coverAbove: Boolean = true): Modifier {
     val glass = LocalAppGlass.current?.takeIf { it.blurred != null }
         ?: return this.background(fallback)
     val origin = remember { mutableStateOf(Offset.Unspecified) }
@@ -320,7 +320,7 @@ fun Modifier.appBackgroundCover(fallback: Color): Modifier {
             val position = origin.value
             if (position.isUnspecified) return@drawBehind
             val left = -(position.x - glass.geometry.origin.x)
-            val top = -(position.y - glass.geometry.origin.y)
+            val top = if (coverAbove) -(position.y - glass.geometry.origin.y) else 0f
             val right = left + glass.geometry.size.width
             clipRect(left = left, top = top, right = right, bottom = size.height) {
                 drawBlurredSlice(glass, position)

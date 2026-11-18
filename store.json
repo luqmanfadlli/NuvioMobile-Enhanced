@@ -20,6 +20,46 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "1.0.0",
+          "buildVersion": "157",
+          "date": "2026-11-16T06:50:50Z",
+          "localizedDescription": "# Nuvio Enhanced 1.0.0\r\n\r\nThank you to everyone who has contributed to the project, tested the betas, and supported us along the way.\r\n\r\nThis is the first stable release. It has additional features and fixes from 0.6.13-beta:\r\n- feat(player): use the chosen More Like This source for end-of-movie picks @luqmanfadlli\r\n- fix(details): fall back to TMDB when Simkl has no related titles @luqmanfadlli\r\n- fix(simkl): look up More Like This titles through the Simkl API client @luqmanfadlli\r\n- fix(ios): render mpv at the screen's backing scale (#383) @luqmanfadlli\r\n- fix(streams): blend episode header artwork smoothly into background (#388) @chrisk325\r\n\r\n> **Note**\r\nOn Android, choose Stable in **Settings → About → Update channel** for fewer updates and a more stable build. Choose **Beta** for frequent updates, with possible breaking changes. If you were already on a beta build, you stay on **Beta** until you switch.\r\n",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/1.0.0/nuvio-1.0.0-enhanced-release.ipa",
+          "size": 75657908,
+          "sha256": "0c0c21e5296c824c1b4fbe8e4890778a38ab757e3ddf572c61971f996336f050",
+          "minOSVersion": "16.1"
+        },
+        {
+          "version": "0.6.13",
+          "buildVersion": "156",
+          "date": "2026-11-15T02:58:11Z",
+          "localizedDescription": "- fix(app): log the mapped network condition after the upstream merge @luqmanfadlli \r\n- fix(details): apply the Simkl More Like This source @luqmanfadlli\r\n- feat(grid): show 6 posters per row in landscape, 7 on tablets @luqmanfadlli\r\n- fix(ios): keep the folder header below the landscape native bar @luqmanfadlli\r\n- feat(ios): apply Dolby Vision RPU reshaping in Picture in Picture @luqmanfadlli\r\n- fix(ios): extend toolbar fade to screen edges in landscape @luqmanfadlli\r\n- fix(ios): collapse collection header under the native bar @luqmanfadlli\r\n- fix(collection): keep folder cover visible under glass header @luqmanfadlli\r\n- feat(streams): static glass shows the streams artwork backdrop @luqmanfadlli\r\n- fix(ios): show the back button in iPad settings sub-pages (#381) @luqmanfadlli\r\n- fix(ios): keep the mpv drawable at native resolution (#383) @luqmanfadlli\r\n- fix(ios): convert Dolby Vision Profile 5 frames for Picture in Picture @luqmanfadlli\r\n- fix(ios): fix the hero trailer in the cinematic details background (#364) @luqmanfadlli\r\n- fix(hero): place the trailer mute button in the top-right corner (#353) @luqmanfadlli\r\n- fix(sync): push stream badge changes before the next pull (#367) @luqmanfadlli\r\n- fix(ios): keep HDR colours when drawing subtitles in Picture in Picture (#372) @luqmanfadlli\r\n- fix(player): pause seek preview prefetch while buffering and no early warm-up on iOS @luqmanfadlli\r\n- fix seekbar thumbnails taking a lot pf time to load (#380) @chrisk325\r\n- i18n: add French strings and align birth and death wording (#2664) @SK-Gits\r\n- i18n(vi): update latest Vietnamese strings (#2622) @blueocean2308\r\n- perf: smoother cold start and home on Android (#2652) @skoruppa\r\n- fix(home): show hero only after its source catalogs load (#2651) @skoruppa\r\n- feat(player): basic keyboard support (#2633) @skoruppa\r\n- fix(cw): dismiss a next up show by its content id, as on TV (#2632) @skoruppa\r\n- feat(cw): choose what selecting a Continue Watching item opens (#2630) @skoruppa\r\n- Translation improvements and adjustments for Slovak language (#2625) @mmsw91\r\n- i18n: add French strings for chapter title setting (#2621) @SK-Gits\r\n- feat(player): fall back to the next matching source on failure (#2612) @skoruppa\r\n- fix(player): show each start-up step on the loading screen, like NuvioTV (#2611) @skoruppa",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.13-beta/nuvio-0.6.13-enhanced-release.ipa",
+          "size": 75644478,
+          "sha256": "179323e4975ba7d95ff704ec64d44b8cfba0f69de306f5b5e93d4514ae0c28d8",
+          "minOSVersion": "16.1"
+        },
+        {
+          "version": "0.6.12",
+          "buildVersion": "155",
+          "date": "2026-11-13T01:28:27Z",
+          "localizedDescription": "- fix(subtitles): config export/import and profile removal for device subtitle prefs @luqmanfadlli\r\n- feat(player): restore HLS quality chooser for Live TV @luqmanfadlli\r\n- Significantly increase anime line sharpener strength (#375) @chrisk325\r\n- fix imdb button not appearing on discord rpc (#373) @chrisk325\r\n- feat(player): isolate subtitle preferences per device (#369) @3l-franco\r\n- fix live tv buffering endlessly and black screen on some streams (#366) @chrisk325\r\n- raw bluray files compatibility for exoplayer (#362) @chrisk325\r\n- migrate simkl oauth v1 to v2 (#359) @chrisk325\r\n- feat(player): chapters setting for every engine, chapters on iOS and a chapter title toggle (#2609) @skoruppa\r\n- fix(collections): respect \"Show catalog type\" in folders (#2608) @skoruppa\r\n- fix(player): show the real cause of playback errors, like NuvioTV (#2607) @skoruppa\r\n- fix(player): use the audio clock when mpv video time drops to 0 (#2605) @skoruppa\r\n- fix(player): add an SPS/PPS init segment to HLS streams that lack them (#2606) @skoruppa\r\n- fix(player): decode DASH MIME query hints before detection (#2600) @retrocodes12\r\n- i18n(vi): update latest Vietnamese strings (#2601) @blueocean2308\r\n- fix(streams): keep tokenized links for reuse and refresh expired saved links (#2598) @skoruppa\r\n- i18n: add French string for signed-out notice (#2593) @SK-Gits\r\n- Update Dutch (nl) strings and reorder Dutch in Settings (#2592) @mronion212",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.12-beta/nuvio-0.6.12-enhanced-release.ipa",
+          "size": 75542331,
+          "sha256": "174609f8dd7ace88851755a1a37f48f1fd151620de9af462de01139db63a9cf9",
+          "minOSVersion": "16.1"
+        },
+        {
+          "version": "0.6.11",
+          "buildVersion": "154",
+          "date": "2026-11-10T08:54:47Z",
+          "localizedDescription": "- feature/subtitle shadow outline blur (#356) @3l-franco\r\n- perf(ios): free more app memory before playback on iPhones @luqmanfadlli\r\n- perf(ios): lighter mpv setup under the iPhone jetsam limit @luqmanfadlli\r\n- fix(mdblist): reuse progress and watched lists until a remap changes them @tapframe\r\n- fix(auth): stay signed in when session refresh fails @tapframe\r\n- fix(player): center opening overlay backdrop on tall screens (#2585) @yvngjoon\r\n- fix(player): show mpv error details on the error screen @tapframe\r\n- fix(autosync): allow AutoSync without a preferred language, enable forced subs and AutoSync by default (#2578) @skoruppa\r\n- feat(hero): smart horizontal framing for cropped backdrops (#2538) @skoruppa\r\n- Add and update Bulgarian strings in strings.xml (#2576) @viiktr\r\n- i18n: harmonize French wording with Nuvio TV (#2575) @SK-Gits\r\n- fix(autosync): search further when a restored subtitle does not fit (#2537) @skoruppa",
+          "downloadURL": "https://github.com/luqmanfadlli/NuvioMobile-Enhanced/releases/download/0.6.11-beta/nuvio-0.6.11-enhanced-release.ipa",
+          "size": 75396411,
+          "sha256": "dd1fae561b4862a40534fd2ad97c8a461986b27b8a4f2e58eac0bb8208bfc188",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.6.10",
           "buildVersion": "153",
           "date": "2026-11-09T07:10:24Z",

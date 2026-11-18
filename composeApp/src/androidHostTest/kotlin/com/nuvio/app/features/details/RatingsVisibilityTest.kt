@@ -77,6 +77,7 @@ class RatingsVisibilityTest {
                         progressByVideoId = progress.value,
                         watchedKeys = watchedKeys.value,
                         episodeRatings = ratings.value,
+                        episodeDownloadFor = { null },
                         episodeRatingsVisibility = visibility.value,
                         blurUnwatchedEpisodes = false,
                         onEpisodeClick = null,
@@ -85,11 +86,14 @@ class RatingsVisibilityTest {
                 } else {
                     DetailSeriesContent(
                         meta = meta,
+                        episodeDownloadFor = { null },
                         episodeCardStyle = if (layout.value == 0) MetaEpisodeCardStyle.Horizontal else MetaEpisodeCardStyle.List,
                         progressByVideoId = progress.value,
                         watchedKeys = watchedKeys.value,
                         episodeRatings = ratings.value,
                         episodeRatingsVisibility = visibility.value,
+                        selectedSeason = 1,
+                        onSeasonSelected = {},
                     )
                 }
             }

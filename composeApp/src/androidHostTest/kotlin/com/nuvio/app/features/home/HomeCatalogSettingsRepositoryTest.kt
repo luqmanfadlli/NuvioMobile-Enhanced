@@ -20,6 +20,8 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.runner.RunWith
@@ -63,6 +65,86 @@ class HomeCatalogSettingsRepositoryTest {
         HomeCatalogSettingsRepository.clearLocalState()
         CollectionRepository.clearLocalState()
         HomeRepository.clear()
+    }
+
+    @Test
+    fun pinTopAndBottomPlacementPersistsAndControlsHomeOrder() {
+        val addons = listOf(addon(listOf("popular", "latest", "trending")))
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+        val topKey = "test:movie:latest"
+        val bottomKey = "test:movie:trending"
+        HomeCatalogSettingsRepository.setRowPlacement(topKey, HomeCatalogRowPlacement.PINNED_TOP)
+        HomeCatalogSettingsRepository.setRowPlacement(bottomKey, HomeCatalogRowPlacement.PINNED_BOTTOM)
+        assertEquals(listOf(topKey, "test:movie:popular", bottomKey), HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+        assertEquals(listOf(topKey, "test:movie:popular", bottomKey), HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+    }
+
+    @Test
+    fun hiddenRowsCanBeReorderedWithoutChangingVisibleRowsOrVisibility() {
+        HomeCatalogSettingsRepository.syncCatalogs(
+            listOf(addon(listOf("popular", "latest", "trending"))),
+        )
+        val initialKeys = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        val firstHiddenKey = initialKeys[0]
+        val secondHiddenKey = initialKeys[1]
+        HomeCatalogSettingsRepository.setEnabled(firstHiddenKey, false)
+        HomeCatalogSettingsRepository.setEnabled(secondHiddenKey, false)
+
+        val visibleBefore = HomeCatalogSettingsRepository.uiState.value.items
+            .filter { it.enabled }
+            .map { it.key }
+        val hiddenBefore = HomeCatalogSettingsRepository.uiState.value.items
+            .filterNot { it.enabled }
+            .map { it.key }
+
+        HomeCatalogSettingsRepository.moveByVisibilityIndex(
+            fromIndex = 0,
+            toIndex = 1,
+            visible = false,
+        )
+
+        val after = HomeCatalogSettingsRepository.uiState.value.items
+        assertEquals(visibleBefore, after.filter { it.enabled }.map { it.key })
+        assertEquals(hiddenBefore.reversed(), after.filterNot { it.enabled }.map { it.key })
+        assertTrue(after.filter { it.key == firstHiddenKey || it.key == secondHiddenKey }.all { !it.enabled })
+    }
+
+    @Test
+    fun rowPlacementIsExcludedFromProfileSyncPayload() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
+        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_BOTTOM)
+
+        val payload = HomeCatalogSettingsRepository.exportToSyncPayload()
+        val serialized = Json.encodeToString(SyncHomeCatalogPayload.serializer(), payload)
+
+        assertTrue("\\"row_placement\\"" !in serialized)
+    }
+
+    @Test
+    fun applyingRemoteSettingsPreservesLocalRowPlacement() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon()))
+        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_BOTTOM)
+
+        HomeCatalogSettingsRepository.applyFromRemote(
+            SyncHomeCatalogPayload(
+                items = listOf(
+                    SyncCatalogItem(
+                        addonId = "test",
+                        type = "movie",
+                        catalogId = "popular",
+                        enabled = false,
+                        order = 0,
+                        key = "test:movie:popular",
+                    ),
+                ),
+            ),
+        )
+
+        val item = HomeCatalogSettingsRepository.uiState.value.items.single()
+        assertEquals(HomeCatalogRowPlacement.PINNED_BOTTOM, item.rowPlacement)
+        assertEquals(false, item.enabled)
     }
 
     @Test
@@ -228,7 +310,7 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(settings, HomeCatalogSettingsRepository.uiState.value)
     }
 
-    private fun addon() = ManagedAddon(
+    private fun addon(catalogIds: List<String> = listOf("popular")) = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(
             id = "test",
@@ -237,7 +319,7 @@ class HomeCatalogSettingsRepositoryTest {
             version = "1",
             resources = emptyList(),
             types = listOf("movie"),
-            catalogs = listOf(AddonCatalog(type = "movie", id = "popular", name = "Popular")),
+            catalogs = catalogIds.map { id -> AddonCatalog(type = "movie", id = id, name = id) },
             transportUrl = "https://example.com",
         ),
     )

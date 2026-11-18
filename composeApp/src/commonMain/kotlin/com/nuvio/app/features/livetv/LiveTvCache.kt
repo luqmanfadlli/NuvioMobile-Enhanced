@@ -159,7 +159,14 @@ internal object LiveTvCacheStore {
     }
 }
 
+/**
+ * Bumped when the channel list is read differently, so lists saved by an older version are
+ * loaded again (3: VLC's user agent by default, Xtream panel links in the account's format).
+ */
+private const val ChannelsCacheFormat = 3
+
 internal fun liveTvChannelSourceSignature(state: LiveTvUiState): String = buildString {
+    append("v").append(ChannelsCacheFormat).append(';')
     state.playlists.filter { it.isEnabled }.forEach { playlist ->
         append(playlist.id).append('|').append(playlist.type.name).append('|')
         append(playlist.source.length).append(':').append(playlist.source.hashCode()).append(';')

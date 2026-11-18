@@ -65,7 +65,7 @@ internal class AndroidDownloadScheduler(val context: Context) {
             } else {
                 val work = OneTimeWorkRequestBuilder<DownloadsTransferWorker>()
                     .setInputData(workDataOf(FILE_NAME to item.fileName, GENERATION to transfer.generation))
-                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(if (mobileDataAllowed()) NetworkType.CONNECTED else NetworkType.UNMETERED).build())
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                     .build()
                 val operation = WorkManager.getInstance(context).enqueueUniqueWork(
@@ -81,7 +81,15 @@ internal class AndroidDownloadScheduler(val context: Context) {
                 }, ContextCompat.getMainExecutor(context))
             }
         } catch (error: Exception) {
-            fail(transfer, error)
+            if (Build.VERSION.SDK_INT >= 34) {
+                store.update(item.fileName, transfer.generation) {
+                    it.copy(item = it.item.copy(status = DownloadStatus.Queued, errorMessage = null))
+                }
+                cancelScheduled(transfer)
+                Log.w(TAG, "Download is queued until the app returns to foreground", error)
+            } else {
+                fail(transfer, error)
+            }
         }
         return store.get(item.fileName) ?: transfer
     }
@@ -90,7 +98,8 @@ internal class AndroidDownloadScheduler(val context: Context) {
     internal fun buildJob(transfer: AndroidDownloadTransfer): JobInfo =
         JobInfo.Builder(transfer.jobId, ComponentName(context, DownloadsTransferJobService::class.java))
             .setUserInitiated(true)
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            // Matches DownloadNetworkGuard's unmetered rule, so the queue and the OS agree.
+            .setRequiredNetworkType(if (mobileDataAllowed()) JobInfo.NETWORK_TYPE_ANY else JobInfo.NETWORK_TYPE_UNMETERED)
             .setPersisted(true)
             .setEstimatedNetworkBytes(transfer.item.totalBytes ?: JobInfo.NETWORK_BYTES_UNKNOWN.toLong(), 0L)
             .setBackoffCriteria(30_000L, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
@@ -99,6 +108,11 @@ internal class AndroidDownloadScheduler(val context: Context) {
                 putString(GENERATION, transfer.generation)
             })
             .build()
+
+    private fun mobileDataAllowed(): Boolean {
+        DownloadsSettingsRepository.ensureLoaded()
+        return DownloadsSettingsRepository.allowMobileDataDownloads.value
+    }
 
     @RequiresApi(34)
     private fun jobScheduler(): JobScheduler =
@@ -114,7 +128,7 @@ internal class AndroidDownloadScheduler(val context: Context) {
             reschedule(item.fileName)
             transfer = store.get(item.fileName) ?: transfer
         }
-        return transfer.item
+        return if (item.status == DownloadStatus.Queued) item else transfer.item
     }
 
     fun reschedule(fileName: String) {
@@ -155,6 +169,13 @@ internal class AndroidDownloadScheduler(val context: Context) {
                 }
             }
         }
+    }
+
+    fun clearUnfinishedTransfers() {
+        store.transfers.value.values
+            .filter { it.item.status != DownloadStatus.Completed }
+            .map { it.item.fileName }
+            .forEach(::remove)
     }
 
     private fun cancelScheduled(transfer: AndroidDownloadTransfer) {

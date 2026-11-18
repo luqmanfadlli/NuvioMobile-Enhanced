@@ -1,6 +1,11 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.core.sync.decodeSyncString
+import com.nuvio.app.core.sync.encodeSyncInt
+import com.nuvio.app.core.sync.encodeSyncString
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import nuvio.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import kotlin.test.Test
@@ -10,17 +15,40 @@ import kotlin.test.assertNull
 
 class SubtitleAppearancePlatformTest {
     @Test
-    fun appearancePersistsAndRestoresFromSync() {
+    fun appearancePersistsLocallyAndIsExcludedFromSharedProfileSync() {
         val original = PlayerSettingsStorage.exportToSyncPayload()
+        val testProfileId = Int.MAX_VALUE - 17
+        val originalDevicePreferences = SubtitleDevicePreferencesStorage.load(testProfileId)
         try {
-            val appearance = SubtitleAppearance("mono", 18, true, 60, 4)
-            PlayerSettingsStorage.saveSubtitleAppearance(appearance.encode())
+            val style = SubtitleStyleState(
+                fontSizeSp = 30,
+                appearance = SubtitleAppearance("mono", 18, true, 60, 4),
+            )
+            SubtitleDevicePreferencesRepository.save(testProfileId, style)
+            PlayerSettingsStorage.savePreferredSubtitleLanguage("en")
+
             val payload = PlayerSettingsStorage.exportToSyncPayload()
-            PlayerSettingsStorage.saveSubtitleAppearance(SubtitleAppearance().encode())
-            PlayerSettingsStorage.replaceFromSyncPayload(payload)
-            assertEquals(appearance, decodeSubtitleAppearance(PlayerSettingsStorage.loadSubtitleAppearance()))
+            assertNull(payload["subtitle_appearance"])
+            assertNull(payload["subtitle_font_size_sp"])
+            assertEquals("en", payload.decodeSyncString("preferred_subtitle_language"))
+
+            val legacyRemotePayload = buildJsonObject {
+                put("subtitle_appearance", encodeSyncString(SubtitleAppearance("serif").encode()))
+                put("subtitle_font_size_sp", encodeSyncInt(16))
+            }
+            PlayerSettingsStorage.replaceFromSyncPayload(legacyRemotePayload)
+
+            assertEquals(
+                style,
+                SubtitleDevicePreferencesRepository.loadOrMigrate(testProfileId, SubtitleStyleState.DEFAULT),
+            )
         } finally {
             PlayerSettingsStorage.replaceFromSyncPayload(original)
+            if (originalDevicePreferences == null) {
+                SubtitleDevicePreferencesStorage.remove(testProfileId)
+            } else {
+                SubtitleDevicePreferencesStorage.save(testProfileId, originalDevicePreferences)
+            }
         }
     }
 

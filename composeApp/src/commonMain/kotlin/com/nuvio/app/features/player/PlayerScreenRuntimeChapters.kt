@@ -2,7 +2,8 @@ package com.nuvio.app.features.player
 
 /**
  * Reads the chapters once per source, when it has loaded: libmpv lists them itself, ExoPlayer
- * reads them from the file (when allowed), so a rebuffer must not read them again.
+ * reads them from the file (when allowed), so a rebuffer must not read them again. They always
+ * feed skip intro, and reach the chapter UI only while "Show Chapters" is on, on either engine.
  */
 internal suspend fun PlayerScreenRuntime.loadChaptersIfNeeded() {
     val controller = playerController ?: return
@@ -11,7 +12,6 @@ internal suspend fun PlayerScreenRuntime.loadChaptersIfNeeded() {
     val loaded = PlayerChapters.normalize(controller.getChapters())
     if (activeSourceUrl != sourceUrl || playerController !== controller) return
     chaptersLoadedForSourceUrl = sourceUrl
-    // Fork: "Show Chapters" only hides the chapter UI; chapter-based skip detection still runs.
     chapters = if (playerSettingsUiState.androidExoChaptersEnabled) loaded else emptyList()
     onChaptersLoaded(loaded)
 }

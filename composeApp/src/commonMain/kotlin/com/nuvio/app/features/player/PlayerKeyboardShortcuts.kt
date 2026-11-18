@@ -21,6 +21,8 @@ enum class PlayerKeyboardShortcut(val wireCode: String) {
     TogglePlayback("toggle_playback"),
     SeekBackward("seek_backward"),
     SeekForward("seek_forward"),
+    VolumeUp("volume_up"),
+    VolumeDown("volume_down"),
     Exit("exit"),
     ;
 
@@ -59,6 +61,8 @@ private fun Key.toPlayerKeyboardShortcut(): PlayerKeyboardShortcut? = when (this
     Key.Spacebar -> PlayerKeyboardShortcut.TogglePlayback
     Key.DirectionLeft -> PlayerKeyboardShortcut.SeekBackward
     Key.DirectionRight -> PlayerKeyboardShortcut.SeekForward
+    Key.DirectionUp -> PlayerKeyboardShortcut.VolumeUp
+    Key.DirectionDown -> PlayerKeyboardShortcut.VolumeDown
     Key.Escape -> PlayerKeyboardShortcut.Exit
     else -> null
 }

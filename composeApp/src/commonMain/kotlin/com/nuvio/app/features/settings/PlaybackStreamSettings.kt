@@ -2,6 +2,8 @@ package com.nuvio.app.features.settings
 
 import com.nuvio.app.core.ui.Slider
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.features.streams.SmartStreamPreferencesSheet
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.isIos
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.SOURCE_FALLBACK_MAX_SOURCES_RANGE
+import com.nuvio.app.features.player.SOURCE_STARTUP_TIMEOUT_SECONDS_RANGE
+import com.nuvio.app.features.player.SOURCE_STARTUP_TIMEOUT_SECONDS_STEP
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.PluginRepository
@@ -49,6 +55,9 @@ internal fun PlaybackStreamSettings(
 ) {
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showSmartStreamPreferences by remember { mutableStateOf(false) }
+    val smartStreamSettings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
+    val smartAutoPlay = smartStreamSettings.autoPlay
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -88,17 +97,35 @@ internal fun PlaybackStreamSettings(
         }
 
         SettingsSection(
+            title = stringResource(Res.string.smart_streams_settings_section),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.smart_streams_settings_row),
+                    description = stringResource(Res.string.smart_streams_settings_row_description),
+                    isTablet = isTablet,
+                    onClick = { showSmartStreamPreferences = true },
+                )
+            }
+        }
+
+        SettingsSection(
             title = stringResource(Res.string.settings_playback_section_stream_auto_play),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = stringResource(settings.streamAutoPlayMode.labelRes),
+                    description = if (smartAutoPlay) {
+                        stringResource(Res.string.smart_streams_autoplay_mode)
+                    } else {
+                        stringResource(settings.streamAutoPlayMode.labelRes)
+                    },
                     isTablet = isTablet,
                     onClick = { showAutoPlayModeDialog = true },
                 )
-                if (settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
+                if (!smartAutoPlay && settings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
                     SettingsNavigationRow(
@@ -107,6 +134,51 @@ internal fun PlaybackStreamSettings(
                         isTablet = isTablet,
                         onClick = { showAutoPlayRegexDialog = true },
                     )
+                }
+                if (smartAutoPlay || settings.streamAutoPlayMode != StreamAutoPlayMode.MANUAL) {
+                    // Excludes the engine switch on error (Android only): both react to the same failure.
+                    // Only the switch that is off is locked, so both stay reachable if both ended up on.
+                    val blockedByEngineSwitch = !isIos && settings.autoSwitchPlaybackEngineOnError &&
+                        !settings.streamAutoPlayFallbackOnFailure
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_fallback_next_source),
+                        description = stringResource(
+                            if (blockedByEngineSwitch) {
+                                Res.string.settings_playback_fallback_next_source_blocked_by_engine_switch
+                            } else {
+                                Res.string.settings_playback_fallback_next_source_description
+                            },
+                        ),
+                        checked = settings.streamAutoPlayFallbackOnFailure,
+                        enabled = !settings.externalPlayerEnabled && !blockedByEngineSwitch,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayFallbackOnFailure,
+                    )
+                    if (settings.streamAutoPlayFallbackOnFailure && !blockedByEngineSwitch) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSliderRow(
+                            title = stringResource(Res.string.settings_playback_fallback_max_sources),
+                            value = settings.streamAutoPlayFallbackMaxSources,
+                            valueText = { count -> count.toString() },
+                            valueRange = SOURCE_FALLBACK_MAX_SOURCES_RANGE,
+                            step = 1,
+                            isTablet = isTablet,
+                            enabled = !settings.externalPlayerEnabled,
+                            onValueChange = PlayerSettingsRepository::setStreamAutoPlayFallbackMaxSources,
+                        )
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSliderRow(
+                            title = stringResource(Res.string.settings_playback_fallback_startup_timeout),
+                            value = settings.streamAutoPlayFallbackStartupTimeoutSeconds,
+                            valueText = { seconds -> stringResource(Res.string.settings_playback_timeout_seconds, seconds) },
+                            valueRange = SOURCE_STARTUP_TIMEOUT_SECONDS_RANGE,
+                            step = SOURCE_STARTUP_TIMEOUT_SECONDS_STEP,
+                            isTablet = isTablet,
+                            enabled = !settings.externalPlayerEnabled,
+                            onValueChange = PlayerSettingsRepository::setStreamAutoPlayFallbackStartupTimeoutSeconds,
+                        )
+                    }
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 val timeoutSec = settings.streamAutoPlayTimeoutSeconds
@@ -219,11 +291,21 @@ internal fun PlaybackStreamSettings(
         )
     }
 
+    if (showSmartStreamPreferences) {
+        SmartStreamPreferencesSheet(onDismiss = { showSmartStreamPreferences = false })
+    }
+
     if (showAutoPlayModeDialog) {
         StreamAutoPlayModeDialog(
             selectedMode = settings.streamAutoPlayMode,
+            smartSelected = smartAutoPlay,
             onModeSelected = {
+                SmartStreamSettingsRepository.update { current -> current.copy(autoPlay = false) }
                 PlayerSettingsRepository.setStreamAutoPlayMode(it)
+                showAutoPlayModeDialog = false
+            },
+            onSmartSelected = {
+                SmartStreamSettingsRepository.update { current -> current.copy(autoPlay = true) }
                 showAutoPlayModeDialog = false
             },
             onDismiss = { showAutoPlayModeDialog = false },

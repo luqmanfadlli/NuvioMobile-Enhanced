@@ -15,7 +15,11 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.create
 import platform.Foundation.stringWithContentsOfURL
 import platform.Foundation.writeToFile
+import kotlinx.cinterop.useContents
+import platform.CoreGraphics.CGRectMake
+import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
+import platform.UIKit.popoverPresentationController
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerMode
 import platform.UIKit.UIDocumentPickerViewController
@@ -45,24 +49,22 @@ internal actual fun rememberSettingsConfigFileLauncher(
                     return@launch
                 }
                 val fileUrl = NSURL.fileURLWithPath(path)
-                val picker = UIDocumentPickerViewController(
-                    forExportingURLs = listOf(fileUrl),
-                    asCopy = true,
+                val sheet = UIActivityViewController(
+                    activityItems = listOf(fileUrl),
+                    applicationActivities = null,
                 )
-                val delegate = SettingsConfigDocumentPickerDelegate(
-                    onPicked = {
-                        NSFileManager.defaultManager.removeItemAtPath(path, null)
-                        delegateHolder.value = null
-                        currentOnSaved()
-                    },
-                    onDismissed = {
-                        NSFileManager.defaultManager.removeItemAtPath(path, null)
-                        delegateHolder.value = null
-                    },
-                )
-                delegateHolder.value = delegate
-                picker.delegate = delegate
-                presenter.presentViewController(picker, animated = true, completion = null)
+                sheet.completionWithItemsHandler = { _, completed, _, _ ->
+                    NSFileManager.defaultManager.removeItemAtPath(path, null)
+                    if (completed) currentOnSaved()
+                }
+                sheet.popoverPresentationController?.let { popover ->
+                    popover.sourceView = presenter.view
+                    popover.sourceRect = presenter.view.bounds.useContents {
+                        CGRectMake(size.width / 2.0, size.height / 2.0, 1.0, 1.0)
+                    }
+                    popover.permittedArrowDirections = 0uL
+                }
+                presenter.presentViewController(sheet, animated = true, completion = null)
             },
             launchPicker = launch@{
                 val presenter = settingsConfigTopViewController()

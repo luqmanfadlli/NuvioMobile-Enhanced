@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,8 +69,7 @@ private const val MaxMpvChapters = 500
 
 internal fun mpvChapters(property: (String) -> String?): List<PlayerChapter> {
     val count = property("chapter-list/count")?.trim()?.toIntOrNull() ?: return emptyList()
-    if (count < 2) return emptyList()
-    return (0 until count.coerceAtMost(MaxMpvChapters))
+    return (0 until count.coerceIn(0, MaxMpvChapters))
         .mapNotNull { index ->
             val seconds = property("chapter-list/$index/time")?.trim()?.toDoubleOrNull()
                 ?: return@mapNotNull null
@@ -77,7 +78,6 @@ internal fun mpvChapters(property: (String) -> String?): List<PlayerChapter> {
                 title = property("chapter-list/$index/title")?.trim()?.takeIf { it.isNotBlank() },
             )
         }
-        .let(PlayerChapters::normalize)
 }
 
 internal fun List<PlayerChapter>.chapterMarkFractions(durationMs: Long): List<Float> {
@@ -97,6 +97,8 @@ internal fun PlayerChapterLabel(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
+    val settings by PlayerSettingsRepository.uiState.collectAsState()
+    if (!settings.chapterTitleEnabled) return
     val index = PlayerChapters.indexAt(chapters, positionMs)
     if (index < 0) return
     val title = chapters[index].title?.takeIf { it.isNotBlank() }

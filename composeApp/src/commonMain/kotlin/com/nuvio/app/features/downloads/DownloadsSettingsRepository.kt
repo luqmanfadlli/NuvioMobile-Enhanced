@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * are inherently per-device facts, not per-profile ones.
  */
 object DownloadsSettingsRepository {
+    private const val PREFERRED_RESOLUTION_KEY = "preferred_download_resolution"
     private val _allowMobileDataDownloads = MutableStateFlow(false)
     val allowMobileDataDownloads: StateFlow<Boolean> = _allowMobileDataDownloads.asStateFlow()
 
@@ -19,6 +20,14 @@ object DownloadsSettingsRepository {
     private val _downloadLocationUri = MutableStateFlow<String?>(null)
     val downloadLocationUri: StateFlow<String?> = _downloadLocationUri.asStateFlow()
 
+    private val _preferredResolution = MutableStateFlow(DownloadPreferredResolution.DEFAULT)
+    val preferredResolution: StateFlow<DownloadPreferredResolution> = _preferredResolution.asStateFlow()
+
+    private val _concurrencyLimits = MutableStateFlow(
+        DownloadConcurrencyLimit.entries.associateWith { it.defaultValue },
+    )
+    val concurrencyLimits: StateFlow<Map<DownloadConcurrencyLimit, Int>> = _concurrencyLimits.asStateFlow()
+
     private var hasLoaded = false
 
     fun ensureLoaded() {
@@ -26,6 +35,10 @@ object DownloadsSettingsRepository {
         hasLoaded = true
         _allowMobileDataDownloads.value = DownloadsSettingsStorage.loadAllowMobileDataDownloads() ?: false
         _showDownloadButton.value = DownloadsSettingsStorage.loadShowDownloadButton() ?: true
+        _preferredResolution.value = DownloadPreferredResolution.fromStorage(DownloadsSettingsStorage.loadString(PREFERRED_RESOLUTION_KEY))
+        _concurrencyLimits.value = DownloadConcurrencyLimit.entries.associateWith { limit ->
+            DownloadsSettingsStorage.loadInt(limit.storageKey)?.let(limit::clamp) ?: limit.defaultValue
+        }
         _downloadLocationUri.value = DownloadsStorage.getDownloadLocationUri()
     }
 
@@ -41,6 +54,26 @@ object DownloadsSettingsRepository {
         if (_showDownloadButton.value == enabled) return
         _showDownloadButton.value = enabled
         DownloadsSettingsStorage.saveShowDownloadButton(enabled)
+    }
+
+    fun setPreferredResolution(resolution: DownloadPreferredResolution) {
+        ensureLoaded()
+        if (_preferredResolution.value == resolution) return
+        _preferredResolution.value = resolution
+        DownloadsSettingsStorage.saveString(PREFERRED_RESOLUTION_KEY, resolution.name)
+    }
+
+    fun concurrencyLimit(limit: DownloadConcurrencyLimit): Int {
+        ensureLoaded()
+        return _concurrencyLimits.value.getValue(limit)
+    }
+
+    fun setConcurrencyLimit(limit: DownloadConcurrencyLimit, count: Int) {
+        ensureLoaded()
+        val clamped = limit.clamp(count)
+        if (_concurrencyLimits.value[limit] == clamped) return
+        _concurrencyLimits.value = _concurrencyLimits.value + (limit to clamped)
+        DownloadsSettingsStorage.saveInt(limit.storageKey, clamped)
     }
 
     fun setDownloadLocationUri(uri: String?) {

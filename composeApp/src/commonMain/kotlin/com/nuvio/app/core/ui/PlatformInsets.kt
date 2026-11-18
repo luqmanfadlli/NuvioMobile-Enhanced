@@ -20,6 +20,11 @@ internal expect fun platformPhysicalTopInset(): Dp
 @Composable
 internal expect fun ResizeForKeyboard()
 
+data class NativeBarButtonAnchor(val centerY: Dp, val trailingCenterX: Dp)
+
+@Composable
+internal expect fun platformNativeBarButtonAnchor(): NativeBarButtonAnchor?
+
 internal val LocalNuvioBottomNavigationOverlayPadding = staticCompositionLocalOf { 0.dp }
 
 internal val LocalBottomInsetsConsumed = staticCompositionLocalOf { false }

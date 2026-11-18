@@ -2,6 +2,7 @@ package com.nuvio.app.features.livetv
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import io.ktor.http.decodeURLQueryComponent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlin.random.Random
 import kotlin.time.Clock
 
@@ -690,6 +695,8 @@ internal fun parseM3uPlaylist(
 ): List<LiveTvChannel> {
     val channels = mutableListOf<LiveTvChannel>()
     var pendingInfo: M3uInfo? = null
+    val pendingHeaders = LinkedHashMap<String, String>()
+    var pendingStreamType: String? = null
 
     payload.lineSequence()
         .map(String::trim)
@@ -697,11 +704,27 @@ internal fun parseM3uPlaylist(
         .forEach { line ->
             when {
                 line.startsWith("#EXTINF", ignoreCase = true) -> {
-                    pendingInfo = parseExtInf(line)
+                    val info = parseExtInf(line)
+                    pendingInfo = info
+                    info.headers.forEach { (key, value) -> pendingHeaders.putM3uHeader(key, value) }
+                }
+                line.startsWith("#EXTVLCOPT", ignoreCase = true) -> {
+                    parseVlcOption(line.substringAfter(':', missingDelimiterValue = ""))
+                        ?.let { (key, value) -> pendingHeaders.putM3uHeader(key, value) }
+                }
+                line.startsWith("#EXTHTTP", ignoreCase = true) -> {
+                    parseExtHttp(line.substringAfter(':', missingDelimiterValue = ""))
+                        .forEach { (key, value) -> pendingHeaders.putM3uHeader(key, value) }
+                }
+                line.startsWith("#KODIPROP", ignoreCase = true) -> {
+                    parseKodiProp(line.substringAfter(':', missingDelimiterValue = ""), pendingHeaders)
+                        ?.let { pendingStreamType = it }
                 }
                 line.startsWith("#") -> Unit
                 else -> {
-                    val streamUrl = line
+                    val (streamUrl, urlHeaders) = splitM3uStreamUrl(line)
+                    if (streamUrl.isBlank()) return@forEach
+                    urlHeaders.forEach { (key, value) -> pendingHeaders.putM3uHeader(key, value) }
                     val info = pendingInfo
                     val name = info?.name?.takeIf(String::isNotBlank)
                         ?: streamUrl.substringAfterLast('/').substringBefore('?').ifBlank { "Channel" }
@@ -713,9 +736,14 @@ internal fun parseM3uPlaylist(
                         group = info?.group?.takeIf(String::isNotBlank),
                         playlistId = playlist?.id,
                         playlistName = playlist?.name,
+                        // The playlist's own headers win; otherwise the channel opens as VLC does.
+                        headers = defaultLiveTvStreamHeaders(streamUrl) + pendingHeaders,
+                        streamType = pendingStreamType,
                         epgId = info?.epgId?.takeIf(String::isNotBlank),
                     )
                     pendingInfo = null
+                    pendingHeaders.clear()
+                    pendingStreamType = null
                 }
             }
         }
@@ -728,21 +756,126 @@ private data class M3uInfo(
     val logoUrl: String?,
     val group: String?,
     val epgId: String? = null,
+    val headers: Map<String, String> = emptyMap(),
 )
 
 private fun parseExtInf(line: String): M3uInfo {
-    val name = line.substringAfter(',', missingDelimiterValue = "")
+    val name = line.substring(extInfNameDelimiterIndex(line) + 1)
         .trim()
         .ifBlank {
             readM3uAttribute(line, "tvg-name").orEmpty()
         }
+    val headers = buildMap {
+        (readM3uAttribute(line, "http-user-agent") ?: readM3uAttribute(line, "user-agent"))
+            ?.let { put("User-Agent", it) }
+        (
+            readM3uAttribute(line, "http-referrer")
+                ?: readM3uAttribute(line, "http-referer")
+                ?: readM3uAttribute(line, "referrer")
+                ?: readM3uAttribute(line, "referer")
+            )?.let { put("Referer", it) }
+    }
     return M3uInfo(
         name = name,
         logoUrl = readM3uAttribute(line, "tvg-logo"),
         group = readM3uAttribute(line, "group-title"),
         epgId = readM3uAttribute(line, "tvg-id"),
+        headers = headers,
     )
 }
+
+private fun extInfNameDelimiterIndex(line: String): Int {
+    var inQuotes = false
+    line.forEachIndexed { index, char ->
+        when {
+            char == '"' -> inQuotes = !inQuotes
+            char == ',' && !inQuotes -> return index
+        }
+    }
+    return line.lastIndex
+}
+
+private fun parseVlcOption(option: String): Pair<String, String>? {
+    val key = option.substringBefore('=', missingDelimiterValue = "").trim().lowercase()
+    val value = option.substringAfter('=', missingDelimiterValue = "").trim().trim('"')
+    if (value.isBlank()) return null
+    return when (key) {
+        "http-user-agent" -> "User-Agent" to value
+        "http-referrer", "http-referer" -> "Referer" to value
+        "http-origin" -> "Origin" to value
+        "http-cookie" -> "Cookie" to value
+        else -> null
+    }
+}
+
+private fun parseExtHttp(json: String): Map<String, String> = runCatching {
+    val element = m3uJson.parseToJsonElement(json.trim()) as? JsonObject ?: return emptyMap()
+    element.mapNotNull { (key, value) ->
+        val content = (value as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+        content?.let { key.trim() to it }
+    }.toMap()
+}.getOrDefault(emptyMap())
+
+private fun parseKodiProp(property: String, headers: MutableMap<String, String>): String? {
+    val key = property.substringBefore('=', missingDelimiterValue = "").trim().lowercase()
+    val value = property.substringAfter('=', missingDelimiterValue = "").trim()
+    if (value.isBlank()) return null
+    return when (key) {
+        "inputstream.adaptive.manifest_type" -> when (value.lowercase()) {
+            "mpd", "dash" -> "dash"
+            "hls", "m3u8" -> "hls"
+            "ism", "isml", "smoothstreaming" -> "ss"
+            else -> null
+        }
+        "mimetype" -> when {
+            value.contains("mpegurl", ignoreCase = true) -> "hls"
+            value.contains("dash", ignoreCase = true) -> "dash"
+            else -> null
+        }
+        "inputstream.adaptive.stream_headers",
+        "inputstream.adaptive.common_headers",
+        "inputstream.adaptive.manifest_headers" -> {
+            parseM3uHeaderQuery(value).forEach { (headerKey, headerValue) -> headers.putM3uHeader(headerKey, headerValue) }
+            null
+        }
+        else -> null
+    }
+}
+
+private fun splitM3uStreamUrl(line: String): Pair<String, Map<String, String>> {
+    val separator = line.indexOf('|')
+    if (separator < 0) return line.trim() to emptyMap()
+    return line.substring(0, separator).trim() to parseM3uHeaderQuery(line.substring(separator + 1))
+}
+
+private fun parseM3uHeaderQuery(query: String): Map<String, String> =
+    query.split('&')
+        .mapNotNull { parameter ->
+            val key = parameter.substringBefore('=', missingDelimiterValue = "").trim().decodeM3uComponent()
+            val value = parameter.substringAfter('=', missingDelimiterValue = "").trim().trim('"').decodeM3uComponent()
+            if (key.isBlank() || value.isBlank()) null else key to value
+        }
+        .toMap()
+
+private fun String.decodeM3uComponent(): String =
+    if ('%' in this) runCatching { decodeURLQueryComponent() }.getOrDefault(this) else this
+
+private fun MutableMap<String, String>.putM3uHeader(rawKey: String, value: String) {
+    val trimmedValue = value.trim()
+    if (trimmedValue.isBlank()) return
+    val key = when (rawKey.trim().lowercase()) {
+        "user-agent", "useragent", "http-user-agent" -> "User-Agent"
+        "referer", "referrer", "http-referer", "http-referrer" -> "Referer"
+        "origin", "http-origin" -> "Origin"
+        "cookie", "http-cookie" -> "Cookie"
+        else -> rawKey.trim()
+    }
+    if (key.isBlank() || key.any { it.isWhitespace() || it == ':' }) return
+    keys.firstOrNull { it.equals(key, ignoreCase = true) }?.let(::remove)
+    put(key, trimmedValue)
+}
+
+private val m3uJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
 private fun readM3uAttribute(line: String, key: String): String? {
     val marker = "$key=\""

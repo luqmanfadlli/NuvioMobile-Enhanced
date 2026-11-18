@@ -64,6 +64,8 @@ actual fun PlatformPlayerSurface(
     playbackEngine: AndroidPlaybackEngine?,
     animeContent: Boolean,
     useNativeController: Boolean,
+    discPlaybackEnabled: Boolean,
+    liveStream: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -79,7 +81,8 @@ actual fun PlatformPlayerSurface(
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
     val experimentalSinglePrimaryPictureInPictureEnabled =
         IosExperimentalPictureInPictureSettingsStorage.loadSinglePrimaryRendererEnabled()
-    var subtitleText by remember(sourceUrl) { mutableStateOf("") }
+    var subtitleText by remember { mutableStateOf("") }
+    LaunchedEffect(sourceUrl) { subtitleText = "" }
     var subtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
 
     // Make room for the player's GPU/decoder memory (4K HDR/DV needs well over 1 GB).
@@ -290,6 +293,9 @@ actual fun PlatformPlayerSurface(
 
             override suspend fun getMediaInfo(): PlayerMediaInfo =
                 mpvMediaInfo { name -> bridge.getProperty(name).ifBlank { null } }
+
+            override suspend fun getChapters(): List<PlayerChapter> =
+                mpvChapters { name -> bridge.getProperty(name).ifBlank { null } }
 
             override fun selectSubtitleTrack(index: Int) {
                 InAppLogger.info("Player/iOS", "select subtitle track index=$index")
@@ -503,10 +509,11 @@ actual fun PlatformPlayerSurface(
             val durationMs = bridge.getDurationMs()
             if (durationMs > 0L && durationMs != chaptersDurationMs) {
                 chaptersDurationMs = durationMs
-                chapters = mpvChapters { name -> bridge.getProperty(name).ifBlank { null } }
+                chapters = PlayerChapters.normalize(mpvChapters { name -> bridge.getProperty(name).ifBlank { null } })
             }
             val snapshot = PlayerPlaybackSnapshot(
                 isLoading = bridge.getIsLoading(),
+                isOpening = bridge.getIsOpening(),
                 isPlaying = bridge.getIsPlaying(),
                 isEnded = bridge.getIsEnded(),
                 durationMs = durationMs,
@@ -566,7 +573,8 @@ actual fun PlatformPlayerSurface(
             },
             interactive = false,
         )
-        StyledSubtitleOverlay(subtitleText, subtitleStyle)
+        val subtitleCues = remember(subtitleText) { parseMpvSubtitleText(subtitleText) }
+        StyledSubtitleOverlay(subtitleCues, subtitleStyle)
         
         if (useNativeController) {
             var isPlayingLocal by remember { mutableStateOf(playWhenReady) }

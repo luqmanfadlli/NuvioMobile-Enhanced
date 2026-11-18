@@ -26,7 +26,6 @@ import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.rememberScreenActiveInfiniteFloat
 import com.nuvio.app.core.ui.themePalette
-import com.nuvio.app.features.downloads.DownloadStatus
 import com.nuvio.app.features.downloads.DownloadsRepository
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_root_downloads_title
@@ -42,7 +41,7 @@ internal fun LibraryDownloadsButton(onClick: () -> Unit) {
 
     IconButton(onClick = onClick) {
         when {
-            downloads.items.any { it.status == DownloadStatus.Downloading } -> FlowingDownloadIcon()
+            downloads.items.any { it.isActive } -> FlowingDownloadIcon()
             hasUnseenCompleted -> DownloadIcon(
                 modifier = Modifier.gradientMask(MaterialTheme.themePalette.accentBrush()),
                 tint = Color.White,

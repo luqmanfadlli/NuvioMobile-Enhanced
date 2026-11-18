@@ -38,6 +38,8 @@ internal data class SimklStoredAuthState(
     val tokenExpiresAtEpochMs: Long? = null,
     val pendingAuthorizationState: String? = null,
     val pendingAuthorizationStartedAtEpochMs: Long? = null,
+    /** AUTH V2 device flow `verification_uri_complete` (safe to display; the user still approves). */
+    val pendingVerificationUrl: String? = null,
     val authenticationMethod: String? = null,
 ) {
     val hasPendingAuthorization: Boolean

@@ -12,6 +12,7 @@ import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
 import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.downloads.BatchDownloadCoordinator
 import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
@@ -24,11 +25,13 @@ import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.SubtitleDevicePreferencesRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.search.SearchHistoryRepository
 import com.nuvio.app.features.search.SearchRepository
 import com.nuvio.app.features.servers.ServerRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.features.streams.PinnedStreamSourcesRepository
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
@@ -191,6 +194,7 @@ object ProfileRepository {
         CardDepthStyleRepository.onProfileChanged()
         PlayerSettingsRepository.onProfileChanged()
         StreamBadgeSettingsRepository.onProfileChanged()
+        PinnedStreamSourcesRepository.onProfileChanged()
         P2pSettingsRepository.onProfileChanged()
         HomeCatalogSettingsRepository.onProfileChanged()
         HomeRepository.clear()
@@ -206,6 +210,7 @@ object ProfileRepository {
         CollectionRepository.onProfileChanged()
         CollectionMobileSettingsRepository.onProfileChanged()
         DownloadsRepository.onProfileChanged()
+        BatchDownloadCoordinator.clearLocalState()
         ServerRepository.onProfileChanged()
         ProfileSettingsSync.onProfileChanged()
     }
@@ -320,6 +325,7 @@ object ProfileRepository {
                 log.w { "Profile $profileIndex was deleted, but local profile-lock cleanup could not be confirmed" }
             }
             ServerRepository.removeProfile(profileIndex)
+            SubtitleDevicePreferencesRepository.removeProfile(profileIndex)
             _state.value = _state.value.copy(
                 profiles = remaining,
                 activeProfile = if (_state.value.activeProfile?.profileIndex == profileIndex) {
@@ -341,6 +347,7 @@ object ProfileRepository {
             }
             SupabaseProvider.client.postgrest.rpc("sync_delete_profile_data", params)
             ServerRepository.removeProfile(profileIndex)
+            SubtitleDevicePreferencesRepository.removeProfile(profileIndex)
             // Remote deletion succeeded; remove device-local authentication artifacts even if
             // the subsequent profile refresh is interrupted or unavailable.
             val localLockCleanupSucceeded = withContext(Dispatchers.IO) {

@@ -11,6 +11,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -181,6 +182,10 @@ internal fun normalizeMimeType(contentType: String?): String? {
 
         "application/vnd.ms-sstr+xml" -> MimeTypes.APPLICATION_SS
 
+        "video/mp2t",
+        "video/mpeg2-ts",
+        "video/x-mpegts" -> MimeTypes.VIDEO_MP2T
+
         "video/mp4",
         "application/mp4",
         "video/x-m4v" -> MimeTypes.VIDEO_MP4
@@ -231,7 +236,10 @@ private fun inferMimeTypeFromQuery(query: String): String? {
 
     query.split('&').forEach { parameter ->
         val key = parameter.substringBefore('=', missingDelimiterValue = "").trim()
-        val value = parameter.substringAfter('=', missingDelimiterValue = "").trim()
+        val rawValue = parameter.substringAfter('=', missingDelimiterValue = "").trim()
+        val value = runCatching {
+            URLDecoder.decode(rawValue.replace("+", "%2B"), Charsets.UTF_8.name())
+        }.getOrDefault(rawValue).lowercase(Locale.US)
         if (key.isBlank() || value.isBlank()) return@forEach
 
         when (key) {
@@ -299,11 +307,25 @@ internal fun probeMimeType(url: String, headers: Map<String, String>): String? {
                 .apply { headers.forEach { (key, value) -> header(key, value) } }
                 .build()
             mimeProbeHttpClient.newCall(request).execute().use { response ->
-                if (response.code in 200..299) normalizeMimeType(response.header("Content-Type")) else null
+                if (response.code !in 200..299) return@use null
+                normalizeMimeType(response.header("Content-Type"))
+                    ?: if (method == "GET") response.body.byteStream().use { mimeTypeFromRemoteHeader(it.readHeaderBytes()) } else null
             }
         }.getOrNull()?.let { return it }
     }
     return null
+}
+
+private fun mimeTypeFromRemoteHeader(header: ByteArray): String? {
+    if (header.isEmpty()) return null
+    val text = header.decodeToString().trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+    return when {
+        text.startsWith("#EXTM3U", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+        text.contains("<MPD", ignoreCase = true) -> MimeTypes.APPLICATION_MPD
+        text.contains("<SmoothStreamingMedia", ignoreCase = true) -> MimeTypes.APPLICATION_SS
+        header[0] == MPEG_TS_SYNC_BYTE -> MimeTypes.VIDEO_MP2T
+        else -> mimeTypeFromHeader(header)
+    }
 }
 
 private val mimeProbeHttpClient by lazy {

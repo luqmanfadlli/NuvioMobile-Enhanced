@@ -19,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +37,21 @@ import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.watching.application.WatchingState
+
+@Composable
+internal fun rememberPosterGridColumnCount(availableWidth: Dp): Int {
+    val windowSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    return remember(availableWidth, windowSize, density) {
+        val windowWidth = with(density) { windowSize.width.toDp() }
+        val windowHeight = with(density) { windowSize.height.toDp() }
+        when {
+            windowWidth <= windowHeight -> posterGridColumnCountForWidth(availableWidth)
+            minOf(windowWidth, windowHeight) >= 600.dp -> 7
+            else -> 6
+        }
+    }
+}
 
 internal fun posterGridColumnCountForWidth(screenWidth: Dp): Int =
     when {
@@ -54,6 +71,7 @@ internal fun PosterGridRow(
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    cellOverride: (@Composable (index: Int, modifier: Modifier) -> (@Composable () -> Unit)?)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
 
@@ -62,12 +80,16 @@ internal fun PosterGridRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        items.forEach { item ->
-            PosterGridTile(
+        items.forEachIndexed { index, item ->
+            val cellModifier = Modifier.weight(1f)
+            val overrideContent = cellOverride?.invoke(index, cellModifier)
+            if (overrideContent != null) {
+                overrideContent()
+            } else PosterGridTile(
                 item = item,
                 cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                 hideLabels = posterCardStyle.hideLabelsEnabled,
-                modifier = Modifier.weight(1f),
+                modifier = cellModifier,
                 isWatched = WatchingState.isPosterWatched(
                     watchedKeys = watchedKeys,
                     item = item,

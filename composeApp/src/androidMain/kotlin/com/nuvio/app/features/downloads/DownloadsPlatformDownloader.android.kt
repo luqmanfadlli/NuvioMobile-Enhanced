@@ -15,6 +15,9 @@ import java.io.File
 import java.net.URI
 
 internal actual object DownloadsPlatformDownloader {
+    // Transfers stream into a .part file and resume with a Range request.
+    actual val restartKeepsProgress: Boolean = true
+
     private var appContext: Context? = null
     private var downloadScheduler: AndroidDownloadScheduler? = null
     private val observerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -35,12 +38,17 @@ internal actual object DownloadsPlatformDownloader {
     actual fun restoreItem(item: DownloadItem): DownloadItem = downloadScheduler?.restore(item)
         ?: if (item.status == DownloadStatus.Downloading) item.copy(status = DownloadStatus.Paused) else item
 
+    actual fun pauseRestoredItem(item: DownloadItem) { downloadScheduler?.pause(item.fileName) }
+
+    actual fun clearUnfinishedTransfers() { downloadScheduler?.clearUnfinishedTransfers() }
+
     actual fun start(
         request: DownloadPlatformRequest,
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
         onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
         onFailure: (message: String) -> Unit,
         onPaused: () -> Unit,
+        onQueued: () -> Unit,
     ): DownloadsTaskHandle {
         val scheduler = checkNotNull(downloadScheduler) { "Downloads are not initialized" }
         val transfer = scheduler.enqueue(request.item)
@@ -55,6 +63,7 @@ internal actual object DownloadsPlatformDownloader {
                         DownloadStatus.Completed -> onSuccess(checkNotNull(item.localFileUri), item.totalBytes)
                         DownloadStatus.Failed -> onFailure(item.errorMessage ?: "Download failed")
                         DownloadStatus.Paused -> onPaused()
+                        DownloadStatus.Queued -> onQueued()
                     }
                     item.status == DownloadStatus.Downloading
                 }.collect()

@@ -7,4 +7,5 @@ package com.nuvio.app.features.downloads
 internal expect object DownloadNetworkGuard {
     /** True when the current connection is Wi-Fi (or no metered/cellular transport is active). */
     fun isOnWifi(): Boolean
+    val transportState: kotlinx.coroutines.flow.StateFlow<Boolean>
 }

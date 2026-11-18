@@ -352,6 +352,7 @@ internal fun Modifier.ambientLiquidGlass(
     withShadow: Boolean = false,
     fallbackBrush: Brush? = null,
     backdropOpacity: Float = 1f,
+    staticFromBackdrop: Boolean = false,
 ): Modifier {
     val backdrop = LocalLiquidGlassBackdrop.current
     val host = backdrop as? LiquidGlassBackdropHost
@@ -362,6 +363,9 @@ internal fun Modifier.ambientLiquidGlass(
         }
     }
     val ready = backdrop != null && (host?.isReady ?: true)
+    if (staticFromBackdrop && ready && backdrop is NuvioBackdrop && !isLiquidGlassSupported()) {
+        return clip(shape) then StaticBackdropGlassElement(backdrop, tint)
+    }
     return liquidGlassSurface(
         backdrop = if (ready) backdrop else null,
         shape = shape,
@@ -376,4 +380,54 @@ internal fun Modifier.ambientLiquidGlass(
         fallbackBrush = fallbackBrush,
         backdropOpacity = backdropOpacity,
     )
+}
+
+private class StaticBackdropGlassElement(
+    val backdrop: NuvioBackdrop,
+    val tint: Color,
+) : ModifierNodeElement<StaticBackdropGlassNode>() {
+
+    override fun create(): StaticBackdropGlassNode = StaticBackdropGlassNode(backdrop, tint)
+
+    override fun update(node: StaticBackdropGlassNode) {
+        node.backdrop = backdrop
+        node.tint = tint
+        node.invalidateDraw()
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "staticBackdropGlass"
+        properties["backdrop"] = backdrop
+        properties["tint"] = tint
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is StaticBackdropGlassElement) return false
+        return backdrop == other.backdrop && tint == other.tint
+    }
+
+    override fun hashCode(): Int = 31 * backdrop.hashCode() + tint.hashCode()
+}
+
+private class StaticBackdropGlassNode(
+    var backdrop: NuvioBackdrop,
+    var tint: Color,
+) : DrawModifierNode, GlobalPositionAwareModifierNode, Modifier.Node() {
+
+    private var coordinates: LayoutCoordinates? = null
+
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
+        this.coordinates = coordinates
+        invalidateDraw()
+    }
+
+    override fun ContentDrawScope.draw() {
+        val target = coordinates
+        if (target != null) {
+            with(backdrop) { drawBackdrop(requireDensity(), target, null) }
+        }
+        if (tint.alpha > 0f) drawRect(tint)
+        drawContent()
+    }
 }

@@ -100,7 +100,8 @@ internal class MdbListProgressProjection(snapshot: MdbListSyncSnapshot) {
         runtime: Int?,
         source: String,
     ): WatchProgressEntry {
-        val duration = (runtime ?: media.runtimeMinutes ?: 0).toLong() * 60_000L
+        val minutes = runtime ?: media.runtimeMinutes.takeIf { type == MdbListItemType.MOVIE }
+        val duration = (minutes ?: 0).toLong() * 60_000L
         return WatchProgressEntry(
             contentType = type.contentType,
             parentMetaId = media.ids.contentId,

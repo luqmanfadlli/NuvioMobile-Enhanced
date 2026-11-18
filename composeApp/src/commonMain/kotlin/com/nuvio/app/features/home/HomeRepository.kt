@@ -101,13 +101,22 @@ object HomeRepository {
         activeJob?.cancel()
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         activeJob = scope.launch {
+            val settingsSnapshot = HomeCatalogSettingsRepository.snapshot()
             val prioritizedRequests = prioritizeDefinitions(
                 definitions = requests,
-                snapshot = HomeCatalogSettingsRepository.snapshot(),
+                snapshot = settingsSnapshot,
             )
             val loadedSections = linkedMapOf<String, HomeCatalogSection>().apply {
                 putAll(cachedSections)
             }
+            val heroSourceKeys = prioritizedRequests
+                .filter { definition ->
+                    settingsSnapshot.heroEnabled &&
+                        settingsSnapshot.preferences[definition.key]?.heroSourceEnabled != false
+                }
+                .mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
+            val attemptedKeys = mutableSetOf<String>()
+            var heroSourcesPublished = false
             var firstErrorMessage: String? = null
             var publishedOnce = false
             var lastPublishMark = TimeSource.Monotonic.markNow()
@@ -135,15 +144,23 @@ object HomeRepository {
                 if (firstErrorMessage == null) {
                     firstErrorMessage = result.exceptionOrNull()?.message
                 }
+                attemptedKeys += request.cacheKey
+                val heroSourcesResolved = attemptedKeys.containsAll(heroSourceKeys)
                 cachedSections = loadedSections.toMap()
                 lastErrorMessage = firstErrorMessage
-                if (!publishedOnce || lastPublishMark.elapsedNow().inWholeMilliseconds >= HOME_CATALOG_PUBLISH_THROTTLE_MS) {
+                if (
+                    !publishedOnce ||
+                    lastPublishMark.elapsedNow().inWholeMilliseconds >= HOME_CATALOG_PUBLISH_THROTTLE_MS ||
+                    (heroSourcesResolved && !heroSourcesPublished)
+                ) {
                     publishedOnce = true
                     lastPublishMark = TimeSource.Monotonic.markNow()
                     publishCurrentState(
                         isLoading = true,
                         requestKey = requestKey,
+                        heroSourcesResolved = heroSourcesResolved,
                     )
+                    heroSourcesPublished = heroSourcesResolved
                 }
             }
 
@@ -220,6 +237,10 @@ object HomeRepository {
 
     private fun applySnapshot(snapshot: HomeSnapshot) {
         if (snapshot.sections.isEmpty()) return
+        HomeHeroDebugLog.log(
+            "home.savedSnapshot",
+            "sections=${snapshot.sections.size} heroItems=${snapshot.heroItems.size} first=${snapshot.heroItems.take(3).joinToString(",") { it.name }}",
+        )
         cachedSections = snapshot.sections.toMap()
         _uiState.value = HomeUiState(
             isLoading = true,
@@ -249,6 +270,7 @@ object HomeRepository {
         isLoading: Boolean,
         requestKey: String?,
         keepVisibleHeroWhilePending: Boolean = true,
+        heroSourcesResolved: Boolean = !isLoading,
     ) {
         if (currentDefinitions.isEmpty() && cachedSections.isNotEmpty()) return
         val snapshot = HomeCatalogSettingsRepository.snapshot()
@@ -262,7 +284,7 @@ object HomeRepository {
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
 
         val entries = currentDefinitions
-            .sortedBy { definition -> preferences[definition.key]?.order ?: Int.MAX_VALUE }
+            .let { orderHomeCatalogDefinitions(it, snapshot) }
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
                 if (preference?.enabled == false) return@mapNotNull null
@@ -282,6 +304,16 @@ object HomeRepository {
         }
         val sections = entries.map { (_, section) -> section }
 
+        if (snapshot.heroEnabled && !heroSourcesResolved) {
+            _uiState.value = HomeUiState(
+                isLoading = isLoading,
+                heroItems = _uiState.value.heroItems,
+                sections = sections,
+                errorMessage = if (sections.isEmpty()) lastErrorMessage else null,
+            )
+            return
+        }
+
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
             currentDefinitions
@@ -296,6 +328,16 @@ object HomeRepository {
             emptyList()
         }
         lastPublishedCatalogHeroEmpty = snapshot.heroEnabled && catalogHeroItems.isEmpty()
+        if (snapshot.heroEnabled) {
+            val heroDefinitions = currentDefinitions.filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
+            HomeHeroDebugLog.log(
+                "home.heroSources",
+                "loading=$isLoading definitions=${currentDefinitions.size} preferences=${preferences.size} " +
+                    "chosen=${heroDefinitions.filter { preferences[it.key] != null }.joinToString(",") { it.key }.ifEmpty { "none" }} " +
+                    "withoutPreference=${heroDefinitions.filter { preferences[it.key] == null }.joinToString(",") { it.key }.ifEmpty { "none" }} " +
+                    "loaded=${heroDefinitions.count { cachedSections[it.cacheKey] != null }}/${heroDefinitions.size} items=${catalogHeroItems.size}",
+            )
+        }
         val visibleHeroItems = _uiState.value.heroItems
         val heroItems = if (snapshot.heroEnabled) {
             if (
@@ -311,6 +353,18 @@ object HomeRepository {
             emptyList()
         }
 
+        if (snapshot.heroEnabled) {
+            val origin = when {
+                heroItems === visibleHeroItems && heroItems !== catalogHeroItems -> "keptVisible"
+                catalogHeroItems.isNotEmpty() -> "catalogs"
+                heroItems.isNotEmpty() -> "collectionFallback"
+                else -> "empty"
+            }
+            HomeHeroDebugLog.log(
+                "home.heroItems",
+                "origin=$origin loading=$isLoading count=${heroItems.size} first=${heroItems.take(3).joinToString(",") { it.name }}",
+            )
+        }
         _uiState.value = HomeUiState(
             isLoading = isLoading,
             heroItems = heroItems,

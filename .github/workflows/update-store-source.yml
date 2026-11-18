@@ -12,6 +12,10 @@ on:
       version:
         required: true
         type: string
+      prerelease:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -22,13 +26,14 @@ concurrency:
 
 jobs:
   update:
-    name: Update store.json
+    name: Update ${{ (inputs.prerelease || github.event.release.prerelease) && 'store-beta.json' || 'store.json' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
       RELEASE_VERSION: ${{ inputs.version || github.event.release.tag_name }}
       RELEASE_BRANCH: ${{ github.event.repository.default_branch }}
+      SOURCE_FILE: ${{ (inputs.prerelease || github.event.release.prerelease) && 'store-beta.json' || 'store.json' }}
 
     steps:
       - name: Check out default branch
@@ -90,7 +95,7 @@ jobs:
 
           jq -rj '.body // ""' "${release_json}" > "${release_notes}"
           python3 scripts/update-store-source.py \
-            --source store.json \
+            --source "${SOURCE_FILE}" \
             --ipa "source-assets/${ipa_name}" \
             --release-notes "${release_notes}" \
             --release-version "${RELEASE_VERSION%-beta}" \
@@ -99,13 +104,17 @@ jobs:
 
       - name: Commit sideload source
         run: |
-          if [[ -z "$(git status --porcelain -- store.json)" ]]; then
-            echo "store.json is already current for ${RELEASE_VERSION}."
+          if [[ -z "$(git status --porcelain -- "${SOURCE_FILE}")" ]]; then
+            echo "${SOURCE_FILE} is already current for ${RELEASE_VERSION}."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add store.json
-          git commit -m "chore(store): publish ${RELEASE_VERSION}"
+          git add "${SOURCE_FILE}"
+          if [[ "${SOURCE_FILE}" == "store-beta.json" ]]; then
+            git commit -m "chore(store-beta): publish ${RELEASE_VERSION}"
+          else
+            git commit -m "chore(store): publish ${RELEASE_VERSION}"
+          fi
           git push origin "HEAD:${RELEASE_BRANCH}"

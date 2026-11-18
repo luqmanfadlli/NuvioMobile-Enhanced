@@ -52,6 +52,8 @@ internal fun buildSimklAuthorizationUrl(
     append(clientId.encodeURLParameter())
     append("&redirect_uri=")
     append(redirectUri.encodeURLParameter())
+    append("&scope=")
+    append(SIMKL_OAUTH2_SCOPE.encodeURLParameter())
     append("&code_challenge=")
     append(material.challenge.encodeURLParameter())
     append("&code_challenge_method=S256")
