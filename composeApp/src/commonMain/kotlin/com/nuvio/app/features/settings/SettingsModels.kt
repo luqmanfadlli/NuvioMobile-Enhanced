@@ -262,6 +262,11 @@ internal enum class SettingsPage(
         category = SettingsCategory.Services,
         parentPage = Integrations,
     ),
+    Telegram(
+        titleRes = Res.string.settings_telegram_title,
+        category = SettingsCategory.Services,
+        parentPage = Integrations,
+    ),
     TraktAuthentication(
         titleRes = Res.string.compose_settings_page_tracking,
         category = SettingsCategory.Services,
@@ -325,4 +330,5 @@ internal val SettingsPage.icon: ImageVector
         SettingsPage.Omdb -> Icons.Default.Link
         SettingsPage.LiveTv -> Icons.Default.LiveTv
         SettingsPage.DiscordRpc -> Icons.Default.Link
+        SettingsPage.Telegram -> Icons.Default.Link
     }

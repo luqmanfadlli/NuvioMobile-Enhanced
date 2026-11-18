@@ -31,6 +31,7 @@ internal fun LazyListScope.integrationsContent(
     onOmdbClick: () -> Unit,
     onLiveTvClick: () -> Unit,
     onDiscordClick: () -> Unit,
+    onTelegramClick: (() -> Unit)? = null,
 ) {
     item {
         SettingsSection(
@@ -85,6 +86,16 @@ internal fun LazyListScope.integrationsContent(
                         icon = Icons.Rounded.Forum,
                         isTablet = isTablet,
                         onClick = onDiscordClick,
+                    )
+                }
+                if (onTelegramClick != null) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_telegram_title),
+                        description = stringResource(Res.string.settings_telegram_description),
+                        iconPainter = integrationLogoPainter(IntegrationLogo.Telegram),
+                        isTablet = isTablet,
+                        onClick = onTelegramClick,
                     )
                 }
             }
