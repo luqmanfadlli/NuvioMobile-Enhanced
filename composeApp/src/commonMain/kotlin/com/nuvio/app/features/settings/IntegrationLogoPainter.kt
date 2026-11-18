@@ -9,6 +9,7 @@ internal enum class IntegrationLogo {
     Simkl,
     MdbList,
     IntroDb,
+    Telegram,
 }
 
 @Composable

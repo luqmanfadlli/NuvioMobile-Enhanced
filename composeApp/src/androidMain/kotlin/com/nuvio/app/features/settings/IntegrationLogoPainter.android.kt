@@ -19,4 +19,5 @@ internal actual fun integrationLogoPainter(logo: IntegrationLogo): Painter =
         IntegrationLogo.Simkl -> simklBrandPainter(SimklBrandAsset.Glyph)
         IntegrationLogo.MdbList -> painterResource(id = R.drawable.mdblist_logo)
         IntegrationLogo.IntroDb -> composePainterResource(Res.drawable.introdb_favicon)
+        IntegrationLogo.Telegram -> painterResource(id = R.drawable.telegram_logo)
     }

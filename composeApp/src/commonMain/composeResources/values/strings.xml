@@ -3234,4 +3234,9 @@
     <string name="batch_download_failed_multiple">%1$d episodes could not be queued</string>
     <string name="downloads_section_movies">Movies</string>
     <string name="downloads_status_completed">Completed • %1$s</string>
+    <string name="settings_telegram_title">Telegram</string>
+    <string name="settings_telegram_description">Find playable video files in your selected Telegram channels and groups.</string>
+    <string name="settings_telegram_build_index">Build media index</string>
+    <string name="settings_telegram_update_index">Build / update media index</string>
+    <string name="settings_telegram_indexed_media_count">%1$d media files indexed · %2$s</string>
 </resources>
