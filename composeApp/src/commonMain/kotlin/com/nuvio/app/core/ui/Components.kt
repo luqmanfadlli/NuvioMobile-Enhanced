@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -259,6 +260,12 @@ fun NuvioScreenHeader(
                         style = MaterialTheme.typography.displayLarge,
                         color = tokens.colors.textPrimary,
                         textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = MaterialTheme.typography.displayLarge.fontSize * 0.6f,
+                            maxFontSize = MaterialTheme.typography.displayLarge.fontSize,
+                        ),
                     )
                 }
             }
