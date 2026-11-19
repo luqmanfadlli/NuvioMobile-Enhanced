@@ -68,7 +68,8 @@ internal object SmartStreamRanking {
         val lines = when (settings.resolutionLimit) {
             SmartResolutionLimit.AUTO -> {
                 val capable = if (device.memoryTier == SmartMemoryTier.AMPLE) device.maxComfortableLines else 1080
-                if (saveData) min(capable, 1080) else capable
+                val aim = min(device.videoLines, capable)
+                if (saveData) min(aim, 1080) else aim
             }
             SmartResolutionLimit.P1080 -> 1080
             SmartResolutionLimit.P4K -> 2160
@@ -224,11 +225,12 @@ internal object SmartStreamRanking {
     internal fun languageScore(languages: SmartStreamLanguages, preferred: List<String>): Double {
         val primary = preferred.firstOrNull() ?: return 0.0
         val secondary = preferred.drop(1).toSet()
+        val codes = if (primary == "en" && languages.codes.isEmpty() && !languages.multiAudio) setOf("en") else languages.codes
         return when {
-            primary in languages.codes -> 30.0
-            languages.codes.any { it in secondary } -> 20.0
-            languages.multiAudio && languages.codes.isEmpty() -> 8.0
-            languages.codes.isNotEmpty() -> -25.0
+            primary in codes -> 30.0
+            codes.any { it in secondary } -> 20.0
+            languages.multiAudio && codes.isEmpty() -> 8.0
+            codes.isNotEmpty() -> -25.0
             else -> 0.0
         }
     }
