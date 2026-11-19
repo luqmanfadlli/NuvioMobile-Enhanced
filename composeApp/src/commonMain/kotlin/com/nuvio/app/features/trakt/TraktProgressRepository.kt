@@ -8,6 +8,7 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.watchprogress.WatchProgressCompletionPercentThreshold
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktPlayback
@@ -45,7 +46,6 @@ import kotlinx.serialization.json.Json
 import kotlin.math.abs
 
 private const val BASE_URL = "https://api.trakt.tv"
-private const val TRAKT_COMPLETION_PERCENT_THRESHOLD = 90f
 private const val HISTORY_PAGE_LIMIT = 1000
 private const val HISTORY_MAX_PAGES = 5
 private const val HISTORY_MAX_PAGES_ALL = 20
@@ -1286,7 +1286,7 @@ object TraktProgressRepository {
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
-            isCompleted = progressPercent >= TRAKT_COMPLETION_PERCENT_THRESHOLD,
+            isCompleted = progressPercent >= WatchProgressCompletionPercentThreshold,
             progressPercent = progressPercent,
             source = WatchProgressSourceTraktPlayback,
         ).normalizedCompletion()
@@ -1321,7 +1321,7 @@ object TraktProgressRepository {
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
-            isCompleted = progressPercent >= TRAKT_COMPLETION_PERCENT_THRESHOLD,
+            isCompleted = progressPercent >= WatchProgressCompletionPercentThreshold,
             progressPercent = progressPercent,
             source = WatchProgressSourceTraktPlayback,
         ).normalizedCompletion()

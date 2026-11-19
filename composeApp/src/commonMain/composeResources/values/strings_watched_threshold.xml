@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_watched_threshold_section">Watch progress</string>
+    <string name="settings_watched_threshold_title">Watched threshold</string>
+    <string name="settings_watched_threshold_description">Movies and episodes count as watched at %1$d%. Below that, Continue Watching keeps your resume point.</string>
+    <string name="settings_watched_threshold_option">%1$d%</string>
+</resources>
