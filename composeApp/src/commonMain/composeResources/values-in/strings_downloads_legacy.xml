@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_legacy_mode_title">Download lama</string>
+    <string name="downloads_legacy_mode_description">Tulis unduhan langsung ke folder unduhan seperti Nuvio asli. Unduhan dijeda saat aplikasi berada di latar belakang. Coba ini jika unduhan yang selesai gagal disimpan.</string>
+</resources>

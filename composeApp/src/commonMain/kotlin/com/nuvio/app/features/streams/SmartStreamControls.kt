@@ -64,6 +64,7 @@ import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.backdropControlColor
 import com.nuvio.app.core.ui.glass.ambientLiquidGlass
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.downloads.DownloadNetworkGuard
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -83,7 +84,8 @@ internal fun rememberSmartStreams(
     isEpisode: Boolean,
 ): SmartStreamsState {
     val settings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
-    val device = remember { currentSmartDeviceProfile() }
+    val onWifi by DownloadNetworkGuard.transportState.collectAsStateWithLifecycle()
+    val device = remember(onWifi) { currentSmartDeviceProfile() }
     DisposableEffect(Unit) {
         onDispose { SmartStreamSettingsRepository.onStreamsScreenClosed() }
     }

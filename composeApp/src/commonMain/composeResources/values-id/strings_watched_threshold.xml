@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_watched_threshold_section">Progres tontonan</string>
+    <string name="settings_watched_threshold_title">Batas selesai ditonton</string>
+    <string name="settings_watched_threshold_description">Film dan episode dianggap sudah ditonton pada %1$d%. Di bawah itu, Lanjutkan Menonton menyimpan posisi terakhir.</string>
+    <string name="settings_watched_threshold_option">%1$d%</string>
+</resources>

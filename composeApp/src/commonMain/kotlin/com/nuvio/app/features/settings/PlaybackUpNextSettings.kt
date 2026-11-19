@@ -27,6 +27,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
+import com.nuvio.app.features.watching.domain.WatchedThresholdSettings
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -207,6 +210,50 @@ internal fun PlaybackUpNextSettings(
                         }
                     }
                 }
+            }
+        }
+        WatchedThresholdSection(isTablet = isTablet)
+    }
+}
+
+@Composable
+private fun WatchedThresholdSection(isTablet: Boolean) {
+    val percent by WatchedThresholdSettings.percent.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { WatchedThresholdSettings.currentPercent() }
+    var showDialog by remember { mutableStateOf(false) }
+    SettingsSection(
+        title = stringResource(Res.string.settings_watched_threshold_section),
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            SettingsNavigationRow(
+                title = stringResource(Res.string.settings_watched_threshold_title),
+                description = stringResource(Res.string.settings_watched_threshold_description, percent),
+                isTablet = isTablet,
+                onClick = { showDialog = true },
+            )
+        }
+    }
+    if (showDialog) {
+        DialogSurface(
+            onDismissRequest = { showDialog = false },
+            title = stringResource(Res.string.settings_watched_threshold_title),
+        ) {
+            WatchedThresholdSettings.options.forEach { option ->
+                DialogOption(
+                    text = stringResource(Res.string.settings_watched_threshold_option, option),
+                    selected = option == percent,
+                    onClick = {
+                        WatchedThresholdSettings.setPercent(option)
+                        showDialog = false
+                    },
+                )
+            }
+            DialogButtons {
+                DialogButton(
+                    text = stringResource(Res.string.action_done),
+                    onClick = { showDialog = false },
+                )
             }
         }
     }

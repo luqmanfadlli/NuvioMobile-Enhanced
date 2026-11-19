@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 object DownloadsSettingsRepository {
     private const val PREFERRED_RESOLUTION_KEY = "preferred_download_resolution"
+    private const val LEGACY_DOWNLOADS_KEY = "legacy_ios_downloads"
     private val _allowMobileDataDownloads = MutableStateFlow(false)
     val allowMobileDataDownloads: StateFlow<Boolean> = _allowMobileDataDownloads.asStateFlow()
 
@@ -28,6 +29,9 @@ object DownloadsSettingsRepository {
     )
     val concurrencyLimits: StateFlow<Map<DownloadConcurrencyLimit, Int>> = _concurrencyLimits.asStateFlow()
 
+    private val _legacyDownloads = MutableStateFlow(false)
+    val legacyDownloads: StateFlow<Boolean> = _legacyDownloads.asStateFlow()
+
     private var hasLoaded = false
 
     fun ensureLoaded() {
@@ -40,6 +44,7 @@ object DownloadsSettingsRepository {
             DownloadsSettingsStorage.loadInt(limit.storageKey)?.let(limit::clamp) ?: limit.defaultValue
         }
         _downloadLocationUri.value = DownloadsStorage.getDownloadLocationUri()
+        _legacyDownloads.value = DownloadsSettingsStorage.loadString(LEGACY_DOWNLOADS_KEY) == "true"
     }
 
     fun setAllowMobileDataDownloads(enabled: Boolean) {
@@ -54,6 +59,13 @@ object DownloadsSettingsRepository {
         if (_showDownloadButton.value == enabled) return
         _showDownloadButton.value = enabled
         DownloadsSettingsStorage.saveShowDownloadButton(enabled)
+    }
+
+    fun setLegacyDownloads(enabled: Boolean) {
+        ensureLoaded()
+        if (_legacyDownloads.value == enabled) return
+        _legacyDownloads.value = enabled
+        DownloadsSettingsStorage.saveString(LEGACY_DOWNLOADS_KEY, enabled.toString())
     }
 
     fun setPreferredResolution(resolution: DownloadPreferredResolution) {
