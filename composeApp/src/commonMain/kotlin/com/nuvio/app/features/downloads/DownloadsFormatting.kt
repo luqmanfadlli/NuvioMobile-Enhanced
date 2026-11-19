@@ -49,7 +49,7 @@ internal fun calculateSeriesDownloadStats(episodes: List<DownloadItem>): SeriesD
 
 @Composable
 internal fun formatDownloadPercent(progress: Float): String =
-    stringResource(Res.string.downloads_progress_percent, (progress * 100f).toInt())
+    stringResource(Res.string.downloads_progress_percent, (progress * 100f).toInt()).replace("%%", "%")
 
 private enum class ByteUnit(val bytes: Double) {
     B(1.0),
