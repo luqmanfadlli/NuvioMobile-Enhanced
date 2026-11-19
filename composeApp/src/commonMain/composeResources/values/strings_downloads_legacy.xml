@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_legacy_mode_title">Legacy download</string>
+    <string name="downloads_legacy_mode_description">Write downloads straight into the downloads folder like the original Nuvio. Downloads pause when the app goes to the background. Try this if finished downloads fail to save.</string>
+</resources>

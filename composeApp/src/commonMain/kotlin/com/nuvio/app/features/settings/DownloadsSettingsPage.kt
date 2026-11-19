@@ -10,6 +10,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.downloads.DownloadConcurrencyLimit
 import com.nuvio.app.features.downloads.DownloadPreferredResolution
 import com.nuvio.app.features.downloads.DownloadsSettingsRepository
+import com.nuvio.app.isIos
+import nuvio.composeapp.generated.resources.downloads_legacy_mode_description
+import nuvio.composeapp.generated.resources.downloads_legacy_mode_title
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_root_downloads_title
 import nuvio.composeapp.generated.resources.settings_downloads_location_private
@@ -38,6 +41,7 @@ internal fun LazyListScope.downloadsSettingsContent(
         val showDownloadButton by DownloadsSettingsRepository.showDownloadButton.collectAsStateWithLifecycle()
         val preferredResolution by DownloadsSettingsRepository.preferredResolution.collectAsStateWithLifecycle()
         val concurrencyLimits by DownloadsSettingsRepository.concurrencyLimits.collectAsStateWithLifecycle()
+        val legacyDownloads by DownloadsSettingsRepository.legacyDownloads.collectAsStateWithLifecycle()
         var showPicker by remember { mutableStateOf(false) }
         var showResolutionDialog by remember { mutableStateOf(false) }
 
@@ -80,6 +84,16 @@ internal fun LazyListScope.downloadsSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = DownloadsSettingsRepository::setShowDownloadButton,
                 )
+                if (isIos) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.downloads_legacy_mode_title),
+                        description = stringResource(Res.string.downloads_legacy_mode_description),
+                        checked = legacyDownloads,
+                        isTablet = isTablet,
+                        onCheckedChange = DownloadsSettingsRepository::setLegacyDownloads,
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_downloads_location_title),
