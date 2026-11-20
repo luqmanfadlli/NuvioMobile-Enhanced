@@ -155,6 +155,7 @@ private fun CollectionFolderCard(
                             animateIfPossible = animateGifs &&
                                 isAnimatedCollectionFolderImage(folder, imageUrl) &&
                                 LocalScreenActive.current,
+                            fallbackImageUrl = firstNonBlank(folder.coverImageUrl),
                         )
                     }
                     !folder.coverEmoji.isNullOrBlank() -> {
@@ -197,10 +198,16 @@ private fun CollectionFolderCard(
 
 private fun collectionFolderCardImageUrl(folder: CollectionFolder): String? {
     return if (folder.mobileFocusGifEnabled) {
-        firstNonBlank(folder.focusGifUrl, folder.coverImageUrl)
+        firstNonBlank(folder.focusGifUrl?.withPlayableGifExtension(), folder.coverImageUrl)
     } else {
         firstNonBlank(folder.coverImageUrl)
     }
+}
+
+private fun String.withPlayableGifExtension(): String {
+    val path = substringBefore('?').substringBefore('#')
+    if (!path.endsWith(".gifv", ignoreCase = true)) return this
+    return path.dropLast(1) + removePrefix(path)
 }
 
 private fun firstNonBlank(vararg candidates: String?): String? {
@@ -211,6 +218,6 @@ private fun isAnimatedCollectionFolderImage(
     folder: CollectionFolder,
     imageUrl: String,
 ): Boolean {
-    val gifUrl = firstNonBlank(folder.focusGifUrl) ?: return false
+    val gifUrl = firstNonBlank(folder.focusGifUrl?.withPlayableGifExtension()) ?: return false
     return folder.mobileFocusGifEnabled && imageUrl == gifUrl
 }
