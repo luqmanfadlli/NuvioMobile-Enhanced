@@ -147,6 +147,7 @@ private data class StoredHomeCatalogSettingsPayload(
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
+    val heroSourcesChosen: Boolean? = null,
 )
 
 object HomeCatalogSettingsRepository {
@@ -183,6 +184,7 @@ object HomeCatalogSettingsRepository {
     private var heroTrailerStartUnmuted = false
     private var showCatalogType = true
     private var hideUnreleasedContent = false
+    private var heroSourcesChosen = false
 
     fun onProfileChanged() {
         hasLoaded = false
@@ -194,6 +196,7 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        heroSourcesChosen = false
         definitions = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
@@ -215,6 +218,7 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        heroSourcesChosen = false
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -344,6 +348,11 @@ object HomeCatalogSettingsRepository {
 
     fun setHeroSourceEnabled(key: String, enabled: Boolean) {
         HomeHeroDebugLog.log("settings.userToggle", "key=$key enabled=$enabled")
+        ensureLoaded()
+        if (!heroSourcesChosen) {
+            heroSourcesChosen = true
+            persist()
+        }
         updatePreference(key, pushRemote = false, heroSourcesChanged = true) { preference ->
             if (!enabled) {
                 preference.copy(heroSourceEnabled = false)
@@ -384,6 +393,7 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        heroSourcesChosen = false
         preferences = emptyMap()
         normalizePreferences()
         publish()
@@ -498,6 +508,7 @@ object HomeCatalogSettingsRepository {
                 "settings.load",
                 "items=${preferences.size} heroEnabled=$heroEnabled heroSources=${HomeHeroDebugLog.heroKeys(preferences.mapValues { it.value.heroSourceEnabled })}",
             )
+            heroSourcesChosen = parsedPayload.heroSourcesChosen ?: hasStoredHeroChoice(parsedPayload.items)
             publish()
             return
         }
@@ -507,8 +518,12 @@ object HomeCatalogSettingsRepository {
         }.getOrDefault(emptyList())
 
         preferences = legacyItems.associateBy { it.key }
+        heroSourcesChosen = hasStoredHeroChoice(legacyItems)
         publish()
     }
+
+    private fun hasStoredHeroChoice(items: List<StoredHomeCatalogPreference>): Boolean =
+        items.any { it.heroSourceEnabled && !it.key.startsWith("collection_") }
 
     private fun normalizePreferences() {
         val current = preferences
@@ -535,11 +550,20 @@ object HomeCatalogSettingsRepository {
         val normalized = current
             .filterKeys { it !in knownKeys }
             .toMutableMap()
-        val hasHeroChoice = current.values.any { it.heroSourceEnabled && !it.key.startsWith("collection_") }
-        val chosenHeroKeys = orderedEntries
-            .filter { entry -> !entry.isCollection && current[entry.key]?.heroSourceEnabled == true }
-            .take(HERO_SOURCE_SELECTION_LIMIT)
-            .mapTo(mutableSetOf()) { it.key }
+        val hasHeroChoice = !heroSourcesChosen ||
+            current.values.any { it.heroSourceEnabled && !it.key.startsWith("collection_") }
+        val chosenHeroKeys = if (heroSourcesChosen) {
+            orderedEntries
+                .filter { entry -> !entry.isCollection && current[entry.key]?.heroSourceEnabled == true }
+                .take(HERO_SOURCE_SELECTION_LIMIT)
+                .mapTo(mutableSetOf()) { it.key }
+        } else {
+            val catalogs = orderedEntries.filter { !it.isCollection }
+            catalogs.filter { current[it.key]?.enabled ?: true }
+                .ifEmpty { catalogs }
+                .take(HERO_SOURCE_SELECTION_LIMIT)
+                .mapTo(mutableSetOf()) { it.key }
+        }
         var enabledHeroSourceCount = chosenHeroKeys.size
         orderedEntries.forEach { entry ->
             val stored = current[entry.key]
@@ -633,6 +657,7 @@ object HomeCatalogSettingsRepository {
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
                     items = preferences.values.sortedBy { it.order },
+                    heroSourcesChosen = heroSourcesChosen,
                 ),
             ),
         )
