@@ -19,3 +19,5 @@ internal object HomeHeroDebugLog {
     fun heroKeys(preferences: Map<String, Boolean>): String =
         preferences.filterValues { it }.keys.sorted().joinToString(",").ifEmpty { "none" }
 }
+
+internal expect fun platformPreferencesSizeBytes(): Long?
