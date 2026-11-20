@@ -482,7 +482,13 @@ object HomeCatalogSettingsRepository {
         hasLoaded = true
 
         val payload = HomeCatalogSettingsStorage.loadPayload().orEmpty().trim()
-        if (payload.isEmpty()) return
+        if (payload.isEmpty()) {
+            HomeHeroDebugLog.log(
+                "settings.load",
+                "profile=${com.nuvio.app.features.profiles.ProfileRepository.activeProfileId} empty=true defaultsBytes=${platformPreferencesSizeBytes()}",
+            )
+            return
+        }
 
         val parsedPayload = runCatching {
             json.decodeFromString<StoredHomeCatalogSettingsPayload>(payload)
@@ -506,7 +512,7 @@ object HomeCatalogSettingsRepository {
             preferences = parsedPayload.items.associateBy { it.key }
             HomeHeroDebugLog.log(
                 "settings.load",
-                "items=${preferences.size} heroEnabled=$heroEnabled heroSources=${HomeHeroDebugLog.heroKeys(preferences.mapValues { it.value.heroSourceEnabled })}",
+                "items=${preferences.size} heroEnabled=$heroEnabled chosen=$heroSourcesChosen heroSources=${HomeHeroDebugLog.heroKeys(preferences.mapValues { it.value.heroSourceEnabled })}",
             )
             heroSourcesChosen = parsedPayload.heroSourcesChosen ?: hasStoredHeroChoice(parsedPayload.items)
             publish()
@@ -660,6 +666,17 @@ object HomeCatalogSettingsRepository {
                     heroSourcesChosen = heroSourcesChosen,
                 ),
             ),
+        )
+        val savedItems = preferences.size
+        val readBack = HomeCatalogSettingsStorage.loadPayload().orEmpty()
+        val readBackItems = runCatching {
+            json.decodeFromString<StoredHomeCatalogSettingsPayload>(readBack).items.size
+        }.getOrDefault(-1)
+        HomeHeroDebugLog.log(
+            "settings.persist",
+            "profile=${com.nuvio.app.features.profiles.ProfileRepository.activeProfileId} items=$savedItems " +
+                "readBackBytes=${readBack.length} readBackItems=$readBackItems chosen=$heroSourcesChosen " +
+                "ok=${readBackItems == savedItems} defaultsBytes=${platformPreferencesSizeBytes()}",
         )
     }
 
