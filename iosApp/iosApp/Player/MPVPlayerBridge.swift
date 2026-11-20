@@ -1093,14 +1093,39 @@ final class MPVPlayerViewController: UIViewController {
             return
         }
 
-        let fontDirectory = fontURL.deletingLastPathComponent().path
+        let configDirectory = fontURL.deletingLastPathComponent().path
+        let fontsDirectory = Self.dedicatedSubtitleFontsDirectory(copying: fontURL) ?? configDirectory
         checkError(mpv_set_option_string(mpv, "config", "yes"))
-        fontDirectory.withCString { path in
+        configDirectory.withCString { path in
             checkError(mpv_set_option_string(mpv, "config-dir", path))
+        }
+        fontsDirectory.withCString { path in
             checkError(mpv_set_option_string(mpv, "sub-fonts-dir", path))
         }
         checkError(mpv_set_option_string(mpv, "sub-font", "Noto Sans"))
         print("[MPV] Using bundled subtitle font: \(fontURL.lastPathComponent)")
+    }
+
+    private static func dedicatedSubtitleFontsDirectory(copying fontURL: URL) -> String? {
+        let manager = FileManager.default
+        guard let caches = manager.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let directory = caches.appendingPathComponent("mpv-subtitle-fonts", isDirectory: true)
+        let target = directory.appendingPathComponent(fontURL.lastPathComponent)
+        do {
+            try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+            let sourceSize = (try? manager.attributesOfItem(atPath: fontURL.path)[.size] as? NSNumber)?.int64Value
+            let targetSize = (try? manager.attributesOfItem(atPath: target.path)[.size] as? NSNumber)?.int64Value
+            if sourceSize == nil || sourceSize != targetSize {
+                if manager.fileExists(atPath: target.path) {
+                    try manager.removeItem(at: target)
+                }
+                try manager.copyItem(at: fontURL, to: target)
+            }
+            return directory.path
+        } catch {
+            InAppLogBridge.shared.info(tag: "MPV/Fonts", message: "dedicated subtitle font folder unavailable: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func setupNotifications() {
