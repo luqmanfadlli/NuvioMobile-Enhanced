@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.runtime.produceState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -209,8 +210,23 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
         }
         runtime.BindMiniPlayerEffects(miniPresentation)
         runtime.BindPlayerRuntimeEffects()
+        val hdrVideo by produceState(
+            initialValue = false,
+            runtime.playerController,
+            runtime.activeSourceUrl,
+            runtime.playbackSnapshot.isLoading,
+        ) {
+            val controller = runtime.playerController
+            value = if (controller == null || runtime.playbackSnapshot.isLoading) {
+                value
+            } else {
+                runCatching { controller.getMediaInfo().hdr.isNotEmpty() }.getOrDefault(value)
+            }
+        }
         CompositionLocalProvider(
-            LocalLiquidGlassBackdrop provides rememberVideoFrameBackdrop(enabled = !runtime.isMiniPresentation && isLiquidGlassSupported()),
+            LocalLiquidGlassBackdrop provides rememberVideoFrameBackdrop(
+                enabled = !runtime.isMiniPresentation && isLiquidGlassSupported() && !hdrVideo,
+            ),
             LocalPlayerControlGlassEnabled provides playerSettingsUiState.playerControlGlassEnabled,
         ) {
             runtime.RenderPlayerRuntimeUi(
