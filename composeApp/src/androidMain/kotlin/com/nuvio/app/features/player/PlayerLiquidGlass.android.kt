@@ -28,7 +28,9 @@ import kotlin.math.roundToInt
 
 // 480px wide keeps the glass crisp enough for a "light blur" look; ~30fps keeps it in step with the video.
 private const val VideoFrameCaptureWidth = 480
-private const val VideoFrameCaptureIntervalMs = 33L
+private const val VideoFrameCaptureIntervalMs = 125L
+private const val VideoFrameMaxLumaDrop = 0.45f
+private const val VideoFrameMaxRejectedInRow = 6
 private const val VideoFrameBufferCount = 3
 
 /** About half a second of all-black captures means PixelCopy can't read this video (DRM/tunneling/device). */
@@ -47,6 +49,8 @@ internal actual fun rememberVideoFrameBackdrop(enabled: Boolean): VideoFrameBack
         val buffers = arrayOfNulls<Bitmap>(VideoFrameBufferCount)
         var nextBuffer = 0
         var blackFrames = 0
+        var lastLuma = -1f
+        var rejectedInRow = 0
         snapshotFlow { backdrop.consumers > 0 }
             .distinctUntilChanged()
             .collectLatest { active ->
@@ -72,6 +76,15 @@ internal actual fun rememberVideoFrameBackdrop(enabled: Boolean): VideoFrameBack
                             if (blackFrames >= BlackFrameLimit) backdrop.clearFrame()
                         } else if (copied) {
                             blackFrames = 0
+                            val luma = bitmap.averageLuma()
+                            val suddenDrop = lastLuma > 0f && luma < lastLuma * (1f - VideoFrameMaxLumaDrop)
+                            if (suddenDrop && rejectedInRow < VideoFrameMaxRejectedInRow) {
+                                rejectedInRow += 1
+                                delay(VideoFrameCaptureIntervalMs)
+                                continue
+                            }
+                            rejectedInRow = 0
+                            lastLuma = luma
                             val location = IntArray(2)
                             surfaceView.getLocationOnScreen(location)
                             backdrop.publishFrame(
@@ -135,6 +148,28 @@ private fun View.findVideoSurfaceView(): SurfaceView? {
     }
     visit(this)
     return fromPlayerView ?: best
+}
+
+private fun Bitmap.averageLuma(): Float {
+    val stepX = (width / 8).coerceAtLeast(1)
+    val stepY = (height / 8).coerceAtLeast(1)
+    var total = 0f
+    var count = 0
+    var y = stepY / 2
+    while (y < height) {
+        var x = stepX / 2
+        while (x < width) {
+            val pixel = getPixel(x, y)
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            total += (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255f
+            count += 1
+            x += stepX
+        }
+        y += stepY
+    }
+    return if (count == 0) 0f else total / count
 }
 
 /** True when every sampled pixel is pure black, i.e. the copy returned an empty/protected frame. */
