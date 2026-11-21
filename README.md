@@ -104,8 +104,10 @@ Everything below is added on top of upstream Nuvio Mobile. Features that upstrea
 | **Night mode** — a player button that evens out loud and quiet scenes for listening at a low volume, on every engine including iOS. | Settings → Playback → Audio → **Night Mode Button** | Button shown, night mode off |
 | **Anime4K** *(Android)* — a 2x upscaler and a line sharpener for anime, on ExoPlayer and libmpv. Only applied to anime. | Settings → Playback → Video → **Anime 2x Upscaler** / **Anime Line Sharpener** | Off |
 | **Plain controls** — hide the glass backgrounds behind player buttons and time pills, and hide the skip back/forward buttons. | Settings → Playback → Player interface → **Glass Backgrounds on Controls** / **Show Skip Buttons** | On |
-| **Title logo in the player** — show the title artwork instead of the title text in the player controls. | Settings → Playback → Player interface → **Show title logo** | Off |
+| **Title logo in the player** — show the title artwork instead of the title text in the player controls. When playback starts without a logo (for example from Continue Watching), the logo is looked up so the loading screen and the player still show it. | Settings → Playback → Player interface → **Show title logo** | Off |
 | **Skip Intro timing** — show the Skip Intro button earlier or later than the intro timestamp. | Settings → Playback → Skip segments → **Skip Intro Timing** | On time |
+| **Skip buttons on the right** — Skip Intro, Recap and Outro sit on the right, just above *Ends at*, so they no longer cover the chapter name. The Next Episode and movie recommendation cards line up on the same edge and stack above the skip button. Title, logo and badges stay visible while a skip button is shown. | — | Always on |
+| **Watched threshold** — choose how far into a movie or episode it counts as watched (80–99%). Below it, Continue Watching keeps your resume point; playing to the end always counts. Stored on this device only. | Settings → Playback → Watch progress → **Watched threshold** | 90% |
 | **Download speed while loading** — the loading screen shows how fast the stream is downloading. | — | Always on |
 | **Mini player** *(Android)* — keep watching in a small floating window while you browse. Tap it to return to full screen. With it on, the player's back button still ends playback; use the **PiP** button in the player header (or the system back gesture) to minimize. | Settings → Playback → **Mini Player** | Off |
 | **Private viewing** — play without saving watch progress, Continue Watching or watched status, and without syncing playback to connected trackers. | Settings → Playback → **Private Viewing** | Off |
@@ -156,8 +158,8 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | **Search bar** — a filter field above the stream list that narrows the results as you type, matching every term against the stream name, description, source, addon, filename and badges — so `1080 hevc multi` works. | Settings → Layout → Streams → **Search bar** | Off |
 | **Smart Streams: sort & filters** — merge every addon's results into one list and sort it by *Best match*, *Highest quality*, *Smallest file*, *Largest file* or keep *Addon order*. Filter by resolution, HDR / Dolby Vision, codec, audio, source (Remux, Blu-ray, WEB-DL…), file size and *Instant only*; CAM / telesync copies are hidden by default. Active filters show as removable chips. | Stream list → **Sort** / **Filters**, or Settings → Playback → Smart Streams → **Preferences** | Best match, low quality hidden |
 | **Play best for this device** — one tap plays the top *Best match* stream. Long-press it to see why it was picked and what the device reports (screen, HDR formats, hardware decoders, memory, connection). | Stream list → **Play best for this device** | — |
-| **Device-aware ranking** — *Best match* weighs what the device can really play: hardware HEVC / AV1 decoding and 4K Main10 support (VideoToolbox on iOS, MediaCodec on Android), the HDR formats the screen supports (Dolby Vision only when it can be decoded), and memory (4K only with enough RAM, Remux / very high bitrates held back on 3–5.5 GB devices). It also prefers instant streams and a sensible bitrate, and saves data on mobile networks. | Settings → Playback → Smart Streams → **Highest resolution** / **On mobile data** | Auto · Save data |
-| **Preferred audio language** — streams in your preferred audio language rank higher, then the secondary language, then multi-audio releases; streams clearly in another language rank lower. Uses the languages you already set for audio, read from addon metadata, flags and names such as `ITA` or `Latino`. | Settings → Playback → Audio → **Preferred audio language** | Device language |
+| **Device-aware ranking** — *Best match* weighs what the device can really play: hardware HEVC / AV1 decoding and 4K Main10 support (VideoToolbox on iOS, MediaCodec on Android), the HDR formats the screen supports (Dolby Vision only when it can be decoded), and memory (4K only with enough RAM, Remux / very high bitrates held back on 3–5.5 GB devices). In *Auto* it aims at the screen's resolution, so a phone picks a sensibly sized 4K file instead of a 30+ GB remux. It also prefers instant streams and a sensible bitrate, and saves data on mobile networks. | Settings → Playback → Smart Streams → **Highest resolution** / **On mobile data** | Auto · Save data |
+| **Preferred audio language** — streams in your preferred audio language rank higher, then the secondary language, then multi-audio releases; streams clearly in another language rank lower. Untagged single-audio releases count as English when English is your first language. Uses the languages you already set for audio, read from addon metadata, flags and names such as `ITA` or `Latino`. | Settings → Playback → Audio → **Preferred audio language** | Device language |
 | **Smart auto-play** — a fourth stream selection mode that waits for sources up to your stream timeout, then plays the *Best match* stream without asking. The loading screen shows how many sources have answered and the best candidate so far. With *Fall back to the next source* on, a failed start moves to the next ranked stream, and the next episode keeps the same release group when it can. Stored on this device only, so the official app is not affected. | Settings → Playback → Stream auto-play → **Stream selection** → **Smart auto-play** | Off |
 
 ### Library
@@ -176,6 +178,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | **Wi-Fi-only downloads** — downloads wait for Wi-Fi unless you allow mobile data. The switch sits at the top of the Downloads screen, not in Settings. | Downloads screen → **Allow mobile data** | Off (Wi-Fi only) |
 | **Custom download location** — pick any folder to save downloads to (a folder you grant via Storage Access Framework on Android, or via the Files app on iOS) instead of the app's private storage. | Downloads screen → **gear icon** → **Download Location** | Internal storage |
 | **Background downloads (iOS)** — a download keeps transferring after you leave the app, instead of stalling the moment it's backgrounded. Doesn't survive a full force-quit. | — | Always on |
+| **Legacy download** *(iOS)* — write downloads straight into the downloads folder like the original Nuvio, for installs where finished background downloads fail to save. Downloads pause when the app goes to the background. | Settings → Downloads → **Legacy download** | Off |
 
 ### Tracking
 
@@ -201,7 +204,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 | Feature | Where | Default |
 |---|---|---|
 | **Morphed Liquid Glass tab bar** — shrinks to a compact pill, with native drag-across-tabs and the system glass highlight (requires an **iPhone on iOS 26 or newer**). | Settings → Layout → **Liquid Glass tab bar** | Morphed |
-| **Skia graphics engine** — rebuild graphics engine for animated artwork rendering with shared codecs and bounded memory. Fixed crash on large animated collection, support animated avatar and badge | — | — |
+| **Skia graphics engine** — rebuild graphics engine for animated artwork rendering with shared codecs and bounded memory. Fixed crash on large animated collection, support animated avatar and badge. Imgur `.gifv` links play as GIF, and a collection card falls back to its static cover when the animation can't load. | — | — |
 | **Bundle CJK Font** — fixed Chinese subtitle rendering | — | — |
 | **Subtitles in Picture in Picture** — text subtitles keep showing in Picture in Picture and the mini player. | — | Always on |
 | **Dolby Vision in Picture in Picture** — Dolby Vision Profile 5 videos keep their colours in Picture in Picture instead of turning purple and green. | — | Always on |
@@ -215,6 +218,7 @@ Upstream Nuvio has no Live TV. This fork adds the whole feature.
 - **Faster details** — movie and show details open sooner.
 - **Smoother scrolling** — home, shelves and grids scroll with fewer dropped frames.
 - **Lower memory on iPhone** — long sessions and 4K HDR / Dolby Vision playback use less memory, so iOS is less likely to close the app.
+- **Lighter subtitle switching** *(iOS)* — the bundled CJK font is no longer copied into memory on every subtitle change, so switching subtitles during 4K playback no longer stutters or gets the app closed.
 - **Libass rendering off the main thread** *(Android, ExoPlayer)* — ASS/SSA subtitles render on their own thread for less stutter with heavy styled subtitles.
 
 ---
