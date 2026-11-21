@@ -1,0 +1,68 @@
+name: Upstream sync
+
+# Daily: merges NuvioMedia/NuvioMobile cmp-rewrite into `enhanced` on a
+# dated branch and opens a PR. Nothing lands on `enhanced` without review.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: enhanced
+
+      - name: Merge upstream into a sync branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_URL: https://github.com/NuvioMedia/NuvioMobile.git
+          UPSTREAM_BRANCH: cmp-rewrite
+        run: |
+          set -euo pipefail
+          git config user.name "fork-sync[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch upstream "$UPSTREAM_BRANCH"
+
+          # Nothing new upstream? Stop quietly.
+          if git merge-base --is-ancestor "upstream/$UPSTREAM_BRANCH" HEAD; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+
+          BRANCH="sync/upstream-$(date -u +%Y%m%d)"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Sync branch $BRANCH already exists; skipping."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          if git merge --no-edit "upstream/$UPSTREAM_BRANCH"; then
+            git push origin "$BRANCH"
+            gh pr create \
+              --base enhanced \
+              --head "$BRANCH" \
+              --title "Sync upstream $UPSTREAM_BRANCH ($(date -u +%F))" \
+              --body "Automated merge of NuvioMedia/NuvioMobile \`$UPSTREAM_BRANCH\` into \`enhanced\`. Clean merge: review, build Android and iOS, then merge."
+          else
+            git merge --abort
+            gh issue create \
+              --title "Upstream sync conflicts ($(date -u +%F))" \
+              --body "Merging upstream \`$UPSTREAM_BRANCH\` into \`enhanced\` produced conflicts. Resolve locally: see docs/FORK_WORKFLOW.md, section 'Resolving upstream conflicts'."
+            exit 1
+          fi
