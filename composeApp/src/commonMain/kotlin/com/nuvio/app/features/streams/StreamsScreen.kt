@@ -520,17 +520,23 @@ private fun MobileStreamsLayout(
                         onFilterSelected = { addonId -> StreamsRepository.selectFilter(addonId) },
                         onRefresh = onRefresh,
                     )
-                    val smartStreams = rememberSmartStreams(
-                        listState = rememberStreamSearchResult(uiState, searchQuery, showSearchField).uiState,
-                        allState = uiState,
-                        debridEnabled = debridEnabled,
-                        isEpisode = isEpisode,
-                    )
-                    SmartStreamControls(
-                        state = smartStreams,
-                        onPlay = { stream -> onStreamSelected(stream, resumePositionMs, resumeProgressFraction) },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
+                    val smartSettings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
+                    val smartStreams = if (smartSettings.smartSorting) {
+                        rememberSmartStreams(
+                            listState = rememberStreamSearchResult(uiState, searchQuery, showSearchField).uiState,
+                            allState = uiState,
+                            debridEnabled = debridEnabled,
+                            isEpisode = isEpisode,
+                        ).also { state ->
+                            SmartStreamControls(
+                                state = state,
+                                onPlay = { stream -> onStreamSelected(stream, resumePositionMs, resumeProgressFraction) },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    }
 
                     if (showSearchField) {
                         StreamSearchField(
@@ -545,15 +551,15 @@ private fun MobileStreamsLayout(
                         StreamSearchEmptyBlock(modifier = Modifier.weight(1f))
                         return@Column
                     }
-                    if (smartStreams.result?.emptyBecauseOfFilters == true) {
+                    if (smartStreams?.result?.emptyBecauseOfFilters == true) {
                         SmartFiltersEmptyBlock(modifier = Modifier.weight(1f))
                         return@Column
                     }
 
                     StreamList(
-                        uiState = smartStreams.result?.listState ?: listUiState.uiState,
-                        smartStreams = smartStreams.result?.sortedStreams,
-                        bestStream = smartStreams.result?.best?.stream,
+                        uiState = smartStreams?.result?.listState ?: listUiState.uiState,
+                        smartStreams = smartStreams?.result?.sortedStreams,
+                        bestStream = smartStreams?.result?.best?.stream,
                         debridEnabled = debridEnabled,
                         appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                         onStreamSelected = onStreamSelected,

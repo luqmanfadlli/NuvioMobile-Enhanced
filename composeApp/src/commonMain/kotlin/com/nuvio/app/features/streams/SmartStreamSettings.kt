@@ -51,6 +51,7 @@ internal data class SmartStreamSettings(
     val resolutionLimit: SmartResolutionLimit = SmartResolutionLimit.AUTO,
     val mobileData: SmartMobileData = SmartMobileData.SAVE_DATA,
     val autoPlay: Boolean = false,
+    val smartSorting: Boolean = true,
 )
 
 internal expect object SmartStreamSettingsStorage {
@@ -85,6 +86,7 @@ internal object SmartStreamSettingsRepository {
             "limit=${settings.resolutionLimit.name}",
             "mobile=${settings.mobileData.name}",
             "auto=${if (settings.autoPlay) 1 else 0}",
+            "smartsort=${if (settings.smartSorting) 1 else 0}",
             "res=${f.resolutions.joinToString(",") { it.name }}",
             "hdr=${f.hdr.joinToString(",") { it.name }}",
             "codec=${f.codecs.joinToString(",") { it.name }}",
@@ -108,6 +110,7 @@ internal object SmartStreamSettingsRepository {
             resolutionLimit = enumOr(map["limit"], SmartResolutionLimit.AUTO),
             mobileData = enumOr(map["mobile"], SmartMobileData.SAVE_DATA),
             autoPlay = map["auto"] == "1",
+            smartSorting = map["smartsort"] != "0",
             filters = SmartStreamFilters(
                 resolutions = enumSet<SmartResolution>(map["res"]),
                 hdr = enumSet<SmartHdrFilter>(map["hdr"]),

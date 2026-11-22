@@ -85,4 +85,6 @@
     <string name="smart_streams_autoplay_searching">Mencari sumber terbaik… %1$d/%2$d</string>
     <string name="smart_streams_autoplay_candidate">Terbaik sejauh ini: %1$s</string>
     <string name="smart_streams_reason_language">Audio %1$s, bahasa pilihanmu</string>
+    <string name="settings_smart_sorting_title">Pengurutan cerdas</string>
+    <string name="settings_smart_sorting_description">Tampilkan urutan, filter, dan Putar yang terbaik untuk perangkat ini dari Smart Streams di layar stream. Jika mati, stream mengikuti urutan addon. Putar otomatis cerdas tetap berjalan.</string>
 </resources>

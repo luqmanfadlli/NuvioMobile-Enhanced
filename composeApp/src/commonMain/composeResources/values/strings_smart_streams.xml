@@ -85,4 +85,6 @@
     <string name="smart_streams_autoplay_searching">Finding the best source… %1$d/%2$d</string>
     <string name="smart_streams_autoplay_candidate">Best so far: %1$s</string>
     <string name="smart_streams_reason_language">Audio in %1$s, your preferred language</string>
+    <string name="settings_smart_sorting_title">Smart sorting</string>
+    <string name="settings_smart_sorting_description">Show the Smart Streams sort, filters and Play best for this device on the stream screen. When off, streams keep the addon order. Smart auto-play still works.</string>
 </resources>

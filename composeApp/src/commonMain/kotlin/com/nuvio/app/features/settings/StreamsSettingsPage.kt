@@ -59,10 +59,13 @@ import com.nuvio.app.features.streams.StreamBadgeImportResult
 import com.nuvio.app.features.streams.StreamBadgePlacement
 import com.nuvio.app.features.streams.StreamBadgeRules
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.SmartStreamSettingsRepository
 import com.nuvio.app.features.streams.StreamBackgroundMode
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.settings_smart_sorting_description
+import nuvio.composeapp.generated.resources.settings_smart_sorting_title
 import nuvio.composeapp.generated.resources.action_close
 import nuvio.composeapp.generated.resources.action_delete
 import nuvio.composeapp.generated.resources.action_import
@@ -187,6 +190,16 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     checked = currentSettings.showAddonLogo,
                     isTablet = isTablet,
                     onCheckedChange = StreamBadgeSettingsRepository::setShowAddonLogo,
+                )
+                val smartSettings by SmartStreamSettingsRepository.state.collectAsStateWithLifecycle()
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_smart_sorting_title),
+                    description = stringResource(Res.string.settings_smart_sorting_description),
+                    checked = smartSettings.smartSorting,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        SmartStreamSettingsRepository.update { it.copy(smartSorting = enabled) }
+                    },
                 )
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_stream_search_title),
