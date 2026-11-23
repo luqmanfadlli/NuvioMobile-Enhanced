@@ -22,11 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.streams_failed_to_load_scraper
@@ -276,9 +273,17 @@ internal object StreamSourceLoader {
                     val group = fetchAddonGroup(addon, type, videoId, forceRefresh = false)
                     checkDebridCache(group, targets.streamAddonIds)
                 }
-            } + targets.pluginProviderGroups.map { providerGroup ->
-                StreamSource(providerGroup.addonName, providerGroup.addonId) {
-                    loadPluginProviderGroup(providerGroup, type, videoId, season, episode)
+            } + targets.pluginProviderGroups.flatMap { providerGroup ->
+                providerGroup.scrapers.map { scraper ->
+                    StreamSource(providerGroup.addonName, providerGroup.addonId) {
+                        val completion = executePluginScraper(scraper, providerGroup, type, videoId, season, episode)
+                        AddonStreamGroup(
+                            addonName = providerGroup.addonName,
+                            addonId = providerGroup.addonId,
+                            streams = completion.streams.sortedForGroupedDisplay(),
+                            isLoading = false,
+                        )
+                    }
                 }
             } + targets.serverSources.map { source ->
                 StreamSource(source.addonName, source.addonId) { source.load() }
@@ -315,33 +320,21 @@ internal object StreamSourceLoader {
             loadScope.cancel()
         }
 
-        val arrivedGroups = sources.indices.mapNotNull { arrivedByIndex[it] }
+        val arrivedGroups = sources.indices
+            .mapNotNull { arrivedByIndex[it] }
+            .groupBy { it.addonId }
+            .values
+            .map { groups ->
+                if (groups.size == 1) {
+                    groups.first()
+                } else {
+                    groups.first().copy(streams = groups.flatMap { it.streams }.sortedForGroupedDisplay())
+                }
+            }
         return StreamAutoPlaySelector.orderAddonStreams(
             groups = arrivedGroups,
             installedOrder = targets.installedAddonOrder,
             preferredGroupIds = targets.preferredGroupIds,
         ).flatMap { it.streams }
-    }
-
-    /** Runs every scraper of [providerGroup] and merges their streams into one group. */
-    private suspend fun loadPluginProviderGroup(
-        providerGroup: PluginProviderGroup,
-        type: String,
-        videoId: String,
-        season: Int?,
-        episode: Int?,
-    ): AddonStreamGroup = supervisorScope {
-        val streams = providerGroup.scrapers
-            .map { scraper ->
-                async { executePluginScraper(scraper, providerGroup, type, videoId, season, episode) }
-            }
-            .awaitAll()
-            .flatMap { it.streams }
-        AddonStreamGroup(
-            addonName = providerGroup.addonName,
-            addonId = providerGroup.addonId,
-            streams = streams.sortedForGroupedDisplay(),
-            isLoading = false,
-        )
     }
 }
