@@ -53,7 +53,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -61,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.DisintegrationRequest
-import com.nuvio.app.core.ui.NativeTabBridge
 import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
@@ -479,9 +477,7 @@ internal fun AppLoadingContent(
     val haloAlpha = remember { Animatable(0f) }
     val ringScale = remember { Animatable(0.7f) }
     val ringAlpha = remember { Animatable(0f) }
-    val density = LocalDensity.current
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    val profileTabIconFrame by NativeTabBridge.profileTabIconFrame.collectAsStateWithLifecycle()
 
     suspend fun CoroutineScope.pulseRing() {
         ringScale.snapTo(0.7f)
@@ -539,42 +535,14 @@ internal fun AppLoadingContent(
 
     LaunchedEffect(exitTowardProfileTab) {
         if (!exitTowardProfileTab) return@LaunchedEffect
-        // Prefer the real Profile tab icon's on-screen frame, pushed live from Swift (see
-        // NativeTabBridge.publishProfileTabIconFrame) — lands pixel-perfect on the actual icon.
-        // Falls back to an approximated bottom-right corner if that frame isn't known yet (e.g.
-        // this ran before Swift ever attached the tab bar coordinator).
-        val frame = profileTabIconFrame
-        val targetX: Float
-        val targetY: Float
-        if (frame != null) {
-            val iconCenterXPx = with(density) { (frame.xDp + frame.widthDp / 2f).dp.toPx() }
-            val iconCenterYPx = with(density) { (frame.yDp + frame.heightDp / 2f).dp.toPx() }
-            targetX = iconCenterXPx - containerSize.width / 2f
-            targetY = iconCenterYPx - containerSize.height / 2f
-        } else {
-            val marginPx = with(density) { 24.dp.toPx() }
-            targetX = (containerSize.width / 2f - marginPx).coerceAtLeast(0f)
-            targetY = (containerSize.height / 2f - marginPx).coerceAtLeast(0f)
-        }
-        // The tab bar is already visible underneath by this point, so the emblem stays fully
-        // opaque for almost the whole trip, only dissolving right at the very end — reading as the
-        // icon shrinking down and merging into the real one, not just fading away. Kept brisk
-        // (rather than the ~900ms this used to run) so the overlay doesn't overstay once content
-        // is ready — still long enough at 550ms for that shrink-and-merge motion to read clearly.
-        val travelDuration = 550
+        val zoomDuration = 450
+        onExitFinished()
         launch { haloAlpha.animateTo(0f, animationSpec = tween(220)) }
         launch { ringAlpha.animateTo(0f, animationSpec = tween(200)) }
         launch {
-            emblemOffsetX.animateTo(targetX, animationSpec = tween(travelDuration, easing = FastOutSlowInEasing))
+            emblemAlpha.animateTo(0f, animationSpec = tween(zoomDuration, easing = FastOutSlowInEasing))
         }
-        launch {
-            emblemScale.animateTo(0.22f, animationSpec = tween(travelDuration, easing = FastOutSlowInEasing))
-        }
-        launch {
-            emblemAlpha.animateTo(0f, animationSpec = tween(180, delayMillis = travelDuration - 180))
-        }
-        emblemOffsetY.animateTo(targetY, animationSpec = tween(travelDuration, easing = FastOutSlowInEasing))
-        onExitFinished()
+        emblemScale.animateTo(3f, animationSpec = tween(zoomDuration, easing = FastOutSlowInEasing))
     }
 
     Box(
