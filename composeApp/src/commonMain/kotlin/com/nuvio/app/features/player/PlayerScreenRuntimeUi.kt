@@ -155,12 +155,21 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
             (bufferedSeconds / 10f).coerceIn(0f, 1f)
         }
     }
+    val isInPip = rememberIsInPictureInPicture()
     val gestureCallbacks = rememberSurfaceGestureCallbacks()
-    val onPinchZoom = rememberUpdatedState<(Float) -> Unit> { factor -> pinchVideoZoom(factor) }
+    val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val onPinchZoom = rememberUpdatedState<(Float) -> Boolean> { factor ->
+        if (partyPanelInset > 0.dp) return@rememberUpdatedState false
+        if (pinchVideoZoom(factor)) {
+            hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            true
+        } else {
+            false
+        }
+    }
     LaunchedEffect(playerController) {
         if (videoZoom != 1f) playerController?.setVideoZoom(videoZoom)
     }
-    val isInPip = rememberIsInPictureInPicture()
     val fold = LocalFold.current?.takeIf { !isInPip }
     val videoModifier = if (fold != null) Modifier.fillMaxWidth().height(fold.top) else Modifier.fillMaxSize()
     val panelModifier = if (fold != null) Modifier.fillMaxSize().padding(top = fold.bottom) else Modifier.fillMaxSize()
@@ -260,6 +269,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                 enabledState = keyboardShortcutsEnabled,
                 onShortcutState = onKeyboardShortcut,
             )
+            .playerSurfacePinchGestures(
+                playbackGesturesEnabled = playbackGesturesEnabled,
+                playerControlsLockedState = gestureCallbacks.playerControlsLocked,
+                touchGesturesEnabledState = gestureCallbacks.touchGesturesEnabled,
+                onPinchZoomState = onPinchZoom,
+            )
             .playerSurfaceTapGestures(
                 layoutSize = layoutSize,
                 playbackGesturesEnabled = playbackGesturesEnabled,
@@ -290,12 +305,6 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                 clearLiveGestureFeedbackState = gestureCallbacks.clearLiveGestureFeedback,
                 revealLockedOverlayState = gestureCallbacks.revealLockedOverlay,
                 commitHorizontalSeekState = gestureCallbacks.commitHorizontalSeek,
-            )
-            .playerSurfacePinchGestures(
-                playbackGesturesEnabled = playbackGesturesEnabled,
-                playerControlsLockedState = gestureCallbacks.playerControlsLocked,
-                touchGesturesEnabledState = gestureCallbacks.touchGesturesEnabled,
-                onPinchZoomState = onPinchZoom,
             ),
     ) {
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
@@ -343,6 +352,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                     animeContent = animeContentState.value,
                     discPlaybackEnabled = !isLiveTvPlayback && !parentMetaType.equals("live", ignoreCase = true),
                     liveStream = isLiveTvPlayback,
+                    controlsVisible = controlsVisible && !playerControlsLocked && !isInPip && fold == null,
                     onInitialPositionHandled = { key, handled ->
                         if (active.value && playbackKey == activePlaybackKey && key == currentInitialPositionRequestKey()) {
                             initialSeekApplied = handled

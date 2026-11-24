@@ -101,7 +101,9 @@ internal class AiostreamsAssEngine(
     private var externalKey: String? = null
     private var layout = AssLayout()
     private var sentLayout: AssLayout? = null
+    private var rawVideoRect = Rect()
     private var style = SubtitleStyleState.DEFAULT
+    private var controlsVisible = false
     private var released = false
 
     private val preDraw = ViewTreeObserver.OnPreDrawListener {
@@ -219,6 +221,12 @@ internal class AiostreamsAssEngine(
     fun setStyle(style: SubtitleStyleState) {
         if (this.style == style) return
         this.style = style
+        updateLayout()
+    }
+
+    fun setControlsVisible(visible: Boolean) {
+        if (this.controlsVisible == visible) return
+        this.controlsVisible = visible
         updateLayout()
     }
 
@@ -347,16 +355,35 @@ internal class AiostreamsAssEngine(
             (left + frame.width * frame.scaleX).roundToInt(),
             (top + frame.height * frame.scaleY).roundToInt(),
         )
-        if (layout.stageWidth == view.width && layout.stageHeight == view.height && layout.video == video) return
+        if (layout.stageWidth == view.width && layout.stageHeight == view.height && rawVideoRect == video) return
+        rawVideoRect = video
         layout = layout.copy(stageWidth = view.width, stageHeight = view.height, video = video)
         updateLayout()
     }
 
     private fun updateLayout() {
+        val rawVideo = rawVideoRect
+        val sw = layout.stageWidth
+        val sh = layout.stageHeight
+        val isZoomed = sw > 0 && sh > 0 &&
+            (rawVideo.left < 0 || rawVideo.top < 0 || rawVideo.right > sw || rawVideo.bottom > sh)
+        val effectiveVideo = if (isZoomed) {
+            Rect(
+                rawVideo.left.coerceIn(0, sw),
+                rawVideo.top.coerceIn(0, sh),
+                rawVideo.right.coerceIn(0, sw),
+                rawVideo.bottom.coerceIn(0, sh),
+            )
+        } else {
+            rawVideo
+        }
+        val basePos = 100.0 - (style.bottomOffset - DEFAULT_BOTTOM_OFFSET) / 10.0
+        val liftedPos = if (controlsVisible) basePos - 14.0 else basePos
         val next = layout.copy(
+            video = effectiveVideo,
             scale = style.fontSizeSp / DEFAULT_FONT_SIZE_SP,
-            position = (100.0 - (style.bottomOffset - DEFAULT_BOTTOM_OFFSET) / 10.0).coerceIn(0.0, 150.0),
-            forceMargins = false,
+            position = liftedPos.coerceIn(0.0, 150.0),
+            forceMargins = isZoomed,
             style = assStyle(style),
         )
         layout = next

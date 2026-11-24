@@ -325,21 +325,29 @@ internal fun PlayerScreenRuntime.cycleResizeMode() {
 
 internal const val PlayerMinVideoZoom = 0.8f
 internal const val PlayerMaxVideoZoom = 2.0f
-private const val PlayerVideoZoomSnapRange = 0.04f
 
-internal fun PlayerScreenRuntime.pinchVideoZoom(zoomFactor: Float) {
-    if (zoomFactor <= 0f || zoomFactor == 1f) return
-    rawVideoZoom = (rawVideoZoom * zoomFactor).coerceIn(PlayerMinVideoZoom, PlayerMaxVideoZoom)
-    val next = if (abs(rawVideoZoom - 1f) < PlayerVideoZoomSnapRange) 1f else rawVideoZoom
-    if (next == videoZoom) return
-    videoZoom = next
-    playerController?.setVideoZoom(next)
+internal fun PlayerScreenRuntime.pinchVideoZoom(zoomFactor: Float): Boolean {
+    if (showPartyPanel) return false
+    val targetMode = resolvePinchResizeMode(zoomFactor, resizeMode) ?: return false
+    resizeMode = targetMode
+    lastSyncedSettingsResizeMode = targetMode
+    PlayerSettingsRepository.setResizeMode(targetMode)
+    rawVideoZoom = 1f
+    if (videoZoom != 1f) {
+        videoZoom = 1f
+        playerController?.setVideoZoom(1f)
+    }
     showGestureFeedback(
         GestureFeedbackState(
-            message = "${(next * 100f).roundToInt()}%",
+            message = when (targetMode) {
+                PlayerResizeMode.Fit -> resizeModeFitLabel
+                PlayerResizeMode.Fill -> resizeModeFillLabel
+                PlayerResizeMode.Zoom -> resizeModeZoomLabel
+            },
             icon = GestureFeedbackIcon.VideoZoom,
         ),
     )
+    return true
 }
 
 internal fun PlayerScreenRuntime.setPlaybackSpeedFromPicker(speed: Float) {

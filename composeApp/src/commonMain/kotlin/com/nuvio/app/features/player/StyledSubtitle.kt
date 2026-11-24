@@ -3,12 +3,15 @@ package com.nuvio.app.features.player
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,19 +51,29 @@ internal fun StyledSubtitleOverlay(
     modifier: Modifier = Modifier,
     videoAspectRatio: Float = 0f,
     videoResizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+    controlsVisible: Boolean = false,
 ) {
     val fontFamily = rememberSubtitleFontFamily(style.appearance.fontId)
-    if (cues.isEmpty) return
     val density = LocalDensity.current
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    val animatedControlsLift = androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (controlsVisible) 108.dp else 0.dp,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+        label = "subtitleControlsLift",
+    ).value
+    if (cues.isEmpty) return
+    BoxWithConstraints(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout)) {
+        val containerWidthPx = with(density) { maxWidth.toPx() }
+        val containerHeightPx = with(density) { maxHeight.toPx() }
         val fittedVideoBounds = subtitleVideoBoundsPx(
-            containerWidthPx = with(density) { maxWidth.toPx() },
-            containerHeightPx = with(density) { maxHeight.toPx() },
+            containerWidthPx = containerWidthPx,
+            containerHeightPx = containerHeightPx,
             videoAspectRatio = videoAspectRatio,
             resizeMode = videoResizeMode,
         )
         val scale = (maxHeight / 360.dp).coerceAtMost(1f)
-        val bottomInset = maxHeight * (0.0533f + style.bottomOffset.coerceIn(0, 200) / 1000f)
+        val controlsLift = animatedControlsLift * scale
+        val bottomInset = (maxHeight * (0.0533f + style.bottomOffset.coerceIn(0, 200) / 1000f) + controlsLift)
+            .coerceAtMost(maxHeight * 0.45f)
         val topInset = maxHeight * TOP_SUBTITLE_INSET_FRACTION
         val sideInset = maxWidth * SIDE_SUBTITLE_INSET_FRACTION
         cues.blocks.forEach { block ->
@@ -78,8 +91,8 @@ internal fun StyledSubtitleOverlay(
                     text = block.text,
                     style = style,
                     scale = scale,
-                    videoWidthPx = fittedVideoBounds.width,
-                    videoHeightPx = fittedVideoBounds.height,
+                    videoWidthPx = fittedVideoBounds.width.coerceAtMost(containerWidthPx),
+                    videoHeightPx = fittedVideoBounds.height.coerceAtMost(containerHeightPx),
                     fontFamily = fontFamily,
                     horizontal = block.horizontal,
                 )

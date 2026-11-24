@@ -127,6 +127,7 @@ expect fun PlatformPlayerSurface(
     discPlaybackEnabled: Boolean = false,
     /** A Live TV channel: an endless stream that gets live-specific buffering and recovery. */
     liveStream: Boolean = false,
+    controlsVisible: Boolean = false,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit = { _, _ -> },
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,

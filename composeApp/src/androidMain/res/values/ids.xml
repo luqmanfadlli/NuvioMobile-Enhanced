@@ -4,4 +4,6 @@
     <item name="libass_overlay_layout_listener" type="id" />
     <item name="libass_overlay_container_gl" type="id" />
     <item name="player_view_sidecar_generation_tag" type="id" />
+    <item name="subtitle_controls_lift_tag" type="id" />
+    <item name="libass_controls_lift_px_tag" type="id" />
 </resources>

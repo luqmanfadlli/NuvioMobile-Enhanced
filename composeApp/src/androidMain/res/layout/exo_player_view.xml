@@ -24,12 +24,16 @@
     <FrameLayout
         android:id="@+id/libass_overlay_container_gl"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false" />
 
     <androidx.media3.ui.SubtitleView
         android:id="@id/exo_subtitles"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false" />
 
     <FrameLayout
         android:id="@id/exo_ad_overlay"
