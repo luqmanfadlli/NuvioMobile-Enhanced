@@ -278,14 +278,15 @@ internal class PlayerScreenRuntime(
     var showAudioModal by mutableStateOf(false)
     var showSubtitleModal by mutableStateOf(false)
     var showVideoSettingsModal by mutableStateOf(false)
+    var showToolbarCustomizer by mutableStateOf(false)
     var showStreamInfoModal by mutableStateOf(false)
     var showUserRatingSheet by mutableStateOf(false)
     var showStreamInfo by mutableStateOf(false)
     var showPartyPanel by mutableStateOf(false)
     var showPartyChat by mutableStateOf(false)
     val isPanelOpen: Boolean
-        get() = showAudioModal || showSubtitleModal || showVideoSettingsModal || showStreamInfo ||
-            showPartyPanel || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal ||
+        get() = showAudioModal || showSubtitleModal || showVideoSettingsModal || showToolbarCustomizer ||
+            showStreamInfo || showPartyPanel || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal ||
             // Fork panels
             showChaptersPanel || showQualityPanel || showSpeedPanel || showLiveChannelsPanel ||
             showDiscTitlesPanel || showStreamInfoModal || showUserRatingSheet
@@ -341,6 +342,7 @@ internal class PlayerScreenRuntime(
         get() = showAudioModal ||
             showSubtitleModal ||
             showVideoSettingsModal ||
+            showToolbarCustomizer ||
             showStreamInfoModal ||
             showStreamInfo ||
             showUserRatingSheet ||

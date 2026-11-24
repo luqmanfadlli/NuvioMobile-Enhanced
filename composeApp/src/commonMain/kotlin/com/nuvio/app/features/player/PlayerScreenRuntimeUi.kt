@@ -757,6 +757,10 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             } else {
                 null
             },
+            onCustomizeToolbarClick = {
+                showToolbarCustomizer = true
+                controlsActivityTick += 1
+            },
             onStreamInfoClick = { openStreamInfo() },
             parentalWarnings = parentalWarnings,
             showParentalGuide = showParentalGuide,
@@ -1304,6 +1308,17 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
             onDismiss = { showSwitchEngineConfirm = false },
         )
     }
+    val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    PlayerToolbarSidePanel(
+        visible = showToolbarCustomizer,
+        layout = playerSettings.toolbarLayout,
+        onLayoutChange = PlayerSettingsRepository::setToolbarLayout,
+        onDismiss = {
+            showToolbarCustomizer = false
+            controlsVisible = true
+            controlsActivityTick += 1
+        },
+    )
 }
 
 /** The movie or episode currently playing, for in-player rating. */
