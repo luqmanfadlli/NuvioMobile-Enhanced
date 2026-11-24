@@ -160,6 +160,7 @@ actual fun PlatformPlayerSurface(
     useNativeController: Boolean,
     discPlaybackEnabled: Boolean,
     liveStream: Boolean,
+    controlsVisible: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -235,6 +236,7 @@ actual fun PlatformPlayerSurface(
             animeContent = animeContent,
             discPlaybackEnabled = discPlaybackEnabled,
             liveStream = liveStream,
+            controlsVisible = controlsVisible,
             onInitialPositionHandled = onInitialPositionHandled,
             onControllerReady = surfaceOnControllerReady,
             onSnapshot = surfaceOnSnapshot,
@@ -261,6 +263,7 @@ actual fun PlatformPlayerSurface(
                 animeLineSharpenEnabled = animeContent && playerSettings.androidAnimeLineSharpenEnabled,
                 animeContent = animeContent,
                 preferredSubtitleLanguage = playerSettings.preferredSubtitleLanguage,
+                controlsVisible = controlsVisible,
                 onControllerReady = surfaceOnControllerReady,
                 onSnapshot = surfaceOnSnapshot,
                 onError = surfaceOnError,
@@ -303,6 +306,7 @@ private fun ExoPlayerSurface(
     animeContent: Boolean,
     discPlaybackEnabled: Boolean,
     liveStream: Boolean,
+    controlsVisible: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
@@ -372,6 +376,7 @@ private fun ExoPlayerSurface(
     val centerMixLevelDb = remember { AtomicInteger(0) }
     // The current player's FFmpeg audio renderer, for center mix changes during playback.
     val ffmpegAudioRenderer = remember { AtomicReference<FfmpegAudioRenderer?>(null) }
+    val cueNormalizingOutputRef = remember(playerSourceKey) { AtomicReference<CueNormalizingTextOutput?>(null) }
     val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var videoAspectRatio by remember(playerSourceKey) { mutableStateOf(0f) }
@@ -611,6 +616,7 @@ private fun ExoPlayerSurface(
             videoBoundsFractionProvider = {
                 playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
             },
+            onTextOutputCreated = cueNormalizingOutputRef::set,
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
@@ -1860,16 +1866,28 @@ private fun ExoPlayerSurface(
                     )
                     aiostreamsAss?.attach(this)
                     aiostreamsAss?.setStyle(currentSubtitleStyle)
+                    aiostreamsAss?.setControlsVisible(controlsVisible)
+                    subtitleView?.let { sv ->
+                        sv.setOnApplyWindowInsetsListener { _, insets ->
+                            applySubtitleStyle(currentSubtitleStyle, pipVideoHeightPx)
+                            insets
+                        }
+                    }
                     if (subtitleStyleGuard.shouldApply(this, currentSubtitleStyle, pipVideoHeightPx)) {
                         applySubtitleStyle(currentSubtitleStyle, pipVideoHeightPx)
                     }
+                    animateSubtitleElevationForControls(controlsVisible)
                 }
             },
             update = { playerView ->
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
+                val resizeChanged = playerView.resizeMode != resizeMode.toExoResizeMode()
                 playerView.resizeMode = resizeMode.toExoResizeMode()
                 playerViewRef = playerView
+                if (resizeChanged) {
+                    cueNormalizingOutputRef.get()?.reapplyCurrentCues()
+                }
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
                 playerView.syncLibassOverlay(
@@ -1880,9 +1898,11 @@ private fun ExoPlayerSurface(
                 )
                 aiostreamsAss?.attach(playerView)
                 aiostreamsAss?.setStyle(currentSubtitleStyle)
+                aiostreamsAss?.setControlsVisible(controlsVisible)
                 if (subtitleStyleGuard.shouldApply(playerView, currentSubtitleStyle, pipVideoHeightPx)) {
                     playerView.applySubtitleStyle(currentSubtitleStyle, pipVideoHeightPx)
                 }
+                playerView.animateSubtitleElevationForControls(controlsVisible)
             },
         )
         StyledSubtitleOverlay(
@@ -1890,6 +1910,7 @@ private fun ExoPlayerSurface(
             currentSubtitleStyle,
             videoAspectRatio = videoAspectRatio,
             videoResizeMode = resizeMode,
+            controlsVisible = controlsVisible,
         )
     }
 }
@@ -1910,6 +1931,7 @@ private fun LibmpvPlayerSurface(
     animeLineSharpenEnabled: Boolean,
     animeContent: Boolean,
     preferredSubtitleLanguage: String?,
+    controlsVisible: Boolean,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
@@ -2224,6 +2246,10 @@ private fun LibmpvPlayerSurface(
         playerViewRef?.applyResizeMode(resizeMode)
     }
 
+    LaunchedEffect(playerViewRef, controlsVisible) {
+        playerViewRef?.setControlsVisible(controlsVisible)
+    }
+
     LaunchedEffect(playerViewRef) {
         val view = playerViewRef ?: return@LaunchedEffect
         PlayerSettingsRepository.uiState
@@ -2278,12 +2304,14 @@ private fun LibmpvPlayerSurface(
                         InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
                         latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
                     }
+                    setControlsVisible(controlsVisible)
                     playerViewRef = this
                 }
             },
             update = { view ->
                 playerViewRef = view
                 view.applyResizeMode(resizeMode)
+                view.setControlsVisible(controlsVisible)
             },
             onRelease = { view ->
                 if (playerViewRef === view) playerViewRef = null
@@ -2296,6 +2324,7 @@ private fun LibmpvPlayerSurface(
                 view.subtitleStyle,
                 videoAspectRatio = view.subtitleVideoAspectRatio,
                 videoResizeMode = resizeMode,
+                controlsVisible = controlsVisible,
             )
         }
     }
@@ -2361,6 +2390,22 @@ private class NuvioLibmpvView(
         private set
     private var appliedSubtitleStyle = SubtitleStyleState.DEFAULT
     private var styledSubtitleVisible = false
+    @Volatile
+    private var controlsOverlayVisible = false
+
+    fun setControlsVisible(visible: Boolean) {
+        if (controlsOverlayVisible == visible) return
+        controlsOverlayVisible = visible
+        executeMpv {
+            applyMpvSubPosLocked(visible)
+        }
+    }
+
+    private fun applyMpvSubPosLocked(controlsOpen: Boolean = controlsOverlayVisible) {
+        val lift = if (controlsOpen) 18 else 0
+        val basePos = (100 - appliedSubtitleStyle.bottomOffset / 10).coerceIn(0, 100)
+        mpv.setPropertyInt("sub-pos", (basePos - lift).coerceIn(15, 100))
+    }
 
     fun updateStyledSubtitle() {
         executeMpv {
@@ -2410,6 +2455,11 @@ private class NuvioLibmpvView(
         // Room above 100% for the player's amplification (+10 dB is about 316%).
         mpv.setOptionString("volume-max", "$LIBMPV_MAX_VOLUME_PERCENT").logIfMpvError("volume-max")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
+        mpv.setOptionString("sub-use-margins", "yes")
+        mpv.setOptionString("sub-ass-force-margins", "no")
+        mpv.setOptionString("sub-scale-by-window", "yes")
+        mpv.setOptionString("sub-margin-y", "24")
+        mpv.setOptionString("sub-margin-x", "24")
         if (animeShaderPaths.isNotEmpty()) {
             mpv.setOptionString("glsl-shaders", animeShaderPaths.joinToString(":")).logIfMpvError("glsl-shaders")
         }
@@ -2814,16 +2864,19 @@ private class NuvioLibmpvView(
                     mpv.setPropertyString("keepaspect", "yes")
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("sub-ass-force-margins", "no")
                 }
                 PlayerResizeMode.Fill -> {
                     mpv.setPropertyString("keepaspect", "no")
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("sub-ass-force-margins", "no")
                 }
                 PlayerResizeMode.Zoom -> {
                     mpv.setPropertyString("keepaspect", "yes")
                     mpv.setPropertyDouble("panscan", 1.0)
                     mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("sub-ass-force-margins", "yes")
                 }
             }
         }
@@ -3065,7 +3118,7 @@ private class NuvioLibmpvView(
                     mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                     // Boost low blur levels so they soften the border instead of only thickening it.
                     mpv.setPropertyString("sub-blur", style.mpvNativeOutlineBlurAmount.toString())
-                    mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
+                    applyMpvSubPosLocked()
                     mpv.setPropertyBoolean("sub-filter-sdh", style.stripSdh)
                     mpv.setPropertyBoolean("sub-filter-sdh-harder", style.stripSdh)
                     updateStyledSubtitle()
@@ -3958,10 +4011,10 @@ private fun libassOverlayMargins(
         return null
     }
     return LibassOverlayMargins(
-        top = videoBounds.top.roundToInt(),
-        bottom = (overlayHeight - videoBounds.bottom).roundToInt(),
-        left = videoBounds.left.roundToInt(),
-        right = (overlayWidth - videoBounds.right).roundToInt()
+        top = videoBounds.top.roundToInt().coerceAtLeast(0),
+        bottom = (overlayHeight - videoBounds.bottom).roundToInt().coerceAtLeast(0),
+        left = videoBounds.left.roundToInt().coerceAtLeast(0),
+        right = (overlayWidth - videoBounds.right).roundToInt().coerceAtLeast(0),
     )
 }
 
@@ -3979,12 +4032,18 @@ private fun PlayerView.syncLibassOverlayGeometry() {
 
     if (assOverlayView == null || assHandler == null || contentFrame == null) return
 
-    val overlayWidth = overlay?.width ?: 0
-    val overlayHeight = overlay?.height ?: 0
+    val overlayWidth = overlay.width
+    val overlayHeight = overlay.height
     val videoBounds = transformedChildBoundsInParent(contentFrame) ?: return
-    val margins = libassOverlayMargins(overlayWidth, overlayHeight, videoBounds) ?: return
+    val baseMargins = libassOverlayMargins(overlayWidth, overlayHeight, videoBounds) ?: return
+    val controlsLiftPx = (getTag(R.id.libass_controls_lift_px_tag) as? Int) ?: 0
 
-    assHandler.setMargins(margins.top, margins.bottom, margins.left, margins.right)
+    assHandler.setMargins(
+        baseMargins.top,
+        (baseMargins.bottom + controlsLiftPx).coerceAtLeast(0),
+        baseMargins.left,
+        baseMargins.right,
+    )
     assHandler.setUseMargins(false)
     assOverlayView.invalidateSubtitles()
 }
@@ -4004,11 +4063,25 @@ private fun android.widget.FrameLayout.findAssOverlayChild(): AssSubtitleSurface
  * so subtitles shrink and grow with the video exactly as it is shown full screen.
  */
 private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, pipVideoHeightPx: Float? = null) {
+    val density = resources.displayMetrics.density
+    val minHorizontalSafePx = (16f * density).roundToInt()
+    val rootInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) rootWindowInsets else null
+    val cutoutLeftPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        rootInsets?.displayCutout?.safeInsetLeft ?: 0
+    } else 0
+    val cutoutRightPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        rootInsets?.displayCutout?.safeInsetRight ?: 0
+    } else 0
+    val safeHorizontalPx = maxOf(minHorizontalSafePx, cutoutLeftPx, cutoutRightPx)
+
     subtitleView?.apply {
         val baseBottomPaddingFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION * 2f / 3f
         val offsetFraction = (style.bottomOffset / 1000f).coerceIn(0f, 0.2f)
         val bottomPaddingFraction = (baseBottomPaddingFraction + offsetFraction).coerceIn(0f, 0.4f)
 
+        if (paddingLeft != safeHorizontalPx || paddingRight != safeHorizontalPx) {
+            setPadding(safeHorizontalPx, paddingTop, safeHorizontalPx, paddingBottom)
+        }
         setApplyEmbeddedStyles(false)
         setApplyEmbeddedFontSizes(false)
         setBottomPaddingFraction(bottomPaddingFraction)
@@ -4033,6 +4106,37 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, pipVideoHei
             // Full-screen size unknown: fall back to a fixed PiP scale.
             else -> setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, fontSizeSp * PIP_FALLBACK_SUBTITLE_SCALE)
         }
+    }
+}
+
+private const val SUBTITLE_CONTROLS_ELEVATION_DP = 108f
+private const val SUBTITLE_CONTROLS_ANIMATION_MS = 200L
+
+private fun PlayerView.animateSubtitleElevationForControls(controlsVisible: Boolean) {
+    val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
+        context.findActivity()?.isInPictureInPictureMode == true
+    val targetLiftPx = if (controlsVisible && !inPip) {
+        (SUBTITLE_CONTROLS_ELEVATION_DP * resources.displayMetrics.density).roundToInt()
+    } else {
+        0
+    }
+    val targetTranslationY = -targetLiftPx.toFloat()
+
+    subtitleView?.let { sv ->
+        val lastTarget = sv.getTag(R.id.subtitle_controls_lift_tag) as? Int
+        if (lastTarget != targetLiftPx) {
+            sv.setTag(R.id.subtitle_controls_lift_tag, targetLiftPx)
+            sv.animate()
+                .translationY(targetTranslationY)
+                .setDuration(SUBTITLE_CONTROLS_ANIMATION_MS)
+                .start()
+        }
+    }
+
+    val previousAssLift = (getTag(R.id.libass_controls_lift_px_tag) as? Int) ?: 0
+    if (previousAssLift != targetLiftPx) {
+        setTag(R.id.libass_controls_lift_px_tag, targetLiftPx)
+        syncLibassOverlayGeometry()
     }
 }
 
@@ -4436,23 +4540,63 @@ private class PcmOnlyAudioSink(sink: AudioSink) : ForwardingAudioSink(sink) {
     }
 }
 
+internal data class NormalizedVideoBounds(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+) {
+    fun width(): Float = right - left
+    fun height(): Float = bottom - top
+    fun toRectF(): RectF = RectF(left, top, right, bottom)
+}
+
+internal fun computeFitVideoBoundsFraction(
+    viewWidth: Float,
+    viewHeight: Float,
+    aspectRatio: Float,
+    resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+): NormalizedVideoBounds? {
+    if (viewWidth <= 0f || viewHeight <= 0f) return null
+    if (resizeMode == PlayerResizeMode.Fill || resizeMode == PlayerResizeMode.Zoom) {
+        if (resizeMode == PlayerResizeMode.Zoom && aspectRatio > 0f) {
+            val parentRatio = viewWidth / viewHeight
+            if (parentRatio > aspectRatio) {
+                val aspectScale = (aspectRatio / parentRatio).coerceIn(0.5f, 1f)
+                val left = (1f - aspectScale) / 2f
+                return NormalizedVideoBounds(left, 0f, left + aspectScale, 1f)
+            }
+        }
+        return NormalizedVideoBounds(0f, 0f, 1f, 1f)
+    }
+    if (aspectRatio <= 0f) return null
+    val parentRatio = viewWidth / viewHeight
+    return if (parentRatio > aspectRatio) {
+        val fitW = viewHeight * aspectRatio
+        val leftPx = (viewWidth - fitW) / 2f
+        NormalizedVideoBounds(leftPx / viewWidth, 0f, (leftPx + fitW) / viewWidth, 1f)
+    } else {
+        val fitH = viewWidth / aspectRatio
+        val topPx = (viewHeight - fitH) / 2f
+        NormalizedVideoBounds(0f, topPx / viewHeight, 1f, (topPx + fitH) / viewHeight)
+    }
+}
+
 private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
     val subtitleView = this.subtitleView ?: return null
-    val viewWidth = subtitleView.width.toFloat()
-    val viewHeight = subtitleView.height.toFloat()
+    val viewWidth = (subtitleView.width - subtitleView.paddingLeft - subtitleView.paddingRight).toFloat()
+    val viewHeight = (subtitleView.height - subtitleView.paddingTop - subtitleView.paddingBottom).toFloat()
     if (viewWidth <= 0f || viewHeight <= 0f) return null
 
+    if (resizeMode == AspectRatioFrameLayout.RESIZE_MODE_ZOOM) {
+        return computeFitVideoBoundsFraction(viewWidth, viewHeight, aspectRatio, PlayerResizeMode.Zoom)?.toRectF()
+    }
+    if (resizeMode == AspectRatioFrameLayout.RESIZE_MODE_FILL) {
+        return RectF(0f, 0f, 1f, 1f)
+    }
+
     if (aspectRatio > 0f) {
-        val parentRatio = viewWidth / viewHeight
-        return if (parentRatio > aspectRatio) {
-            val fitW = viewHeight * aspectRatio
-            val leftPx = (viewWidth - fitW) / 2f
-            RectF(leftPx / viewWidth, 0f, (leftPx + fitW) / viewWidth, 1f)
-        } else {
-            val fitH = viewWidth / aspectRatio
-            val topPx = (viewHeight - fitH) / 2f
-            RectF(0f, topPx / viewHeight, 1f, (topPx + fitH) / viewHeight)
-        }
+        return computeFitVideoBoundsFraction(viewWidth, viewHeight, aspectRatio, PlayerResizeMode.Fit)?.toRectF()
     }
 
     val contentFrame = getTag(androidx.media3.ui.R.id.exo_content_frame) as? AspectRatioFrameLayout
@@ -4462,14 +4606,16 @@ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
     val frameWidth = contentFrame.width.toFloat()
     val frameHeight = contentFrame.height.toFloat()
     if (frameWidth <= 0f || frameHeight <= 0f) return null
-    if (frameWidth > viewWidth || frameHeight > viewHeight) return null
-    val left = contentFrame.x / viewWidth
-    val top = contentFrame.y / viewHeight
+    if (frameWidth > viewWidth || frameHeight > viewHeight) {
+        return RectF(0f, 0f, 1f, 1f)
+    }
+    val left = ((contentFrame.x - subtitleView.paddingLeft) / viewWidth).coerceIn(0f, 1f)
+    val top = ((contentFrame.y - subtitleView.paddingTop) / viewHeight).coerceIn(0f, 1f)
     return RectF(
         left,
         top,
-        left + frameWidth / viewWidth,
-        top + frameHeight / viewHeight,
+        (left + frameWidth / viewWidth).coerceIn(left, 1f),
+        (top + frameHeight / viewHeight).coerceIn(top, 1f),
     )
 }
 
@@ -4498,6 +4644,7 @@ private class SubtitleOffsetRenderersFactory(
     private val audioPassthroughEnabled: Boolean,
     private val presentCues: (List<Cue>) -> List<Cue>,
     private val videoBoundsFractionProvider: () -> RectF?,
+    private val onTextOutputCreated: (CueNormalizingTextOutput) -> Unit = {},
 ) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(
         context: Context,
@@ -4594,7 +4741,7 @@ private class SubtitleOffsetRenderersFactory(
             shouldStripSdhProvider = shouldStripSdhProvider,
             presentCues = presentCues,
             videoBoundsFractionProvider = videoBoundsFractionProvider,
-        )
+        ).also(onTextOutputCreated)
         val startIndex = out.size
         super.buildTextRenderers(context, normalizingOutput, outputLooper, extensionRendererMode, out)
         for (index in startIndex until out.size) {
@@ -4643,13 +4790,23 @@ private class CueNormalizingTextOutput(
     private val presentCues: (List<Cue>) -> List<Cue>,
     private val videoBoundsFractionProvider: () -> RectF?,
 ) : TextOutput {
+    private var lastRawCueGroup: CueGroup? = null
+
+    fun reapplyCurrentCues() {
+        val current = lastRawCueGroup ?: return
+        val processed = current.cues.mapNotNull(::processCue)
+        delegate.onCues(CueGroup(presentCues(processed), current.presentationTimeUs))
+    }
+
     override fun onCues(cueGroup: CueGroup) {
+        lastRawCueGroup = cueGroup
         val processed = cueGroup.cues.mapNotNull(::processCue)
         delegate.onCues(CueGroup(presentCues(processed), cueGroup.presentationTimeUs))
     }
 
     @Deprecated("Uses the deprecated Media3 callback for text outputs.")
     override fun onCues(cues: List<Cue>) {
+        lastRawCueGroup = CueGroup(cues, 0L)
         delegate.onCues(presentCues(cues.mapNotNull(::processCue)))
     }
 
@@ -4668,11 +4825,7 @@ private class CueNormalizingTextOutput(
         if (processed.bitmap != null) {
             val bounds = videoBoundsFractionProvider()
             if (bounds != null && bounds.width() > 0f && bounds.height() > 0f) {
-                val isIdentity = bounds.left == 0f && bounds.top == 0f
-                    && bounds.width() == 1f && bounds.height() == 1f
-                if (!isIdentity) {
-                    processed = remapBitmapCueToVideoBounds(processed, bounds)
-                }
+                processed = remapBitmapCueToVideoBounds(processed, bounds)
             }
         }
         return processed
@@ -4681,16 +4834,16 @@ private class CueNormalizingTextOutput(
     private fun remapBitmapCueToVideoBounds(cue: Cue, bounds: RectF): Cue {
         val builder = cue.buildUpon()
         if (cue.position != Cue.DIMEN_UNSET) {
-            builder.setPosition(bounds.left + cue.position * bounds.width())
+            builder.setPosition((bounds.left + cue.position * bounds.width()).coerceIn(0.02f, 0.98f))
         }
         if (cue.size != Cue.DIMEN_UNSET) {
-            builder.setSize(cue.size * bounds.width())
+            builder.setSize((cue.size * bounds.width()).coerceIn(0.05f, 0.96f))
         }
         if (cue.lineType == Cue.LINE_TYPE_FRACTION && cue.line != Cue.DIMEN_UNSET) {
-            builder.setLine(bounds.top + cue.line * bounds.height(), Cue.LINE_TYPE_FRACTION)
+            builder.setLine((bounds.top + cue.line * bounds.height()).coerceIn(0.02f, 0.96f), Cue.LINE_TYPE_FRACTION)
         }
         if (cue.bitmapHeight != Cue.DIMEN_UNSET) {
-            builder.setBitmapHeight(cue.bitmapHeight * bounds.height())
+            builder.setBitmapHeight((cue.bitmapHeight * bounds.height()).coerceIn(0.02f, 0.92f))
         }
         return builder.build()
     }

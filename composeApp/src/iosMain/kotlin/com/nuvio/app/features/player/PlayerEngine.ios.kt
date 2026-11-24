@@ -66,6 +66,7 @@ actual fun PlatformPlayerSurface(
     useNativeController: Boolean,
     discPlaybackEnabled: Boolean,
     liveStream: Boolean,
+    controlsVisible: Boolean,
     onInitialPositionHandled: (key: String, handled: Boolean) -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,

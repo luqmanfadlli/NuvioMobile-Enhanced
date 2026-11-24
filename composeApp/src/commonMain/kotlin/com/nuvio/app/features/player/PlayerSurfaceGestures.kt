@@ -47,14 +47,14 @@ internal fun Modifier.playerSurfaceTapGestures(
 
 internal fun Modifier.playerSurfaceDragGestures(
     gestureController: PlayerGestureController?,
-    playerController: PlayerEngineController?,
+    playerController: PlayerEngineController? = null,
     layoutSize: IntSize,
     playbackGesturesEnabled: Boolean,
     sideGestureSystemEdgeExclusionPx: Float,
     horizontalSeekSystemEdgeExclusionPx: Float = 0f,
     playerControlsLockedState: State<Boolean>,
     touchGesturesEnabledState: State<Boolean>,
-    swipeToSeekEnabledState: State<Boolean>,
+    swipeToSeekEnabledState: State<Boolean> = androidx.compose.runtime.mutableStateOf(true),
     isHoldToSpeedGestureActiveState: State<Boolean>,
     currentPositionMsState: State<Long>,
     currentDurationMsState: State<Long>,
@@ -261,22 +261,51 @@ internal fun Modifier.playerSurfaceDragGestures(
         }
     }
 
+internal const val PINCH_ZOOM_IN_THRESHOLD = 1.15f
+internal const val PINCH_ZOOM_OUT_THRESHOLD = 0.85f
+
+internal fun resolvePinchResizeMode(
+    cumulativeZoom: Float,
+    currentMode: PlayerResizeMode,
+): PlayerResizeMode? = when {
+    cumulativeZoom >= PINCH_ZOOM_IN_THRESHOLD && currentMode != PlayerResizeMode.Zoom -> PlayerResizeMode.Zoom
+    cumulativeZoom <= PINCH_ZOOM_OUT_THRESHOLD && currentMode != PlayerResizeMode.Fit -> PlayerResizeMode.Fit
+    else -> null
+}
+
 internal fun Modifier.playerSurfacePinchGestures(
     playbackGesturesEnabled: Boolean,
     playerControlsLockedState: State<Boolean>,
     touchGesturesEnabledState: State<Boolean>,
-    onPinchZoomState: State<(zoomFactor: Float) -> Unit>,
+    onPinchZoomState: State<(zoomFactor: Float) -> Boolean>,
 ): Modifier =
     pointerInput(playbackGesturesEnabled) {
         if (!playbackGesturesEnabled) return@pointerInput
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
+            var cumulativeZoom = 1f
+            var triggered = false
+            var hadMultiTouch = false
             do {
                 val event = awaitPointerEvent()
                 val multiTouch = event.changes.count { it.pressed } > 1
+                if (multiTouch) {
+                    hadMultiTouch = true
+                }
                 if (multiTouch && !playerControlsLockedState.value && touchGesturesEnabledState.value) {
                     val zoom = event.calculateZoom()
-                    if (zoom != 1f) onPinchZoomState.value(zoom)
+                    if (zoom.isFinite() && zoom > 0f && zoom != 1f) {
+                        cumulativeZoom = (cumulativeZoom * zoom).coerceIn(0.25f, 4.0f)
+                        if (!triggered && (cumulativeZoom >= PINCH_ZOOM_IN_THRESHOLD || cumulativeZoom <= PINCH_ZOOM_OUT_THRESHOLD)) {
+                            if (onPinchZoomState.value(cumulativeZoom)) {
+                                triggered = true
+                            } else {
+                                cumulativeZoom = 1f
+                            }
+                        }
+                    }
+                }
+                if (hadMultiTouch) {
                     event.changes.forEach { it.consume() }
                 }
             } while (event.changes.any { it.pressed })
