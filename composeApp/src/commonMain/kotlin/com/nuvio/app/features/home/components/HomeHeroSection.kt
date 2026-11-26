@@ -247,7 +247,10 @@ internal fun HomeHeroSection(
         }
     }
 
-    ScreenActivityEffect(autoScrollPage, items.size, effectiveTrailerPlaybackEnabled) { active ->
+    // A touch on the hero restarts the wait, so the pager never advances between finger down and
+    // finger up (the tap then opened the next item instead of the one on screen).
+    var heroTouchCount by remember { mutableStateOf(0) }
+    ScreenActivityEffect(autoScrollPage, items.size, effectiveTrailerPlaybackEnabled, heroTouchCount) { active ->
         if (!active || items.size <= 1 || effectiveTrailerPlaybackEnabled) return@ScreenActivityEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
@@ -288,6 +291,7 @@ internal fun HomeHeroSection(
                     pagerState = pagerState,
                     itemCount = items.size,
                     coroutineScope = coroutineScope,
+                    onTouch = { heroTouchCount += 1 },
                 )
                 .clip(heroShape),
         ) {
@@ -1034,12 +1038,14 @@ private fun Modifier.homeHeroPagerGesture(
     pagerState: PagerState,
     itemCount: Int,
     coroutineScope: CoroutineScope,
+    onTouch: () -> Unit = {},
 ): Modifier {
     if (itemCount <= 1) return this
 
     return pointerInput(pagerState, itemCount) {
         awaitEachGesture {
             val down = awaitFirstDown(pass = PointerEventPass.Initial)
+            onTouch()
             val widthPx = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
             val velocityTracker = VelocityTracker().apply {
                 addPosition(down.uptimeMillis, down.position)
