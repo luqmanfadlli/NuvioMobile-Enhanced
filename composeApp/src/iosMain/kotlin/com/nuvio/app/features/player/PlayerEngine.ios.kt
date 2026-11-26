@@ -211,7 +211,14 @@ actual fun PlatformPlayerSurface(
                 bridge.setMuted(muted)
             }
 
+            private var cachedAudioTracks: List<AudioTrack>? = null
+            private var cachedAudioGeneration = Long.MIN_VALUE
+
             override fun getAudioTracks(): List<AudioTrack> {
+                // Polled four times a second (refreshAudioTracksIfChanged); the same list until
+                // the engine's tracks change, so its identity check can skip the refresh.
+                val generation = bridge.getTracksGeneration()
+                cachedAudioTracks?.let { if (generation == cachedAudioGeneration && generation >= 0) return it }
                 val count = bridge.getAudioTrackCount()
                 val tracks = (0 until count).map { i ->
                     AudioTrack(
@@ -228,6 +235,8 @@ actual fun PlatformPlayerSurface(
                     lastLoggedAudioTracks = tracksLog
                     InAppLogger.debug("Player/iOS", tracksLog)
                 }
+                cachedAudioTracks = tracks
+                cachedAudioGeneration = generation
                 return tracks
             }
 
