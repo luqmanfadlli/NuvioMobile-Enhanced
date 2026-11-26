@@ -302,8 +302,9 @@ fun LiveTvScreen(
     }
 
     // Sports -----------------------------------------------------------------------------------
-    LaunchedEffect(section) {
-        if (section != LiveTvSection.Sports) return@LaunchedEffect
+    // Only while Live TV is on screen: the screen stays composed when another tab is shown.
+    com.nuvio.app.core.ui.ScreenActivityEffect(section) { active ->
+        if (!active || section != LiveTvSection.Sports) return@ScreenActivityEffect
         while (true) {
             LiveTvSportsRepository.refreshIfStale()
             delay(30_000L)
