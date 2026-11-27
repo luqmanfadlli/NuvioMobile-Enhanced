@@ -2,6 +2,9 @@ package com.nuvio.app.features.livetv
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.player.PlaybackDrm
+import com.nuvio.app.features.player.PlaybackDrmRegistry
+import com.nuvio.app.features.player.parseKodiDrm
 import io.ktor.http.decodeURLQueryComponent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -290,9 +293,12 @@ object LiveTvRepository {
         refreshEpg(force = true)
     }
 
-    suspend fun prepareForPlayback(channel: LiveTvChannel): LiveTvChannel =
-        if (channel.stalkerCommand.isNullOrBlank()) channel
+    suspend fun prepareForPlayback(channel: LiveTvChannel): LiveTvChannel {
+        val playable = if (channel.stalkerCommand.isNullOrBlank()) channel
         else preparePortalChannelForPlayback(channel, _uiState.value.stalkerSettings)
+        PlaybackDrmRegistry.register(playable.streamUrl, playable.drm)
+        return playable
+    }
 
     fun refresh() {
         ensureLoaded()
@@ -697,6 +703,7 @@ internal fun parseM3uPlaylist(
     var pendingInfo: M3uInfo? = null
     val pendingHeaders = LinkedHashMap<String, String>()
     var pendingStreamType: String? = null
+    val pendingDrm = PendingKodiDrm()
 
     payload.lineSequence()
         .map(String::trim)
@@ -717,7 +724,7 @@ internal fun parseM3uPlaylist(
                         .forEach { (key, value) -> pendingHeaders.putM3uHeader(key, value) }
                 }
                 line.startsWith("#KODIPROP", ignoreCase = true) -> {
-                    parseKodiProp(line.substringAfter(':', missingDelimiterValue = ""), pendingHeaders)
+                    parseKodiProp(line.substringAfter(':', missingDelimiterValue = ""), pendingHeaders, pendingDrm)
                         ?.let { pendingStreamType = it }
                 }
                 line.startsWith("#") -> Unit
@@ -740,10 +747,12 @@ internal fun parseM3uPlaylist(
                         headers = defaultLiveTvStreamHeaders(streamUrl) + pendingHeaders,
                         streamType = pendingStreamType,
                         epgId = info?.epgId?.takeIf(String::isNotBlank),
+                        drm = pendingDrm.build(),
                     )
                     pendingInfo = null
                     pendingHeaders.clear()
                     pendingStreamType = null
+                    pendingDrm.clear()
                 }
             }
         }
@@ -816,7 +825,23 @@ private fun parseExtHttp(json: String): Map<String, String> = runCatching {
     }.toMap()
 }.getOrDefault(emptyMap())
 
-private fun parseKodiProp(property: String, headers: MutableMap<String, String>): String? {
+private class PendingKodiDrm {
+    var licenseType: String? = null
+    var licenseKey: String? = null
+
+    fun build(): PlaybackDrm? = parseKodiDrm(licenseType, licenseKey, ::parseM3uHeaderQuery)
+
+    fun clear() {
+        licenseType = null
+        licenseKey = null
+    }
+}
+
+private fun parseKodiProp(
+    property: String,
+    headers: MutableMap<String, String>,
+    drm: PendingKodiDrm,
+): String? {
     val key = property.substringBefore('=', missingDelimiterValue = "").trim().lowercase()
     val value = property.substringAfter('=', missingDelimiterValue = "").trim()
     if (value.isBlank()) return null
@@ -836,6 +861,20 @@ private fun parseKodiProp(property: String, headers: MutableMap<String, String>)
         "inputstream.adaptive.common_headers",
         "inputstream.adaptive.manifest_headers" -> {
             parseM3uHeaderQuery(value).forEach { (headerKey, headerValue) -> headers.putM3uHeader(headerKey, headerValue) }
+            null
+        }
+        "inputstream.adaptive.license_type" -> {
+            drm.licenseType = value
+            null
+        }
+        "inputstream.adaptive.license_key" -> {
+            drm.licenseKey = value
+            null
+        }
+        "inputstream.adaptive.drm_legacy" -> {
+            val parts = value.split('|', limit = 2)
+            drm.licenseType = parts.first()
+            drm.licenseKey = parts.getOrNull(1)
             null
         }
         else -> null

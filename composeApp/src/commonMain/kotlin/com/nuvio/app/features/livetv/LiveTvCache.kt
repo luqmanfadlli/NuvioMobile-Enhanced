@@ -1,6 +1,8 @@
 package com.nuvio.app.features.livetv
 
 import com.nuvio.app.core.storage.AppFileCache
+import com.nuvio.app.features.player.PlaybackDrm
+import com.nuvio.app.features.player.PlaybackDrmScheme
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -26,7 +28,33 @@ private data class CachedLiveTvChannel(
     val streamType: String? = null,
     val stalkerCommand: String? = null,
     val epgId: String? = null,
+    val drm: CachedPlaybackDrm? = null,
 )
+
+@Serializable
+private data class CachedPlaybackDrm(
+    val scheme: String,
+    val clearKeys: Map<String, String> = emptyMap(),
+    val licenseUrl: String? = null,
+    val licenseHeaders: Map<String, String> = emptyMap(),
+)
+
+private fun PlaybackDrm.toCached(): CachedPlaybackDrm = CachedPlaybackDrm(
+    scheme = scheme.name,
+    clearKeys = clearKeys,
+    licenseUrl = licenseUrl,
+    licenseHeaders = licenseHeaders,
+)
+
+private fun CachedPlaybackDrm.toPlaybackDrm(): PlaybackDrm? {
+    val drmScheme = PlaybackDrmScheme.entries.firstOrNull { it.name == scheme } ?: return null
+    return PlaybackDrm(
+        scheme = drmScheme,
+        clearKeys = clearKeys,
+        licenseUrl = licenseUrl,
+        licenseHeaders = licenseHeaders,
+    )
+}
 
 @Serializable
 private data class CachedLiveTvChannelsPayload(
@@ -86,6 +114,7 @@ internal object LiveTvCacheStore {
                     streamType = channel.streamType,
                     stalkerCommand = channel.stalkerCommand,
                     epgId = channel.epgId,
+                    drm = channel.drm?.toPlaybackDrm(),
                 )
             },
         )
@@ -110,6 +139,7 @@ internal object LiveTvCacheStore {
                         streamType = channel.streamType,
                         stalkerCommand = channel.stalkerCommand,
                         epgId = channel.epgId,
+                        drm = channel.drm?.toCached(),
                     )
                 },
             )
@@ -163,7 +193,7 @@ internal object LiveTvCacheStore {
  * Bumped when the channel list is read differently, so lists saved by an older version are
  * loaded again (3: VLC's user agent by default, Xtream panel links in the account's format).
  */
-private const val ChannelsCacheFormat = 3
+private const val ChannelsCacheFormat = 4
 
 internal fun liveTvChannelSourceSignature(state: LiveTvUiState): String = buildString {
     append("v").append(ChannelsCacheFormat).append(';')

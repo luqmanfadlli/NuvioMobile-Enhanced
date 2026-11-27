@@ -1,5 +1,7 @@
 package com.nuvio.app.features.livetv
 
+import com.nuvio.app.features.player.PlaybackDrm
+
 data class LiveTvChannel(
     val id: String,
     val name: String,
@@ -12,6 +14,7 @@ data class LiveTvChannel(
     val streamType: String? = null,
     val stalkerCommand: String? = null,
     val epgId: String? = null,
+    val drm: PlaybackDrm? = null,
 )
 
 data class LiveTvEpgProgram(
