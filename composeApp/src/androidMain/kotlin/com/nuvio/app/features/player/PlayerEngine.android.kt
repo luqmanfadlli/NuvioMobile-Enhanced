@@ -331,6 +331,10 @@ private fun ExoPlayerSurface(
     val normalizedStreamType = remember(streamType) {
         normalizeStreamType(streamType)
     }
+    val playbackDrm = remember(sourceUrl) { PlaybackDrmRegistry.forUrl(sourceUrl) }
+    val drmSessionManagerProvider = remember(playbackDrm, sanitizedSourceHeaders) {
+        playbackDrm?.exoDrmSessionManagerProvider(sanitizedSourceHeaders)
+    }
     val useLibmpvAss = playerSettings.useLibmpvAss && AiostreamsAss.isAvailable
     val useLibass = playerSettings.useLibass && !useLibmpvAss
     val aiostreamsAss = remember {
@@ -506,7 +510,8 @@ private fun ExoPlayerSurface(
             "prepare source url=${InAppLogger.redactUrl(sourceUrl)} audio=${!sourceAudioUrl.isNullOrBlank()} " +
                 "subtitles=${externalSubtitles.size} requestHeaders=${InAppLogger.headerKeys(sanitizedSourceHeaders)} " +
                 "responseHeaderOverrides=${InAppLogger.headerKeys(sanitizedSourceResponseHeaders)} " +
-                "streamType=${normalizedStreamType ?: "unknown"} youtubeChunked=$useYoutubeChunkedPlayback",
+                "streamType=${normalizedStreamType ?: "unknown"} youtubeChunked=$useYoutubeChunkedPlayback " +
+                "drm=${playbackDrm?.logDescription ?: "none"}",
         )
     }
 
@@ -538,7 +543,7 @@ private fun ExoPlayerSurface(
         } else if (liveStream) {
             setMediaSource(
                 AudioDelayMediaSource(
-                    createLiveMediaSource(dataSourceFactory, extractorsFactory, videoMediaItem),
+                    createLiveMediaSource(dataSourceFactory, extractorsFactory, videoMediaItem, drmSessionManagerProvider),
                     audioDelayUs::get,
                 ),
             )
@@ -729,6 +734,7 @@ private fun ExoPlayerSurface(
                 extractorsFactory,
             )
             aiostreamsAss?.let { mediaSourceFactory.setSubtitleParserFactory(it.scripts()) }
+            drmSessionManagerProvider?.let(mediaSourceFactory::setDrmSessionManagerProvider)
 
             playerBuilder
                 .setRenderersFactory(renderersFactory)

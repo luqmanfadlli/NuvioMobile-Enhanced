@@ -14,6 +14,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.analytics.PlayerId
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.TrackGroupArray
@@ -76,9 +77,11 @@ internal fun createLiveMediaSource(
     dataSourceFactory: DataSource.Factory,
     extractorsFactory: ExtractorsFactory,
     mediaItem: MediaItem,
+    drmSessionManagerProvider: DrmSessionManagerProvider? = null,
 ): MediaSource =
     DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
         .setLoadErrorHandlingPolicy(LiveLoadErrorPolicy)
+        .apply { drmSessionManagerProvider?.let(::setDrmSessionManagerProvider) }
         .createMediaSource(mediaItem)
 
 /**
