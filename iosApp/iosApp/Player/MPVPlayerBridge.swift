@@ -1469,6 +1469,7 @@ final class MPVPlayerViewController: UIViewController {
 
             self.metalLayer.setRenderingSuspended(false, reason: "device-loss-recovery")
             self.metalLayer.releasePendingDrawable()
+            self.reattachMetalLayerIfNeeded()
 
             self.setupMpv()
             guard self.mpv != nil else {
@@ -1574,6 +1575,19 @@ final class MPVPlayerViewController: UIViewController {
         }
         guard Thread.isMainThread else { return }
         detach()
+    }
+
+    private func reattachMetalLayerIfNeeded() {
+        guard metalLayer.superlayer == nil, isViewLoaded else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if let displayLayer = pictureInPictureController?.displayLayer, displayLayer.superlayer === view.layer {
+            view.layer.insertSublayer(metalLayer, above: displayLayer)
+        } else {
+            view.layer.addSublayer(metalLayer)
+        }
+        CATransaction.commit()
+        layoutPlayerSurfaces()
     }
 
     private func reapplyRememberedSettings() {
