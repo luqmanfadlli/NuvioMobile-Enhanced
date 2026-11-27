@@ -23,6 +23,7 @@ interface NuvioPlayerBridge {
     fun getKeepsPlaybackInBackground(): Boolean
     fun retry()
     fun isPictureInPictureSupported(): Boolean
+    fun getTracksGeneration(): Long
     fun startPictureInPicture()
     fun setVideoZoom(scale: Double)
     fun setExperimentalSinglePrimaryPictureInPictureEnabled(enabled: Boolean)

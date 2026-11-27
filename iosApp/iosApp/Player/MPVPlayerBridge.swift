@@ -156,6 +156,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     // Audio tracks
+    func getTracksGeneration() -> Int64 { playerVC?.tracksGeneration ?? -1 }
     func getAudioTrackCount() -> Int32 { Int32(playerVC?.audioTracks.count ?? 0) }
     func getAudioTrackIndex(at: Int32) -> Int32 {
         guard let t = playerVC?.audioTracks, Int(at) < t.count else { return 0 }
@@ -293,7 +294,7 @@ struct PluginSubtitle {
 
 // MARK: - Track Info
 
-struct TrackInfo {
+struct TrackInfo: Equatable {
     let index: Int
     let id: Int
     let type: String
@@ -503,6 +504,7 @@ final class MPVPlayerViewController: UIViewController {
     private var throttledLogEntries: [String: ThrottledLogEntry] = [:]
 
     var audioTracks: [TrackInfo] = []
+    private(set) var tracksGeneration: Int64 = 0
     var subtitleTracks: [TrackInfo] = []
     var isPlayerLoading: Bool = true
     var isPlayerPlaying: Bool = false
@@ -2375,7 +2377,9 @@ final class MPVPlayerViewController: UIViewController {
 
             guard let tracks else { return }
             DispatchQueue.main.async {
+                guard tracks.audio != self.audioTracks || tracks.subtitles != self.subtitleTracks else { return }
                 self.audioTracks = tracks.audio
+                self.tracksGeneration &+= 1
                 self.subtitleTracks = tracks.subtitles
             }
         }
