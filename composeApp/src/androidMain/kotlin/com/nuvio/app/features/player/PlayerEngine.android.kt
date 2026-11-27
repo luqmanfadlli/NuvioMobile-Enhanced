@@ -2410,7 +2410,7 @@ private class NuvioLibmpvView(
         mpv.setOptionString("ytdl", "no").logIfMpvError("ytdl")
         mpv.setOptionString("tls-verify", "yes")
         mpv.setOptionString("tls-ca-file", "${context.filesDir.path}/cacert.pem")
-        mpv.setOptionString("demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]").logIfMpvError("demuxer-lavf-o")
+        mpv.setOptionString("demuxer-lavf-o", MpvBaseDemuxerLavfOptions).logIfMpvError("demuxer-lavf-o")
         mpv.setOptionString("demuxer-max-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-bytes")
         mpv.setOptionString("demuxer-max-back-bytes", "${libmpvCacheBytes()}").logIfMpvError("demuxer-max-back-bytes")
         // Room above 100% for the player's amplification (+10 dB is about 316%).
@@ -2488,6 +2488,7 @@ private class NuvioLibmpvView(
     private fun loadCurrentSourceNow(playWhenReady: Boolean) {
         val sourceUrl = currentSourceUrl ?: return
         applyRequestHeadersNow(currentRequestHeaders)
+        applyDrmNow(sourceUrl)
         setPausedNow(!playWhenReady)
         mpv.setPropertyString("aid", "auto")
         fileLoaded = false
@@ -2496,6 +2497,14 @@ private class NuvioLibmpvView(
             mpv.command("audio-add", sourceAudioUrl.toMpvSource(), "auto")
         }
         setPausedNow(!playWhenReady)
+    }
+
+    private fun applyDrmNow(sourceUrl: String) {
+        val drm = PlaybackDrmRegistry.forUrl(sourceUrl)
+        if (drm.isUnsupportedByMpv()) {
+            InAppLogger.warn("MPV/Android", "drm=${drm?.logDescription} needs ExoPlayer; libmpv only decrypts ClearKey keys from the playlist")
+        }
+        mpv.setPropertyString("demuxer-lavf-o", drm.mpvDemuxerLavfOptions())
     }
 
     fun onFileStarted() {

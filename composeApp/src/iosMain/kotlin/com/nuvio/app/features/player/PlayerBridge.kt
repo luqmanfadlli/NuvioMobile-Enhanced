@@ -9,6 +9,7 @@ import platform.UIKit.UIViewController
 interface NuvioPlayerBridge {
     fun createPlayerViewController(): UIViewController
     fun loadFile(url: String)
+    fun setDemuxerLavfOptions(options: String)
     fun loadFileWithAudio(
         videoUrl: String,
         audioUrl: String?,

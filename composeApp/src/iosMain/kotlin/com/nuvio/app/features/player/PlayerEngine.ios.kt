@@ -460,6 +460,14 @@ actual fun PlatformPlayerSurface(
                 "hwdec=${latestPlayerSettings.value.iosHardwareDecoderMode.mpvValue} toneMapping=${latestPlayerSettings.value.iosToneMappingMode.mpvValue}",
         )
         bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
+        val playbackDrm = PlaybackDrmRegistry.forUrl(sourceUrl)
+        if (playbackDrm != null) {
+            InAppLogger.info("Player/iOS", "drm=${playbackDrm.logDescription}")
+            if (playbackDrm.isUnsupportedByMpv()) {
+                InAppLogger.warn("Player/iOS", "mpv only decrypts ClearKey keys from the playlist; this channel needs a license server")
+            }
+        }
+        bridge.setDemuxerLavfOptions(playbackDrm.mpvDemuxerLavfOptions())
         bridge.loadFileWithAudio(
             videoUrl = sourceUrl,
             audioUrl = sourceAudioUrl,

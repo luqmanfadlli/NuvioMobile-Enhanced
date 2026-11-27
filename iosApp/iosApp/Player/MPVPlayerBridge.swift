@@ -34,6 +34,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     func loadFile(url: String) { ensurePlayerViewController().loadFile(url) }
+    func setDemuxerLavfOptions(options: String) { ensurePlayerViewController().demuxerLavfOptions = options }
     func loadFileWithAudio(videoUrl: String, audioUrl: String?, headersJson: String?, subtitlesJson: String?) {
         ensurePlayerViewController().loadFile(
             videoUrl,
@@ -308,6 +309,7 @@ private struct PendingLoadRequest {
     let audioUrl: String?
     let requestHeaders: [String: String]
     let subtitles: [PluginSubtitle]
+    let demuxerLavfOptions: String
     let queuedAtUptime: TimeInterval
 }
 
@@ -504,6 +506,8 @@ final class MPVPlayerViewController: UIViewController {
     private var throttledLogEntries: [String: ThrottledLogEntry] = [:]
 
     var audioTracks: [TrackInfo] = []
+    static let baseDemuxerLavfOptions = "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]"
+    var demuxerLavfOptions = MPVPlayerViewController.baseDemuxerLavfOptions
     private(set) var tracksGeneration: Int64 = 0
     var subtitleTracks: [TrackInfo] = []
     var isPlayerLoading: Bool = true
@@ -898,7 +902,7 @@ final class MPVPlayerViewController: UIViewController {
             setSetupOption("correct-downscaling", "no")
             setSetupOption("dscale", "bilinear")
         }
-        setSetupOption("demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]")
+        setSetupOption("demuxer-lavf-o", Self.baseDemuxerLavfOptions)
 
         checkError(mpv_initialize(mpv))
         applyNightModeFilter()
@@ -1168,6 +1172,7 @@ final class MPVPlayerViewController: UIViewController {
             audioUrl: audioUrl,
             requestHeaders: requestHeaders,
             subtitles: subtitles,
+            demuxerLavfOptions: demuxerLavfOptions,
             queuedAtUptime: ProcessInfo.processInfo.systemUptime
         )
 
@@ -1215,6 +1220,7 @@ final class MPVPlayerViewController: UIViewController {
         )
         activeRequestHeaders = sanitizedHeaders
         applyRequestHeaders(sanitizedHeaders)
+        setStringProperty("demuxer-lavf-o", request.demuxerLavfOptions)
         isPlayerLoading = true
         isPlayerEnded = false
         playbackStateGeneration &+= 1
