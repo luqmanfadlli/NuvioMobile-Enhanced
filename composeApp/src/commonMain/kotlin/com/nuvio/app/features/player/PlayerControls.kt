@@ -772,7 +772,7 @@ private fun PlayerHeader(
                                 LegacyTopButton.VIDEO_SETTINGS -> {
                                     if (onVideoSettingsClick != null) {
                                         PlayerHeaderIconButton(
-                                            icon = Icons.Rounded.Build,
+                                            icon = Icons.Rounded.Tune,
                                             contentDescription = stringResource(Res.string.player_action_video_settings),
                                             buttonSize = metrics.headerIconSize + 16.dp,
                                             iconSize = metrics.headerIconSize,
@@ -783,7 +783,7 @@ private fun PlayerHeader(
                                 LegacyTopButton.CUSTOMIZE_BUTTONS -> {
                                     if (onCustomizeToolbarClick != null && !isLocked) {
                                         PlayerHeaderIconButton(
-                                            icon = Icons.Rounded.Tune,
+                                            icon = Icons.Rounded.Build,
                                             contentDescription = stringResource(Res.string.settings_playback_toolbar_layout),
                                             buttonSize = metrics.headerIconSize + 16.dp,
                                             iconSize = metrics.headerIconSize,

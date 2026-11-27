@@ -145,7 +145,7 @@ internal fun PlayerToolbar(
                 if (!isLocked) {
                     PlayerAction(
                         description = stringResource(Res.string.settings_playback_toolbar_layout),
-                        icon = Icons.Rounded.Tune,
+                        icon = Icons.Rounded.Build,
                         onClick = customize,
                     )
                 }
@@ -301,7 +301,7 @@ internal fun PlayerControlActions(
         onVideoSettingsClick?.let {
             this[PlayerToolbarButton.VIDEO_SETTINGS] = PlayerControlAction(
                 stringResource(Res.string.player_action_video_settings), it,
-                icon = Icons.Rounded.Build,
+                icon = Icons.Rounded.Tune,
             )
         }
         onSubmitIntroClick?.let {
@@ -504,7 +504,7 @@ internal fun playerControlActions(
         onVideoSettingsClick?.let {
             PlayerControlAction(
                 stringResource(Res.string.player_action_video_settings), it,
-                icon = Icons.Rounded.Build,
+                icon = Icons.Rounded.Tune,
             )
         },
         onSubmitIntroClick?.let {
