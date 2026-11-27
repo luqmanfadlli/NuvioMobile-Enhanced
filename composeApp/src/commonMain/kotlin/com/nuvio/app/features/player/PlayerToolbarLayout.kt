@@ -25,30 +25,84 @@ enum class PlayerToolbarButton(val storageId: String) {
     }
 }
 
+enum class PlayerControlBarAlignment(val storageId: String) {
+    LEFT("left"),
+    CENTER("center"),
+    RIGHT("right"),
+    ;
+
+    companion object {
+        fun fromStorageId(value: String?): PlayerControlBarAlignment =
+            entries.firstOrNull { it.storageId.equals(value?.trim(), ignoreCase = true) } ?: LEFT
+    }
+}
+
+enum class PlayerToolbarPlacement(val storageCode: String) {
+    BAR("v"),
+    OVERFLOW("o"),
+    HIDDEN("h"),
+    ;
+
+    companion object {
+        fun fromStorageCode(code: String, legacyHiddenMeansOverflow: Boolean): PlayerToolbarPlacement =
+            when (code.trim().lowercase()) {
+                "o" -> OVERFLOW
+                "h" -> if (legacyHiddenMeansOverflow) OVERFLOW else HIDDEN
+                else -> BAR
+            }
+    }
+}
+
 data class PlayerToolbarEntry(
     val button: PlayerToolbarButton,
-    val visible: Boolean,
-)
+    val placement: PlayerToolbarPlacement = PlayerToolbarPlacement.BAR,
+) {
+    constructor(button: PlayerToolbarButton, visible: Boolean) : this(
+        button = button,
+        placement = if (visible) PlayerToolbarPlacement.BAR else PlayerToolbarPlacement.OVERFLOW,
+    )
 
-data class PlayerToolbarLayout(val entries: List<PlayerToolbarEntry>) {
+    val visible: Boolean
+        get() = placement == PlayerToolbarPlacement.BAR
+}
+
+data class PlayerToolbarLayout(
+    val entries: List<PlayerToolbarEntry>,
+    val alignment: PlayerControlBarAlignment = PlayerControlBarAlignment.LEFT,
+) {
     val visibleButtons: List<PlayerToolbarButton>
-        get() = entries.filter { it.visible }.map { it.button }
+        get() = entries.filter { it.placement == PlayerToolbarPlacement.BAR }.map { it.button }
+
+    val overflowButtons: List<PlayerToolbarButton>
+        get() = entries.filter { it.placement == PlayerToolbarPlacement.OVERFLOW }.map { it.button }
 
     val hiddenButtons: List<PlayerToolbarButton>
-        get() = entries.filterNot { it.visible }.map { it.button }
+        get() = entries.filter { it.placement == PlayerToolbarPlacement.HIDDEN }.map { it.button }
+
+    val showOverflowArrow: Boolean
+        get() = overflowButtons.isNotEmpty()
+
+    fun withPlacement(button: PlayerToolbarButton, placement: PlayerToolbarPlacement): PlayerToolbarLayout =
+        copy(entries = entries.map { if (it.button == button) it.copy(placement = placement) else it })
 
     fun withVisibility(button: PlayerToolbarButton, visible: Boolean): PlayerToolbarLayout =
-        PlayerToolbarLayout(entries.map { if (it.button == button) it.copy(visible = visible) else it })
+        withPlacement(button, if (visible) PlayerToolbarPlacement.BAR else PlayerToolbarPlacement.HIDDEN)
+
+    fun withAlignment(newAlignment: PlayerControlBarAlignment): PlayerToolbarLayout =
+        copy(alignment = newAlignment)
 
     fun moved(fromIndex: Int, toIndex: Int): PlayerToolbarLayout {
         if (fromIndex !in entries.indices || toIndex !in entries.indices || fromIndex == toIndex) return this
         val updated = entries.toMutableList()
         updated.add(toIndex, updated.removeAt(fromIndex))
-        return PlayerToolbarLayout(updated)
+        return copy(entries = updated)
     }
 
-    fun encode(): String = entries.joinToString(",") { entry ->
-        "${entry.button.storageId}:${if (entry.visible) "v" else "h"}"
+    fun encode(): String {
+        val base = entries.joinToString(",") { entry ->
+            "${entry.button.storageId}:${entry.placement.storageCode}"
+        }
+        return "$base;v2;align=${alignment.storageId}"
     }
 
     companion object {
@@ -60,7 +114,7 @@ data class PlayerToolbarLayout(val entries: List<PlayerToolbarEntry>) {
                 PlayerToolbarButton.SUBTITLES,
                 PlayerToolbarButton.CHAPTERS,
                 PlayerToolbarButton.NIGHT_MODE,
-            ).map { PlayerToolbarEntry(it, visible = true) } +
+            ).map { PlayerToolbarEntry(it, PlayerToolbarPlacement.BAR) } +
                 listOf(
                     PlayerToolbarButton.AUDIO,
                     PlayerToolbarButton.QUALITY,
@@ -72,18 +126,51 @@ data class PlayerToolbarLayout(val entries: List<PlayerToolbarEntry>) {
                     PlayerToolbarButton.SWITCH_ENGINE,
                     PlayerToolbarButton.VIDEO_SETTINGS,
                     PlayerToolbarButton.SUBMIT_INTRO,
-                ).map { PlayerToolbarEntry(it, visible = false) },
+                ).map { PlayerToolbarEntry(it, PlayerToolbarPlacement.OVERFLOW) },
         )
 
         fun decode(value: String?): PlayerToolbarLayout {
             if (value.isNullOrBlank()) return Default
-            val parsed = value.split(',').mapNotNull { token ->
+            val segments = value.split(';')
+            val entriesPart = segments.firstOrNull().orEmpty()
+            var isV2 = false
+            var alignment = PlayerControlBarAlignment.LEFT
+            var legacyOverflowEnabled = true
+            for (meta in segments.drop(1)) {
+                val trimmed = meta.trim()
+                if (trimmed.equals("v2", ignoreCase = true)) {
+                    isV2 = true
+                    continue
+                }
+                val key = trimmed.substringBefore('=').trim().lowercase()
+                val rawVal = trimmed.substringAfter('=', "").trim()
+                when (key) {
+                    "align" -> alignment = PlayerControlBarAlignment.fromStorageId(rawVal)
+                    "overflow" -> legacyOverflowEnabled = rawVal == "1" || rawVal.equals("true", ignoreCase = true)
+                }
+            }
+            val rawTokens = entriesPart.split(',')
+            val hasExplicitOverflowToken = rawTokens.any { token ->
+                token.substringAfter(':', "").trim().equals("o", ignoreCase = true)
+            }
+            val legacyHiddenMeansOverflow = !isV2 && !hasExplicitOverflowToken && legacyOverflowEnabled
+            val parsed = rawTokens.mapNotNull { token ->
                 val button = PlayerToolbarButton.fromStorageId(token.substringBefore(':').trim())
                     ?: return@mapNotNull null
-                PlayerToolbarEntry(button, visible = token.substringAfter(':', "v").trim() != "h")
+                val rawCode = token.substringAfter(':', "v")
+                PlayerToolbarEntry(
+                    button = button,
+                    placement = PlayerToolbarPlacement.fromStorageCode(
+                        code = rawCode,
+                        legacyHiddenMeansOverflow = legacyHiddenMeansOverflow,
+                    ),
+                )
             }.distinctBy { it.button }
             val missing = Default.entries.filter { default -> parsed.none { it.button == default.button } }
-            return PlayerToolbarLayout(parsed + missing)
+            return PlayerToolbarLayout(
+                entries = parsed + missing,
+                alignment = alignment,
+            )
         }
     }
 }

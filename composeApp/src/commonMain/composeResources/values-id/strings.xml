@@ -2960,6 +2960,13 @@
     <string name="settings_playback_toolbar_hide">Pindahkan ke balik panah</string>
     <string name="settings_playback_toolbar_show">Selalu tampilkan</string>
     <string name="settings_playback_toolbar_note">Tombol yang tidak berlaku untuk video saat ini, seperti Episode Berikutnya pada film, akan dilewati.</string>
+    <string name="settings_playback_toolbar_align">Rata</string>
+    <string name="settings_playback_toolbar_align_left">Kiri</string>
+    <string name="settings_playback_toolbar_align_center">Tengah</string>
+    <string name="settings_playback_toolbar_align_right">Kanan</string>
+    <string name="settings_playback_toolbar_placement_bar">Bar</string>
+    <string name="settings_playback_toolbar_placement_arrow">Panah</string>
+    <string name="settings_playback_toolbar_placement_off">Mati</string>
     <string name="player_toolbar_button_resize">Ubah ukuran</string>
     <string name="player_toolbar_button_quality">Kualitas</string>
     <string name="player_night_mode">Mode malam</string>

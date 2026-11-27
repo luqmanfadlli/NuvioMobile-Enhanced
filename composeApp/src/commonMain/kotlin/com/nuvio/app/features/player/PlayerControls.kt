@@ -174,6 +174,7 @@ internal fun PlayerControlsShell(
     onOpenInExternalPlayer: (() -> Unit)? = null,
     onSubmitIntroClick: (() -> Unit)? = null,
     onSwitchEngineClick: (() -> Unit)? = null,
+    onCustomizeToolbarClick: (() -> Unit)? = null,
     onStreamInfoClick: () -> Unit = {},
     parentalWarnings: List<ParentalWarning> = emptyList(),
     showParentalGuide: Boolean = false,
@@ -339,6 +340,7 @@ internal fun PlayerControlsShell(
                         isPortraitPlayback = isPortraitPlayback,
                         onPictureInPictureClick = onPictureInPictureClick,
                         onDiscTitlesClick = onDiscTitlesClick,
+                        onCustomizeToolbarClick = onCustomizeToolbarClick,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .windowInsetsPadding(playerToolbarTopInsets(metrics))

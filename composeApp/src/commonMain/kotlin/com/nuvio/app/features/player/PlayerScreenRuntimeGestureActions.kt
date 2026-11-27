@@ -71,6 +71,7 @@ internal fun PlayerScreenRuntime.lockPlayerControls() {
     showAudioModal = false
     showSubtitleModal = false
     showVideoSettingsModal = false
+    showToolbarCustomizer = false
     showStreamInfoModal = false
     showUserRatingSheet = false
     showStreamInfo = false

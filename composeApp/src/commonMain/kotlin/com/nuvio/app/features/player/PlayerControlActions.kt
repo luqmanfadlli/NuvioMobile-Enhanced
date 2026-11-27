@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Toc
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Flag
@@ -91,6 +92,7 @@ internal fun PlayerToolbar(
     isPortraitPlayback: Boolean = false,
     onPictureInPictureClick: (() -> Unit)? = null,
     onDiscTitlesClick: (() -> Unit)? = null,
+    onCustomizeToolbarClick: (() -> Unit)? = null,
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.weight(1f))
@@ -138,6 +140,15 @@ internal fun PlayerToolbar(
                     icon = if (isCasting) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
                     onClick = it,
                 )
+            }
+            onCustomizeToolbarClick?.let { customize ->
+                if (!isLocked) {
+                    PlayerAction(
+                        description = stringResource(Res.string.settings_playback_toolbar_layout),
+                        icon = Icons.Rounded.Tune,
+                        onClick = customize,
+                    )
+                }
             }
             PlayerAction(
                 description = stringResource(
@@ -303,12 +314,17 @@ internal fun PlayerControlActions(
     val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
     val toolbarLayout = playerSettings.toolbarLayout
     val primaryActions = toolbarLayout.visibleButtons.mapNotNull(availableActions::get)
-    val secondaryActions = toolbarLayout.hiddenButtons.mapNotNull(availableActions::get)
-    val hasOverflow = secondaryActions.isNotEmpty()
+    val overflowActions = toolbarLayout.overflowButtons.mapNotNull(availableActions::get)
+    val hasOverflow = overflowActions.isNotEmpty()
     var expanded by remember(hasOverflow) { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     LaunchedEffect(expanded, scrollState.maxValue) {
         if (expanded) scrollState.animateScrollTo(scrollState.maxValue) else scrollState.scrollTo(0)
+    }
+    val boxAlignment = when (toolbarLayout.alignment) {
+        PlayerControlBarAlignment.LEFT -> Alignment.CenterStart
+        PlayerControlBarAlignment.CENTER -> Alignment.Center
+        PlayerControlBarAlignment.RIGHT -> Alignment.CenterEnd
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
@@ -316,44 +332,49 @@ internal fun PlayerControlActions(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier
-                        .playerLiquidGlass(
-                            shape = PlayerGlassCapsule,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 12.dp,
-                        )
-                        .horizontalScroll(scrollState),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    (if (expanded) primaryActions + secondaryActions else primaryActions).forEach { action ->
-                        Box {
-                            PlayerAction(
-                                description = action.description,
-                                onClick = {
-                                    onInteraction()
-                                    action.onClick()
-                                },
-                                icon = action.icon,
-                                painter = action.painter,
-                                iconSize = action.iconSize,
-                                tint = action.tint,
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = boxAlignment,
+            ) {
+                if (primaryActions.isNotEmpty() || hasOverflow) {
+                    Row(
+                        modifier = Modifier
+                            .playerLiquidGlass(
+                                shape = PlayerGlassCapsule,
+                                refractionHeight = 8.dp,
+                                refractionAmount = 12.dp,
                             )
-                            action.popup?.invoke()
+                            .horizontalScroll(scrollState),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        (if (expanded && hasOverflow) primaryActions + overflowActions else primaryActions).forEach { action ->
+                            Box {
+                                PlayerAction(
+                                    description = action.description,
+                                    onClick = {
+                                        onInteraction()
+                                        action.onClick()
+                                    },
+                                    icon = action.icon,
+                                    painter = action.painter,
+                                    iconSize = action.iconSize,
+                                    tint = action.tint,
+                                )
+                                action.popup?.invoke()
+                            }
                         }
-                    }
-                    if (hasOverflow) {
-                        PlayerAction(
-                            description = stringResource(
-                                if (expanded) Res.string.compose_player_fewer_actions else Res.string.compose_player_more_actions,
-                            ),
-                            onClick = {
-                                expanded = !expanded
-                                onInteraction()
-                            },
-                            icon = if (expanded) Icons.AutoMirrored.Rounded.KeyboardArrowLeft else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        )
+                        if (hasOverflow) {
+                            PlayerAction(
+                                description = stringResource(
+                                    if (expanded) Res.string.compose_player_fewer_actions else Res.string.compose_player_more_actions,
+                                ),
+                                onClick = {
+                                    expanded = !expanded
+                                    onInteraction()
+                                },
+                                icon = if (expanded) Icons.AutoMirrored.Rounded.KeyboardArrowLeft else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            )
+                        }
                     }
                 }
             }
