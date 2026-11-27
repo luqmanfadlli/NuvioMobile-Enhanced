@@ -7,6 +7,8 @@ final class PlayerAudioSessionController: NSObject, CXCallObserverDelegate {
     private var isActive = false
     private var interruptionObserver: NSObjectProtocol?
     var onConfigurationChanged: (() -> Void)?
+    var onRouteChanged: ((_ lostHeadphones: Bool) -> Void)?
+    private var routeObserver: NSObjectProtocol?
 
     func activate() {
         if !isActive {
@@ -23,11 +25,34 @@ final class PlayerAudioSessionController: NSObject, CXCallObserverDelegate {
                 self.configure()
             }
         }
+        observeRoute()
         configure()
+    }
+
+    private func observeRoute() {
+        guard routeObserver == nil else { return }
+        routeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(), queue: .main
+        ) { [weak self] notification in
+            guard let self, self.isActive,
+                  let value = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: value),
+                  reason == .newDeviceAvailable || reason == .oldDeviceUnavailable || reason == .override else { return }
+            let previous = notification.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription
+            let personal: Set<AVAudioSession.Port> = [.headphones, .bluetoothA2DP, .bluetoothLE, .bluetoothHFP, .usbAudio]
+            let lost = reason == .oldDeviceUnavailable &&
+                (previous?.outputs.contains { personal.contains($0.portType) } ?? false)
+            self.onRouteChanged?(lost)
+        }
     }
 
     func deactivate() {
         isActive = false
+        if let routeObserver {
+            NotificationCenter.default.removeObserver(routeObserver)
+            self.routeObserver = nil
+        }
         callObserver.setDelegate(nil, queue: nil)
         if let interruptionObserver {
             NotificationCenter.default.removeObserver(interruptionObserver)
@@ -69,6 +94,7 @@ final class PlayerAudioSessionController: NSObject, CXCallObserverDelegate {
     }
 
     deinit {
+        if let routeObserver { NotificationCenter.default.removeObserver(routeObserver) }
         if let interruptionObserver {
             NotificationCenter.default.removeObserver(interruptionObserver)
         }

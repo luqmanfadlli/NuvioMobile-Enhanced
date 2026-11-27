@@ -360,6 +360,13 @@ final class MPVPlayerViewController: UIViewController {
             self.publishCachedNowPlayingInfoIfNeeded()
             self.syncNowPlayingPlaybackState(isPlaying: self.isPlayerPlaying)
         }
+        controller.onRouteChanged = { [weak self] lostHeadphones in
+            guard let self, self.mpv != nil else { return }
+            if lostHeadphones {
+                if self.isPlayerPlaying { self.pausePlayback() }
+            }
+            self.audioHardwareChanged()
+        }
         return controller
     }()
     private let eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
@@ -761,6 +768,48 @@ final class MPVPlayerViewController: UIViewController {
         if targetFrame.size != size {
             targetFrame.size = size
             view.frame = targetFrame
+        }
+    }
+
+    private var audioReloadWorkItem: DispatchWorkItem?
+    private var lastAudioReloadLatency: TimeInterval = 0
+
+    private func audioHardwareChanged() {
+        audioReloadWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.mpv != nil, !self.isPlayerDestroyed else { return }
+            self.reopenAudioOutput()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                guard let self, self.mpv != nil, !self.isPlayerDestroyed,
+                      abs(AVAudioSession.sharedInstance().outputLatency - self.lastAudioReloadLatency) > 0.03 else { return }
+                self.reopenAudioOutput()
+            }
+        }
+        audioReloadWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: item)
+    }
+
+    private func reopenAudioOutput() {
+        let session = AVAudioSession.sharedInstance()
+        lastAudioReloadLatency = session.outputLatency
+        InAppLogBridge.shared.info(
+            tag: "MPV/iOS",
+            message: "Audio output reopened: \(session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: ",")) latency=\(Int(session.outputLatency * 1000))ms"
+        )
+        command("ao-reload", checkForErrors: false)
+        let generation = mpvGeneration
+        mpvQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self, self.mpvGeneration == generation, self.mpv != nil, !self.getFlag("pause") else { return }
+            let before = self.getDouble("time-pos")
+            self.mpvQueue.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                guard let self, self.mpvGeneration == generation, self.mpv != nil,
+                      !self.getFlag("pause"), !self.getFlag("seeking"),
+                      !self.getFlag("paused-for-cache"), !self.getFlag("eof-reached"),
+                      self.getDouble("time-pos") <= before + 0.05 else { return }
+                InAppLogBridge.shared.warn(tag: "MPV/iOS", message: "Playback stood still after a sound change; restarting it")
+                self.setFlag("pause", true)
+                self.setFlag("pause", false)
+            }
         }
     }
 
