@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.LocalDynamicArtworkBackgroundActive
+import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.NuvioIconActionButton
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
@@ -302,8 +303,8 @@ fun LiveTvScreen(
     }
 
     // Sports -----------------------------------------------------------------------------------
-    LaunchedEffect(section) {
-        if (section != LiveTvSection.Sports) return@LaunchedEffect
+    ScreenActivityEffect(section) { active ->
+        if (!active || section != LiveTvSection.Sports) return@ScreenActivityEffect
         while (true) {
             LiveTvSportsRepository.refreshIfStale()
             delay(30_000L)
