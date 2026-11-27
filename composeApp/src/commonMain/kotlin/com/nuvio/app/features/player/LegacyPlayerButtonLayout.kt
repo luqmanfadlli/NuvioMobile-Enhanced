@@ -24,6 +24,7 @@ enum class LegacyTopButton(val storageId: String) {
     RATE("rate"),
     PLAYBACK_INFO("playback_info"),
     VIDEO_SETTINGS("video_settings"),
+    CUSTOMIZE_BUTTONS("customize_buttons"),
     LOCK("lock"),
 }
 

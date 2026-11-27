@@ -1309,16 +1309,26 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
         )
     }
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
-    PlayerToolbarSidePanel(
-        visible = showToolbarCustomizer,
-        layout = playerSettings.toolbarLayout,
-        onLayoutChange = PlayerSettingsRepository::setToolbarLayout,
-        onDismiss = {
-            showToolbarCustomizer = false
-            controlsVisible = true
-            controlsActivityTick += 1
-        },
-    )
+    val onToolbarCustomizerDismiss = {
+        showToolbarCustomizer = false
+        controlsVisible = true
+        controlsActivityTick += 1
+    }
+    if (playerSettings.useLegacyPlayerLayout) {
+        LegacyPlayerButtonsSidePanel(
+            visible = showToolbarCustomizer,
+            topLayout = playerSettings.legacyTopButtons,
+            bottomLayout = playerSettings.legacyBottomButtons,
+            onDismiss = onToolbarCustomizerDismiss,
+        )
+    } else {
+        PlayerToolbarSidePanel(
+            visible = showToolbarCustomizer,
+            layout = playerSettings.toolbarLayout,
+            onLayoutChange = PlayerSettingsRepository::setToolbarLayout,
+            onDismiss = onToolbarCustomizerDismiss,
+        )
+    }
 }
 
 /** The movie or episode currently playing, for in-player rating. */

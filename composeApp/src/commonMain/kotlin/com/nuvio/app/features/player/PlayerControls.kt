@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Forward30
@@ -319,6 +320,7 @@ internal fun PlayerControlsShell(
                     partyActive = partyActive,
                     onSwitchEngineClick = onSwitchEngineClick,
                     onDiscTitlesClick = onDiscTitlesClick,
+                    onCustomizeToolbarClick = onCustomizeToolbarClick,
                     onBack = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -557,6 +559,7 @@ private fun PlayerHeader(
     partyActive: Boolean,
     onSwitchEngineClick: (() -> Unit)? = null,
     onDiscTitlesClick: (() -> Unit)? = null,
+    onCustomizeToolbarClick: (() -> Unit)? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -774,6 +777,17 @@ private fun PlayerHeader(
                                             buttonSize = metrics.headerIconSize + 16.dp,
                                             iconSize = metrics.headerIconSize,
                                             onClick = onVideoSettingsClick,
+                                        )
+                                    }
+                                }
+                                LegacyTopButton.CUSTOMIZE_BUTTONS -> {
+                                    if (onCustomizeToolbarClick != null && !isLocked) {
+                                        PlayerHeaderIconButton(
+                                            icon = Icons.Rounded.Tune,
+                                            contentDescription = stringResource(Res.string.settings_playback_toolbar_layout),
+                                            buttonSize = metrics.headerIconSize + 16.dp,
+                                            iconSize = metrics.headerIconSize,
+                                            onClick = onCustomizeToolbarClick,
                                         )
                                     }
                                 }
