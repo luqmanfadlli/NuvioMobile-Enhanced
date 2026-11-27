@@ -64,6 +64,7 @@ internal val LegacyTopButton.labelRes: StringResource
         LegacyTopButton.RATE -> Res.string.user_rating_action_rate
         LegacyTopButton.PLAYBACK_INFO -> Res.string.compose_player_playback_info
         LegacyTopButton.VIDEO_SETTINGS -> Res.string.player_action_video_settings
+        LegacyTopButton.CUSTOMIZE_BUTTONS -> Res.string.settings_playback_toolbar_layout
         LegacyTopButton.LOCK -> Res.string.compose_player_lock_controls
     }
 
@@ -88,16 +89,7 @@ internal fun <B : Enum<B>> LegacyPlayerButtonsSettingsDialog(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            LegacyButtonGroup(
-                title = stringResource(Res.string.settings_playback_legacy_buttons_shown),
-                visible = true,
-                layout = layout,
-                label = label,
-                onLayoutChange = onLayoutChange,
-            )
-            LegacyButtonGroup(
-                title = stringResource(Res.string.settings_playback_legacy_buttons_hidden),
-                visible = false,
+            LegacyPlayerButtonsEditorContent(
                 layout = layout,
                 label = label,
                 onLayoutChange = onLayoutChange,
@@ -115,6 +107,28 @@ internal fun <B : Enum<B>> LegacyPlayerButtonsSettingsDialog(
             )
         }
     }
+}
+
+@Composable
+internal fun <B : Enum<B>> LegacyPlayerButtonsEditorContent(
+    layout: PlayerButtonLayout<B>,
+    label: (B) -> StringResource,
+    onLayoutChange: (PlayerButtonLayout<B>) -> Unit,
+) {
+    LegacyButtonGroup(
+        title = stringResource(Res.string.settings_playback_legacy_buttons_shown),
+        visible = true,
+        layout = layout,
+        label = label,
+        onLayoutChange = onLayoutChange,
+    )
+    LegacyButtonGroup(
+        title = stringResource(Res.string.settings_playback_legacy_buttons_hidden),
+        visible = false,
+        layout = layout,
+        label = label,
+        onLayoutChange = onLayoutChange,
+    )
 }
 
 @Composable
