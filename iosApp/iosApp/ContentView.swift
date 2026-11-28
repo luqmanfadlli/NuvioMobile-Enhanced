@@ -19,6 +19,7 @@ let nuvioPlayerImmersiveSystemUIVisibleKey = "isVisible"
 private enum NuvioComposeHost {
     static let registerPlayerBridge: Void = {
         NuvioPlayerRegistration.register()
+        AudioSyncNativeRegistration.register()
     }()
 
     static func wrap(

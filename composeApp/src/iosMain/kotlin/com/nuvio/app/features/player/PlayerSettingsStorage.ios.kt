@@ -53,6 +53,7 @@ actual object PlayerSettingsStorage {
     private const val secondaryPreferredSubtitleLanguageKey = "secondary_preferred_subtitle_language"
     private const val subtitleTextColorKey = "subtitle_text_color"
     private const val subtitleAppearanceKey = "subtitle_appearance"
+    private const val assSubtitleStyleKey = "subtitle_ass_style"
     private const val subtitleBackgroundColorKey = "subtitle_background_color"
     private const val androidAudioPassthroughEnabledKey = "android_audio_passthrough_enabled"
     private const val streamAutoPlayFallbackOnFailureKey = "stream_auto_play_fallback_on_failure"
@@ -579,6 +580,13 @@ actual object PlayerSettingsStorage {
 
     actual fun saveSubtitleAppearance(value: String) {
         NSUserDefaults.standardUserDefaults.setObject(value, forKey = ProfileScopedKey.of(subtitleAppearanceKey))
+    }
+
+    actual fun loadAssSubtitleStyle(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(assSubtitleStyleKey))
+
+    actual fun saveAssSubtitleStyle(value: String) {
+        NSUserDefaults.standardUserDefaults.setObject(value, forKey = ProfileScopedKey.of(assSubtitleStyleKey))
     }
 
     actual fun loadSubtitleBackgroundColor(): String? {

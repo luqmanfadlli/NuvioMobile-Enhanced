@@ -2,6 +2,7 @@ package com.nuvio.app
 
 import android.content.Intent
 import android.content.res.Configuration
+import com.nuvio.app.features.audiosync.AudioSyncFallback
 import com.nuvio.app.features.autosync.AutoSyncPreferencesAndroid
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -122,6 +123,7 @@ open class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         ProfileBiometricAuth.initialize(this)
         AutoSyncPreferencesAndroid.initialize(applicationContext) // AutoSync hook
+        AudioSyncFallback.initialize(applicationContext)
         window.setBackgroundDrawableResource(R.color.nuvio_background)
         SyncClientIdentityStorage.initialize(applicationContext)
         AddonHttpClientProvider.initialize(applicationContext)
